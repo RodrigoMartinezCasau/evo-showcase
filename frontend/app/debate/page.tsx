@@ -1,0 +1,337 @@
+'use client'
+
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { t } from '@/src/i18n'
+import {
+  type Message,
+  type Thread,
+  type DebateResponse,
+  type CreatorResponse,
+} from './types'
+import {
+  fetchDebates,
+  createDebate,
+  getDebate,
+  sendMessage,
+  updateDebateTitle,
+  type DebateListItem,
+} from './api'
+import { MainLayout } from './components/MainLayout'
+import { ChatView } from './components/ChatView'
+
+function toThreadItem(d: DebateListItem): Thread {
+  return {
+    id: d.id,
+    title: d.title,
+    messages: [],
+    createdAt: new Date(d.updated_at).getTime(),
+  }
+}
+
+export default function DebatePage() {
+  const [debateList, setDebateList] = useState<DebateListItem[]>([])
+  const [currentThread, setCurrentThread] = useState<Thread | null>(null)
+  const [currentThreadId, setCurrentThreadId] = useState<string | null>(null)
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [loadingDebate, setLoadingDebate] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [creatorLoading, setCreatorLoading] = useState(false)
+  const topBarLeftRef = useRef<HTMLDivElement>(null)
+  const setLoadingRef = useRef(setLoading)
+  setLoadingRef.current = setLoading
+  const placeholderIdRef = useRef<string | null>(null)
+  const fullTextRef = useRef<string>('')
+  const typewriterIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [topBarReady, setTopBarReady] = useState(false)
+
+  useEffect(() => {
+    setTopBarReady(true)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (typewriterIntervalRef.current) {
+        clearInterval(typewriterIntervalRef.current)
+        typewriterIntervalRef.current = null
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchDebates()
+      .then(setDebateList)
+      .catch(() => setDebateList([]))
+  }, [])
+
+  const threads: Thread[] = debateList.map(toThreadItem)
+  const messages: Message[] = currentThread?.messages ?? []
+  const isEmptyChat = messages.length === 0
+
+  const loadDebate = useCallback(async (id: string) => {
+    setLoadingDebate(true)
+    setError(null)
+    try {
+      const t = await getDebate(id)
+      if (t) setCurrentThread(t)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('errorLoadDebate'))
+    } finally {
+      setLoadingDebate(false)
+    }
+  }, [])
+
+  const handleNewDebate = useCallback(async () => {
+    setError(null)
+    try {
+      const { id, title } = await createDebate(undefined)
+      setDebateList((prev) => [{ id, title, updated_at: new Date().toISOString() }, ...prev])
+      setCurrentThreadId(id)
+      setCurrentThread({ id, title, messages: [], createdAt: Date.now() })
+      setInput('')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('errorCreateDebate'))
+    }
+  }, [])
+
+  const handleSelectThread = useCallback(
+    (id: string) => {
+      setCurrentThreadId(id)
+      loadDebate(id)
+    },
+    [loadDebate]
+  )
+
+  const handleUpdateTitle = useCallback(async (id: string, title: string) => {
+    const newTitle = title.trim().slice(0, 30)
+    if (!newTitle) return
+    setDebateList((prev) => prev.map((d) => (d.id === id ? { ...d, title: newTitle } : d)))
+    if (currentThread?.id === id) setCurrentThread((prev) => (prev ? { ...prev, title: newTitle } : null))
+    try {
+      await updateDebateTitle(id, newTitle)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('errorUpdateTitle'))
+      fetchDebates().then(setDebateList).catch(() => {})
+    }
+  }, [currentThread?.id])
+
+  const handleGoHome = useCallback(() => {
+    setCurrentThreadId(null)
+    setCurrentThread(null)
+  }, [])
+
+  const handleSend = useCallback(async () => {
+    const text = input.trim()
+    if (!text || loading) return
+
+    setInput('')
+    setError(null)
+    const userMsg: Message = { role: 'user', content: text }
+    let debateId = currentThreadId
+
+    if (!debateId) {
+      try {
+        const { id, title } = await createDebate(text)
+        debateId = id
+        setDebateList((prev) => [{ id, title, updated_at: new Date().toISOString() }, ...prev])
+        setCurrentThreadId(id)
+        setCurrentThread((prev) => ({
+          id,
+          title,
+          messages: prev ? [...prev.messages, userMsg] : [userMsg],
+          createdAt: Date.now(),
+        }))
+      } catch (e) {
+        const raw = e instanceof Error ? e.message : String(e)
+        const msg =
+          raw === 'Failed to fetch' || raw.includes('fetch') || raw === 'NetworkError when attempting to fetch resource'
+            ? t('errorConnection')
+            : raw || t('errorCreateDebate')
+        setError(msg)
+        return
+      }
+    } else {
+      setCurrentThread((prev) =>
+        prev ? { ...prev, messages: [...prev.messages, userMsg] } : null
+      )
+    }
+
+    const placeholderId = `typing-${Date.now()}`
+    placeholderIdRef.current = placeholderId
+    const streamingPlaceholder: Message = {
+      role: 'assistant',
+      content: '',
+      streaming: true,
+      id: placeholderId,
+    }
+    setCurrentThread((prev) =>
+      prev ? { ...prev, messages: [...prev.messages, streamingPlaceholder] } : null
+    )
+    setLoading(true)
+    if (typewriterIntervalRef.current) {
+      clearInterval(typewriterIntervalRef.current)
+      typewriterIntervalRef.current = null
+    }
+
+    try {
+      const data = await sendMessage(debateId!, text)
+      const fullText = data.assistant_text ?? ''
+      fullTextRef.current = fullText
+      const realId = data.message_id
+      const fullPayload: Omit<Extract<Message, { role: 'assistant' }>, 'role'> = {
+        content: fullText,
+        id: realId,
+        debateResponse: data.debate_response as DebateResponse,
+        nextQuestion: data.next_question,
+        topic: data.topic,
+        lang: data.lang,
+        streaming: false,
+      }
+
+      setCurrentThread((prev) => {
+        if (!prev) return prev
+        const idx = prev.messages.findIndex((m) => m.role === 'assistant' && m.id === placeholderId)
+        if (idx === -1) return prev
+        const next = [...prev.messages]
+        next[idx] = { role: 'assistant', ...fullPayload, content: '', streaming: true }
+        return { ...prev, messages: next }
+      })
+      setLoadingRef.current(false)
+
+      if (fullText.length === 0) {
+        setCurrentThread((prev) => {
+          if (!prev) return prev
+          const idx = prev.messages.findIndex((m) => m.role === 'assistant' && m.id === realId)
+          if (idx === -1) return prev
+          const next = [...prev.messages]
+          const msg = next[idx]
+          if (msg.role !== 'assistant') return prev
+          next[idx] = { ...msg, content: '', streaming: false }
+          return { ...prev, messages: next }
+        })
+        return
+      }
+      const chunkSize = 3
+      const intervalMs = 15
+      let index = 0
+      typewriterIntervalRef.current = setInterval(() => {
+        index += chunkSize
+        const slice = fullText.slice(0, Math.min(index, fullText.length))
+        const done = slice.length >= fullText.length
+        setCurrentThread((prev) => {
+          if (!prev) return prev
+          const idx = prev.messages.findIndex((m) => m.role === 'assistant' && m.id === realId)
+          if (idx === -1) return prev
+          const msg = prev.messages[idx]
+          if (msg.role !== 'assistant') return prev
+          const next = [...prev.messages]
+          next[idx] = {
+            ...msg,
+            content: slice,
+            streaming: !done,
+          }
+          return { ...prev, messages: next }
+        })
+        if (done && typewriterIntervalRef.current) {
+          clearInterval(typewriterIntervalRef.current)
+          typewriterIntervalRef.current = null
+        }
+      }, intervalMs)
+    } catch (err) {
+      const errorContent = t('errorRetry')
+      const rawMessage = err instanceof Error ? err.message : String(err)
+      const displayError =
+        rawMessage === 'Failed to fetch' || rawMessage.includes('fetch') || rawMessage === 'NetworkError when attempting to fetch resource'
+          ? t('errorConnection')
+          : rawMessage
+      setError(displayError)
+      setCurrentThread((prev) => {
+        if (!prev) return prev
+        const idx = prev.messages.findIndex((m) => m.role === 'assistant' && m.id === placeholderId)
+        if (idx === -1) return prev
+        const next = [...prev.messages]
+        const msg = next[idx]
+        if (msg.role !== 'assistant') return prev
+        next[idx] = { ...msg, content: errorContent, streaming: false }
+        return { ...prev, messages: next }
+      })
+      setLoading(false)
+    }
+  }, [input, loading, currentThreadId])
+
+  const handleGenerateCreator = useCallback((_messageIndex: number) => {
+    // Creator is now fetched via AssistantCard -> fetchMessageCreator
+  }, [])
+
+  const handleFactsLoaded = useCallback((messageIndex: number, data: import('./types').FactsLayer) => {
+    setCurrentThread((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        messages: prev.messages.map((m, i) =>
+          i === messageIndex && m.role === 'assistant'
+            ? { ...m, factsCache: data }
+            : m
+        ),
+      }
+    })
+  }, [])
+
+  const handleQuotesLoaded = useCallback((messageIndex: number, data: import('./types').AuthorLayer) => {
+    setCurrentThread((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        messages: prev.messages.map((m, i) =>
+          i === messageIndex && m.role === 'assistant'
+            ? { ...m, quotesCache: data }
+            : m
+        ),
+      }
+    })
+  }, [])
+
+  const handleCreatorLoaded = useCallback((messageIndex: number, data: CreatorResponse) => {
+    setCurrentThread((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        messages: prev.messages.map((m, i) =>
+          i === messageIndex && m.role === 'assistant'
+            ? { ...m, creatorResponse: data }
+            : m
+        ),
+      }
+    })
+  }, [])
+
+  return (
+    <MainLayout
+      threads={threads}
+      currentThreadId={currentThreadId}
+      onNewDebate={handleNewDebate}
+      onSelectThread={handleSelectThread}
+      onGoHome={handleGoHome}
+      onUpdateTitle={handleUpdateTitle}
+      topBarLeftRef={topBarLeftRef}
+      topBarReady={topBarReady}
+      inputValue={input}
+      onInputChange={setInput}
+      onSend={handleSend}
+      loading={loading}
+      placeholder={t('placeholderDebate')}
+      error={error}
+      isEmptyChat={isEmptyChat}
+    >
+      <ChatView
+        messages={messages}
+        loading={loading || loadingDebate}
+        creatorLoading={creatorLoading}
+        onGenerateCreator={handleGenerateCreator}
+        onFactsLoaded={handleFactsLoaded}
+        onQuotesLoaded={handleQuotesLoaded}
+        onCreatorLoaded={handleCreatorLoaded}
+      />
+    </MainLayout>
+  )
+}

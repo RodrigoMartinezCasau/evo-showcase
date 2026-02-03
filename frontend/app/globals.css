@@ -1,0 +1,58 @@
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: #0f0f12;
+  color: #e4e4e7;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Debate input focus — brand accent */
+.debate-input:focus {
+  outline: 2px solid #7000ff;
+  outline-offset: 2px;
+}
+
+/* Assistant message body — slightly larger for readability (easy to tweak: 1rem → 1.125rem etc.) */
+.debate-assistant-body {
+  font-size: 1.0625rem;
+  line-height: 1.6;
+}
+
+/* Home "E" button — hover and focus */
+.debate-home-btn:hover {
+  opacity: 0.9;
+  transform: scale(1.05);
+}
+.debate-home-btn:focus {
+  outline: 2px solid #7000ff;
+  outline-offset: 2px;
+}
+.debate-home-btn:focus:not(:focus-visible) {
+  outline: none;
+}
+.debate-home-btn:focus-visible {
+  outline: 2px solid #7000ff;
+  outline-offset: 2px;
+}
+
+@keyframes debate-cursor-blink {
+  50% { opacity: 0; }
+}
+.debate-streaming-cursor {
+  animation: debate-cursor-blink 1s step-end infinite;
+}
