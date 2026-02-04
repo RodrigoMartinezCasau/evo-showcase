@@ -5,6 +5,9 @@ import { HomeButton } from './HomeButton'
 
 const TOP_BAR_HEIGHT = 56
 
+/** Premium button image size — change this to resize the button (height in px; width scales automatically). */
+const PREMIUM_BUTTON_HEIGHT = 100
+
 const barStyle: React.CSSProperties = {
   position: 'fixed',
   top: 0,
@@ -27,14 +30,12 @@ const leftRowStyle: React.CSSProperties = {
 }
 
 const premiumStyle: React.CSSProperties = {
-  padding: '8px 14px',
-  background: 'linear-gradient(90deg, #c7ff02 0%, #7000ff 100%)',
+  padding: 0,
   border: 'none',
-  borderRadius: 8,
-  color: '#fff',
-  fontSize: 13,
-  fontWeight: 500,
+  background: 'transparent',
   cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
 }
 
 type Props = {
@@ -49,8 +50,12 @@ export function TopBar({ onGoHome, topBarLeftRef }: Props) {
         <div ref={topBarLeftRef as React.RefObject<HTMLDivElement>} style={{ display: 'flex', alignItems: 'center' }} />
         <HomeButton onGoHome={onGoHome} inline />
       </div>
-      <button type="button" style={premiumStyle}>
-        {t('premiumUpgrade')}
+      <button type="button" style={premiumStyle} aria-label={t('premiumUpgrade')}>
+        <img
+          src="/premium-button.png"
+          alt="Mejorar a Premium"
+          style={{ display: 'block', height: PREMIUM_BUTTON_HEIGHT, width: 'auto', objectFit: 'contain' }}
+        />
       </button>
     </header>
   )
