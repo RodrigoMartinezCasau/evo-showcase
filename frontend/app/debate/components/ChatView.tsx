@@ -5,12 +5,30 @@ import { t } from '@/src/i18n'
 import type { Message } from '../types'
 import { MessageBubble } from './MessageBubble'
 
+/** Fills scroll area; no align-items so children can center. */
 const containerStyle: React.CSSProperties = {
   flex: 1,
+  width: '100%',
+  minWidth: 0,
   overflowY: 'auto',
   display: 'flex',
   flexDirection: 'column',
-  padding: '20px',
+  padding: '20px 0',
+}
+
+/** Centering layer: centers the column in the main area (like ChatGPT). */
+const centerLayerStyle: React.CSSProperties = {
+  width: '100%',
+  display: 'flex',
+  justifyContent: 'center',
+}
+
+/** Centered column: max-w-4xl (~900px), horizontal padding. */
+const columnWrapStyle: React.CSSProperties = {
+  width: '100%',
+  maxWidth: 896,
+  padding: '0 16px',
+  boxSizing: 'border-box',
 }
 
 const emptyWrapStyle: React.CSSProperties = {
@@ -31,8 +49,6 @@ const emptyTitleStyle: React.CSSProperties = {
 }
 
 const messagesWrapStyle: React.CSSProperties = {
-  maxWidth: 768,
-  margin: '0 auto',
   width: '100%',
 }
 
@@ -66,30 +82,34 @@ export function ChatView({
 
   return (
     <div style={containerStyle}>
-      {isEmpty ? (
-        <div style={emptyWrapStyle}>
-          <h2 style={emptyTitleStyle}>{t('landingHeadline')}</h2>
-          <p style={{ color: '#737373', fontSize: 14, margin: 0 }}>
-            {t('landingSubtitle')}
-          </p>
+      <div style={centerLayerStyle}>
+        <div style={columnWrapStyle}>
+          {isEmpty ? (
+            <div style={emptyWrapStyle}>
+              <h2 style={emptyTitleStyle}>{t('landingHeadline')}</h2>
+              <p style={{ color: '#737373', fontSize: 14, margin: 0 }}>
+                {t('landingSubtitle')}
+              </p>
+            </div>
+          ) : (
+            <div style={messagesWrapStyle}>
+              {messages.map((m, i) => (
+                <MessageBubble
+                  key={i}
+                  message={m}
+                  messageIndex={i}
+                  creatorLoading={creatorLoading}
+                  onGenerateCreator={onGenerateCreator}
+                  onFactsLoaded={onFactsLoaded}
+                  onQuotesLoaded={onQuotesLoaded}
+                  onCreatorLoaded={onCreatorLoaded}
+                />
+              ))}
+              <div ref={endRef} />
+            </div>
+          )}
         </div>
-      ) : (
-        <div style={messagesWrapStyle}>
-          {messages.map((m, i) => (
-            <MessageBubble
-              key={i}
-              message={m}
-              messageIndex={i}
-              creatorLoading={creatorLoading}
-              onGenerateCreator={onGenerateCreator}
-              onFactsLoaded={onFactsLoaded}
-              onQuotesLoaded={onQuotesLoaded}
-              onCreatorLoaded={onCreatorLoaded}
-            />
-          ))}
-          <div ref={endRef} />
-        </div>
-      )}
+      </div>
     </div>
   )
 }

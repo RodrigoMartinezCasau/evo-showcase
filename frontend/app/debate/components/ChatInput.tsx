@@ -58,7 +58,8 @@ const sendStyle = (disabled: boolean): React.CSSProperties => ({
 type Props = {
   value: string
   onChange: (v: string) => void
-  onSend: () => void
+  /** Called with the current trimmed message when user submits (Enter or send button). */
+  onSend: (message: string) => void
   loading: boolean
   placeholder?: string
   /** When true, omit the top border (e.g. for landing empty state). */
@@ -70,9 +71,26 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, Props>(function ChatInp
   ref
 ) {
   const wrapStyle = hideTopBorder ? wrapStyleBase : wrapStyleWithBorder
+  const trimmed = value.trim()
+  const isEmpty = trimmed.length === 0
+  const sendDisabled = isEmpty // only disable when input is empty
+
+  const isDev = typeof process !== 'undefined' && process.env.NODE_ENV === 'development'
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (trimmed) {
+      if (isDev) console.debug('[ChatInput] send submitted (Enter or button)', { length: trimmed.length })
+      onSend(trimmed)
+    }
+  }
+
   return (
     <div style={wrapStyle}>
-      <div style={innerStyle}>
+      <form
+        style={{ ...innerStyle, width: '100%' }}
+        onSubmit={handleSubmit}
+      >
         <textarea
           ref={ref}
           className="debate-input"
@@ -81,7 +99,11 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, Props>(function ChatInp
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
-              onSend()
+              const v = value.trim()
+              if (v) {
+                if (isDev) console.debug('[ChatInput] send submitted (Enter)', { length: v.length })
+                onSend(v)
+              }
             }
           }}
           placeholder={placeholder}
@@ -91,15 +113,14 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, Props>(function ChatInp
           aria-label={t('ariaMessageInput')}
         />
         <button
-          type="button"
-          onClick={onSend}
-          disabled={loading || !value.trim()}
-          style={sendStyle(loading || !value.trim())}
+          type="submit"
+          disabled={sendDisabled}
+          style={sendStyle(sendDisabled)}
           aria-label={t('ariaSend')}
         >
           ↑
         </button>
-      </div>
+      </form>
     </div>
   )
 })

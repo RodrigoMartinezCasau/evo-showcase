@@ -1,9 +1,5 @@
 // Types matching backend; shared across debate components
 
-/** App mode: determines route, center view, input placeholder, and conversation filter. */
-export type AppMode = 'debate' | 'students' | 'scripts'
-// export type AppMode = 'debate' | 'students' | 'scripts' | 'copilot'  // future
-
 export type Claim = {
   text: string
   certainty: string

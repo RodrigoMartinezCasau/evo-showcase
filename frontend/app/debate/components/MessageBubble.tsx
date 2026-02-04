@@ -7,12 +7,16 @@ const wrapStyle: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'flex-end',
   padding: '8px 0',
+  width: '100%',
+  boxSizing: 'border-box',
 }
 
 const wrapAssistantStyle: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'flex-start',
   padding: '8px 0',
+  width: '100%',
+  boxSizing: 'border-box',
 }
 
 const bubbleUserStyle: React.CSSProperties = {

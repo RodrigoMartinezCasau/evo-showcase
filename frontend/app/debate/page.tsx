@@ -120,8 +120,10 @@ export default function DebatePage() {
     setCurrentThread(null)
   }, [])
 
-  const handleSend = useCallback(async () => {
-    const text = input.trim()
+  const isDev = typeof process !== 'undefined' && process.env.NODE_ENV === 'development'
+
+  const handleSend = useCallback(async (message: string) => {
+    const text = (message || '').trim()
     if (!text || loading) return
 
     setInput('')
@@ -130,9 +132,11 @@ export default function DebatePage() {
     let debateId = currentThreadId
 
     if (!debateId) {
+      if (isDev) console.debug('[debate] Home send: creating conversation then sending', { text: text.slice(0, 40) })
       try {
         const { id, title } = await createDebate(text)
         debateId = id
+        if (isDev) console.debug('[debate] conversation created', { id, title })
         setDebateList((prev) => [{ id, title, updated_at: new Date().toISOString() }, ...prev])
         setCurrentThreadId(id)
         setCurrentThread((prev) => ({
@@ -172,6 +176,8 @@ export default function DebatePage() {
       clearInterval(typewriterIntervalRef.current)
       typewriterIntervalRef.current = null
     }
+
+    if (isDev) console.debug('[debate] message send called', { debateId, textLength: text.length })
 
     try {
       const data = await sendMessage(debateId!, text)
@@ -257,7 +263,7 @@ export default function DebatePage() {
       })
       setLoading(false)
     }
-  }, [input, loading, currentThreadId])
+  }, [loading, currentThreadId])
 
   const handleGenerateCreator = useCallback((_messageIndex: number) => {
     // Creator is now fetched via AssistantCard -> fetchMessageCreator

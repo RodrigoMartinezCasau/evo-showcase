@@ -9,6 +9,8 @@ import { ChatInput } from './ChatInput'
 
 const mainStyle: React.CSSProperties = {
   flex: 1,
+  width: '100%',
+  minWidth: 0,
   display: 'flex',
   flexDirection: 'column',
   minHeight: 0,
@@ -24,8 +26,8 @@ const errorStyle: React.CSSProperties = {
   fontSize: 13,
 }
 
-/** Same max-width as chat messages panel (ChatView messagesWrapStyle). */
-const INPUT_MAX_WIDTH = 768
+/** Same max-width as chat column (ChatView columnWrapStyle) so input aligns with messages. */
+const INPUT_MAX_WIDTH = 896
 
 const inputWrapperBase: React.CSSProperties = {
   position: 'absolute',
@@ -39,11 +41,15 @@ const inputWrapperBottom: React.CSSProperties = {
   bottom: 0,
   transform: 'translateY(0)',
   background: '#0f0f12',
+  display: 'flex',
+  justifyContent: 'center',
 }
 
 const inputInnerWrap: React.CSSProperties = {
   width: '100%',
   maxWidth: INPUT_MAX_WIDTH,
+  margin: 0,
+  padding: '0 16px',
   boxSizing: 'border-box',
 }
 
@@ -103,7 +109,7 @@ export type MainLayoutProps = {
   children: React.ReactNode
   inputValue: string
   onInputChange: (v: string) => void
-  onSend: () => void
+  onSend: (message: string) => void
   loading: boolean
   placeholder: string
   newButtonLabel?: string
@@ -183,6 +189,8 @@ export function MainLayout({
               <div
                 style={{
                   flex: 1,
+                  width: '100%',
+                  minWidth: 0,
                   minHeight: 0,
                   overflow: 'auto',
                   paddingBottom: BOTTOM_INPUT_PADDING,

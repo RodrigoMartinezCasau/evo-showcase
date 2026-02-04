@@ -298,7 +298,7 @@ export function Sidebar({
         />
       )}
 
-      <div style={listStyle}>
+      <div className="debate-sidebar-list" style={listStyle}>
         {collapsed
           ? filtered.map((thread) => (
               <button

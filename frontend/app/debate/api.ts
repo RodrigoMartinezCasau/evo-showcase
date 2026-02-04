@@ -17,7 +17,7 @@ function logRequestFailure(url: string, status?: number, error?: string): void {
   if (isDev) console.error('[api] request failed', { url, status, error })
 }
 
-export type DebateListItem = { id: string; title: string; updated_at: string; mode?: string }
+export type DebateListItem = { id: string; title: string; updated_at: string }
 
 export type FullDebate = {
   id: string
@@ -59,8 +59,8 @@ function mapApiMessage(m: FullDebate['messages'][0]): Message {
   }
 }
 
-export async function fetchDebates(mode?: string): Promise<DebateListItem[]> {
-  const url = mode ? `${API_URL}/debates?mode=${encodeURIComponent(mode)}` : `${API_URL}/debates`
+export async function fetchDebates(): Promise<DebateListItem[]> {
+  const url = `${API_URL}/debates`
   const res = await fetch(url)
   if (!res.ok) {
     logRequestFailure(url, res.status, res.statusText)
@@ -76,7 +76,7 @@ function networkErrorMessage(msg: string): string {
     : msg
 }
 
-export async function createDebate(initialMessage?: string, mode?: string): Promise<{ id: string; title: string; mode?: string }> {
+export async function createDebate(initialMessage?: string): Promise<{ id: string; title: string }> {
   const url = `${API_URL}/debates`
   let res: Response
   try {
@@ -85,7 +85,6 @@ export async function createDebate(initialMessage?: string, mode?: string): Prom
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         initial_message: initialMessage || null,
-        mode: mode || 'debate',
       }),
     })
   } catch (networkErr) {
@@ -93,13 +92,13 @@ export async function createDebate(initialMessage?: string, mode?: string): Prom
     logRequestFailure(url, undefined, msg)
     throw new Error(networkErrorMessage(msg))
   }
-  const data = await res.json().catch(() => ({}))
+  const data = await res.json().catch(() => ({} as any))
   if (!res.ok) {
     const detail = typeof data?.detail === 'string' ? data.detail : data?.detail?.[0]?.msg ?? data?.message ?? res.statusText
     logRequestFailure(url, res.status, detail)
     throw new Error(detail || `Error del servidor (${res.status})`)
   }
-  return { id: data.id, title: data.title, mode: data.mode }
+  return { id: data.id, title: data.title }
 }
 
 export async function getDebate(id: string): Promise<Thread | null> {
@@ -121,11 +120,10 @@ export async function getDebate(id: string): Promise<Thread | null> {
 
 export async function sendMessage(
   debateId: string,
-  message: string,
-  mode: string = 'debate'
+  message: string
 ): Promise<SendMessageResponse> {
   const url = `${API_URL}/debates/${debateId}/chat`
-  const payload = { message, mode: mode || 'debate' }
+  const payload = { message }
   let res: Response
   try {
     res = await fetch(url, {

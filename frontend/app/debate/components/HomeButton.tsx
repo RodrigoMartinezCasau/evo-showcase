@@ -12,12 +12,9 @@ const baseStyle: React.CSSProperties = {
   height: 40,
   minWidth: 40,
   minHeight: 40,
-  borderRadius: '50%',
-  background: 'linear-gradient(90deg, #c7ff02 0%, #7000ff 100%)',
+  padding: 0,
   border: 'none',
-  color: '#fff',
-  fontSize: 16,
-  fontWeight: 700,
+  background: 'transparent',
   cursor: 'pointer',
   display: 'flex',
   alignItems: 'center',
@@ -48,7 +45,13 @@ export function HomeButton({ onGoHome, inline }: Props) {
         e.currentTarget.style.opacity = '1'
       }}
     >
-      E
+      <img
+        src="/logo-star.png"
+        alt=""
+        width={80}
+        height={80}
+        style={{ display: 'block', width: 80, height: 80, objectFit: 'contain' }}
+      />
     </button>
   )
 }

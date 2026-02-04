@@ -37,7 +37,13 @@ app.add_middleware(
 def on_startup():
     import logging
     logging.basicConfig(level=logging.INFO)
+    # Ensure debate tables exist and are migrated (e.g., add mode column if missing)
     import debate_db  # noqa: F401 - register Debate, DebateMessage, DebateMemory
+    try:
+        debate_db.init_debate_db()
+    except Exception:
+        # Migration is best-effort; if it fails we still start the app
+        logging.exception("init_debate_db failed")
     init_db()
 
 

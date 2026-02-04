@@ -9,7 +9,7 @@ export default function Home() {
         {t('homeDescription')}
       </p>
       <Link
-        href="/chat"
+        href="/debate"
         style={{
           display: 'inline-block',
           padding: '0.5rem 1rem',

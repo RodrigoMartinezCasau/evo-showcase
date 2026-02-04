@@ -56,3 +56,22 @@ a {
 .debate-streaming-cursor {
   animation: debate-cursor-blink 1s step-end infinite;
 }
+
+/* Left sidebar panel — thin dark scrollbar only */
+.debate-sidebar-list {
+  scrollbar-width: thin;
+  scrollbar-color: #404040 transparent;
+}
+.debate-sidebar-list::-webkit-scrollbar {
+  width: 6px;
+}
+.debate-sidebar-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.debate-sidebar-list::-webkit-scrollbar-thumb {
+  background: #404040;
+  border-radius: 3px;
+}
+.debate-sidebar-list::-webkit-scrollbar-thumb:hover {
+  background: #525252;
+}
