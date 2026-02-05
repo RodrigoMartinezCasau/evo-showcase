@@ -6,7 +6,7 @@ import { HomeButton } from './HomeButton'
 const TOP_BAR_HEIGHT = 56
 
 /** Premium button image size — change this to resize the button (height in px; width scales automatically). */
-const PREMIUM_BUTTON_HEIGHT = 100
+const PREMIUM_BUTTON_HEIGHT = 200
 
 const barStyle: React.CSSProperties = {
   position: 'fixed',

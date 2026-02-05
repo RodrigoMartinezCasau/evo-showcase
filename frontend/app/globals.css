@@ -75,3 +75,15 @@ a {
 .debate-sidebar-list::-webkit-scrollbar-thumb:hover {
   background: #525252;
 }
+
+/* Welcome headline — decorative stars (top-right of "YA") */
+.welcome-stars {
+  position: absolute;
+  top: -20px;
+  right: -45px;
+  width: 48px;
+  height: auto;
+  opacity: 0.9;
+  transform: rotate(12deg);
+  pointer-events: none;
+}

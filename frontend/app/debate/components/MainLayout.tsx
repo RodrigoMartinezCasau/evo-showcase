@@ -178,7 +178,15 @@ export function MainLayout({
             <div style={landingContainerStyle} className="empty-state-landing">
               <div style={landingInputWrapStyle}>
                 <div style={landingHeaderStyle}>
-                  <h2 style={landingHeadlineStyle}>{landingHeadline}</h2>
+                  <div style={{ position: 'relative', display: 'inline-block' }}>
+                    <h2 style={landingHeadlineStyle}>{landingHeadline}</h2>
+                    <img
+                      src="/welcome-stars.png"
+                      alt=""
+                      className="welcome-stars"
+                      aria-hidden
+                    />
+                  </div>
                   <p style={landingSubtitleStyle}>{landingSubtitle}</p>
                 </div>
                 <ChatInput ref={inputRef} {...chatInputProps} hideTopBorder />
