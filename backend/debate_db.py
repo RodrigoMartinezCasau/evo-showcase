@@ -51,8 +51,28 @@ class DebateMemory(SQLModel, table=True):
     last_updated: datetime = Field(default_factory=datetime.utcnow)
 
 
+class DebateFavorite(SQLModel, table=True):
+    """Favorites: debate_id is favorited if a row exists."""
+    debate_id: str = Field(primary_key=True, foreign_key="debate.id")
+
+
+class Folder(SQLModel, table=True):
+    """Folder: id, name, created_at."""
+    id: str = Field(primary_key=True)
+    name: str = Field()
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class FolderDebate(SQLModel, table=True):
+    """Assignment: one debate belongs to at most one folder."""
+    folder_id: str = Field(foreign_key="folder.id", primary_key=True)
+    debate_id: str = Field(foreign_key="debate.id", primary_key=True)
+
+
 def init_debate_db():
-    """Ensure debate tables exist. Add mode column if missing (migration)."""
+    """Ensure debate tables exist (including favorites, folders). Add mode column if missing (migration)."""
+    from sqlmodel import SQLModel
+    SQLModel.metadata.create_all(debate_engine)
     from sqlalchemy import text
     try:
         with get_debate_session() as s:
@@ -73,14 +93,26 @@ def get_debate_session():
 # --- CRUD ---
 
 def list_debates(mode: str | None = None) -> list[dict]:
-    """GET /debates: list debates (id, title, mode, updated_at), newest first. If mode is set, filter by it."""
+    """GET /debates: list debates (id, title, mode, updated_at, is_favorite, folder_id), newest first."""
+    fav_ids = set(list_favorite_ids())
+    folder_by_debate = {}
+    for folder in list_folders():
+        for did in folder["chatIds"]:
+            folder_by_debate[did] = folder["id"]
     with get_debate_session() as s:
         q = select(Debate).order_by(Debate.updated_at.desc())
         if mode:
             q = q.where(Debate.mode == mode)
         rows = s.exec(q).all()
         return [
-            {"id": r.id, "title": r.title, "mode": getattr(r, "mode", None) or "debate", "updated_at": r.updated_at.isoformat()}
+            {
+                "id": r.id,
+                "title": r.title,
+                "mode": getattr(r, "mode", None) or "debate",
+                "updated_at": r.updated_at.isoformat(),
+                "is_favorite": r.id in fav_ids,
+                "folder_id": folder_by_debate.get(r.id),
+            }
             for r in rows
         ]
 
@@ -227,14 +259,123 @@ def upsert_message_details(
 
 
 def delete_debate(debate_id: str) -> bool:
-    """DELETE /debates/{id}. Returns True if deleted."""
+    """DELETE /debates/{id}. Returns True if deleted. Also removes from favorites and folder assignment."""
     with get_debate_session() as s:
         d = s.get(Debate, debate_id)
         if d is None:
             return False
+        fav = s.get(DebateFavorite, debate_id)
+        if fav is not None:
+            s.delete(fav)
+        fd = s.exec(select(FolderDebate).where(FolderDebate.debate_id == debate_id)).first()
+        if fd is not None:
+            s.delete(fd)
         s.delete(d)
         s.commit()
         return True
+
+
+# --- Favorites ---
+
+def list_favorite_ids() -> list[str]:
+    """Return list of debate ids that are favorited."""
+    with get_debate_session() as s:
+        rows = s.exec(select(DebateFavorite)).all()
+        return [r.debate_id for r in rows]
+
+
+def toggle_favorite(debate_id: str) -> bool:
+    """Toggle favorite for debate_id. Returns True if now favorited, False if removed."""
+    with get_debate_session() as s:
+        row = s.get(DebateFavorite, debate_id)
+        if row is None:
+            s.add(DebateFavorite(debate_id=debate_id))
+            s.commit()
+            return True
+        s.delete(row)
+        s.commit()
+        return False
+
+
+def is_favorite(debate_id: str) -> bool:
+    """Check if debate is favorited."""
+    with get_debate_session() as s:
+        return s.get(DebateFavorite, debate_id) is not None
+
+
+# --- Folders ---
+
+def list_folders() -> list[dict]:
+    """Return folders with id, name, created_at, and list of debate_ids."""
+    with get_debate_session() as s:
+        folders = s.exec(select(Folder).order_by(Folder.created_at)).all()
+        result = []
+        for f in folders:
+            links = s.exec(select(FolderDebate).where(FolderDebate.folder_id == f.id)).all()
+            result.append({
+                "id": f.id,
+                "name": f.name,
+                "created_at": f.created_at.isoformat(),
+                "chatIds": [fd.debate_id for fd in links],
+            })
+        return result
+
+
+def create_folder(name: str) -> Folder:
+    """Create a folder. name trimmed, max 100 chars."""
+    n = (name or "Nueva carpeta").strip()[:100] or "Nueva carpeta"
+    fid = uuid.uuid4().hex
+    f = Folder(id=fid, name=n)
+    with get_debate_session() as s:
+        s.add(f)
+        s.commit()
+        s.refresh(f)
+    return f
+
+
+def update_folder_name(folder_id: str, name: str) -> bool:
+    """Rename folder. Returns False if not found."""
+    n = (name or "").strip()[:100]
+    if not n:
+        return False
+    with get_debate_session() as s:
+        f = s.get(Folder, folder_id)
+        if f is None:
+            return False
+        f.name = n
+        s.commit()
+        return True
+
+
+def delete_folder(folder_id: str) -> bool:
+    """Delete folder and all folder_debate mappings. Debates are not deleted. Returns True if folder existed."""
+    with get_debate_session() as s:
+        f = s.get(Folder, folder_id)
+        if f is None:
+            return False
+        for fd in s.exec(select(FolderDebate).where(FolderDebate.folder_id == folder_id)).all():
+            s.delete(fd)
+        s.delete(f)
+        s.commit()
+        return True
+
+
+def get_debate_folder_id(debate_id: str) -> str | None:
+    """Return folder_id for debate, or None."""
+    with get_debate_session() as s:
+        row = s.exec(select(FolderDebate).where(FolderDebate.debate_id == debate_id)).first()
+        return row.folder_id if row else None
+
+
+def set_debate_folder(debate_id: str, folder_id: str | None) -> None:
+    """Assign debate to folder (or remove from folder if folder_id is None)."""
+    with get_debate_session() as s:
+        existing = s.exec(select(FolderDebate).where(FolderDebate.debate_id == debate_id)).first()
+        if existing:
+            s.delete(existing)
+        if folder_id:
+            s.add(FolderDebate(folder_id=folder_id, debate_id=debate_id))
+        s.commit()
 
 
 # --- DebateMemory ---

@@ -17,7 +17,15 @@ function logRequestFailure(url: string, status?: number, error?: string): void {
   if (isDev) console.error('[api] request failed', { url, status, error })
 }
 
-export type DebateListItem = { id: string; title: string; updated_at: string }
+export type DebateListItem = {
+  id: string
+  title: string
+  updated_at: string
+  is_favorite?: boolean
+  folder_id?: string | null
+}
+
+export type FolderListItem = { id: string; name: string; created_at: string; chatIds: string[] }
 
 export type FullDebate = {
   id: string
@@ -67,7 +75,63 @@ export async function fetchDebates(): Promise<DebateListItem[]> {
     throw new Error('Failed to fetch debates')
   }
   const data = await res.json()
-  return data.debates || []
+  return (data.debates || []) as DebateListItem[]
+}
+
+export async function fetchFolders(): Promise<FolderListItem[]> {
+  const url = `${API_URL}/folders`
+  const res = await fetch(url)
+  if (!res.ok) {
+    logRequestFailure(url, res.status, res.statusText)
+    throw new Error('Failed to fetch folders')
+  }
+  const data = await res.json()
+  return data.folders || []
+}
+
+export async function toggleFavorite(debateId: string): Promise<boolean> {
+  const url = `${API_URL}/debates/${debateId}/favorite`
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+  if (!res.ok) throw new Error('Failed to toggle favorite')
+  const data = await res.json()
+  return data.favorited === true
+}
+
+export async function createFolder(name: string): Promise<FolderListItem> {
+  const url = `${API_URL}/folders`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: name || 'Nueva carpeta' }),
+  })
+  if (!res.ok) throw new Error('Failed to create folder')
+  const data = await res.json()
+  return { id: data.id, name: data.name, created_at: data.created_at || '', chatIds: data.chatIds || [] }
+}
+
+export async function updateFolderName(folderId: string, name: string): Promise<void> {
+  const url = `${API_URL}/folders/${folderId}`
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })
+  if (!res.ok) throw new Error('Failed to rename folder')
+}
+
+export async function deleteFolder(folderId: string): Promise<void> {
+  const res = await fetch(`${API_URL}/folders/${folderId}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error('Failed to delete folder')
+}
+
+export async function moveDebateToFolder(debateId: string, folderId: string | null): Promise<void> {
+  const url = `${API_URL}/debates/${debateId}/move-to-folder`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ folder_id: folderId }),
+  })
+  if (!res.ok) throw new Error('Failed to move to folder')
 }
 
 function networkErrorMessage(msg: string): string {

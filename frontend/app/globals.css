@@ -1,3 +1,16 @@
+:root {
+  --sidebar-icon-size: 30px;
+  --sidebar-icon-size-favorite: 32px;   /* estrella favorito en cada fila de debate */
+  --sidebar-icon-size-pencil: 17px;     /* lápiz editar en cada fila de debate */
+  --sidebar-icon-size-pencil-folder: 17px;  /* lápiz editar nombre de carpeta */
+  --sidebar-icon-size-lg: 22px;
+  --sidebar-header-icon-size: 30px;
+  --sidebar-header-icon-size-favorites: 30px;  /* icono FAVORITOS */
+  --sidebar-header-icon-size-folders: 28px;     /* icono CARPETAS */
+  --sidebar-header-icon-size-debates: 30px;     /* icono TUS DEBATES */
+  --sidebar-header-icon-slot: 30px;
+}
+
 * {
   box-sizing: border-box;
   padding: 0;
@@ -19,6 +32,27 @@ body {
 a {
   color: inherit;
   text-decoration: none;
+}
+
+/* Global scrollbar — same look as sidebar (dark thumb, discreet track, rounded) */
+html,
+body {
+  scrollbar-width: thin;
+  scrollbar-color: #404040 #1a1a1a;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+*::-webkit-scrollbar-thumb {
+  background: #404040;
+  border-radius: 3px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #525252;
 }
 
 /* Debate input focus — brand accent */
@@ -74,6 +108,39 @@ a {
 }
 .debate-sidebar-list::-webkit-scrollbar-thumb:hover {
   background: #525252;
+}
+
+/* Sidebar section header — fixed icon slot so text doesn't shift when icon size changes */
+.sbHeaderRow {
+  display: flex;
+  align-items: center;
+}
+.sbHeaderIconSlot {
+  width: var(--sidebar-header-icon-slot);
+  min-width: var(--sidebar-header-icon-slot);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 var(--sidebar-header-icon-slot);
+}
+.sbHeaderIcon {
+  width: var(--sidebar-header-icon-size);
+  height: var(--sidebar-header-icon-size);
+  display: block;
+}
+.sbHeaderTitle {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Thinking state — star pulse in send button (scale 50% → 150% → 50%, 5s, ease-in-out) */
+@keyframes thinking-star-pulse {
+  0%, 100% { transform: scale(0.5); }
+  50% { transform: scale(1.5); }
+}
+.thinking-star {
+  animation: thinking-star-pulse 5s ease-in-out infinite;
+  display: block;
 }
 
 /* Welcome headline — decorative stars (top-right of "YA") */

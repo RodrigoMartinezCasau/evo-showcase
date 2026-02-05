@@ -3,6 +3,7 @@
 import { useRef, useEffect } from 'react'
 import { t } from '@/src/i18n'
 import type { Thread } from '../types'
+import type { FolderListItem } from '../api'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { ChatInput } from './ChatInput'
@@ -117,6 +118,15 @@ export type MainLayoutProps = {
   isEmptyChat?: boolean
   landingHeadline?: string
   landingSubtitle?: string
+  favorites?: string[]
+  folders?: FolderListItem[]
+  onToggleFavorite?: (debateId: string) => void | Promise<void>
+  /** Create folder; when used from "move to folder" flow, return new folder id. */
+  onCreateFolder?: (name?: string) => void | Promise<void | string>
+  onRenameFolder?: (folderId: string, name: string) => void | Promise<void>
+  onMoveToFolder?: (debateId: string, folderId: string | null) => void | Promise<void>
+  onDeleteDebate?: (debateId: string) => void | Promise<void>
+  onDeleteFolder?: (folderId: string) => void | Promise<void>
 }
 
 const BOTTOM_INPUT_PADDING = 88
@@ -141,6 +151,14 @@ export function MainLayout({
   isEmptyChat = false,
   landingHeadline = t('landingHeadline'),
   landingSubtitle = t('landingSubtitle'),
+  favorites,
+  folders,
+  onToggleFavorite,
+  onCreateFolder,
+  onRenameFolder,
+  onMoveToFolder,
+  onDeleteDebate,
+  onDeleteFolder,
 }: MainLayoutProps) {
   const sidebarNewLabel = newButtonLabel
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -171,6 +189,14 @@ export function MainLayout({
           topBarLeftRef={topBarLeftRef}
           topBarReady={topBarReady}
           newButtonLabel={sidebarNewLabel}
+          favorites={favorites}
+          folders={folders}
+          onToggleFavorite={onToggleFavorite}
+          onCreateFolder={onCreateFolder}
+          onRenameFolder={onRenameFolder}
+          onMoveToFolder={onMoveToFolder}
+          onDeleteDebate={onDeleteDebate}
+          onDeleteFolder={onDeleteFolder}
         />
         <div style={mainStyle}>
           {error && <div style={errorStyle}>{error}</div>}

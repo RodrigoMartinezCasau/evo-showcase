@@ -73,12 +73,13 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, Props>(function ChatInp
   const wrapStyle = hideTopBorder ? wrapStyleBase : wrapStyleWithBorder
   const trimmed = value.trim()
   const isEmpty = trimmed.length === 0
-  const sendDisabled = isEmpty // only disable when input is empty
+  const sendDisabled = isEmpty || loading
 
   const isDev = typeof process !== 'undefined' && process.env.NODE_ENV === 'development'
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (loading) return
     if (trimmed) {
       if (isDev) console.debug('[ChatInput] send submitted (Enter or button)', { length: trimmed.length })
       onSend(trimmed)
@@ -99,6 +100,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, Props>(function ChatInp
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
+              if (loading) return
               const v = value.trim()
               if (v) {
                 if (isDev) console.debug('[ChatInput] send submitted (Enter)', { length: v.length })
@@ -118,7 +120,18 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, Props>(function ChatInp
           style={sendStyle(sendDisabled)}
           aria-label={t('ariaSend')}
         >
-          ↑
+          {loading ? (
+            <img
+              src="/estrella2.png"
+              alt=""
+              role="presentation"
+              width={50}
+              height={50}
+              className="thinking-star"
+            />
+          ) : (
+            '↑'
+          )}
         </button>
       </form>
     </div>

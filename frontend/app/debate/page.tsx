@@ -10,11 +10,19 @@ import {
 } from './types'
 import {
   fetchDebates,
+  fetchFolders,
   createDebate,
   getDebate,
   sendMessage,
   updateDebateTitle,
+  toggleFavorite,
+  createFolder,
+  updateFolderName,
+  moveDebateToFolder,
+  deleteDebate,
+  deleteFolder,
   type DebateListItem,
+  type FolderListItem,
 } from './api'
 import { MainLayout } from './components/MainLayout'
 import { ChatView } from './components/ChatView'
@@ -30,6 +38,7 @@ function toThreadItem(d: DebateListItem): Thread {
 
 export default function DebatePage() {
   const [debateList, setDebateList] = useState<DebateListItem[]>([])
+  const [folders, setFolders] = useState<FolderListItem[]>([])
   const [currentThread, setCurrentThread] = useState<Thread | null>(null)
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null)
   const [input, setInput] = useState('')
@@ -59,9 +68,15 @@ export default function DebatePage() {
   }, [])
 
   useEffect(() => {
-    fetchDebates()
-      .then(setDebateList)
-      .catch(() => setDebateList([]))
+    Promise.all([fetchDebates(), fetchFolders()])
+      .then(([debates, folderList]) => {
+        setDebateList(debates)
+        setFolders(folderList)
+      })
+      .catch(() => {
+        setDebateList([])
+        setFolders([])
+      })
   }, [])
 
   const threads: Thread[] = debateList.map(toThreadItem)
@@ -118,6 +133,81 @@ export default function DebatePage() {
   const handleGoHome = useCallback(() => {
     setCurrentThreadId(null)
     setCurrentThread(null)
+  }, [])
+
+  const favorites = debateList.filter((d) => d.is_favorite).map((d) => d.id)
+
+  const handleToggleFavorite = useCallback(async (id: string) => {
+    try {
+      await toggleFavorite(id)
+      const list = await fetchDebates()
+      setDebateList(list)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al marcar favorito')
+    }
+  }, [])
+
+  const handleCreateFolder = useCallback(async (name?: string): Promise<string | undefined> => {
+    try {
+      const folder = await createFolder(name ?? 'Nueva carpeta')
+      const list = await fetchFolders()
+      setFolders(list)
+      return folder.id
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al crear carpeta')
+      return undefined
+    }
+  }, [])
+
+  const handleRenameFolder = useCallback(async (folderId: string, name: string) => {
+    try {
+      await updateFolderName(folderId, name)
+      const list = await fetchFolders()
+      setFolders(list)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al renombrar carpeta')
+    }
+  }, [])
+
+  const handleMoveToFolder = useCallback(async (debateId: string, folderId: string | null) => {
+    try {
+      await moveDebateToFolder(debateId, folderId)
+      const [debates, folderList] = await Promise.all([fetchDebates(), fetchFolders()])
+      setDebateList(debates)
+      setFolders(folderList)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al mover a carpeta')
+    }
+  }, [])
+
+  const handleDeleteDebate = useCallback(
+    async (id: string) => {
+      try {
+        await deleteDebate(id)
+        setDebateList((prev) => prev.filter((d) => d.id !== id))
+        if (currentThreadId === id) {
+          setCurrentThreadId(null)
+          setCurrentThread(null)
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : t('errorDeleteDebate'))
+        throw e
+      }
+    },
+    [currentThreadId]
+  )
+
+  const handleDeleteFolder = useCallback(async (folderId: string) => {
+    try {
+      await deleteFolder(folderId)
+      setFolders((prev) => prev.filter((f) => f.id !== folderId))
+      setDebateList((prev) =>
+        prev.map((d) => (d.folder_id === folderId ? { ...d, folder_id: null } : d))
+      )
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('errorDeleteFolder'))
+      throw e
+    }
   }, [])
 
   const isDev = typeof process !== 'undefined' && process.env.NODE_ENV === 'development'
@@ -325,9 +415,17 @@ export default function DebatePage() {
       onInputChange={setInput}
       onSend={handleSend}
       loading={loading}
-      placeholder={t('placeholderDebate')}
+      placeholder={currentThreadId ? t('placeholderInConversation') : t('placeholderDebateExample')}
       error={error}
       isEmptyChat={isEmptyChat}
+      favorites={favorites}
+      folders={folders}
+      onToggleFavorite={handleToggleFavorite}
+      onCreateFolder={handleCreateFolder}
+      onRenameFolder={handleRenameFolder}
+      onMoveToFolder={handleMoveToFolder}
+      onDeleteDebate={handleDeleteDebate}
+      onDeleteFolder={handleDeleteFolder}
     >
       <ChatView
         messages={messages}

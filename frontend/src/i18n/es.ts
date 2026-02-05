@@ -30,16 +30,47 @@ export const es = {
 
   // Placeholders
   placeholderDebate: 'Escribe tu reflexión…',
+  placeholderDebateExample: 'Ej: ¿Existe Dios según la ciencia?',
+  placeholderInConversation: 'Reflexiona cuanto quieras...',
   placeholderStudents: 'Pega tu texto o idea…',
   placeholderScripts: 'Tema + plataforma + objetivo…',
   placeholderMessage: 'Escribe tu mensaje…',
   sidebarSearchPlaceholder: 'Buscar debates…',
+
+  // Chat feedback
+  thinking: 'Pensando…',
 
   // Sidebar
   sidebarExpand: 'Expandir barra lateral',
   sidebarCollapse: 'Contraer barra lateral',
   sidebarDefaultTitle: 'Nuevo debate',
   sidebarEditTitle: 'Editar título',
+  sidebarFavorites: 'Favoritos',
+  sidebarFolders: 'Carpetas',
+  sidebarNewFolder: 'Nueva carpeta',
+  sidebarNewFolderPrompt: 'Nueva carpeta…',
+  newFolderNamePlaceholder: 'Nombre de carpeta…',
+  newFolderCreate: 'Crear',
+  newFolderDuplicateError: 'Ya existe una carpeta con ese nombre',
+  sidebarNoFolder: 'Sin carpeta',
+  sidebarConversations: 'Conversaciones',
+  sidebarMarkFavorite: 'Marcar como favorito',
+  sidebarUnmarkFavorite: 'Quitar de favoritos',
+  sidebarMoveToFolder: 'Mover a carpeta',
+  sidebarRename: 'Renombrar conversación',
+  sidebarRenameFolder: 'Renombrar carpeta',
+  sidebarDeleteDebate: 'Eliminar debate',
+  sidebarDeleteFolder: 'Eliminar carpeta',
+  sidebarYourDebates: 'TUS DEBATES',
+  confirmDeleteDebateTitle: 'Eliminar debate',
+  confirmDeleteDebateBody: '¿Seguro que quieres eliminar este debate? Esta acción no se puede deshacer.',
+  confirmDeleteFolderTitle: 'Eliminar carpeta',
+  confirmDeleteFolderBody: '¿Seguro que quieres eliminar esta carpeta? Los debates dentro no se borrarán, solo se quedarán sin carpeta.',
+  confirmCancel: 'Cancelar',
+  confirmDelete: 'Eliminar',
+  errorDeleteDebate: 'Error al eliminar debate',
+  errorDeleteFolder: 'Error al eliminar carpeta',
+  errorCreateFolder: 'Error al crear carpeta',
 
   // Chat input / send
   ariaMessageInput: 'Escribir mensaje',

@@ -981,6 +981,91 @@ def _run_creator(topic: str, user_message: str):
     )
 
 
+# --- Favorites & Folders (persisted) ---
+
+class ToggleFavoriteResponse(BaseModel):
+    favorited: bool  # True if now favorited, False if removed
+
+
+class MoveToFolderRequest(BaseModel):
+    folder_id: str | None = None  # null = remove from folder
+
+
+class CreateFolderRequest(BaseModel):
+    name: str = "Nueva carpeta"
+
+
+class UpdateFolderRequest(BaseModel):
+    name: str
+
+
+@app.post("/debates/{debate_id}/favorite", response_model=ToggleFavoriteResponse)
+def toggle_debate_favorite(debate_id: str):
+    """Toggle favorite for debate. Returns { favorited: true|false }."""
+    from debate_db import get_debate, toggle_favorite
+
+    if get_debate(debate_id) is None:
+        raise HTTPException(status_code=404, detail="Debate not found")
+    favorited = toggle_favorite(debate_id)
+    return ToggleFavoriteResponse(favorited=favorited)
+
+
+@app.post("/debates/{debate_id}/move-to-folder")
+def move_debate_to_folder(debate_id: str, payload: MoveToFolderRequest):
+    """Assign debate to folder (folder_id) or remove (folder_id=null)."""
+    from debate_db import get_debate, set_debate_folder, get_debate_session
+    from debate_db import Folder as FolderModel
+
+    if get_debate(debate_id) is None:
+        raise HTTPException(status_code=404, detail="Debate not found")
+    if payload.folder_id is not None:
+        with get_debate_session() as s:
+            if s.get(FolderModel, payload.folder_id) is None:
+                raise HTTPException(status_code=404, detail="Folder not found")
+    set_debate_folder(debate_id, payload.folder_id)
+    return {"ok": True, "folder_id": payload.folder_id}
+
+
+@app.get("/folders")
+def list_folders_endpoint():
+    """GET /folders -> list folders with id, name, created_at, chatIds."""
+    from debate_db import list_folders as _list_folders
+    return {"folders": _list_folders()}
+
+
+@app.post("/folders")
+def create_folder_endpoint(payload: CreateFolderRequest):
+    """POST /folders -> create folder. Body: { name }."""
+    from debate_db import create_folder as _create_folder
+
+    name = (payload.name or "Nueva carpeta").strip()[:100] or "Nueva carpeta"
+    f = _create_folder(name)
+    return {"id": f.id, "name": f.name, "created_at": f.created_at.isoformat(), "chatIds": []}
+
+
+@app.patch("/folders/{folder_id}")
+def update_folder_endpoint(folder_id: str, payload: UpdateFolderRequest):
+    """PATCH /folders/{id} -> rename folder."""
+    from debate_db import update_folder_name
+
+    name = (payload.name or "").strip()[:100]
+    if not name:
+        raise HTTPException(status_code=400, detail="name cannot be empty")
+    if not update_folder_name(folder_id, name):
+        raise HTTPException(status_code=404, detail="Folder not found")
+    return {"ok": True, "name": name}
+
+
+@app.delete("/folders/{folder_id}")
+def delete_folder_endpoint(folder_id: str):
+    """DELETE /folders/{id} -> delete folder. Debates inside are unassigned, not deleted."""
+    from debate_db import delete_folder as _delete_folder
+
+    if not _delete_folder(folder_id):
+        raise HTTPException(status_code=404, detail="Folder not found")
+    return {"ok": True}
+
+
 @app.patch("/debates/{debate_id}/title")
 def update_debate_title_endpoint(debate_id: str, payload: UpdateTitleRequest):
     """PATCH /debates/{id}/title: update debate title. Max 30 chars, no empty."""

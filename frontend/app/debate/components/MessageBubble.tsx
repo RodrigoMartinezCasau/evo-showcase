@@ -20,21 +20,30 @@ const wrapAssistantStyle: React.CSSProperties = {
 }
 
 const bubbleUserStyle: React.CSSProperties = {
-  maxWidth: '85%',
-  padding: '12px 16px',
-  borderRadius: 18,
+  maxWidth: '70%',
+  padding: '10px 14px',
+  borderRadius: 14,
   background: '#262626',
   borderLeft: '4px solid #7000ff',
-  color: '#fff',
-  fontSize: 14,
+  color: '#fafafa',
+  fontSize: 13,
   lineHeight: 1.5,
   whiteSpace: 'pre-wrap',
   wordBreak: 'break-word',
 }
 
 const bubbleAssistantStreamingStyle: React.CSSProperties = {
-  ...bubbleUserStyle,
-  borderLeft: '1px solid #404040',
+  maxWidth: '100%',
+  padding: '14px 18px',
+  borderRadius: 14,
+  background: '#1a1a1a',
+  border: '1px solid #404040',
+  borderLeft: '3px solid #525252',
+  color: '#e4e4e7',
+  fontSize: 14,
+  lineHeight: 1.55,
+  whiteSpace: 'pre-wrap',
+  wordBreak: 'break-word',
 }
 
 type Props = {
