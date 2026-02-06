@@ -49,7 +49,7 @@ export const es = {
   sidebarFolders: 'Carpetas',
   sidebarNewFolder: 'Nueva carpeta',
   sidebarNewFolderPrompt: 'Nueva carpeta…',
-  newFolderNamePlaceholder: 'Nombre de carpeta…',
+  newFolderNamePlaceholder: 'Nombre de la carpeta',
   newFolderCreate: 'Crear',
   newFolderDuplicateError: 'Ya existe una carpeta con ese nombre',
   sidebarNoFolder: 'Sin carpeta',

@@ -831,94 +831,101 @@ export function Sidebar({
                                 </button>
                                 {moveSubOpen && (
                                   <div style={menuSubmenuBlockStyle}>
-                                    <button
-                                      type="button"
-                                      style={menuItemStyle}
-                                      onMouseEnter={(e) => (e.currentTarget.style.background = '#404040')}
-                                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                                      onClick={() => {
-                                        assignToFolder(thread.id, null)
-                                        setMenuThreadId(null)
-                                      }}
-                                    >
-                                      {t('sidebarNoFolder')}
-                                    </button>
-                                    {folders.map((f) => (
-                                      <button
-                                        key={f.id}
-                                        type="button"
-                                        style={menuItemStyle}
-                                        onMouseEnter={(e) => (e.currentTarget.style.background = '#404040')}
-                                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                                        onClick={() => {
-                                          assignToFolder(thread.id, f.id)
-                                          setMenuThreadId(null)
-                                        }}
-                                      >
-                                        {f.name}
-                                      </button>
-                                    ))}
+                                    {/* Panel nueva carpeta: siempre primero cuando está activo para que sea visible */}
                                     {creatingFolderForThreadId === thread.id ? (
-                                      <div ref={newFolderFormRef} style={{ padding: '8px 12px 4px', borderTop: '1px solid #404040', marginTop: 4 }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                          <input
-                                            ref={newFolderInputRef}
-                                            type="text"
-                                            value={newFolderName}
-                                            onChange={(e) => {
-                                              setNewFolderName(e.target.value.slice(0, 30))
+                                      <div
+                                        ref={newFolderFormRef}
+                                        style={{
+                                          padding: '8px 12px',
+                                          borderBottom: '1px solid #404040',
+                                          marginBottom: 4,
+                                          background: '#262626',
+                                          borderRadius: 6,
+                                          marginLeft: 4,
+                                          marginRight: 4,
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <input
+                                          ref={newFolderInputRef}
+                                          type="text"
+                                          value={newFolderName}
+                                          onChange={(e) => {
+                                            setNewFolderName(e.target.value.slice(0, 30))
+                                            setNewFolderError('')
+                                          }}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Escape') {
+                                              setCreatingFolderForThreadId(null)
+                                              setNewFolderName('')
                                               setNewFolderError('')
-                                            }}
-                                            onKeyDown={(e) => {
-                                              if (e.key === 'Escape') {
+                                            }
+                                            if (e.key === 'Enter') {
+                                              e.preventDefault()
+                                              const trimmed = newFolderName.trim()
+                                              if (!trimmed) return
+                                              const lower = trimmed.toLowerCase()
+                                              if (folders.some((f) => f.name.trim().toLowerCase() === lower)) {
+                                                setNewFolderError(t('newFolderDuplicateError'))
+                                                return
+                                              }
+                                              if (useBackend && onCreateFolderProp) {
+                                                void (async () => {
+                                                  try {
+                                                    const id = await onCreateFolderProp(trimmed)
+                                                    if (id) {
+                                                      assignToFolder(thread.id, id)
+                                                      setCreatingFolderForThreadId(null)
+                                                      setNewFolderName('')
+                                                      setNewFolderError('')
+                                                    }
+                                                  } catch (err) {
+                                                    setNewFolderError(err instanceof Error ? err.message : t('errorCreateFolder'))
+                                                  }
+                                                })()
+                                              } else {
+                                                const id = addFolder(trimmed)
+                                                assignToFolder(thread.id, id)
                                                 setCreatingFolderForThreadId(null)
                                                 setNewFolderName('')
                                                 setNewFolderError('')
                                               }
-                                              if (e.key === 'Enter') {
-                                                e.preventDefault()
-                                                const trimmed = newFolderName.trim()
-                                                if (!trimmed) return
-                                                const lower = trimmed.toLowerCase()
-                                                if (folders.some((f) => f.name.trim().toLowerCase() === lower)) {
-                                                  setNewFolderError(t('newFolderDuplicateError'))
-                                                  return
-                                                }
-                                                if (useBackend && onCreateFolderProp) {
-                                                  void (async () => {
-                                                    try {
-                                                      const id = await onCreateFolderProp(trimmed)
-                                                      if (id) {
-                                                        assignToFolder(thread.id, id)
-                                                        setCreatingFolderForThreadId(null)
-                                                        setNewFolderName('')
-                                                        setNewFolderError('')
-                                                      }
-                                                    } catch (err) {
-                                                      setNewFolderError(err instanceof Error ? err.message : t('errorCreateFolder'))
-                                                    }
-                                                  })()
-                                                } else {
-                                                  const id = addFolder(trimmed)
-                                                  assignToFolder(thread.id, id)
-                                                  setCreatingFolderForThreadId(null)
-                                                  setNewFolderName('')
-                                                  setNewFolderError('')
-                                                }
-                                              }
+                                            }
+                                          }}
+                                          placeholder={t('newFolderNamePlaceholder')}
+                                          style={{
+                                            width: '100%',
+                                            boxSizing: 'border-box',
+                                            padding: '6px 10px',
+                                            fontSize: 13,
+                                            background: '#1a1a1a',
+                                            border: '1px solid #404040',
+                                            borderRadius: 6,
+                                            color: '#e4e4e7',
+                                            outline: 'none',
+                                            marginBottom: 8,
+                                          }}
+                                        />
+                                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setCreatingFolderForThreadId(null)
+                                              setNewFolderName('')
+                                              setNewFolderError('')
                                             }}
-                                            placeholder={t('newFolderNamePlaceholder')}
                                             style={{
-                                              flex: 1,
-                                              padding: '6px 10px',
-                                              fontSize: 13,
-                                              background: '#262626',
+                                              padding: '6px 12px',
+                                              fontSize: 12,
+                                              background: 'transparent',
                                               border: '1px solid #404040',
                                               borderRadius: 6,
-                                              color: '#e4e4e7',
-                                              outline: 'none',
+                                              color: '#a3a3a3',
+                                              cursor: 'pointer',
                                             }}
-                                          />
+                                          >
+                                            {t('confirmCancel')}
+                                          </button>
                                           <button
                                             type="button"
                                             onClick={() => {
@@ -955,58 +962,65 @@ export function Sidebar({
                                               }
                                             }}
                                             style={{
-                                              padding: '6px 10px',
+                                              padding: '6px 12px',
                                               fontSize: 12,
                                               background: '#404040',
                                               border: 'none',
                                               borderRadius: 6,
                                               color: '#fafafa',
                                               cursor: 'pointer',
-                                              flexShrink: 0,
                                             }}
-                                            title={t('newFolderCreate')}
                                           >
-                                            ✓
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              setCreatingFolderForThreadId(null)
-                                              setNewFolderName('')
-                                              setNewFolderError('')
-                                            }}
-                                            style={{
-                                              padding: '6px 10px',
-                                              fontSize: 12,
-                                              background: 'transparent',
-                                              border: '1px solid #404040',
-                                              borderRadius: 6,
-                                              color: '#a3a3a3',
-                                              cursor: 'pointer',
-                                              flexShrink: 0,
-                                            }}
-                                            title={t('confirmCancel')}
-                                          >
-                                            ✕
+                                            {t('newFolderCreate')}
                                           </button>
                                         </div>
                                         {newFolderError && (
-                                          <div style={{ fontSize: 11, color: '#f87171', marginTop: 4 }}>
+                                          <div style={{ fontSize: 11, color: '#f87171', marginTop: 6 }}>
                                             {newFolderError}
                                           </div>
                                         )}
                                       </div>
-                                    ) : (
+                                    ) : null}
+                                    <button
+                                      type="button"
+                                      style={menuItemStyle}
+                                      onMouseEnter={(e) => (e.currentTarget.style.background = '#404040')}
+                                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        assignToFolder(thread.id, null)
+                                        setMenuThreadId(null)
+                                      }}
+                                    >
+                                      {t('sidebarNoFolder')}
+                                    </button>
+                                    {folders.map((f) => (
                                       <button
+                                        key={f.id}
                                         type="button"
                                         style={menuItemStyle}
                                         onMouseEnter={(e) => (e.currentTarget.style.background = '#404040')}
                                         onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                                        onClick={() => setCreatingFolderForThreadId(thread.id)}
+                                        onClick={() => {
+                                          assignToFolder(thread.id, f.id)
+                                          setMenuThreadId(null)
+                                        }}
                                       >
-                                        + {t('sidebarNewFolderPrompt')}
+                                        {f.name}
                                       </button>
-                                    )}
+                                    ))}
+                                    <button
+                                      type="button"
+                                      style={menuItemStyle}
+                                      onMouseEnter={(e) => (e.currentTarget.style.background = '#404040')}
+                                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setCreatingFolderForThreadId(thread.id)
+                                      }}
+                                    >
+                                      + {t('sidebarNewFolderPrompt')}
+                                    </button>
                                   </div>
                                 )}
                               </div>

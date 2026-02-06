@@ -2,11 +2,15 @@
 
 import { t } from '@/src/i18n'
 import { HomeButton } from './HomeButton'
+import { ModelBadge } from './ModelBadge'
 
 const TOP_BAR_HEIGHT = 56
 
 /** Premium button image size — change this to resize the button (height in px; width scales automatically). */
 const PREMIUM_BUTTON_HEIGHT = 200
+
+/** Espacio entre el botón Home (estrella) y el badge "Evo 0.1". Cambia este valor para ajustar el gap. */
+const MODEL_BADGE_GAP_FROM_LEFT = 1
 
 const barStyle: React.CSSProperties = {
   position: 'fixed',
@@ -49,6 +53,9 @@ export function TopBar({ onGoHome, topBarLeftRef }: Props) {
       <div style={leftRowStyle}>
         <div ref={topBarLeftRef as React.RefObject<HTMLDivElement>} style={{ display: 'flex', alignItems: 'center' }} />
         <HomeButton onGoHome={onGoHome} inline />
+        <span style={{ marginLeft: MODEL_BADGE_GAP_FROM_LEFT, display: 'flex', alignItems: 'center' }}>
+          <ModelBadge />
+        </span>
       </div>
       <button type="button" style={premiumStyle} aria-label={t('premiumUpgrade')}>
         <img
