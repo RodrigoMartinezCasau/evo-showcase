@@ -29,6 +29,8 @@ class FactsLayer(BaseModel):
     # for the Scientific Facts UI section. Each item: id, claim, value?, units?, formula?,
     # certainty, source_name, source_note?
     facts: Optional[list] = None
+    # "science" = show "Hechos científicos" and science KB; "other" = show "Hechos verificados" and no science facts
+    facts_domain: Optional[str] = None
 
 logger = logging.getLogger(__name__)
 

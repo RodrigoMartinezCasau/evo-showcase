@@ -17,6 +17,10 @@ export type ScienceFactItem = {
   certainty: string
   source_name: string
   source_note?: string | null
+  /** Deterministic relevance 0..1 (backend cosine). */
+  score?: number | null
+  /** Display: 0–100 (backend). Shown in badge as NN% instead of VERIFIED. */
+  score_pct?: number | null
 }
 
 export type FactsLayer = {
@@ -26,6 +30,8 @@ export type FactsLayer = {
   common_misconceptions?: string[]
   /** Science KB facts (from POST /messages/{id}/facts). */
   facts?: ScienceFactItem[]
+  /** "science" = Hechos científicos; "other" = Hechos verificados (no science KB). */
+  facts_domain?: 'science' | 'other'
 }
 
 export type Quote = {

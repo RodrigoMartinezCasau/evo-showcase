@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 
 from sqlalchemy import Column, Text
+from sqlalchemy.sql import exists
 from sqlmodel import Field, Session, SQLModel, select
 
 # Reuse main DB
@@ -93,14 +94,15 @@ def get_debate_session():
 # --- CRUD ---
 
 def list_debates(mode: str | None = None) -> list[dict]:
-    """GET /debates: list debates (id, title, mode, updated_at, is_favorite, folder_id), newest first."""
+    """GET /debates: list debates (id, title, mode, updated_at, is_favorite, folder_id), newest first. Only debates with at least one message."""
     fav_ids = set(list_favorite_ids())
     folder_by_debate = {}
     for folder in list_folders():
         for did in folder["chatIds"]:
             folder_by_debate[did] = folder["id"]
     with get_debate_session() as s:
-        q = select(Debate).order_by(Debate.updated_at.desc())
+        has_messages = exists(select(1).select_from(DebateMessage).where(DebateMessage.debate_id == Debate.id))
+        q = select(Debate).where(has_messages).order_by(Debate.updated_at.desc())
         if mode:
             q = q.where(Debate.mode == mode)
         rows = s.exec(q).all()

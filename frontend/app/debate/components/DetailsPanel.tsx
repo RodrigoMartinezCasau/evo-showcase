@@ -100,15 +100,17 @@ export function DetailsPanel({
   onGenerateCreator,
 }: Props) {
   const { facts_layer, author_layer } = debateResponse
-  const hasFacts = (facts_layer.claims?.length ?? 0) > 0 || (facts_layer.summary?.trim() ?? '') !== ''
+  const hasFacts = true
   const hasQuotes = author_layer.quotes?.length > 0
   const hasCreator = creatorResponse && (creatorResponse.title_options?.length > 0 || creatorResponse.outline?.length > 0)
+  const factsSectionLabel = 'Hechos científicos'
+  const factsEmptyText = t('detailsNoFacts')
 
   return (
     <div style={panelStyle}>
       <div style={tabRowStyle}>
         <button type="button" style={tabStyle(activeTab === 'facts')} onClick={() => onTab('facts')}>
-          {t('tabFacts')}
+          {factsSectionLabel}
         </button>
         <button type="button" style={tabStyle(activeTab === 'quotes')} onClick={() => onTab('quotes')}>
           {t('tabQuotes')}
@@ -120,26 +122,45 @@ export function DetailsPanel({
 
       {activeTab === 'facts' && (
         <div>
-          {hasFacts ? (
-            <>
-              {facts_layer.summary?.trim() && (
-                <p style={{ margin: '0 0 12px', fontSize: 13, color: '#a3a3a3' }}>{facts_layer.summary}</p>
-              )}
-              {facts_layer.claims?.map((c, j) => (
-                <div key={j} style={claimRowStyle}>
-                  <span style={badgeStyle(c.certainty)}>{c.certainty}</span>
-                  {c.text}
-                  {c.source_ids?.length > 0 && (
-                    <div style={{ fontSize: 11, color: '#737373', marginTop: 4 }}>
-                      Sources: {c.source_ids.join(', ')}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </>
-          ) : (
-            <p style={emptyStyle}>{t('detailsNoFacts')}</p>
+          {facts_layer.summary?.trim() && (
+            <p style={{ margin: '0 0 12px', fontSize: 13, color: '#a3a3a3' }}>{facts_layer.summary}</p>
           )}
+          {(() => {
+            const rawFacts = (facts_layer.facts ?? []).slice(0, 3)
+            const slots = [...rawFacts]
+            while (slots.length < 3) {
+              slots.push({
+                id: `placeholder-${slots.length}`,
+                claim: '—',
+                certainty: '',
+                source_name: '',
+                source_note: '',
+              } as (typeof rawFacts)[0])
+            }
+            return slots.map((f) => (
+              <div key={f.id} style={claimRowStyle}>
+                {f.source_name !== undefined && f.source_name !== '' ? (
+                  <>
+                    <span style={badgeStyle(f.certainty)}>
+                      {typeof f.score_pct === 'number' ? `${f.score_pct}%` : (f.certainty || 'VERIFIED')}
+                    </span>
+                    {f.claim}
+                    {(f.value ?? f.units ?? f.formula) && (
+                      <div style={{ fontSize: 12, color: '#a3a3a3', marginTop: 4 }}>
+                        {[f.value, f.units, f.formula].filter(Boolean).join(' · ')}
+                      </div>
+                    )}
+                    <div style={{ fontSize: 11, color: '#737373', marginTop: 4 }}>
+                      {f.source_name}
+                      {f.source_note ? ` — ${f.source_note}` : ''}
+                    </div>
+                  </>
+                ) : (
+                  <span style={{ color: '#737373' }}>{f.claim}</span>
+                )}
+              </div>
+            ))
+          })()}
         </div>
       )}
 

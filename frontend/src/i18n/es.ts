@@ -98,11 +98,14 @@ export const es = {
 
   // Tabs / panels
   tabFacts: 'Hechos científicos',
+  tabFactsVerified: 'Hechos verificados',
+  detailsNoFactsVerified: 'No hay hechos verificados relevantes en la base para este tema todavía.',
   tabQuotes: 'Citas textuales',
   tabCreator: 'Ideas de Creator',
   detailsTitleOptions: 'Opciones de título',
   detailsOutline: 'Esquema / ideas de vídeo',
   detailsNoFacts: 'No hay hechos científicos relevantes todavía.',
+  assistantNoFactsVerified: 'No hay hechos verificados relevantes en la base para este tema todavía.',
   detailsNoQuotes: 'No hay citas relevantes en la KB todavía.',
   detailsNoCreatorYet: 'Aún no hay ideas de guion para esta respuesta.',
   detailsGenerating: 'Generando…',

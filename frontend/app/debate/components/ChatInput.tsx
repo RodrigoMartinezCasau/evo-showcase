@@ -1,7 +1,9 @@
 'use client'
 
-import { forwardRef } from 'react'
+import { forwardRef, useRef, useCallback } from 'react'
 import { t } from '@/src/i18n'
+import { useAutoResizeTextarea } from '@/src/hooks/useAutoResizeTextarea'
+import { STAR_ICON_SIZE } from './starSizes'
 
 const wrapStyleBase: React.CSSProperties = {
   width: '100%',
@@ -37,6 +39,7 @@ const textareaStyle: React.CSSProperties = {
   resize: 'none',
   minHeight: 44,
   maxHeight: 200,
+  overflowY: 'auto',
   outline: 'none',
 }
 
@@ -70,6 +73,17 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, Props>(function ChatInp
   { value, onChange, onSend, loading, placeholder = t('placeholderMessage'), hideTopBorder = false },
   ref
 ) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const setRef = useCallback(
+    (el: HTMLTextAreaElement | null) => {
+      (textareaRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = el
+      if (typeof ref === 'function') ref(el)
+      else if (ref) (ref as React.MutableRefObject<HTMLTextAreaElement | null>).current = el
+    },
+    [ref]
+  )
+  useAutoResizeTextarea(textareaRef, value, { minHeight: 44, maxHeight: 200 })
+
   const wrapStyle = hideTopBorder ? wrapStyleBase : wrapStyleWithBorder
   const trimmed = value.trim()
   const isEmpty = trimmed.length === 0
@@ -93,7 +107,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, Props>(function ChatInp
         onSubmit={handleSubmit}
       >
         <textarea
-          ref={ref}
+          ref={setRef}
           className="debate-input"
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -130,7 +144,13 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, Props>(function ChatInp
               className="thinking-star"
             />
           ) : (
-            '↑'
+            <img
+              src="/star-send.png"
+              alt=""
+              role="presentation"
+              width={STAR_ICON_SIZE}
+              height={STAR_ICON_SIZE}
+            />
           )}
         </button>
       </form>

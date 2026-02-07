@@ -96,17 +96,12 @@ export default function DebatePage() {
     }
   }, [])
 
-  const handleNewDebate = useCallback(async () => {
+  /** "Nuevo debate": solo resetea la UI a pantalla inicial. No crea debate hasta que el usuario envíe el primer mensaje. */
+  const handleNewDebate = useCallback(() => {
     setError(null)
-    try {
-      const { id, title } = await createDebate(undefined)
-      setDebateList((prev) => [{ id, title, updated_at: new Date().toISOString() }, ...prev])
-      setCurrentThreadId(id)
-      setCurrentThread({ id, title, messages: [], createdAt: Date.now() })
-      setInput('')
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('errorCreateDebate'))
-    }
+    setCurrentThreadId(null)
+    setCurrentThread(null)
+    setInput('')
   }, [])
 
   const handleSelectThread = useCallback(

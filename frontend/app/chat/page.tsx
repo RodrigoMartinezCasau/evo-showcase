@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
+import { useAutoResizeTextarea } from '@/src/hooks/useAutoResizeTextarea'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -415,6 +416,8 @@ function VerificationPanel({
 
 export default function ChatPage() {
   const [input, setInput] = useState('')
+  const chatInputRef = useRef<HTMLTextAreaElement>(null)
+  useAutoResizeTextarea(chatInputRef, input, { minHeight: 44, maxHeight: 200 })
   const [turns, setTurns] = useState<ChatTurn[]>([])
   const [spec, setSpec] = useState<PhysicalSpec | null>(null)
   const [checkReport, setCheckReport] = useState<CheckReport | null>(null)
@@ -516,13 +519,20 @@ export default function ChatPage() {
         </div>
 
         <form onSubmit={handleSubmit} style={{ padding: '1rem 1.5rem', borderTop: '1px solid #27272a' }}>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <input
-              type="text"
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end' }}>
+            <textarea
+              ref={chatInputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  if (input.trim()) handleSubmit(e as unknown as React.FormEvent)
+                }
+              }}
               placeholder="Escribe un mensaje..."
               disabled={loading}
+              rows={1}
               style={{
                 flex: 1,
                 padding: '0.75rem 1rem',
@@ -530,6 +540,13 @@ export default function ChatPage() {
                 border: '1px solid #3f3f46',
                 background: '#18181b',
                 color: '#e4e4e7',
+                fontFamily: 'inherit',
+                fontSize: 14,
+                resize: 'none',
+                minHeight: 44,
+                maxHeight: 200,
+                overflowY: 'auto',
+                outline: 'none',
               }}
             />
             <button

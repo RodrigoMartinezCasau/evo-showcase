@@ -139,11 +139,12 @@ export function AssistantCard({ message, messageIndex, creatorLoading, onGenerat
 
   const factsData = message.factsCache ?? dr?.facts_layer
   const quotesData = message.quotesCache ?? dr?.author_layer
-  const hasFacts =
-    factsData &&
-    ((factsData.facts?.length ?? 0) > 0 ||
-      (factsData.claims?.length ?? 0) > 0 ||
-      (factsData.summary?.trim() ?? '') !== '')
+  const factsDomain = factsData?.facts_domain
+  const isVerifiedFacts = factsDomain === 'other'
+  // Always show exactly 3 fact slots when we have facts data (backend sends 3; pad for old cache)
+  const hasFacts = !!factsData
+  const factsSectionLabel = 'Hechos científicos'
+  const factsEmptyText = isVerifiedFacts ? t('assistantNoFactsVerified') : t('assistantNoFacts')
   const hasQuotes = quotesData && (quotesData.quotes?.length ?? 0) > 0
   const hasCreator =
     message.creatorResponse &&
@@ -205,7 +206,7 @@ export function AssistantCard({ message, messageIndex, creatorLoading, onGenerat
             aria-expanded={factsOpen}
           >
             <span style={{ fontSize: 14 }}>{factsOpen ? '▼' : '▶'}</span>
-            {t('tabFacts')}
+            {factsSectionLabel}
           </button>
           {factsOpen && (
             <div style={accordionContentStyle}>
@@ -218,38 +219,50 @@ export function AssistantCard({ message, messageIndex, creatorLoading, onGenerat
                       {factsData!.summary}
                     </p>
                   )}
-                  {(factsData!.facts?.length ?? 0) > 0 ? (
-                    factsData!.facts!.map((f) => (
+                  {(() => {
+                    const rawFacts = (factsData!.facts ?? []).slice(0, 3)
+                    const FACT_SLOTS = 3
+                    const slots = [...rawFacts]
+                    while (slots.length < FACT_SLOTS) {
+                      slots.push({
+                        id: `placeholder-${slots.length}`,
+                        claim: '—',
+                        certainty: '',
+                        source_name: '',
+                        source_note: '',
+                      } as (typeof rawFacts)[0])
+                    }
+                    return slots.map((f) => (
                       <div key={f.id} style={claimRowStyle}>
-                        <span style={badgeStyle(f.certainty)}>{f.certainty}</span>
-                        {f.claim}
-                        {(f.value ?? f.units ?? f.formula) && (
-                          <div style={{ fontSize: 12, color: '#a3a3a3', marginTop: 4 }}>
-                            {[f.value, f.units, f.formula].filter(Boolean).join(' · ')}
-                          </div>
-                        )}
-                        <div style={{ fontSize: 11, color: '#737373', marginTop: 4 }}>
-                          {f.source_name}
-                          {f.source_note ? ` — ${f.source_note}` : ''}
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    factsData!.claims?.map((c, j) => (
-                      <div key={j} style={claimRowStyle}>
-                        <span style={badgeStyle(c.certainty)}>{c.certainty}</span>
-                        {c.text}
-                        {c.source_ids?.length > 0 && (
-                          <div style={{ fontSize: 11, color: '#737373', marginTop: 4 }}>
-                            {t('sourcesLabel')} {c.source_ids.join(', ')}
-                          </div>
+                        {f.source_name !== undefined && f.source_name !== '' ? (
+                          <>
+                            <span style={badgeStyle(f.certainty)}>
+                              {typeof f.score_pct === 'number' ? `${f.score_pct}%` : (f.certainty || 'VERIFIED')}
+                            </span>
+                            {f.claim}
+                            {(f.value ?? f.units ?? f.formula) && (
+                              <div style={{ fontSize: 12, color: '#a3a3a3', marginTop: 4 }}>
+                                {[f.value, f.units, f.formula].filter(Boolean).join(' · ')}
+                              </div>
+                            )}
+                            <div style={{ fontSize: 11, color: '#737373', marginTop: 4 }}>
+                              {f.source_name}
+                              {f.source_note ? ` — ${f.source_note}` : ''}
+                            </div>
+                          </>
+                        ) : (
+                          <span style={{ color: '#737373' }}>{f.claim}</span>
                         )}
                       </div>
                     ))
-                  )}
+                  })()}
                 </>
               ) : (
-                <p style={emptyStyle}>{t('assistantNoFacts')}</p>
+                isVerifiedFacts ? (
+                  <div style={claimRowStyle}>{factsEmptyText}</div>
+                ) : (
+                  <p style={emptyStyle}>{factsEmptyText}</p>
+                )
               )}
             </div>
           )}

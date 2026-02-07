@@ -16,6 +16,7 @@ def test_favorites_folders_persist():
     from debate_db import (
         init_debate_db,
         create_debate,
+        append_message,
         list_debates,
         list_folders,
         list_favorite_ids,
@@ -26,9 +27,10 @@ def test_favorites_folders_persist():
 
     init_debate_db()
 
-    # Create a debate and a folder
+    # Create a debate (with at least one message so it appears in list_debates) and a folder
     d = create_debate(title="Sanity test debate")
     debate_id = d.id
+    append_message(debate_id, "user", "hello")
     folder = create_folder("Sanity folder")
     folder_id = folder.id
 
@@ -51,3 +53,19 @@ def test_favorites_folders_persist():
     folder_row = next((f for f in folders if f["id"] == folder_id), None)
     assert folder_row is not None, "Folder should exist"
     assert debate_id in folder_row["chatIds"], "Folder should contain the debate"
+
+
+def test_list_debates_excludes_empty():
+    """list_debates must only return debates that have at least one message."""
+    from debate_db import init_debate_db, create_debate, append_message, list_debates
+
+    init_debate_db()
+
+    empty = create_debate(title="Empty debate")
+    with_msg = create_debate(title="With message")
+    append_message(with_msg.id, "user", "first message")
+
+    debates = list_debates()
+    ids = {x["id"] for x in debates}
+    assert empty.id not in ids, "Empty debate must not appear in list_debates"
+    assert with_msg.id in ids, "Debate with message must appear in list_debates"

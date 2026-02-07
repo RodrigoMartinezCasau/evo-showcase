@@ -158,6 +158,7 @@ def _run_debate_pipeline(
         from debate_facts_generator import generate_facts_layer
         from debate_author_generator import generate_author_layer
         from llm import OpenAIClient
+        from facts_retrieval import get_three_facts
 
         retriever = DebateRetriever()
         science_results = retriever.retrieve_science(payload.topic, payload.user_message, top_n=5)
@@ -173,54 +174,18 @@ def _run_debate_pipeline(
             llm_client=llm_client,
             response_language=response_language,
         )
-        # Rank and inject science facts from knowledge_base_science/facts/*.yaml (max 3, deterministic)
-        fact_dicts: list[dict] = []
-        try:
-            from debate_kb_loader import ScienceFactsLoader
-            facts_loader = ScienceFactsLoader()
-            query = f"{payload.topic or ''} {payload.user_message or ''}".strip()[:400] or "physics"
-            science_facts_ranked = facts_loader.rank_facts_for_debate(
-                query=query, debate_title=payload.topic or "", lang=response_language, max_k=3
-            )
-            fact_dicts = [item for item, _ in science_facts_ranked][:3]
-            if fact_dicts:
-                logger.info("Debate facts used (ids): %s", [f.get("id") for f in fact_dicts])
-                fallback_en = "Insufficient KB coverage for this topic yet."
-                fallback_es = "Cobertura de KB insuficiente para este tema aún."
-                if facts_layer.summary in (fallback_en, fallback_es):
-                    facts_layer = FactsLayer(
-                        summary="Relevant scientific facts from the KB." if response_language == "en" else "Hechos científicos relevantes del KB.",
-                        claims=facts_layer.claims,
-                        what_we_dont_know=facts_layer.what_we_dont_know,
-                        common_misconceptions=facts_layer.common_misconceptions,
-                        facts=fact_dicts,
-                    )
-                else:
-                    facts_layer = FactsLayer(
-                        summary=facts_layer.summary,
-                        claims=facts_layer.claims,
-                        what_we_dont_know=facts_layer.what_we_dont_know,
-                        common_misconceptions=facts_layer.common_misconceptions,
-                        facts=fact_dicts,
-                    )
-            else:
-                logger.info("No relevant scientific facts for this debate; proceeding with empty facts list.")
-        except Exception as e:  # YAML parse error, missing file, schema error, etc.
-            try:
-                import yaml
-                cause = e.__cause__ or e
-                if hasattr(cause, "problem_mark") and cause.problem_mark:
-                    pm = cause.problem_mark
-                    logger.warning(
-                        "Science facts load failed: file=%s line=%s column=%s error=%s",
-                        getattr(cause, "name", "unknown"), pm.line + 1, pm.column + 1, cause,
-                    )
-                else:
-                    logger.warning("Science facts load failed: %s", e, exc_info=True)
-            except Exception:
-                logger.warning("Science facts load failed: %s", e, exc_info=True)
-            # fact_dicts remains []; debate will be generated with no scientific facts and grounding instruction.
-            # Leave facts_layer unchanged (no facts injected). Opinion/counterpoint/question continue normally.
+        # Always exactly 3 facts from knowledge_base_facts/ (JSON domain files + general fallback); no quotes/literature
+        query_text = f"{payload.topic or ''} {payload.user_message or ''}".strip()[:500]
+        three_facts = get_three_facts(query_text)
+        logger.info("Debate facts (always 3 from KB): %s", [f.get("id") for f in three_facts])
+        facts_layer = FactsLayer(
+            summary=facts_layer.summary,
+            claims=facts_layer.claims,
+            what_we_dont_know=facts_layer.what_we_dont_know,
+            common_misconceptions=facts_layer.common_misconceptions,
+            facts=three_facts,
+            facts_domain="science",
+        )
         # Verbatim Quotes KB: deterministic retrieval (max 3, max 1 per author); if any match, use them
         verbatim_results = retriever.retrieve_verbatim_quotes(
             payload.topic or "",
@@ -270,7 +235,7 @@ def _run_debate_pipeline(
             user_message=payload.user_message,
             stance=stance,
             facts_summary=facts_layer.summary,
-            scientific_facts=fact_dicts,
+            scientific_facts=three_facts,
             llm_client=llm_client,
             debate_memory=debate_memory,
             response_language=response_language,
@@ -802,10 +767,11 @@ def append_debate_message(debate_id: str, payload: dict):
 
 @app.post("/messages/{message_id}/facts")
 def fetch_message_facts(message_id: str):
-    """Lazy-load facts for an assistant message. Returns from cache or from Science KB (no LLM)."""
+    """Lazy-load facts for an assistant message. Returns from cache or from Science KB (no LLM). Non-science topics get facts_domain=other and no science facts."""
     from debate_db import get_debate_with_messages, get_message, get_or_create_message_details, upsert_message_details
     from debate_kb_loader import ScienceFactsLoader
     from language_detector import detect_language
+    from domain_classifier import classify_domain
 
     msg = get_message(message_id)
     if not msg or msg.role != "assistant":
@@ -822,7 +788,7 @@ def fetch_message_facts(message_id: str):
             upsert_message_details(message_id, facts_json=json.dumps(facts))
             return facts
 
-    # Generate from Science Facts KB: deterministic, no LLM
+    # Get topic and last user message for domain classification
     debate = get_debate_with_messages(msg.debate_id) if msg.debate_id else None
     meta = json.loads(msg.meta_json) if msg.meta_json else {}
     topic = (meta.get("topic") or "").strip()
@@ -838,36 +804,17 @@ def fetch_message_facts(message_id: str):
                 last_user_content = (m.get("content") or "").strip()
                 break
 
-    lang = meta.get("lang") or meta.get("language") or detect_language(last_user_content or msg.content or "")
-    if lang not in ("es", "en"):
-        lang = "en"
-
+    # Always exactly 3 facts from knowledge_base_facts/ (no quotes/literature)
+    from facts_retrieval import get_three_facts
     query_parts = [topic, last_user_content, assistant_reply]
-    query = " ".join(q for q in query_parts if q).strip()[:400]
-    if not query:
-        query = topic or "physics constants"
-
-    try:
-        loader = ScienceFactsLoader()
-        scored = loader.search_by_overlap(query=query, lang=lang, max_k=3)
-        # Items are already UI-shaped dicts; cap at 3
-        facts_list = [item for item, _ in scored][:3]
-        response = {"facts": facts_list}
-    except Exception as e:
-        try:
-            import yaml
-            cause = e.__cause__ or e
-            if hasattr(cause, "problem_mark") and cause.problem_mark:
-                pm = cause.problem_mark
-                logger.warning(
-                    "Science facts load failed (fetch_message_facts): file=%s line=%s column=%s error=%s",
-                    getattr(cause, "name", "unknown"), pm.line + 1, pm.column + 1, cause,
-                )
-            else:
-                logger.warning("Science facts load failed (fetch_message_facts): %s", e, exc_info=True)
-        except Exception:
-            logger.warning("Science facts load failed (fetch_message_facts): %s", e, exc_info=True)
-        response = {"facts": [], "facts_status": "error"}
+    query_text = " ".join(q for q in query_parts if q).strip()[:500]
+    three_facts = get_three_facts(query_text)
+    response = {
+        "facts": three_facts,
+        "facts_domain": "science",
+        "summary": meta.get("facts_summary") or "",
+        "claims": [],
+    }
     upsert_message_details(message_id, facts_json=json.dumps(response))
     return response
 

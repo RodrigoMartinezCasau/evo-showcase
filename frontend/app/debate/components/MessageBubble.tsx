@@ -2,6 +2,10 @@
 
 import type { AuthorLayer, FactsLayer, Message } from '../types'
 import { AssistantCard } from './AssistantCard'
+import { TYPING_STAR_SIZE } from './starSizes'
+
+/** Tamaño fijo del contenedor del loader (estrella). Evita que crezca por estilos heredados. */
+const LOADER_BOX_SIZE = 44
 
 const wrapStyle: React.CSSProperties = {
   display: 'flex',
@@ -34,8 +38,8 @@ const bubbleUserStyle: React.CSSProperties = {
 
 const bubbleAssistantStreamingStyle: React.CSSProperties = {
   maxWidth: '100%',
-  padding: '14px 18px',
-  borderRadius: 14,
+  padding: '8px 12px',
+  borderRadius: 10,
   background: '#1a1a1a',
   border: '1px solid #404040',
   borderLeft: '3px solid #525252',
@@ -44,6 +48,28 @@ const bubbleAssistantStreamingStyle: React.CSSProperties = {
   lineHeight: 1.55,
   whiteSpace: 'pre-wrap',
   wordBreak: 'break-word',
+}
+
+/** Contenedor fijo del loader (estrella). Tamaño explícito para que no crezca. No reutiliza estilos de botón. */
+const loadingIndicatorContainerStyle: React.CSSProperties = {
+  width: LOADER_BOX_SIZE,
+  height: LOADER_BOX_SIZE,
+  minWidth: LOADER_BOX_SIZE,
+  minHeight: LOADER_BOX_SIZE,
+  maxWidth: LOADER_BOX_SIZE,
+  maxHeight: LOADER_BOX_SIZE,
+  padding: 0,
+  borderRadius: 10,
+  border: '1px solid rgba(255,255,255,0.1)',
+  background: 'rgba(255,255,255,0.05)',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,
+  flexGrow: 0,
+  marginLeft: 6,
+  verticalAlign: 'middle',
+  boxSizing: 'border-box',
 }
 
 type Props = {
@@ -73,13 +99,35 @@ export function MessageBubble({
     )
   }
 
-  // Streaming: show simple bubble with content + cursor (no full card)
+  // Streaming: loader compacto (contenedor fijo) + bubble solo si hay contenido
   if ('streaming' in message && message.streaming) {
+    const hasContent = (message.content || '').trim().length > 0
+    const loaderBox = (
+      <span style={loadingIndicatorContainerStyle}>
+        <img
+          src="/star-send.png"
+          alt=""
+          role="presentation"
+          className="thinking-star-typing"
+          width={TYPING_STAR_SIZE}
+          height={TYPING_STAR_SIZE}
+          style={{ display: 'block' }}
+          aria-hidden
+        />
+      </span>
+    )
+    if (!hasContent) {
+      return (
+        <div style={wrapAssistantStyle}>
+          {loaderBox}
+        </div>
+      )
+    }
     return (
       <div style={wrapAssistantStyle}>
         <div style={bubbleAssistantStreamingStyle}>
           {message.content}
-          <span className="debate-streaming-cursor" style={{ display: 'inline-block', width: 2, height: 16, background: '#a3a3a3', marginLeft: 2 }} aria-hidden />
+          {loaderBox}
         </div>
       </div>
     )

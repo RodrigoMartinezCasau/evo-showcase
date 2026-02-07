@@ -110,7 +110,7 @@ body {
   background: #525252;
 }
 
-/* Sidebar section header — fixed icon slot so text doesn't shift when icon size changes */
+/* Sidebar section header — fixed icon slot so text doesn't shift when icon changes */
 .sbHeaderRow {
   display: flex;
   align-items: center;
@@ -133,13 +133,31 @@ body {
   min-width: 0;
 }
 
-/* Thinking state — star pulse in send button (scale 50% → 150% → 50%, 5s, ease-in-out) */
+/* ========== EDITOR 1: animación estrella del BOTÓN de enviar ========== */
+:root {
+  --thinking-star-scale-min-btn: 0.5;   /* decrecimiento: inicio/fin (ej. 0.5 = 50%) */
+  --thinking-star-scale-max-btn: 1.5;   /* crecimiento: pico (ej. 1.8 = 180%) */
+}
 @keyframes thinking-star-pulse {
-  0%, 100% { transform: scale(0.5); }
-  50% { transform: scale(1.5); }
+  0%, 100% { transform: scale(var(--thinking-star-scale-min-btn)); }
+  50% { transform: scale(var(--thinking-star-scale-max-btn)); }
 }
 .thinking-star {
   animation: thinking-star-pulse 5s ease-in-out infinite;
+  display: block;
+}
+
+/* ========== EDITOR 2: animación estrella del INDICADOR "escribiendo" ========== */
+:root {
+  --thinking-star-scale-min-typing: 0.5;   /* decrecimiento: inicio/fin (ej. 0.5 = 50%) */
+  --thinking-star-scale-max-typing: 1.5;   /* crecimiento: pico (ej. 1.8 = 180%) */
+}
+@keyframes thinking-star-pulse-typing {
+  0%, 100% { transform: scale(var(--thinking-star-scale-min-typing)); }
+  50% { transform: scale(var(--thinking-star-scale-max-typing)); }
+}
+.thinking-star-typing {
+  animation: thinking-star-pulse-typing 5s ease-in-out infinite;
   display: block;
 }
 
