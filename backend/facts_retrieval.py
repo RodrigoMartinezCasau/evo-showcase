@@ -16,6 +16,41 @@ KB_FACTS_DIR = Path(__file__).resolve().parent / "knowledge_base_facts"
 GENERAL_FILE = KB_FACTS_DIR / "general.json"
 MIN_TEXT_LEN = 40
 
+# Calibration for relevance percentage. Scores below A ~ 0%, above B ~ 100%.
+CALIB_A = 0.25
+CALIB_B = 0.75
+
+# Minimum raw similarity threshold for considering a fact "relevant enough" in the main pass.
+MIN_SIM = 0.05
+
+# Simple domain groups for adjacency (hierarchical fallback) and gating.
+DOMAIN_ADJACENCY: dict[str, list[str]] = {
+    "psicologia": ["sociologia", "biologia", "general"],
+    "sociologia": ["psicologia", "historia", "general"],
+    "economia": ["psicologia", "sociologia", "general"],
+    "biologia": ["psicologia", "general"],
+    "fisica": ["cosmologia", "matematicas", "general"],
+    "cosmologia": ["fisica", "matematicas", "general"],
+    "historia": ["sociologia", "general"],
+    "tecnologia": ["computacion", "general"],
+}
+
+# History domain should only be used when query is explicitly historical.
+HISTORY_QUERY_KEYWORDS = frozenset([
+    "historia",
+    "guerra",
+    "guerras",
+    "revolucion",
+    "revolución",
+    "revoluciones",
+    "hitler",
+    "nazi",
+    "nazis",
+    "wwii",
+    "segunda guerra",
+    "primera guerra",
+])
+
 # Simple stopwords (EN/ES) for scoring — lightweight, no external deps.
 STOPWORDS = frozenset([
     "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by", "from",
@@ -186,6 +221,58 @@ def _load_domain_facts() -> dict[str, list[dict]]:
     return result
 
 
+def _score_domains(query_text: str, domains_data: dict[str, list[dict]]) -> dict[str, float]:
+    """
+    Lightweight domain scoring using fact tags and domain name.
+    Returns {domain: score in 0..1}.
+    """
+    keywords = set(_extract_prompt_keywords(query_text))
+    query_lower = (query_text or "").lower()
+    if not keywords:
+        return {}
+    scores: dict[str, float] = {}
+    for domain, facts in domains_data.items():
+        if domain == "general":
+            continue
+        # Hard gating for history: only allow when query is explicitly historical.
+        if domain == "historia":
+            if not any(k in query_lower for k in HISTORY_QUERY_KEYWORDS):
+                continue
+        domain_tokens: set[str] = {domain.lower()}
+        for f in facts:
+            for tag in f.get("tags") or []:
+                for w in _PUNCT.sub(" ", str(tag).lower()).split():
+                    if len(w) > 2 and w not in STOPWORDS:
+                        domain_tokens.add(_normalize_plural(w))
+        if not domain_tokens:
+            continue
+        overlap = 0
+        for kw in keywords:
+            for tok in domain_tokens:
+                if kw in tok or tok in kw:
+                    overlap += 1
+                    break
+        if overlap == 0:
+            continue
+        scores[domain] = overlap / max(1, len(domain_tokens))
+    return scores
+
+
+def _expand_domains(primary_domains: list[str]) -> list[str]:
+    """
+    Hierarchical domain fallback: start from primary domains, then add adjacent ones.
+    History is never added unless explicitly in primary_domains (gated above).
+    """
+    if not primary_domains:
+        # Safe default when we cannot infer domain: prefer human/soft-science and general science.
+        return ["psicologia", "sociologia", "economia", "biologia", "general", "cosmologia", "fisica"]
+    allowed: set[str] = set(primary_domains)
+    for d in primary_domains:
+        for adj in DOMAIN_ADJACENCY.get(d, []):
+            allowed.add(adj)
+    return list(allowed)
+
+
 def _fact_to_ui_item(
     fact: dict,
     score: float | None = None,
@@ -216,19 +303,23 @@ def _fact_to_ui_item(
 
 def _rescale_score_pct(scores: list[float]) -> list[int]:
     """
-    Rescale raw scores (top 3) to display percentages 20–100.
-    Best fact gets 100%, worst of the three gets 20%. If all equal, 50%.
+    Map raw scores to calibrated percentages 0–100 using linear window [CALIB_A, CALIB_B].
+    Scores <= CALIB_A -> 0, scores >= CALIB_B -> 100.
     """
-    if not scores:
-        return []
-    min_s = min(scores)
-    max_s = max(scores)
-    if max_s - min_s < 1e-6:
-        return [50] * len(scores)
-    return [
-        min(100, max(0, round(20 + 80 * (s - min_s) / (max_s - min_s))))
-        for s in scores
-    ]
+    pcts: list[int] = []
+    denom = CALIB_B - CALIB_A if CALIB_B != CALIB_A else 1.0
+    for s in scores:
+        adj = (s - CALIB_A) / denom
+        if adj < 0:
+            adj = 0.0
+        elif adj > 1:
+            adj = 1.0
+        pct = int(round(adj * 100))
+        # Never render 0%; treat extremely low scores as 10% to avoid "nonsense zero" perception.
+        if pct == 0:
+            pct = 10
+        pcts.append(pct)
+    return pcts
 
 
 def get_three_facts(query_text: str) -> list[dict]:
@@ -250,6 +341,12 @@ def get_three_facts(query_text: str) -> list[dict]:
             {"id": "gen_fallback_3", "text": "La correlación no implica causalidad; pueden existir factores confundantes.", "tags": ["estadística"], "sources": ["KB"]},
         ]
 
+    # Domain-level scoring to prioritize likely relevant domains
+    domain_scores = _score_domains(query_text, domains_data)
+    sorted_domains = sorted(domain_scores.items(), key=lambda x: -x[1])
+    top_domains = [d for d, _ in sorted_domains[:4] if domain_scores.get(d, 0.0) > 0]
+    allowed_domains = _expand_domains(top_domains)
+
     # Build (fact, domain) for all domains including general
     all_candidates: list[tuple[dict, str]] = []
     for domain, facts in domains_data.items():
@@ -258,28 +355,57 @@ def get_three_facts(query_text: str) -> list[dict]:
     for f in general_facts:
         all_candidates.append((f, "general"))
 
-    # Score each with deterministic score_fact
+    # Score each with deterministic score_fact + small domain bonus
     scored: list[tuple[dict, str, float]] = []
     for fact, domain in all_candidates:
         text = (fact.get("text") or "").strip()
         tags = fact.get("tags") or []
-        sc = score_fact(query_text, text, tags, domain)
+        base = score_fact(query_text, text, tags, domain)
+        dom_bonus = 0.0
+        if domain != "general":
+            dom_bonus = 0.2 * domain_scores.get(domain, 0.0)
+        sc = max(0.0, min(1.0, round(base + dom_bonus, 4)))
         scored.append((fact, domain, sc))
 
     # Sort by score desc, then by id for stability
     scored.sort(key=lambda x: (-x[2], (x[0].get("id") or "")))
 
+    # Prefer candidates from allowed/top domains first, then adjacent fallback only
+    primary: list[tuple[dict, str, float]] = []
+    fallback_scored: list[tuple[dict, str, float]] = []
+    for fact, domain, sc in scored:
+        if domain in top_domains:
+            primary.append((fact, domain, sc))
+        elif domain in allowed_domains:
+            fallback_scored.append((fact, domain, sc))
+
     # Take top 3, dedupe by id; collect (fact, score) for rescaling
     seen_ids: set[str] = set()
     top3: list[tuple[dict, float]] = []
-    for fact, _domain, sc in scored:
-        if len(top3) >= 3:
-            break
-        fid = (fact.get("id") or "").strip()
-        if fid in seen_ids:
-            continue
-        seen_ids.add(fid)
-        top3.append((fact, sc))
+
+    def _consume(candidates: list[tuple[dict, str, float]], min_sim: float) -> None:
+        nonlocal top3, seen_ids
+        for fact, _domain, sc in candidates:
+            if len(top3) >= 3:
+                break
+            if sc < min_sim:
+                continue
+            fid = (fact.get("id") or "").strip()
+            if fid in seen_ids:
+                continue
+            seen_ids.add(fid)
+            top3.append((fact, sc))
+
+    # First pass: only facts above MIN_SIM from top domains, then adjacent ones.
+    _consume(primary, MIN_SIM)
+    if len(top3) < 3:
+        _consume(fallback_scored, MIN_SIM)
+
+    # Second pass (relaxed): if still not enough, allow lower scores but keep domain gating.
+    if len(top3) < 3:
+        _consume(primary, 0.0)
+    if len(top3) < 3:
+        _consume(fallback_scored, 0.0)
 
     # Fill from general if fewer than 3 (score 0)
     for f in general_facts:
