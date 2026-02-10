@@ -1,0 +1,53 @@
+# Quote retriever: scoring weights and generic-tag penalty.
+# Editable; no code change needed to tune.
+weights:
+  entity_match: 12.0
+  subdomain_match: 6.0
+  domain_match: 3.0
+  tag_overlap: 2.0
+  keyword_overlap: 1.0
+  generic_penalty: 4.0
+  language_bonus: 1.0
+
+# Tags that are too generic; if a quote matches ONLY these (no entity/subdomain), apply generic_penalty.
+generic_tags:
+  - truth
+  - meaning
+  - life
+  - ethics
+  - existence
+  - reason
+  - belief
+  - doubt
+  - knowledge
+  - evidence
+  - epistemology
+
+# Entity/keyword -> preferred domains (for preferred_domains when no entity detected).
+# Used when building preferred_domains from query_entities (entity_to_domains) and keyword hints.
+entity_to_domains:
+  dios: [religion]
+  comunismo: [politics, history]
+  nazismo: [politics, history]
+  hitler: [history, politics]
+  marx: [politics, history, economics]
+
+keyword_domain_hints:
+  dios: religion
+  god: religion
+  religion: religion
+  faith: religion
+  comunismo: politics
+  marx: politics
+  nazismo: history
+  hitler: history
+  fascismo: history
+  holocausto: history
+  ciencia: science
+  science: science
+  filosofia: philosophy
+  philosophy: philosophy
+  literatura: literature
+  literature: literature
+  psicologia: psychology
+  psychology: psychology

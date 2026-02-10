@@ -36,6 +36,16 @@ SCIENCE_FACTS_DIR = SCIENCE_KB_DIR / "facts"
 PHILOSOPHY_KB_DIR = Path(__file__).resolve().parent / "knowledge_base_philosophy"
 QUOTES_KB_DIR = Path(__file__).resolve().parent / "knowledge_base_quotes" / "quotes"
 
+# Category (folder name) -> topic_domain when not set in YAML (backwards compatible)
+CATEGORY_TO_TOPIC_DOMAIN: dict[str, str] = {
+    "philosophy": "philosophy",
+    "science": "science",
+    "literature": "literature",
+    "religion": "religion",
+    "psychology": "psychology",
+    "history": "history",
+}
+
 
 class ScienceKBLoader:
     """Loads and validates Science Knowledge Base entries from YAML files."""
@@ -525,7 +535,24 @@ class QuotesKBLoader:
             if not isinstance(entry_dict, dict):
                 continue
             try:
-                entry = VerbatimQuote(**entry_dict)
+                # Build dict with only model fields; set topic_domain, subdomain, entities (backwards compatible)
+                d = {k: v for k, v in entry_dict.items() if k in VerbatimQuote.model_fields}
+                domain_val = entry_dict.get("domain", "quotes")
+                if domain_val and domain_val != "quotes":
+                    topic_domain_from_yaml = domain_val
+                    d["domain"] = "quotes"
+                else:
+                    topic_domain_from_yaml = None
+                cat = entry_dict.get("category", "")
+                d["topic_domain"] = (
+                    entry_dict.get("topic_domain")
+                    or topic_domain_from_yaml
+                    or CATEGORY_TO_TOPIC_DOMAIN.get(cat, cat)
+                )
+                d["subdomain"] = entry_dict.get("subdomain", "")
+                d["entities"] = entry_dict.get("entities", [])
+                d["topics"] = entry_dict.get("topics", [])
+                entry = VerbatimQuote(**d)
                 if entry.id in self._quotes:
                     logger.warning("Quotes KB: duplicate id %s in %s", entry.id, yaml_path.name)
                     continue

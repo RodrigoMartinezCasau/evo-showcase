@@ -84,3 +84,8 @@ class VerbatimQuote(BaseModel):
     attribution_confidence: str = "medium"  # high | medium | low
     notes: Optional[str] = None
     license_note: str = "unknown"  # public_domain | unknown | needs_review
+    # Optional topic fields for precision retrieval (backwards compatible)
+    topic_domain: Optional[str] = None  # e.g. religion, politics, history, philosophy, science, literature, psychology
+    subdomain: str = ""  # e.g. religion.theism, politics.communism, politics.fascism
+    entities: list[str] = Field(default_factory=list)  # canonical tokens: dios, marx, hitler, nazismo, etc.
+    topics: list[str] = Field(default_factory=list)  # canonical topics: god, faith, atheism, love, friendship, sadness, stoicism, communism, nazism, ethics, etc.

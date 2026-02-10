@@ -1,0 +1,50 @@
+# Quote retriever: canonical entity -> list of synonyms (user/quote text tokens match these).
+# If any synonym appears in the query, we add the canonical key to query_entities.
+# Format: canonical_entity: [synonym1, synonym2, ...] (include the canonical key in the list).
+dios:
+  - dios
+  - god
+  - divinidad
+  - deidad
+  - teismo
+  - teísmo
+  - theism
+  - ateismo
+  - ateísmo
+  - atheism
+  - agnosticismo
+  - agnosticism
+  - fe
+  - faith
+  - religion
+  - religión
+  - creencia
+  - belief
+comunismo:
+  - comunismo
+  - communism
+  - marxismo
+  - marxism
+  - socialismo
+  - socialism
+  - leninismo
+  - leninism
+  - urss
+  - ussr
+  - planificacion
+  - planificación
+  - propiedad_colectiva
+  - marx
+nazismo:
+  - nazismo
+  - nazism
+  - fascismo
+  - fascism
+  - hitler
+  - holocausto
+  - holocaust
+  - reich
+  - antisemitismo
+  - antisemitism
+  - tercera_reich
+  - third_reich
