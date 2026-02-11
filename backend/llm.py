@@ -146,3 +146,70 @@ Output ONLY the JSON object, no markdown."""
         )
     except Exception:
         return None
+
+
+def translate_debate_layer_structured_to_es(
+    steelman_blocks: list[dict],
+    steelman_resumen: str,
+    contrarian_blocks: list[dict],
+    contrarian_resumen: str,
+    counterarguments: list[str],
+    socratic_questions: list[str],
+    where_contrarian_might_fail: list[str],
+    llm_client: "OpenAIClient | None" = None,
+) -> tuple[list[dict], str, list[dict], str, list[str], list[str], list[str]] | None:
+    """
+    Translate structured debate layer (blocks + resumen) from English to Spanish.
+    Returns (steelman_blocks_es, steelman_resumen_es, contrarian_blocks_es, contrarian_resumen_es,
+             counterarguments_es, socratic_questions_es, where_contrarian_might_fail_es) or None.
+    """
+    if llm_client is None:
+        llm_client = OpenAIClient()
+    system = """You are a professional translator. Translate from English to Spanish (Spain).
+
+STRICT RULES:
+- DO NOT summarize or shorten. Preserve structure: same number of blocks, same number of bullets per block.
+- Titles and bullets: conceptual, same density. Max 30 words per title, max 20 words per bullet.
+- Return ONLY valid JSON with keys: steelman_blocks, steelman_resumen, contrarian_blocks, contrarian_resumen, counterarguments, socratic_questions, where_contrarian_might_fail.
+- steelman_blocks and contrarian_blocks are arrays of { "title": "...", "bullets": ["...", ...] }."""
+
+    user = f"""Translate to Spanish. Preserve structure and length.
+
+steelman_blocks: {json.dumps(steelman_blocks, ensure_ascii=False)}
+steelman_resumen: {json.dumps(steelman_resumen, ensure_ascii=False)}
+contrarian_blocks: {json.dumps(contrarian_blocks, ensure_ascii=False)}
+contrarian_resumen: {json.dumps(contrarian_resumen, ensure_ascii=False)}
+counterarguments: {json.dumps(counterarguments, ensure_ascii=False)}
+socratic_questions: {json.dumps(socratic_questions, ensure_ascii=False)}
+where_contrarian_might_fail: {json.dumps(where_contrarian_might_fail, ensure_ascii=False)}
+
+Output ONLY the JSON object, no markdown."""
+
+    try:
+        raw = llm_client.complete(system=system, user=user, language=None, max_tokens=2000, prompt_id="TRANSLATE_ES_STRUCTURED")
+        raw = (raw or "").strip()
+        if raw.startswith("```"):
+            lines = raw.split("\n")
+            if lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            raw = "\n".join(lines)
+        data = json.loads(raw)
+        sb = data.get("steelman_blocks") or []
+        sr = str(data.get("steelman_resumen", steelman_resumen)).strip()
+        cb = data.get("contrarian_blocks") or []
+        cr = str(data.get("contrarian_resumen", contrarian_resumen)).strip()
+        steelman_blocks_es = [{"title": str(b.get("title", "")).strip(), "bullets": [str(x).strip() for x in b.get("bullets", [])]} for b in sb]
+        contrarian_blocks_es = [{"title": str(b.get("title", "")).strip(), "bullets": [str(x).strip() for x in b.get("bullets", [])]} for b in cb]
+        return (
+            steelman_blocks_es,
+            sr,
+            contrarian_blocks_es,
+            cr,
+            [str(x).strip() for x in data.get("counterarguments", counterarguments)],
+            [str(x).strip() for x in data.get("socratic_questions", socratic_questions)],
+            [str(x).strip() for x in data.get("where_contrarian_might_fail", where_contrarian_might_fail)],
+        )
+    except Exception:
+        return None

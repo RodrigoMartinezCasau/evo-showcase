@@ -6,7 +6,7 @@ so the Scientific Facts UI section shows relevant items without "Insufficient KB
 """
 import json
 import logging
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from llm import OpenAIClient
 from debate_kb_schemas import KBScienceEntry
@@ -31,6 +31,8 @@ class FactsLayer(BaseModel):
     facts: Optional[list] = None
     # "science" = show "Hechos científicos" and science KB; "other" = show "Hechos verificados" and no science facts
     facts_domain: Optional[str] = None
+    # Optional: generated verification bullets for "Contexto científico (generado)" UI.
+    verification_points: Optional[list[str]] = None
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +52,104 @@ def _extract_json(text: str) -> dict | None:
         return json.loads(text)
     except json.JSONDecodeError:
         return None
+
+
+def generate_science_context_block(
+    topic: str,
+    user_message: str,
+    llm_client: OpenAIClient | None = None,
+    response_language: str = "es",
+) -> Tuple[str, list[str]]:
+    """
+    Generate a short scientific context + "Cómo se podría verificar" bullets.
+    Used for the Hechos científicos UI block when we are NOT showing KB facts.
+    - context_paragraph: 3–6 lines, high-level, related to topic.
+    - verification_bullets: 3–5 items about how one could empirically study or verify claims.
+    If LLM or parsing fails, returns a safe generic fallback (language-aware).
+    """
+    if llm_client is None:
+        llm_client = OpenAIClient()
+
+    def _fallback(lang: str) -> Tuple[str, list[str]]:
+        if lang == "es":
+            ctx = (
+                "Contexto: Este tema suele abordarse desde la metodología científica, "
+                "analizando qué variables son observables, qué mecanismos hipotéticos se proponen "
+                "y cómo podrían compararse con explicaciones alternativas."
+            )
+            bullets = [
+                "Revisar cómo se define exactamente el fenómeno que se quiere estudiar.",
+                "Diseñar estudios observacionales o experimentales que midan variables relevantes de forma cuantificable.",
+                "Comparar los resultados con predicciones alternativas para descartar explicaciones triviales.",
+            ]
+            return ctx, bullets
+        ctx = (
+            "Context: This topic is usually discussed in science by asking what can be observed, "
+            "what mechanisms are being proposed, and how they could be compared against alternative explanations."
+        )
+        bullets = [
+            "Clarify how the phenomenon is defined and which variables are observable.",
+            "Design observational or experimental studies that measure those variables in a quantifiable way.",
+            "Compare the results with alternative hypotheses to rule out trivial explanations.",
+        ]
+        return ctx, bullets
+
+    system_lang = "Spanish" if response_language == "es" else "English"
+    system_prompt = f"""You are a careful scientific explainer.
+
+TASK:
+- Given a debate topic and user message, you must:
+  1) Provide a short scientific context paragraph (3–6 lines) about how science usually frames this type of question.
+  2) Provide a mini-list of 1–3 bullet points describing how one could empirically study or verify claims about this topic.
+
+SAFETY RULES (VERY IMPORTANT):
+- DO NOT invent specific study names, authors, journals, or dates.
+- Avoid precise numbers (percentages, sample sizes, years) unless they are explicitly provided in the input.
+- Use cautious language: talk about typical evidence, study designs, measurements, or observations.
+- NO citations like "según X estudio" or "according to a study in [journal]".
+- Output ALL text strictly in {system_lang}.
+
+OUTPUT FORMAT:
+- Return ONLY valid JSON, no markdown, with this exact structure:
+{{
+  "context_paragraph": "string, 3–6 lines, high-level scientific context related to the topic",
+  "verification_bullets": [
+    "bullet 1 about how to empirically verify or study the topic",
+    "bullet 2 ...",
+    "bullet 3 ..."
+  ]
+}}"""
+
+    user_prompt = f"""Topic: {topic}
+User message: {user_message}
+
+Generate the JSON object now."""
+
+    try:
+        raw = llm_client.complete(system=system_prompt, user=user_prompt, language=response_language)
+        data = _extract_json(raw)
+        if not isinstance(data, dict):
+            raise ValueError("context JSON is not a dict")
+        ctx = (data.get("context_paragraph") or "").strip()
+        bullets_raw = data.get("verification_bullets") or []
+        if not isinstance(bullets_raw, list):
+            raise ValueError("verification_bullets is not a list")
+        bullets: list[str] = []
+        for b in bullets_raw:
+            if not isinstance(b, str):
+                continue
+            b_clean = b.strip()
+            if b_clean:
+                bullets.append(b_clean)
+        # Enforce 1–3 bullets; trim or fallback if out of bounds.
+        if not ctx or len(bullets) < 1:
+            raise ValueError("missing context or insufficient bullets")
+        if len(bullets) > 3:
+            bullets = bullets[:3]
+        return ctx, bullets
+    except Exception as e:
+        logger.warning("generate_science_context_block failed (%s), using fallback", e)
+        return _fallback(response_language)
 
 
 def generate_facts_layer(

@@ -32,6 +32,8 @@ export type FactsLayer = {
   facts?: ScienceFactItem[]
   /** "science" = Hechos científicos; "other" = Hechos verificados (no science KB). */
   facts_domain?: 'science' | 'other'
+  /** Generated verification bullets for "Contexto científico (generado)". */
+  verification_points?: string[]
 }
 
 export type Quote = {
@@ -48,12 +50,23 @@ export type AuthorLayer = {
   quote_policy_note: string
 }
 
+/** One conceptual block: title + bullets (for structured Postura/Contrapunto). */
+export type DebateBlock = {
+  title: string
+  bullets: string[]
+}
+
 export type DebateLayer = {
   steelman_of_user: string
   contrarian_position: string
   counterarguments: string[]
   socratic_questions: string[]
   where_contrarian_might_fail: string[]
+  /** Structured format for display: blocks + resumen. */
+  steelman_blocks?: DebateBlock[]
+  steelman_resumen?: string
+  contrarian_blocks?: DebateBlock[]
+  contrarian_resumen?: string
 }
 
 export type Closing = {

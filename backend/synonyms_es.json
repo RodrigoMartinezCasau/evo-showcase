@@ -1,0 +1,15 @@
+{
+  "dios": ["deidad", "divinidad", "religion", "religión", "fe", "creencia", "teologia", "teología"],
+  "religion": ["religión", "fe", "creencias", "iglesia", "espiritualidad"],
+  "mente": ["psicologia", "psicología", "cognicion", "cognición", "pensamiento"],
+  "conciencia": ["conocimiento", "awareness"],
+  "realidad": ["mundo", "mundo_externo", "realidad_objetiva"],
+  "comunismo": ["socialismo", "marxismo", "leninismo", "planificacion", "planificación"],
+  "capitalismo": ["mercado", "mercados", "economia_de_mercado"],
+  "nazismo": ["nazi", "hitler", "holocausto", "genocidio", "fascismo"],
+  "guerra": ["guerras", "conflicto_armado", "wwii", "segunda_guerra_mundial"],
+  "evidencia": ["prueba", "datos", "observacion", "observación", "experimento"],
+  "metodo_cientifico": ["ciencia", "metodo", "método", "hipotesis", "hipótesis", "teoria", "teoría"],
+  "verdad": ["hecho", "realidad_objetiva"]
+}
+

@@ -123,44 +123,26 @@ export function DetailsPanel({
       {activeTab === 'facts' && (
         <div>
           {facts_layer.summary?.trim() && (
-            <p style={{ margin: '0 0 12px', fontSize: 13, color: '#a3a3a3' }}>{facts_layer.summary}</p>
+            <>
+              <div style={sectionTitleStyle}>CONTEXTO CIENTÍFICO (GENERADO)</div>
+              <p style={{ margin: '0 0 4px', fontSize: 12, color: '#a3a3a3' }}>
+                Nota: esto es una explicación general generada por IA; puede contener errores y no sustituye verificación con fuentes.
+              </p>
+              <p style={{ margin: '0 0 12px', fontSize: 13, color: '#a3a3a3' }}>{facts_layer.summary}</p>
+            </>
           )}
-          {(() => {
-            const rawFacts = (facts_layer.facts ?? []).slice(0, 3)
-            const slots = [...rawFacts]
-            while (slots.length < 3) {
-              slots.push({
-                id: `placeholder-${slots.length}`,
-                claim: '—',
-                certainty: '',
-                source_name: '',
-                source_note: '',
-              } as (typeof rawFacts)[0])
-            }
-            return slots.map((f) => (
-              <div key={f.id} style={claimRowStyle}>
-                {f.source_name !== undefined && f.source_name !== '' ? (
-                  <>
-                    <span style={badgeStyle(f.certainty)}>
-                      {typeof f.score_pct === 'number' ? `${f.score_pct}%` : (f.certainty || 'VERIFIED')}
-                    </span>
-                    {f.claim}
-                    {(f.value ?? f.units ?? f.formula) && (
-                      <div style={{ fontSize: 12, color: '#a3a3a3', marginTop: 4 }}>
-                        {[f.value, f.units, f.formula].filter(Boolean).join(' · ')}
-                      </div>
-                    )}
-                    <div style={{ fontSize: 11, color: '#737373', marginTop: 4 }}>
-                      {f.source_name}
-                      {f.source_note ? ` — ${f.source_note}` : ''}
-                    </div>
-                  </>
-                ) : (
-                  <span style={{ color: '#737373' }}>{f.claim}</span>
-                )}
-              </div>
-            ))
-          })()}
+          {Array.isArray(facts_layer.verification_points) && facts_layer.verification_points.length > 0 && (
+            <div>
+              <div style={{ ...sectionTitleStyle, marginTop: 4, marginBottom: 4 }}>Cómo se podría verificar</div>
+              <ul style={{ margin: 0, paddingLeft: 18, color: '#e4e4e7', fontSize: 13 }}>
+                {facts_layer.verification_points.map((v, idx) => (
+                  <li key={idx} style={{ marginBottom: 4 }}>
+                    {v}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
 

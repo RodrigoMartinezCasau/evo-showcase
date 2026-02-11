@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 KB_FACTS_DIR = Path(__file__).resolve().parent / "knowledge_base_facts"
 GENERAL_FILE = KB_FACTS_DIR / "general.json"
 CONCEPT_MAP_PATH = Path(__file__).resolve().parent / "concept_map.yml"
+SYN_ES_PATH = Path(__file__).resolve().parent / "synonyms_es.json"
+SYN_EN_PATH = Path(__file__).resolve().parent / "synonyms_en.json"
 MIN_TEXT_LEN = 40
 
 # Calibration for relevance percentage. Scores below A ~ 0%, above B ~ 100%.
@@ -76,6 +78,44 @@ QUESTION_STARTERS = frozenset([
 ])
 
 
+def _load_synonym_index() -> dict[str, set[str]]:
+    """
+    Load ES/EN synonym maps into a surface -> expansions index.
+    All keys and values are normalized to lowercase tokens without punctuation.
+    """
+    index: dict[str, set[str]] = {}
+
+    def _add_from(path: Path) -> None:
+        if not path.exists():
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            return
+        if not isinstance(data, dict):
+            return
+        for base, arr in data.items():
+            tokens: set[str] = set()
+            for w in [base, *(arr or [])]:
+                if not isinstance(w, str):
+                    continue
+                w_clean = "".join(c for c in w.lower().strip() if c.isalnum() or c in ("_", "-"))
+                if len(w_clean) >= 3:
+                    tokens.add(w_clean)
+            if not tokens:
+                continue
+            for surface in tokens:
+                index.setdefault(surface, set()).update(tokens)
+
+    _add_from(SYN_ES_PATH)
+    _add_from(SYN_EN_PATH)
+    return index
+
+
+_SYNONYM_INDEX: dict[str, set[str]] = _load_synonym_index()
+
+
 def _normalize_for_concept(w: str) -> str:
     """Lowercase, strip diacritics, alphanumeric only. For concept-map matching."""
     if not w:
@@ -108,11 +148,22 @@ def _normalize_plural(w: str) -> str:
 
 
 def _extract_prompt_keywords(prompt_text: str) -> list[str]:
-    """Extract keywords from prompt: lowercase, no stopwords, no punctuation, length >= 4, optional plural norm."""
+    """
+    Extract keywords from prompt: lowercase, no stopwords, no punctuation, length >= 4,
+    optional plural norm. Expanded with simple ES/EN synonyms from editable JSON maps.
+    """
     text = (prompt_text or "").strip()[:500]
     raw = _PUNCT.sub(" ", text).strip().lower()
-    words = [w for w in raw.split() if w and w not in STOPWORDS and len(w) >= 4]
-    return [_normalize_plural(w) for w in words]
+    base_words = [w for w in raw.split() if w and w not in STOPWORDS and len(w) >= 4]
+    base_norm = [_normalize_plural(w) for w in base_words]
+    if not _SYNONYM_INDEX:
+        return base_norm
+    expanded: set[str] = set(base_norm)
+    for w in base_norm:
+        key = "".join(c for c in w.lower() if c.isalnum() or c in ("_", "-"))
+        if key in _SYNONYM_INDEX:
+            expanded.update(_SYNONYM_INDEX[key])
+    return sorted(expanded)
 
 
 def _term_counts(tokens: list[str]) -> dict[str, int]:
@@ -599,23 +650,29 @@ def _fact_to_ui_item(
     return out
 
 
-def _rescale_score_pct(scores: list[float]) -> list[int]:
+def _rescale_score_pct(scores: list[float], tiers: list[str] | None = None) -> list[int]:
     """
-    Map raw scores to calibrated percentages 0–100 using linear window [CALIB_A, CALIB_B].
-    Scores <= CALIB_A -> 0, scores >= CALIB_B -> 100.
+    Map raw scores to percentages 0–100 relative to best score:
+    - top score -> 100%
+    - others scaled by (score / top_score) * 100
+    - never render 0% (use 10% floor)
+    - tier-3 fallback facts ("general" or "pad") are capped at 35%
     """
+    if not scores:
+        return []
+    top = max(scores)
     pcts: list[int] = []
-    denom = CALIB_B - CALIB_A if CALIB_B != CALIB_A else 1.0
-    for s in scores:
-        adj = (s - CALIB_A) / denom
-        if adj < 0:
-            adj = 0.0
-        elif adj > 1:
-            adj = 1.0
-        pct = int(round(adj * 100))
-        # Never render 0%; treat extremely low scores as 10% to avoid "nonsense zero" perception.
-        if pct == 0:
+    for i, s in enumerate(scores):
+        if top <= 0:
             pct = 10
+        else:
+            pct = int(round((s / top) * 100))
+            if pct == 0:
+                pct = 10
+        tier = tiers[i] if tiers and i < len(tiers) else None
+        if tier in ("general", "pad") and pct > 35:
+            pct = 35
+        pct = min(100, max(0, pct))
         pcts.append(pct)
     return pcts
 
@@ -651,7 +708,8 @@ def get_three_facts(query_text: str) -> list[dict]:
     )
 
     # We will accumulate up to 3 facts, first from concept-based path, then from domain/general fallback.
-    selected: list[tuple[dict, float]] = []
+    # Each entry: (fact, score, tier) where tier ∈ {"concept", "domain", "general", "pad"}.
+    selected: list[tuple[dict, float, str]] = []
     seen_ids: set[str] = set()
 
     if concept_top:
@@ -662,7 +720,7 @@ def get_three_facts(query_text: str) -> list[dict]:
             if not fid or fid in seen_ids:
                 continue
             seen_ids.add(fid)
-            selected.append((fact, sc))
+            selected.append((fact, sc, "concept"))
 
     # Domain-level scoring to prioritize likely relevant domains (fallback after concepts)
     domain_scores = _score_domains(query_text, domains_data)
@@ -716,7 +774,7 @@ def get_three_facts(query_text: str) -> list[dict]:
             if not fid or fid in seen_ids:
                 continue
             seen_ids.add(fid)
-            selected.append((fact, sc))
+            selected.append((fact, sc, "domain"))
 
     # First pass: only facts above MIN_SIM from top domains, then adjacent ones.
     if len(selected) < 3:
@@ -738,7 +796,7 @@ def get_three_facts(query_text: str) -> list[dict]:
         if not fid or fid in seen_ids:
             continue
         seen_ids.add(fid)
-        selected.append((f, 0.0))
+        selected.append((f, 0.0, "general"))
 
     # Last resort: pad with generic line (score 0) if KB/general.json is missing.
     while len(selected) < 3:
@@ -751,14 +809,16 @@ def get_three_facts(query_text: str) -> list[dict]:
                 "sources": ["KB"],
             },
             0.0,
+            "pad",
         ))
 
     # Rescale score_pct for display among final 3
-    scores_only = [s for _, s in selected]
-    score_pcts = _rescale_score_pct(scores_only)
+    scores_only = [s for _, s, _ in selected]
+    tiers_only = [tier for _, _, tier in selected]
+    score_pcts = _rescale_score_pct(scores_only, tiers_only)
 
     result: list[dict] = []
-    for i, (fact, sc) in enumerate(selected[:3]):
+    for i, (fact, sc, _tier) in enumerate(selected[:3]):
         pct = score_pcts[i] if i < len(score_pcts) else 50
         result.append(_fact_to_ui_item(fact, sc, score_pct=pct))
 

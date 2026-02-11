@@ -155,10 +155,9 @@ def _run_debate_pipeline(
     logger.info("_run_debate_pipeline: response_language=%s topic=%s", response_language, (payload.topic or "")[:60])
     try:
         from debate_retriever import DebateRetriever
-        from debate_facts_generator import generate_facts_layer
+        from debate_facts_generator import generate_facts_layer, generate_science_context_block
         from debate_author_generator import generate_author_layer
         from llm import OpenAIClient
-        from facts_retrieval import get_three_facts
 
         retriever = DebateRetriever()
         science_results = retriever.retrieve_science(payload.topic, payload.user_message, top_n=5)
@@ -174,17 +173,21 @@ def _run_debate_pipeline(
             llm_client=llm_client,
             response_language=response_language,
         )
-        # Always exactly 3 facts from knowledge_base_facts/ (JSON domain files + general fallback); no quotes/literature
-        query_text = f"{payload.topic or ''} {payload.user_message or ''}".strip()[:500]
-        three_facts = get_three_facts(query_text)
-        logger.info("Debate facts (always 3 from KB): %s", [f.get("id") for f in three_facts])
+        # Generate LLM-based scientific context + verification bullets for the Hechos científicos UI block.
+        ctx_summary, verification_points = generate_science_context_block(
+            payload.topic or "",
+            payload.user_message or "",
+            llm_client=llm_client,
+            response_language=response_language,
+        )
         facts_layer = FactsLayer(
-            summary=facts_layer.summary,
+            summary=ctx_summary or facts_layer.summary,
             claims=facts_layer.claims,
             what_we_dont_know=facts_layer.what_we_dont_know,
             common_misconceptions=facts_layer.common_misconceptions,
-            facts=three_facts,
+            facts=None,
             facts_domain="science",
+            verification_points=verification_points,
         )
         # Verbatim Quotes KB: deterministic retrieval (max 3, max 1 per author); if any match, use them
         verbatim_results = retriever.retrieve_verbatim_quotes(
@@ -235,7 +238,6 @@ def _run_debate_pipeline(
             user_message=payload.user_message,
             stance=stance,
             facts_summary=facts_layer.summary,
-            scientific_facts=three_facts,
             llm_client=llm_client,
             debate_memory=debate_memory,
             response_language=response_language,
@@ -691,6 +693,7 @@ def debate_chat_persisted(debate_id: str, payload: DebateChatPayload):
             "next_question": next_question,
             "topic": topic,
             "lang": lang,
+            "facts_summary": (response.facts_layer.summary or "").strip(),
         },
     )
     upsert_message_details(
@@ -767,11 +770,11 @@ def append_debate_message(debate_id: str, payload: dict):
 
 @app.post("/messages/{message_id}/facts")
 def fetch_message_facts(message_id: str):
-    """Lazy-load facts for an assistant message. Returns from cache or from Science KB (no LLM). Non-science topics get facts_domain=other and no science facts."""
+    """Lazy-load scientific context for an assistant message. Returns from cache or generates via LLM."""
     from debate_db import get_debate_with_messages, get_message, get_or_create_message_details, upsert_message_details
-    from debate_kb_loader import ScienceFactsLoader
     from language_detector import detect_language
-    from domain_classifier import classify_domain
+    from debate_facts_generator import generate_science_context_block
+    from llm import OpenAIClient
 
     msg = get_message(message_id)
     if not msg or msg.role != "assistant":
@@ -788,7 +791,7 @@ def fetch_message_facts(message_id: str):
             upsert_message_details(message_id, facts_json=json.dumps(facts))
             return facts
 
-    # Get topic and last user message for domain classification
+    # Get topic and last user message for context generation
     debate = get_debate_with_messages(msg.debate_id) if msg.debate_id else None
     meta = json.loads(msg.meta_json) if msg.meta_json else {}
     topic = (meta.get("topic") or "").strip()
@@ -804,16 +807,21 @@ def fetch_message_facts(message_id: str):
                 last_user_content = (m.get("content") or "").strip()
                 break
 
-    # Always exactly 3 facts from knowledge_base_facts/ (no quotes/literature)
-    from facts_retrieval import get_three_facts
-    query_parts = [topic, last_user_content, assistant_reply]
-    query_text = " ".join(q for q in query_parts if q).strip()[:500]
-    three_facts = get_three_facts(query_text)
+    # Build language-aware scientific context + verification bullets (no KB facts).
+    lang = (meta.get("lang") or "").strip() or detect_language(last_user_content or topic or assistant_reply)
+    llm_client = OpenAIClient()
+    ctx_summary, verification_points = generate_science_context_block(
+        topic or "",
+        last_user_content or assistant_reply,
+        llm_client=llm_client,
+        response_language=lang,
+    )
     response = {
-        "facts": three_facts,
+        "facts": [],
         "facts_domain": "science",
-        "summary": meta.get("facts_summary") or "",
+        "summary": ctx_summary or meta.get("facts_summary") or "",
         "claims": [],
+        "verification_points": verification_points,
     }
     upsert_message_details(message_id, facts_json=json.dumps(response))
     return response

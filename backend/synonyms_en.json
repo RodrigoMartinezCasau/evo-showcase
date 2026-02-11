@@ -1,0 +1,15 @@
+{
+  "god": ["deity", "divinity", "religion", "faith", "belief"],
+  "religion": ["faith", "beliefs", "church", "spirituality"],
+  "mind": ["cognition", "psychology", "thought"],
+  "consciousness": ["awareness"],
+  "reality": ["world", "external_world", "objective_reality"],
+  "communism": ["socialism", "marxism", "leninism", "planned_economy"],
+  "capitalism": ["markets", "market_economy", "free_market"],
+  "nazism": ["nazi", "hitler", "holocaust", "genocide", "fascism"],
+  "war": ["wars", "conflict", "wwii", "world_war_ii"],
+  "evidence": ["data", "observation", "experiment", "proof"],
+  "scientific_method": ["science", "method", "hypothesis", "theory"],
+  "truth": ["fact", "objective_reality"]
+}
+

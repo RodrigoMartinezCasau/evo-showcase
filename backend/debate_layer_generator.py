@@ -3,8 +3,14 @@ import logging
 import re
 from typing import Any, Generator, List
 
-from llm import OpenAIClient, translate_debate_layer_to_es
+from llm import OpenAIClient, translate_debate_layer_to_es, translate_debate_layer_structured_to_es
 from pydantic import BaseModel
+
+
+class DebateBlock(BaseModel):
+    """One conceptual block: title (max 30 words) + bullets (max 20 words each)."""
+    title: str
+    bullets: list[str]
 
 
 class DebateLayer(BaseModel):
@@ -13,6 +19,11 @@ class DebateLayer(BaseModel):
     counterarguments: list[str]
     socratic_questions: list[str]
     where_contrarian_might_fail: list[str]
+    # Optional structured format for high-retention display (blocks + resumen).
+    steelman_blocks: list[DebateBlock] | None = None
+    steelman_resumen: str | None = None
+    contrarian_blocks: list[DebateBlock] | None = None
+    contrarian_resumen: str | None = None
 
 
 logger = logging.getLogger(__name__)
@@ -141,7 +152,39 @@ Rewrite Spanish to match English density. Output JSON only."""
 
 
 def _translate_and_validate_es(en_layer: DebateLayer, llm_client: OpenAIClient) -> DebateLayer:
-    """Translate EN to ES, validate richness, repair if needed."""
+    """Translate EN to ES. Uses structured translation when layer has blocks; else flat."""
+    if en_layer.steelman_blocks and en_layer.steelman_resumen and en_layer.contrarian_blocks and en_layer.contrarian_resumen:
+        sb = [{"title": b.title, "bullets": b.bullets} for b in en_layer.steelman_blocks]
+        cb = [{"title": b.title, "bullets": b.bullets} for b in en_layer.contrarian_blocks]
+        translated = translate_debate_layer_structured_to_es(
+            sb,
+            en_layer.steelman_resumen,
+            cb,
+            en_layer.contrarian_resumen,
+            en_layer.counterarguments,
+            en_layer.socratic_questions,
+            en_layer.where_contrarian_might_fail,
+            llm_client,
+        )
+        if not translated:
+            logger.warning("Structured translation to ES failed, returning EN debate_layer")
+            return en_layer
+        sb_es, sr_es, cb_es, cr_es, counter_es, sq_es, wcf_es = translated
+        steelman_blocks_es = [DebateBlock(title=b["title"], bullets=b["bullets"]) for b in sb_es]
+        contrarian_blocks_es = [DebateBlock(title=b["title"], bullets=b["bullets"]) for b in cb_es]
+        flat_steelman = _derived_flat_from_structured(sb_es, sr_es)
+        flat_contrarian = _derived_flat_from_structured(cb_es, cr_es)
+        return DebateLayer(
+            steelman_of_user=flat_steelman,
+            contrarian_position=flat_contrarian,
+            counterarguments=counter_es,
+            socratic_questions=sq_es,
+            where_contrarian_might_fail=wcf_es,
+            steelman_blocks=steelman_blocks_es,
+            steelman_resumen=sr_es,
+            contrarian_blocks=contrarian_blocks_es,
+            contrarian_resumen=cr_es,
+        )
     translated = translate_debate_layer_to_es(
         en_layer.steelman_of_user,
         en_layer.contrarian_position,
@@ -162,7 +205,6 @@ def _translate_and_validate_es(en_layer: DebateLayer, llm_client: OpenAIClient) 
         where_contrarian_might_fail=translated[4],
     )
 
-    # Validate richness
     if not _is_spanish_rich(
         en_layer.steelman_of_user,
         en_layer.contrarian_position,
@@ -229,16 +271,18 @@ def _build_debate_prompts(
     has_facts = len(facts_list) > 0
     system_prompt = """You are a calm, respectful debate facilitator. Output in English.
 
-MANDATORY STRUCTURE:
-1. steelman_of_user: Present the user's view in its strongest form. Minimum 2 distinct arguments with reasoning. Aim: ~120–220 words. Detailed, not a summary.
-2. contrarian_position: Adopt a contrarian position. Minimum 2 distinct counterarguments with reasoning. Aim: ~90–180 words.
-3. socratic_questions: First question MUST be specific and Socratic. Total 3–7 questions. Exactly 1 main question.
+MANDATORY OUTPUT FORMAT (structured, high-retention):
+- steelman_blocks: Array of conceptual blocks. Each block has "title" (short conceptual title, max 30 words) and "bullets" (array of strings, each max 20 words, one idea per bullet). Use as many blocks as needed to cover the full argument; minimum 2 blocks.
+- steelman_resumen: 1–2 sentence conclusion summarizing the core argument (no filler).
+- contrarian_blocks: Same structure as steelman_blocks for the counter-position. Minimum 2 blocks.
+- contrarian_resumen: 1–2 sentence conclusion summarizing the counter-argument.
+- socratic_questions: Array of 3–7 questions. First = main Socratic question (specific).
 
-HARD RULES:
-- Output detailed, not summary. Address the user's specific question.
-- At least 2 concrete argumentative moves per side.
-- NO final conclusions. Tone: calm, non-polemical, open.
-- NO generic filler: "raises questions worth considering", "worth exploring further", "multiple perspectives".
+STYLE RULES:
+- Titles: conceptual, not descriptive sentences. Max 30 words each.
+- Bullets: one idea per bullet, max 20 words. No long paragraphs. No filler transitions ("therefore", "moreover we can observe that").
+- Keep argument density high and intellectual tone serious. Do not reduce conceptual rigor or oversimplify.
+- NO final conclusions in the blocks; reserve synthesis for the resumen only.
 - socratic_questions: 3-7 items. First is main question."""
     if has_facts:
         system_prompt += """
@@ -279,20 +323,27 @@ Facts summary: {facts_summary}
 
 Generate debate_layer JSON:
 {{
-  "steelman_of_user": "Strongest version of user's position (respectful, accurate)",
-  "contrarian_position": "Contrarian or balanced critique (respectful, no conclusions)",
+  "steelman_blocks": [
+    {{ "title": "Short conceptual title (max 30 words)", "bullets": ["Bullet idea (max 20 words)", "Bullet idea", ...] }},
+    ...
+  ],
+  "steelman_resumen": "1–2 sentence conclusion summarizing the core argument.",
+  "contrarian_blocks": [
+    {{ "title": "Short conceptual title (max 30 words)", "bullets": ["Bullet idea (max 20 words)", ...] }},
+    ...
+  ],
+  "contrarian_resumen": "1–2 sentence conclusion summarizing the counter-argument.",
   "counterarguments": ["Counterargument 1", "Counterargument 2", ...],
-  "socratic_questions": ["Question 1", "Question 2", "Question 3", ...],
+  "socratic_questions": ["Main Socratic question (specific)", "Question 2", "Question 3", ...],
   "where_contrarian_might_fail": ["Limit 1", "Limit 2", ...]
 }}
 
 REQUIREMENTS:
-- steelman_of_user: ~120–220 words. At least 2 concrete arguments. Reference user's specific wording.
-- contrarian_position: ~90–180 words. At least 2 concrete counterarguments.
+- steelman_blocks and contrarian_blocks: at least 2 blocks each. Titles max 30 words; bullets max 20 words each. One idea per bullet.
+- steelman_resumen and contrarian_resumen: 1–2 sentences each. No filler.
 - socratic_questions: 3–7 items. First = main Socratic question (specific).
 - where_contrarian_might_fail: Acknowledge limits.
-- NO conclusive language. NO generic filler.
-- GROUNDING: Base arguments on the provided Scientific Facts only; do not introduce new empirical claims. If no facts were provided, state explicitly that science does not provide direct empirical facts on this question.
+- NO generic filler. GROUNDING: Base arguments on the provided Scientific Facts only; do not introduce new empirical claims. If no facts were provided, state explicitly that science does not provide direct empirical facts on this question.
 - Output ONLY JSON, no markdown."""
     return system_prompt, user_prompt
 
@@ -407,31 +458,94 @@ def generate_debate_layer_stream(
         yield {"type": "done", "layer": layer}
 
 
-def _validate_and_build_debate_layer(debate_dict: dict) -> DebateLayer | None:
-    """Validate debate_dict and build DebateLayer if valid."""
-    try:
-        for key in ["steelman_of_user", "contrarian_position", "counterarguments", "socratic_questions", "where_contrarian_might_fail"]:
-            if key not in debate_dict:
-                return None
+def _derived_flat_from_structured(blocks: list[dict], resumen: str) -> str:
+    """Derive flat paragraph from structured blocks + resumen for backward compat."""
+    parts = []
+    for b in blocks:
+        title = (b.get("title") or "").strip()
+        bullets = b.get("bullets") or []
+        if title:
+            parts.append(title)
+        for bl in bullets:
+            if (bl or "").strip():
+                parts.append("• " + str(bl).strip())
+    if (resumen or "").strip():
+        parts.append("RESUMEN RÁPIDO → " + str(resumen).strip())
+    return "\n".join(parts)
 
+
+def _validate_and_build_debate_layer(debate_dict: dict) -> DebateLayer | None:
+    """Validate debate_dict and build DebateLayer. Accepts structured (blocks + resumen) or flat format."""
+    try:
         sq = debate_dict.get("socratic_questions", [])
         if not isinstance(sq, list) or len(sq) < 3 or len(sq) > 7:
             return None
+        sq_clean = [str(x).strip() for x in sq]
+        counter = [str(x).strip() for x in debate_dict.get("counterarguments", [])]
+        wcf = [str(x).strip() for x in debate_dict.get("where_contrarian_might_fail", [])]
 
-        # Check for conclusive language in key fields
-        for field in ["steelman_of_user", "contrarian_position"]:
-            if _has_conclusive_language(debate_dict.get(field, "")):
+        # Structured format (preferred)
+        sb = debate_dict.get("steelman_blocks")
+        sr = (debate_dict.get("steelman_resumen") or "").strip()
+        cb = debate_dict.get("contrarian_blocks")
+        cr = (debate_dict.get("contrarian_resumen") or "").strip()
+        if isinstance(sb, list) and len(sb) >= 1 and isinstance(cb, list) and len(cb) >= 1 and sr and cr:
+            steelman_blocks_pydantic: list[DebateBlock] = []
+            for b in sb:
+                if not isinstance(b, dict):
+                    continue
+                title = (b.get("title") or "").strip()
+                bullets = [str(x).strip() for x in (b.get("bullets") or []) if str(x).strip()]
+                if title or bullets:
+                    steelman_blocks_pydantic.append(DebateBlock(title=title or "...", bullets=bullets))
+            contrarian_blocks_pydantic: list[DebateBlock] = []
+            for b in cb:
+                if not isinstance(b, dict):
+                    continue
+                title = (b.get("title") or "").strip()
+                bullets = [str(x).strip() for x in (b.get("bullets") or []) if str(x).strip()]
+                if title or bullets:
+                    contrarian_blocks_pydantic.append(DebateBlock(title=title or "...", bullets=bullets))
+            if steelman_blocks_pydantic and contrarian_blocks_pydantic:
+                flat_steelman = _derived_flat_from_structured(
+                    [{"title": b.title, "bullets": b.bullets} for b in steelman_blocks_pydantic], sr
+                )
+                flat_contrarian = _derived_flat_from_structured(
+                    [{"title": b.title, "bullets": b.bullets} for b in contrarian_blocks_pydantic], cr
+                )
+                if _has_conclusive_language(flat_steelman) or _has_conclusive_language(flat_contrarian):
+                    return None
+                for q in sq_clean:
+                    if _has_conclusive_language(q):
+                        return None
+                return DebateLayer(
+                    steelman_of_user=flat_steelman,
+                    contrarian_position=flat_contrarian,
+                    counterarguments=counter,
+                    socratic_questions=sq_clean,
+                    where_contrarian_might_fail=wcf,
+                    steelman_blocks=steelman_blocks_pydantic,
+                    steelman_resumen=sr,
+                    contrarian_blocks=contrarian_blocks_pydantic,
+                    contrarian_resumen=cr,
+                )
+        # Flat format (legacy)
+        for key in ["steelman_of_user", "contrarian_position"]:
+            if key not in debate_dict:
                 return None
-        for q in sq:
-            if _has_conclusive_language(str(q)):
+        flat_steelman = str(debate_dict["steelman_of_user"]).strip()
+        flat_contrarian = str(debate_dict["contrarian_position"]).strip()
+        if _has_conclusive_language(flat_steelman) or _has_conclusive_language(flat_contrarian):
+            return None
+        for q in sq_clean:
+            if _has_conclusive_language(q):
                 return None
-
         return DebateLayer(
-            steelman_of_user=str(debate_dict["steelman_of_user"]).strip(),
-            contrarian_position=str(debate_dict["contrarian_position"]).strip(),
-            counterarguments=[str(x).strip() for x in debate_dict.get("counterarguments", [])],
-            socratic_questions=[str(x).strip() for x in sq],
-            where_contrarian_might_fail=[str(x).strip() for x in debate_dict.get("where_contrarian_might_fail", [])],
+            steelman_of_user=flat_steelman,
+            contrarian_position=flat_contrarian,
+            counterarguments=counter,
+            socratic_questions=sq_clean,
+            where_contrarian_might_fail=wcf,
         )
     except Exception as e:
         logger.debug(f"DebateLayer validation error: {e}")
