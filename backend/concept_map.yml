@@ -1,0 +1,230 @@
+god_religion:
+  aliases:
+    - dios
+    - god
+    - deidad
+    - deity
+    - religion
+    - religión
+    - church
+    - iglesia
+    - espiritualidad
+    - spirituality
+    - oracion
+    - oración
+    - prayer
+  related:
+    - scientific_method
+
+scientific_method:
+  aliases:
+    - metodo
+    - método
+    - metodo cientifico
+    - método cientifico
+    - método científico
+    - metodo_cientifico
+    - scientific method
+    - experiment
+    - experimento
+    - evidencia
+    - evidence
+    - prueba
+    - proof
+    - hipotesis
+    - hipótesis
+    - hypothesis
+    - teoria
+    - teoría
+    - theory
+    - observacion
+    - observación
+    - observation
+    - replicabilidad
+    - reproducibilidad
+    - revision por pares
+    - revisión por pares
+    - peer review
+    - correlacion
+    - correlación
+    - causalidad
+    - causality
+    - estadistica
+    - estadística
+  related:
+    - evidence
+    - causality
+
+evidence:
+  aliases:
+    - evidencia
+    - evidence
+    - datos
+    - facts
+    - hechos
+  related:
+    - scientific_method
+
+causality:
+  aliases:
+    - causalidad
+    - causality
+    - causa
+    - causas
+    - correlacion
+    - correlación
+  related:
+    - scientific_method
+
+ethics_morality:
+  aliases:
+    - etica
+    - ética
+    - moral
+    - moralidad
+    - bien
+    - mal
+    - bueno
+    - malo
+    - daño
+    - harm
+    - justicia
+    - justice
+  related:
+    - psychology_mind
+
+political_systems:
+  aliases:
+    - comunismo
+    - comunist
+    - comunistmo
+    - marxismo
+    - leninismo
+    - socialismo
+    - capitalism
+    - capitalismo
+    - democracia
+    - democracy
+    - dictadura
+    - authoritarianism
+    - autoritarismo
+    - nazismo
+    - nazi
+    - nazis
+    - fascismo
+    - fascism
+  related:
+    - economics
+    - history_war
+
+psychology_mind:
+  aliases:
+    - mente
+    - mind
+    - emocion
+    - emoción
+    - emociones
+    - emotion
+    - empathy
+    - empatia
+    - cognicion
+    - cognición
+    - cognition
+    - sesgo
+    - sesgos
+    - bias
+    - trauma
+  related:
+    - ethics_morality
+    - objective_reality
+
+history_war:
+  aliases:
+    - historia
+    - history
+    - guerra
+    - guerras
+    - war
+    - wwii
+    - segunda guerra
+    - segunda guerra mundial
+    - holocausto
+    - holocaust
+    - hitler
+    - genocidio
+    - genocide
+    - derechos humanos
+    - human rights
+  related:
+    - political_systems
+
+economics:
+  aliases:
+    - economia
+    - economía
+    - economia politica
+    - economic
+    - economics
+    - mercado
+    - mercados
+    - market
+    - markets
+    - inflacion
+    - inflación
+    - inequality
+    - desigualdad
+    - coste oportunidad
+    - costo de oportunidad
+    - opportunity cost
+    - incentivos
+    - incentives
+  related:
+    - political_systems
+
+objective_reality:
+  aliases:
+    - realidad
+    - realidad objetiva
+    - objective reality
+    - mundo
+    - world
+    - externo
+    - external world
+    - mundo externo
+    - existencia
+    - existence
+    - existir
+    - exist
+  related:
+    - perception
+    - consciousness
+
+perception:
+  aliases:
+    - percepcion
+    - percepción
+    - perception
+    - sentidos
+    - sentidos humanos
+    - sensory
+    - sensorial
+  related:
+    - objective_reality
+    - psychology_mind
+
+consciousness:
+  aliases:
+    - conciencia
+    - consciousness
+    - consciente
+    - awareness
+  related:
+    - psychology_mind
+    - objective_reality
+
+truth:
+  aliases:
+    - verdad
+    - truth
+  related:
+    - scientific_method

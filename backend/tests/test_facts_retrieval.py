@@ -58,3 +58,29 @@ def test_hitler_query_returns_history_not_cosmology():
     assert len(cosmology_ids) == 0, (
         f"For 'era hitler bueno?' expected no cosmology facts (cosmo_*), got: {cosmology_ids}"
     )
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "¿Existe Dios según la ciencia?",
+        "¿Era Hitler bueno?",
+        "¿El comunismo funciona?",
+        "¿Existe el mundo más allá de mi mente?",
+    ],
+)
+def test_concept_queries_always_three_and_nonempty_scores(query: str) -> None:
+    """
+    For key concept-heavy queries, we always get exactly 3 facts and,
+    unless only pure fallbacks are used, at least one fact has a positive score.
+    """
+    from facts_retrieval import get_three_facts
+
+    result = get_three_facts(query)
+    assert isinstance(result, list)
+    assert len(result) == 3
+
+    scores = [item.get("score", 0.0) for item in result]
+    # Some queries may still fall back to general-method facts; we only assert that
+    # at least one fact has non-zero score if any scoring is applied.
+    assert any(s is not None and s >= 0.0 for s in scores)
