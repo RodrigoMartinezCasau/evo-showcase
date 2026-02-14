@@ -271,18 +271,17 @@ def _build_debate_prompts(
     has_facts = len(facts_list) > 0
     system_prompt = """You are a calm, respectful debate facilitator. Output in English.
 
-MANDATORY OUTPUT FORMAT (structured, high-retention):
-- steelman_blocks: Array of conceptual blocks. Each block has "title" (short conceptual title, max 30 words) and "bullets" (array of strings, each max 20 words, one idea per bullet). Use as many blocks as needed to cover the full argument; minimum 2 blocks.
-- steelman_resumen: 1–2 sentence conclusion summarizing the core argument (no filler).
-- contrarian_blocks: Same structure as steelman_blocks for the counter-position. Minimum 2 blocks.
-- contrarian_resumen: 1–2 sentence conclusion summarizing the counter-argument.
-- socratic_questions: Array of 3–7 questions. First = main Socratic question (specific).
+MANDATORY STRUCTURE:
+1. steelman_of_user: Present the user's view in its strongest form. Minimum 2 distinct arguments with reasoning. Aim: ~200–350 words. One or two continuous paragraphs, not bullet points. Formal, reflective tone.
+2. contrarian_position: Adopt a contrarian position. Minimum 2 distinct counterarguments with reasoning. Aim: ~150–280 words. One or two continuous paragraphs, not bullet points.
+3. socratic_questions: First question MUST be specific and Socratic. Total 3–7 questions. Exactly 1 main question.
 
-STYLE RULES:
-- Titles: conceptual, not descriptive sentences. Max 30 words each.
-- Bullets: one idea per bullet, max 20 words. No long paragraphs. No filler transitions ("therefore", "moreover we can observe that").
-- Keep argument density high and intellectual tone serious. Do not reduce conceptual rigor or oversimplify.
-- NO final conclusions in the blocks; reserve synthesis for the resumen only.
+HARD RULES:
+- Output detailed, not summary. Address the user's specific question.
+- At least 2 concrete argumentative moves per side.
+- NO final conclusions. Tone: calm, non-polemical, open.
+- NO generic filler: "raises questions worth considering", "worth exploring further", "multiple perspectives".
+- NO bullet points or mini-section titles inside steelman_of_user or contrarian_position.
 - socratic_questions: 3-7 items. First is main question."""
     if has_facts:
         system_prompt += """
@@ -323,24 +322,16 @@ Facts summary: {facts_summary}
 
 Generate debate_layer JSON:
 {{
-  "steelman_blocks": [
-    {{ "title": "Short conceptual title (max 30 words)", "bullets": ["Bullet idea (max 20 words)", "Bullet idea", ...] }},
-    ...
-  ],
-  "steelman_resumen": "1–2 sentence conclusion summarizing the core argument.",
-  "contrarian_blocks": [
-    {{ "title": "Short conceptual title (max 30 words)", "bullets": ["Bullet idea (max 20 words)", ...] }},
-    ...
-  ],
-  "contrarian_resumen": "1–2 sentence conclusion summarizing the counter-argument.",
+  "steelman_of_user": "Strongest version of user's position (respectful, accurate, essay-style paragraphs)",
+  "contrarian_position": "Contrarian or balanced critique (respectful, no conclusions, essay-style paragraphs)",
   "counterarguments": ["Counterargument 1", "Counterargument 2", ...],
-  "socratic_questions": ["Main Socratic question (specific)", "Question 2", "Question 3", ...],
+  "socratic_questions": ["Question 1", "Question 2", "Question 3", ...],
   "where_contrarian_might_fail": ["Limit 1", "Limit 2", ...]
 }}
 
 REQUIREMENTS:
-- steelman_blocks and contrarian_blocks: at least 2 blocks each. Titles max 30 words; bullets max 20 words each. One idea per bullet.
-- steelman_resumen and contrarian_resumen: 1–2 sentences each. No filler.
+- steelman_of_user: ~200–350 words. 1–3 continuous paragraphs. No bullets, no mini-titles. Reference user's specific wording.
+- contrarian_position: ~150–280 words. 1–2 continuous paragraphs. No bullets, no mini-titles.
 - socratic_questions: 3–7 items. First = main Socratic question (specific).
 - where_contrarian_might_fail: Acknowledge limits.
 - NO generic filler. GROUNDING: Base arguments on the provided Scientific Facts only; do not introduce new empirical claims. If no facts were provided, state explicitly that science does not provide direct empirical facts on this question.

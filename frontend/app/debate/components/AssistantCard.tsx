@@ -132,10 +132,6 @@ export function AssistantCard({ message, messageIndex, creatorLoading, onGenerat
   const dl = dr?.debate_layer
   const steelman = dl?.steelman_of_user ?? ''
   const contrarian = dl?.contrarian_position ?? ''
-  const steelmanBlocks = dl?.steelman_blocks
-  const steelmanResumen = dl?.steelman_resumen ?? ''
-  const contrarianBlocks = dl?.contrarian_blocks
-  const contrarianResumen = dl?.contrarian_resumen ?? ''
   const oneQuestion =
     message.nextQuestion ??
     dl?.socratic_questions?.[0] ??
@@ -187,72 +183,19 @@ export function AssistantCard({ message, messageIndex, creatorLoading, onGenerat
 
   const mainContent = (message.content || '').trim()
 
-  const sectionHeaderStyle: React.CSSProperties = { ...labelStyle, marginBottom: 6 }
-  const blockTitleStyle: React.CSSProperties = { fontSize: 13, fontWeight: 600, color: '#e4e4e7', marginBottom: 4, marginTop: 8 }
-  const bulletStyle: React.CSSProperties = { marginBottom: 4, paddingLeft: 4, fontSize: 13, color: '#e4e4e7' }
-  const resumenStyle: React.CSSProperties = { marginTop: 8, fontSize: 13, color: '#a3a3a3', fontStyle: 'italic' }
-
   return (
     <div style={cardStyle} className="debate-assistant-body">
       <div style={blockStyle}>
-        <div style={sectionHeaderStyle}>⭐ TU POSTURA (EN SU MEJOR VERSIÓN)</div>
-        {steelmanBlocks && steelmanBlocks.length > 0 ? (
-          <>
-            {steelmanBlocks.map((block, i) => (
-              <div key={i}>
-                <div style={blockTitleStyle}>[{i + 1}] {block.title}</div>
-                <ul style={{ margin: 0, paddingLeft: 18 }}>
-                  {(block.bullets || []).map((b, j) => (
-                    <li key={j} style={bulletStyle}>• {b}</li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-            {steelmanResumen && (
-              <div style={resumenStyle}>
-                <strong>RESUMEN RÁPIDO</strong><br />
-                → {steelmanResumen}
-              </div>
-            )}
-          </>
-        ) : (
-          <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{steelman || mainContent || '—'}</p>
-        )}
+        <div style={labelStyle}>{labelPostura}</div>
+        <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{steelman || mainContent || '—'}</p>
       </div>
       <div style={blockStyle}>
-        <div style={sectionHeaderStyle}>⭐ CONTRAPOSTURA</div>
-        {contrarianBlocks && contrarianBlocks.length > 0 ? (
-          <>
-            {contrarianBlocks.map((block, i) => (
-              <div key={i}>
-                <div style={blockTitleStyle}>[{i + 1}] {block.title}</div>
-                <ul style={{ margin: 0, paddingLeft: 18 }}>
-                  {(block.bullets || []).map((b, j) => (
-                    <li key={j} style={bulletStyle}>• {b}</li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-            {contrarianResumen && (
-              <div style={resumenStyle}>
-                <strong>RESUMEN RÁPIDO</strong><br />
-                → {contrarianResumen}
-              </div>
-            )}
-          </>
-        ) : (
-          <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{contrarian || '—'}</p>
-        )}
+        <div style={labelStyle}>{labelContrapunto}</div>
+        <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{contrarian || '—'}</p>
       </div>
       <div style={blockStyle}>
-        <div style={sectionHeaderStyle}>⭐ PREGUNTA PARA TI</div>
-        {oneQuestion ? (
-          <ul style={{ margin: 0, paddingLeft: 18 }}>
-            <li style={bulletStyle}>• {oneQuestion}</li>
-          </ul>
-        ) : (
-          <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>—</p>
-        )}
+        <div style={questionLabelStyle}>{labelPregunta}</div>
+        <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{oneQuestion || '—'}</p>
       </div>
 
       {dr && (
