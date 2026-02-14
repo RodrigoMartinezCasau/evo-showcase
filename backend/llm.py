@@ -213,3 +213,57 @@ Output ONLY the JSON object, no markdown."""
         )
     except Exception:
         return None
+
+
+def translate_debate_layer_star_format_to_es(
+    stance_section: dict,
+    counter_section: dict,
+    question_section: dict,
+    counterarguments: list[str],
+    where_contrarian_might_fail: list[str],
+    llm_client: "OpenAIClient | None" = None,
+) -> tuple[dict, dict, dict, list[str], list[str]] | None:
+    """
+    Translate structured debate (stance_section, counter_section, question_section) from English to Spanish.
+    Returns (stance_section_es, counter_section_es, question_section_es, counterarguments_es, where_contrarian_might_fail_es) or None.
+    """
+    if llm_client is None:
+        llm_client = OpenAIClient()
+    system = """You are a professional translator. Translate from English to Spanish (Spain).
+
+STRICT RULES:
+- DO NOT summarize or shorten. Preserve structure: same section_title, same number of points, same number of bullets per point.
+- Titles: max 30 words. Bullets: full sentences, same density. quick_summary: 1-2 sentences. socratic_question: 1 sentence.
+- Return ONLY valid JSON with keys: stance, counter, question, counterarguments, where_contrarian_might_fail.
+- stance and counter: { "section_title": "...", "points": [ { "index": 1, "title": "...", "bullets": [ { "text": "..." }, ... ] } ], "quick_summary": "..." }.
+- question: { "section_title": "...", "socratic_question": "..." }."""
+
+    user = f"""Translate to Spanish. Preserve structure and length.
+
+stance: {json.dumps(stance_section, ensure_ascii=False)}
+counter: {json.dumps(counter_section, ensure_ascii=False)}
+question: {json.dumps(question_section, ensure_ascii=False)}
+counterarguments: {json.dumps(counterarguments, ensure_ascii=False)}
+where_contrarian_might_fail: {json.dumps(where_contrarian_might_fail, ensure_ascii=False)}
+
+Output ONLY the JSON object, no markdown."""
+
+    try:
+        raw = llm_client.complete(system=system, user=user, language=None, max_tokens=2500, prompt_id="TRANSLATE_ES_STAR")
+        raw = (raw or "").strip()
+        if raw.startswith("```"):
+            lines = raw.split("\n")
+            if lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            raw = "\n".join(lines)
+        data = json.loads(raw)
+        stance_es = data.get("stance") or stance_section
+        counter_es = data.get("counter") or counter_section
+        question_es = data.get("question") or question_section
+        counter_es_list = [str(x).strip() for x in data.get("counterarguments", counterarguments)]
+        wcf_es = [str(x).strip() for x in data.get("where_contrarian_might_fail", where_contrarian_might_fail)]
+        return (stance_es, counter_es, question_es, counter_es_list, wcf_es)
+    except Exception:
+        return None

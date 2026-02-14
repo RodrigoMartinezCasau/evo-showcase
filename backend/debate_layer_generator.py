@@ -3,7 +3,7 @@ import logging
 import re
 from typing import Any, Generator, List
 
-from llm import OpenAIClient, translate_debate_layer_to_es, translate_debate_layer_structured_to_es
+from llm import OpenAIClient, translate_debate_layer_to_es, translate_debate_layer_structured_to_es, translate_debate_layer_star_format_to_es
 from pydantic import BaseModel
 
 
@@ -11,6 +11,28 @@ class DebateBlock(BaseModel):
     """One conceptual block: title (max 30 words) + bullets (max 20 words each)."""
     title: str
     bullets: list[str]
+
+
+# Structured debate output (Postura / Contrapostura / Pregunta) with titled points and bullets
+class BulletPoint(BaseModel):
+    text: str
+
+
+class ArgumentPoint(BaseModel):
+    index: int
+    title: str
+    bullets: list[BulletPoint]
+
+
+class StructuredSection(BaseModel):
+    section_title: str
+    points: list[ArgumentPoint]
+    quick_summary: str
+
+
+class QuestionSection(BaseModel):
+    section_title: str
+    socratic_question: str
 
 
 class DebateLayer(BaseModel):
@@ -24,6 +46,10 @@ class DebateLayer(BaseModel):
     steelman_resumen: str | None = None
     contrarian_blocks: list[DebateBlock] | None = None
     contrarian_resumen: str | None = None
+    # New structured format: stance/counter/question with points and bullets (star layout)
+    stance_section: StructuredSection | None = None
+    counter_section: StructuredSection | None = None
+    question_section: QuestionSection | None = None
 
 
 logger = logging.getLogger(__name__)
@@ -152,7 +178,43 @@ Rewrite Spanish to match English density. Output JSON only."""
 
 
 def _translate_and_validate_es(en_layer: DebateLayer, llm_client: OpenAIClient) -> DebateLayer:
-    """Translate EN to ES. Uses structured translation when layer has blocks; else flat."""
+    """Translate EN to ES. Uses star-format translation when layer has stance_section/counter_section/question_section; else blocks; else flat."""
+    if en_layer.stance_section and en_layer.counter_section and en_layer.question_section:
+        stance_d = en_layer.stance_section.model_dump()
+        counter_d = en_layer.counter_section.model_dump()
+        question_d = en_layer.question_section.model_dump()
+        translated = translate_debate_layer_star_format_to_es(
+            stance_d,
+            counter_d,
+            question_d,
+            en_layer.counterarguments,
+            en_layer.where_contrarian_might_fail,
+            llm_client,
+        )
+        if not translated:
+            logger.warning("Star-format translation to ES failed, returning EN debate_layer")
+            return en_layer
+        stance_es_d, counter_es_d, question_es_d, counter_es, wcf_es = translated
+        stance_sec_es = StructuredSection.model_validate(stance_es_d)
+        counter_sec_es = StructuredSection.model_validate(counter_es_d)
+        question_sec_es = QuestionSection.model_validate(question_es_d)
+        flat_steelman = _derived_flat_from_stance_section(stance_sec_es)
+        flat_contrarian = _derived_flat_from_stance_section(counter_sec_es)
+        sq_es = [
+            question_sec_es.socratic_question,
+            "¿Qué haría cambiar tu postura?",
+            "¿Qué supuestos estás asumiendo?",
+        ]
+        return DebateLayer(
+            steelman_of_user=flat_steelman,
+            contrarian_position=flat_contrarian,
+            counterarguments=counter_es,
+            socratic_questions=sq_es,
+            where_contrarian_might_fail=wcf_es,
+            stance_section=stance_sec_es,
+            counter_section=counter_sec_es,
+            question_section=question_sec_es,
+        )
     if en_layer.steelman_blocks and en_layer.steelman_resumen and en_layer.contrarian_blocks and en_layer.contrarian_resumen:
         sb = [{"title": b.title, "bullets": b.bullets} for b in en_layer.steelman_blocks]
         cb = [{"title": b.title, "bullets": b.bullets} for b in en_layer.contrarian_blocks]
@@ -238,6 +300,189 @@ def _has_conclusive_language(text: str) -> bool:
         if re.search(pat, t, re.IGNORECASE):
             return True
     return False
+
+
+MAX_TITLE_WORDS = 30
+MIN_BULLETS_PER_POINT = 2
+MAX_BULLETS_PER_POINT = 5
+MIN_BULLET_LEN = 30
+
+
+def _word_count(s: str) -> int:
+    return len((s or "").strip().split())
+
+
+def _derived_flat_from_stance_section(section: StructuredSection) -> str:
+    """Derive flat paragraph from structured stance/counter section for fallback display."""
+    parts = []
+    for p in section.points:
+        if (p.title or "").strip():
+            parts.append((p.title or "").strip())
+        for b in p.bullets:
+            t = (getattr(b, "text", b) if isinstance(b, BulletPoint) else str(b)).strip()
+            if t:
+                parts.append("• " + t)
+    if (section.quick_summary or "").strip():
+        parts.append("RESUMEN RÁPIDO → " + (section.quick_summary or "").strip())
+    return "\n".join(parts)
+
+
+def _build_structured_debate_prompts(
+    topic: str,
+    user_message: str,
+    stance: str,
+    facts_summary: str,
+    facts_list: list[dict],
+    debate_memory: dict | None,
+) -> tuple[str, str]:
+    """Build (system_prompt, user_prompt) for StructuredDebateOutput (stance/counter/question with points and bullets)."""
+    has_facts = len(facts_list) > 0
+    system_prompt = """You are a calm, respectful debate facilitator. You are generating a debate response. IMPORTANT: keep the SAME informational value and coverage as a full essay would have, but output ONLY JSON that follows the schema below.
+
+RULES:
+- Do NOT invent new arguments. Do NOT remove arguments. Only reorganize.
+- stance.points: split the stance (user's position in its strongest form) into multiple titled points. Each point has 2–5 bullet sentences. Titles <= 30 words. Bullets must be full sentences with real depth (not one-liners).
+- counter.points: same for the contrarian position.
+- stance.quick_summary and counter.quick_summary: 1–2 sentences summarizing that section.
+- question.socratic_question: 1 sentence that invites reflection (Socratic question).
+- Maintain language: output in English.
+- Include counterarguments and where_contrarian_might_fail as arrays (same as before).
+
+SCHEMA (StructuredDebateOutput):
+{
+  "stance": { "section_title": "TU POSTURA (EN SU MEJOR VERSIÓN)", "points": [ { "index": 1, "title": "...", "bullets": [ { "text": "..." }, ... ] } ], "quick_summary": "..." },
+  "counter": { "section_title": "CONTRAPOSTURA", "points": [ ... ], "quick_summary": "..." },
+  "question": { "section_title": "PREGUNTA PARA TI", "socratic_question": "..." },
+  "counterarguments": ["...", ...],
+  "where_contrarian_might_fail": ["...", ...]
+}
+
+Return ONLY valid JSON, no markdown."""
+    if has_facts:
+        system_prompt += "\n\nGROUNDING (STRICT): Your arguments MUST be based on the provided Scientific Facts. You may interpret them, but you may NOT introduce new empirical claims."
+    else:
+        system_prompt += "\n\nGROUNDING (STRICT): No relevant scientific facts were provided. stance and counter MUST explicitly state that science does not provide direct empirical facts on this question where appropriate."
+    contrarian_instruction = (
+        "Adopt a clear contrarian position that challenges the user's view."
+        if stance not in ("agnostic", "unknown", "balanced")
+        else "Offer a balanced critique that considers multiple perspectives without favoring one side."
+    )
+    memory_block = ""
+    if debate_memory:
+        terms = debate_memory.get("key_terms", [])
+        assumptions = debate_memory.get("assumptions", [])
+        prev_stance = debate_memory.get("user_stance")
+        if terms or assumptions or prev_stance:
+            memory_block = "\n[Previous debate context]\n"
+            if prev_stance:
+                memory_block += f"- User's stance: {prev_stance}\n"
+            if terms:
+                memory_block += f"- Key terms: {', '.join(terms[:8])}\n"
+            if assumptions:
+                memory_block += f"- Assumptions: {'; '.join(assumptions[:5])}\n"
+    facts_block = _format_scientific_facts_block(facts_list)
+    user_prompt = f"""topic: {topic}
+user_message: {user_message}
+Detected stance: {stance}
+Facts summary: {facts_summary}
+{memory_block}
+{facts_block + chr(10) + chr(10) if facts_block else ""}
+{contrarian_instruction}
+
+Generate the JSON for StructuredDebateOutput. Return ONLY valid JSON, no markdown."""
+    return system_prompt, user_prompt
+
+
+def _validate_structured_debate(debate_dict: dict) -> tuple[StructuredSection, StructuredSection, QuestionSection] | None:
+    """Validate debate_dict as StructuredDebateOutput. Returns (stance_section, counter_section, question_section) or None."""
+    try:
+        stance = debate_dict.get("stance")
+        counter = debate_dict.get("counter")
+        question = debate_dict.get("question")
+        if not isinstance(stance, dict) or not isinstance(counter, dict) or not isinstance(question, dict):
+            return None
+        for section_name, section in (("stance", stance), ("counter", counter)):
+            st = (section.get("section_title") or "").strip()
+            qs = (section.get("quick_summary") or "").strip()
+            pts = section.get("points")
+            if not st or not qs or not isinstance(pts, list) or len(pts) < 1:
+                return None
+            for p in pts:
+                if not isinstance(p, dict):
+                    return None
+                title = (p.get("title") or "").strip()
+                if _word_count(title) > MAX_TITLE_WORDS:
+                    return None
+                blist = p.get("bullets")
+                if not isinstance(blist, list) or len(blist) < MIN_BULLETS_PER_POINT or len(blist) > MAX_BULLETS_PER_POINT:
+                    return None
+                for b in blist:
+                    if isinstance(b, dict):
+                        t = (b.get("text") or "").strip()
+                    else:
+                        t = str(b).strip()
+                    if len(t) < MIN_BULLET_LEN:
+                        return None
+        sq = (question.get("socratic_question") or "").strip()
+        if not sq or "\n" in sq:
+            return None
+        # Build Pydantic models
+        def to_bullet_list(items: list) -> list[BulletPoint]:
+            out = []
+            for b in items:
+                if isinstance(b, dict):
+                    t = (b.get("text") or "").strip()
+                else:
+                    t = str(b).strip()
+                if t:
+                    out.append(BulletPoint(text=t))
+            return out
+
+        def to_argument_points(items: list) -> list[ArgumentPoint]:
+            out = []
+            for i, p in enumerate(items):
+                if not isinstance(p, dict):
+                    continue
+                idx = p.get("index")
+                if idx is None:
+                    idx = i + 1
+                title = (p.get("title") or "").strip() or "..."
+                blist = to_bullet_list(p.get("bullets") or [])
+                if len(blist) < MIN_BULLETS_PER_POINT:
+                    continue
+                out.append(ArgumentPoint(index=int(idx), title=title, bullets=blist))
+            return out
+
+        stance_sec = StructuredSection(
+            section_title=(stance.get("section_title") or "").strip() or "TU POSTURA (EN SU MEJOR VERSIÓN)",
+            points=to_argument_points(stance.get("points") or []),
+            quick_summary=(stance.get("quick_summary") or "").strip(),
+        )
+        counter_sec = StructuredSection(
+            section_title=(counter.get("section_title") or "").strip() or "CONTRAPOSTURA",
+            points=to_argument_points(counter.get("points") or []),
+            quick_summary=(counter.get("quick_summary") or "").strip(),
+        )
+        if len(stance_sec.points) < 1 or len(counter_sec.points) < 1:
+            return None
+        question_sec = QuestionSection(
+            section_title=(question.get("section_title") or "").strip() or "PREGUNTA PARA TI",
+            socratic_question=sq,
+        )
+        if _has_conclusive_language(stance_sec.quick_summary) or _has_conclusive_language(counter_sec.quick_summary):
+            return None
+        for p in stance_sec.points:
+            if _has_conclusive_language(p.title):
+                return None
+        for p in counter_sec.points:
+            if _has_conclusive_language(p.title):
+                return None
+        if _has_conclusive_language(sq):
+            return None
+        return (stance_sec, counter_sec, question_sec)
+    except Exception as e:
+        logger.debug("Structured debate validation error: %s", e)
+        return None
 
 
 def _format_scientific_facts_block(scientific_facts: list[dict]) -> str:
@@ -351,46 +596,80 @@ def generate_debate_layer(
 ) -> DebateLayer:
     """
     Generate debate_layer using LLM. Always generates in English (canonical).
-    Opinion and Counterpoint MUST be grounded in scientific_facts when provided; no new empirical claims.
+    Tries structured output (stance/counter/question with points and bullets) first; falls back to essay format if invalid.
     If response_language == "es", translates to Spanish with strict richness preservation.
     """
     if llm_client is None:
         llm_client = OpenAIClient()
     facts_list = scientific_facts if scientific_facts is not None else []
-    system_prompt, user_prompt = _build_debate_prompts(
+    from llm import MAX_TOKENS_DEBATE
+
+    # 1) Try structured prompt first
+    system_structured, user_structured = _build_structured_debate_prompts(
         topic, user_message, stance, facts_summary, facts_list, debate_memory
     )
-    full_prompt = system_prompt + "\n\n" + user_prompt
-    _assert_prompt_uses_user_text(full_prompt, user_message)
+    full_structured = system_structured + "\n\n" + user_structured
+    _assert_prompt_uses_user_text(full_structured, user_message)
 
     try:
-        from llm import MAX_TOKENS_DEBATE
-        # Always generate in English (canonical)
+        raw_response = llm_client.complete(
+            system=system_structured, user=user_structured, language=None, max_tokens=MAX_TOKENS_DEBATE, prompt_id="DEBATE_STRUCTURED"
+        )
+        debate_dict = _extract_json(raw_response)
+
+        if debate_dict is not None:
+            structured_triple = _validate_structured_debate(debate_dict)
+            if structured_triple:
+                stance_sec, counter_sec, question_sec = structured_triple
+                flat_steelman = _derived_flat_from_stance_section(stance_sec)
+                flat_contrarian = _derived_flat_from_stance_section(counter_sec)
+                counter = [str(x).strip() for x in debate_dict.get("counterarguments", [])]
+                wcf = [str(x).strip() for x in debate_dict.get("where_contrarian_might_fail", [])]
+                sq_list = [
+                    question_sec.socratic_question,
+                    "What would change your view on this?",
+                    "What assumptions are you making?",
+                ]
+                debate_layer = DebateLayer(
+                    steelman_of_user=flat_steelman,
+                    contrarian_position=flat_contrarian,
+                    counterarguments=counter if counter else ["See counter section above."],
+                    socratic_questions=sq_list,
+                    where_contrarian_might_fail=wcf if wcf else [],
+                    stance_section=stance_sec,
+                    counter_section=counter_sec,
+                    question_section=question_sec,
+                )
+                if response_language == "es":
+                    return _translate_and_validate_es(debate_layer, llm_client)
+                return debate_layer
+        # 2) Fallback: essay-style prompt and validation
+        logger.info("Structured debate validation failed or missing; using essay prompt")
+        system_prompt, user_prompt = _build_debate_prompts(
+            topic, user_message, stance, facts_summary, facts_list, debate_memory
+        )
+        full_prompt = system_prompt + "\n\n" + user_prompt
+        _assert_prompt_uses_user_text(full_prompt, user_message)
         raw_response = llm_client.complete(
             system=system_prompt, user=user_prompt, language=None, max_tokens=MAX_TOKENS_DEBATE, prompt_id="DEBATE_EN"
         )
         debate_dict = _extract_json(raw_response)
-
         if debate_dict is None:
             logger.warning("Failed to parse LLM JSON for debate_layer, attempting repair")
             return _repair_debate_layer(
                 topic, user_message, stance, facts_summary, facts_list, llm_client, "Failed to parse JSON", response_language
             )
-
         debate_layer = _validate_and_build_debate_layer(debate_dict)
         if debate_layer:
-            # Translate to Spanish if needed
             if response_language == "es":
                 return _translate_and_validate_es(debate_layer, llm_client)
             return debate_layer
-
         logger.warning("DebateLayer validation failed, attempting repair")
         return _repair_debate_layer(
             topic, user_message, stance, facts_summary, facts_list, llm_client, "Validation failed", response_language
         )
-
     except Exception as e:
-        logger.error(f"Error generating debate_layer: {e}", exc_info=True)
+        logger.error("Error generating debate_layer: %s", e, exc_info=True)
         return _fallback_debate_layer(user_message, response_language, llm_client)
 
 
@@ -406,24 +685,59 @@ def generate_debate_layer_stream(
 ) -> Generator[dict[str, Any], None, None]:
     """
     Stream debate layer: yield {"type": "delta", "content": chunk} for each LLM chunk,
-    then {"type": "done", "layer": DebateLayer}. Same logic as generate_debate_layer; delivery only is streamed.
+    then {"type": "done", "layer": DebateLayer}. Tries structured output first, then essay fallback.
     """
     if llm_client is None:
         llm_client = OpenAIClient()
     facts_list = scientific_facts if scientific_facts is not None else []
-    system_prompt, user_prompt = _build_debate_prompts(
+    from llm import MAX_TOKENS_DEBATE
+    system_prompt, user_prompt = _build_structured_debate_prompts(
         topic, user_message, stance, facts_summary, facts_list, debate_memory
     )
     _assert_prompt_uses_user_text(system_prompt + "\n\n" + user_prompt, user_message)
-    from llm import MAX_TOKENS_DEBATE
     accumulated: list[str] = []
     try:
         for chunk in llm_client.complete_stream(
-            system=system_prompt, user=user_prompt, language=None, max_tokens=MAX_TOKENS_DEBATE, prompt_id="DEBATE_EN"
+            system=system_prompt, user=user_prompt, language=None, max_tokens=MAX_TOKENS_DEBATE, prompt_id="DEBATE_STRUCTURED"
         ):
             accumulated.append(chunk)
             yield {"type": "delta", "content": chunk}
         raw_response = "".join(accumulated)
+        debate_dict = _extract_json(raw_response)
+        if debate_dict is not None:
+            structured_triple = _validate_structured_debate(debate_dict)
+            if structured_triple:
+                stance_sec, counter_sec, question_sec = structured_triple
+                flat_steelman = _derived_flat_from_stance_section(stance_sec)
+                flat_contrarian = _derived_flat_from_stance_section(counter_sec)
+                counter = [str(x).strip() for x in debate_dict.get("counterarguments", [])]
+                wcf = [str(x).strip() for x in debate_dict.get("where_contrarian_might_fail", [])]
+                sq_list = [
+                    question_sec.socratic_question,
+                    "What would change your view on this?",
+                    "What assumptions are you making?",
+                ]
+                debate_layer = DebateLayer(
+                    steelman_of_user=flat_steelman,
+                    contrarian_position=flat_contrarian,
+                    counterarguments=counter if counter else ["See counter section above."],
+                    socratic_questions=sq_list,
+                    where_contrarian_might_fail=wcf if wcf else [],
+                    stance_section=stance_sec,
+                    counter_section=counter_sec,
+                    question_section=question_sec,
+                )
+                if response_language == "es":
+                    debate_layer = _translate_and_validate_es(debate_layer, llm_client)
+                yield {"type": "done", "layer": debate_layer}
+                return
+        # Fallback: essay prompt
+        system_essay, user_essay = _build_debate_prompts(
+            topic, user_message, stance, facts_summary, facts_list, debate_memory
+        )
+        raw_response = llm_client.complete(
+            system=system_essay, user=user_essay, language=None, max_tokens=MAX_TOKENS_DEBATE, prompt_id="DEBATE_EN"
+        )
         debate_dict = _extract_json(raw_response)
         if debate_dict is None:
             logger.warning("Failed to parse LLM JSON for debate_layer (stream), attempting repair")

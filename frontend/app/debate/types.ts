@@ -56,6 +56,29 @@ export type DebateBlock = {
   bullets: string[]
 }
 
+/** Single bullet in structured stance/counter (full sentence). */
+export type BulletPoint = { text: string }
+
+/** One argument point: index (for star icon), title (<= 30 words), bullets. */
+export type ArgumentPoint = {
+  index: number
+  title: string
+  bullets: BulletPoint[]
+}
+
+/** Structured section: section_title, points, quick_summary. */
+export type StructuredSection = {
+  section_title: string
+  points: ArgumentPoint[]
+  quick_summary: string
+}
+
+/** Question section: section_title + single socratic_question. */
+export type QuestionSection = {
+  section_title: string
+  socratic_question: string
+}
+
 export type DebateLayer = {
   steelman_of_user: string
   contrarian_position: string
@@ -67,6 +90,10 @@ export type DebateLayer = {
   steelman_resumen?: string
   contrarian_blocks?: DebateBlock[]
   contrarian_resumen?: string
+  /** New structured format: stance/counter/question with points and bullets (star layout). */
+  stance_section?: StructuredSection
+  counter_section?: StructuredSection
+  question_section?: QuestionSection
 }
 
 export type Closing = {
