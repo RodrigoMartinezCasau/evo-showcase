@@ -1,32 +1,8 @@
 'use client'
 
-import { UI_TUNING } from '../styles/debateBlockSizes'
+import { STYLE_CONTROLS } from '../styles/debateBlockSizes'
 
-const starContainerStyle: React.CSSProperties = {
-  flexShrink: 0,
-  width: UI_TUNING.STAR_TITLE_SIZE_PX,
-  height: UI_TUNING.STAR_TITLE_SIZE_PX,
-  minWidth: UI_TUNING.STAR_TITLE_SIZE_PX,
-  minHeight: UI_TUNING.STAR_TITLE_SIZE_PX,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-}
-
-const textContainerStyle: React.CSSProperties = {
-  flex: 1,
-  minWidth: 0,
-  display: 'flex',
-  alignItems: 'center',
-}
-
-const titleStyle: React.CSSProperties = {
-  fontSize: UI_TUNING.FONT_TITLE_PX,
-  lineHeight: UI_TUNING.LINE_TITLE,
-  fontWeight: 600,
-  color: '#e4e4e7',
-  margin: 0,
-}
+const SC = STYLE_CONTROLS
 
 type Props = {
   title: string
@@ -34,33 +10,51 @@ type Props = {
 }
 
 /**
- * Cabecera de sección con icono a la izquierda (títulos principales: Postura, Contrapostura, Pregunta).
+ * Cabecera de sección con estrella en gutter (posición absoluta).
+ * El texto usa TEXT_LEFT_PADDING; cambiar STAR_MAIN_SIZE no mueve el texto.
  */
 export function SectionHeaderWithIcon({ title, iconSrc }: Props) {
   return (
     <div
       style={{
-        display: 'flex',
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: UI_TUNING.STAR_GAP_PX,
-        marginBottom: UI_TUNING.GAP_AFTER_MAIN_TITLE_PX,
+        position: 'relative',
+        paddingLeft: SC.TEXT_LEFT_PADDING,
+        marginBottom: SC.GAP_AFTER_MAIN_TITLE,
+        minHeight: SC.STAR_MAIN_SIZE,
       }}
       role="heading"
       aria-level={2}
     >
-      <div style={starContainerStyle} aria-hidden>
+      {/* Estrella: absoluta, no afecta flujo del texto */}
+      <div
+        style={{
+          position: 'absolute',
+          left: SC.STAR_MAIN_LEFT_OFFSET,
+          top: SC.STAR_MAIN_TOP_OFFSET,
+          width: SC.STAR_MAIN_SIZE,
+          height: SC.STAR_MAIN_SIZE,
+        }}
+        aria-hidden
+      >
         <img
           src={iconSrc}
           alt=""
-          width={UI_TUNING.STAR_TITLE_SIZE_PX}
-          height={UI_TUNING.STAR_TITLE_SIZE_PX}
-          style={{ display: 'block', width: UI_TUNING.STAR_TITLE_SIZE_PX, height: UI_TUNING.STAR_TITLE_SIZE_PX }}
+          width={SC.STAR_MAIN_SIZE}
+          height={SC.STAR_MAIN_SIZE}
+          style={{ display: 'block', width: SC.STAR_MAIN_SIZE, height: SC.STAR_MAIN_SIZE }}
         />
       </div>
-      <div style={textContainerStyle}>
-        <span style={titleStyle}>{title}</span>
-      </div>
+      <span
+        style={{
+          fontSize: SC.TEXT_MAIN_TITLE_SIZE,
+          lineHeight: SC.LINE_HEIGHT_MAIN,
+          fontWeight: 600,
+          color: '#e4e4e7',
+          display: 'block',
+        }}
+      >
+        {title}
+      </span>
     </div>
   )
 }

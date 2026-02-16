@@ -1,6 +1,6 @@
 'use client'
 
-/** UI tuning (Postura/Contrapunto/Pregunta): edit UI_TUNING in ../styles/debateBlockSizes.ts */
+/** Estilos Postura/Contrapunto/Pregunta: edit STYLE_CONTROLS in ../styles/debateBlockSizes.ts */
 import { useEffect, useState } from 'react'
 import { t } from '@/src/i18n'
 import type { AuthorLayer, FactsLayer, Message } from '../types'
@@ -8,7 +8,9 @@ import type { StructuredSection, QuestionSection } from '../types'
 import { fetchMessageCreator, fetchMessageFacts, fetchMessageQuotes } from '../api'
 import { SectionHeaderWithIcon } from './SectionHeaderWithIcon'
 import { NumberedPoint } from './NumberedPoint'
-import { UI_TUNING } from '../styles/debateBlockSizes'
+import { STYLE_CONTROLS } from '../styles/debateBlockSizes'
+
+const SC = STYLE_CONTROLS
 
 const STAR_ICON_SRC = '/estrella2.png'
 const POSTURA_TITLE_STAR_SRC = '/postura-star.png'
@@ -51,7 +53,7 @@ const cardStyle: React.CSSProperties = {
   width: '100%',
   maxWidth: '100%',
   minWidth: 0,
-  padding: `${UI_TUNING.PAD_CONTAINER_V_PX}px ${UI_TUNING.PAD_CONTAINER_H_PX}px`,
+  padding: `${SC.PAD_CONTAINER_V}px ${SC.PAD_CONTAINER_H}px`,
   borderRadius: 18,
   background: '#262626',
   border: '1px solid #404040',
@@ -60,7 +62,11 @@ const cardStyle: React.CSSProperties = {
 }
 
 const blockStyle: React.CSSProperties = {
-  marginBottom: UI_TUNING.GAP_BETWEEN_SECTIONS_PX,
+  marginBottom: SC.SPACING_BETWEEN_SECTIONS,
+}
+
+const blockStylePregunta: React.CSSProperties = {
+  marginBottom: SC.GAP_AFTER_PREGUNTA,
 }
 
 const labelStyle: React.CSSProperties = {
@@ -230,11 +236,11 @@ export function AssistantCard({ message, messageIndex, creatorLoading, onGenerat
   const mainContent = (message.content || '').trim()
 
   const quickSummaryStyle: React.CSSProperties = {
-    marginTop: UI_TUNING.GAP_BEFORE_SUMMARY_PX,
-    paddingTop: UI_TUNING.DIVIDER_PADDING_TOP_PX,
-    borderTop: `${UI_TUNING.DIVIDER_HEIGHT_PX}px solid #404040`,
-    fontSize: UI_TUNING.FONT_SUMMARY_PX,
-    lineHeight: UI_TUNING.LINE_BODY,
+    marginTop: SC.GAP_BEFORE_SUMMARY,
+    paddingTop: SC.DIVIDER_PADDING_TOP,
+    borderTop: `${SC.DIVIDER_HEIGHT}px solid #404040`,
+    fontSize: SC.TEXT_SUMMARY_SIZE,
+    lineHeight: SC.LINE_HEIGHT_BODY,
     color: '#a3a3a3',
   }
 
@@ -257,10 +263,10 @@ export function AssistantCard({ message, messageIndex, creatorLoading, onGenerat
         ))}
         {section.quick_summary?.trim() && (
           <div style={quickSummaryStyle}>
-            <strong style={{ color: '#737373', fontSize: UI_TUNING.FONT_SUMMARY_LABEL_PX, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <strong style={{ color: '#737373', fontSize: SC.TEXT_SUMMARY_LABEL_SIZE, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               RESUMEN RÁPIDO
             </strong>
-            <p style={{ margin: '4px 0 0', color: '#e4e4e7', fontSize: UI_TUNING.FONT_SUMMARY_PX, lineHeight: UI_TUNING.LINE_BODY }}>
+            <p style={{ margin: '4px 0 0', color: '#e4e4e7', fontSize: SC.TEXT_SUMMARY_SIZE, lineHeight: SC.LINE_HEIGHT_BODY }}>
               {section.quick_summary}
             </p>
           </div>
@@ -269,28 +275,37 @@ export function AssistantCard({ message, messageIndex, creatorLoading, onGenerat
     )
   }
 
-  const questionRowStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: UI_TUNING.STAR_GAP_PX,
-  }
-
   function renderQuestionSection(qSection: QuestionSection) {
     return (
       <>
         <SectionHeaderWithIcon title={qSection.section_title} iconSrc={PREGUNTA_TITLE_STAR_SRC} />
-        <div style={questionRowStyle}>
-          <div style={{ flexShrink: 0, width: UI_TUNING.STAR_SUB_SIZE_PX, height: UI_TUNING.STAR_SUB_SIZE_PX }} aria-hidden>
+        {/* Pregunta: estrella en gutter (absoluta), texto con TEXT_LEFT_PADDING */}
+        <div
+          style={{
+            position: 'relative',
+            paddingLeft: SC.TEXT_LEFT_PADDING,
+            minHeight: SC.STAR_SUBTITLE_SIZE,
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              left: SC.STAR_SUBTITLE_LEFT_OFFSET,
+              top: SC.STAR_SUBTITLE_TOP_OFFSET,
+              width: SC.STAR_SUBTITLE_SIZE,
+              height: SC.STAR_SUBTITLE_SIZE,
+            }}
+            aria-hidden
+          >
             <img
               src={PREGUNTA_SUB_STAR_SRC}
               alt=""
-              width={UI_TUNING.STAR_SUB_SIZE_PX}
-              height={UI_TUNING.STAR_SUB_SIZE_PX}
-              style={{ display: 'block', width: UI_TUNING.STAR_SUB_SIZE_PX, height: UI_TUNING.STAR_SUB_SIZE_PX }}
+              width={SC.STAR_SUBTITLE_SIZE}
+              height={SC.STAR_SUBTITLE_SIZE}
+              style={{ display: 'block', width: SC.STAR_SUBTITLE_SIZE, height: SC.STAR_SUBTITLE_SIZE }}
             />
           </div>
-          <p style={{ flex: 1, minWidth: 0, margin: 0, whiteSpace: 'pre-wrap', fontSize: UI_TUNING.FONT_BODY_PX, lineHeight: UI_TUNING.LINE_BODY }}>
+          <p style={{ margin: 0, minWidth: 0, whiteSpace: 'pre-wrap', fontSize: SC.TEXT_QUESTION_SIZE, lineHeight: SC.LINE_HEIGHT_BODY }}>
             {qSection.socratic_question}
           </p>
         </div>
@@ -308,7 +323,7 @@ export function AssistantCard({ message, messageIndex, creatorLoading, onGenerat
           <div style={blockStyle}>
             {renderStructuredSection(dl!.counter_section!, CONTRAPOSTURA_TITLE_STAR_SRC, CONTRAPOSTURA_SUB_STAR_SRC)}
           </div>
-          <div style={blockStyle}>
+          <div style={blockStylePregunta}>
             {renderQuestionSection(dl!.question_section!)}
           </div>
         </>
@@ -332,7 +347,7 @@ export function AssistantCard({ message, messageIndex, creatorLoading, onGenerat
                   ))}
                   {summary != null && summary.trim() && (
                     <div style={quickSummaryStyle}>
-                      <p style={{ margin: 0, whiteSpace: 'pre-wrap', color: '#e4e4e7', fontSize: UI_TUNING.FONT_SUMMARY_PX, lineHeight: UI_TUNING.LINE_BODY }}>
+                      <p style={{ margin: 0, whiteSpace: 'pre-wrap', color: '#e4e4e7', fontSize: SC.TEXT_SUMMARY_SIZE, lineHeight: SC.LINE_HEIGHT_BODY }}>
                         {summary}
                       </p>
                     </div>
@@ -359,7 +374,7 @@ export function AssistantCard({ message, messageIndex, creatorLoading, onGenerat
                   ))}
                   {summary != null && summary.trim() && (
                     <div style={quickSummaryStyle}>
-                      <p style={{ margin: 0, whiteSpace: 'pre-wrap', color: '#e4e4e7', fontSize: UI_TUNING.FONT_SUMMARY_PX, lineHeight: UI_TUNING.LINE_BODY }}>
+                      <p style={{ margin: 0, whiteSpace: 'pre-wrap', color: '#e4e4e7', fontSize: SC.TEXT_SUMMARY_SIZE, lineHeight: SC.LINE_HEIGHT_BODY }}>
                         {summary}
                       </p>
                     </div>
@@ -368,19 +383,34 @@ export function AssistantCard({ message, messageIndex, creatorLoading, onGenerat
               )
             })()}
           </div>
-          <div style={blockStyle}>
+          <div style={blockStylePregunta}>
             <SectionHeaderWithIcon title={labelPregunta} iconSrc={PREGUNTA_TITLE_STAR_SRC} />
-            <div style={questionRowStyle}>
-              <div style={{ flexShrink: 0, width: UI_TUNING.STAR_SUB_SIZE_PX, height: UI_TUNING.STAR_SUB_SIZE_PX }} aria-hidden>
+            <div
+              style={{
+                position: 'relative',
+                paddingLeft: SC.TEXT_LEFT_PADDING,
+                minHeight: SC.STAR_SUBTITLE_SIZE,
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  left: SC.STAR_SUBTITLE_LEFT_OFFSET,
+                  top: SC.STAR_SUBTITLE_TOP_OFFSET,
+                  width: SC.STAR_SUBTITLE_SIZE,
+                  height: SC.STAR_SUBTITLE_SIZE,
+                }}
+                aria-hidden
+              >
                 <img
                   src={PREGUNTA_SUB_STAR_SRC}
                   alt=""
-                  width={UI_TUNING.STAR_SUB_SIZE_PX}
-                  height={UI_TUNING.STAR_SUB_SIZE_PX}
-                  style={{ display: 'block', width: UI_TUNING.STAR_SUB_SIZE_PX, height: UI_TUNING.STAR_SUB_SIZE_PX }}
+                  width={SC.STAR_SUBTITLE_SIZE}
+                  height={SC.STAR_SUBTITLE_SIZE}
+                  style={{ display: 'block', width: SC.STAR_SUBTITLE_SIZE, height: SC.STAR_SUBTITLE_SIZE }}
                 />
               </div>
-              <p style={{ flex: 1, minWidth: 0, margin: 0, whiteSpace: 'pre-wrap', fontSize: UI_TUNING.FONT_BODY_PX, lineHeight: UI_TUNING.LINE_BODY }}>
+              <p style={{ margin: 0, minWidth: 0, whiteSpace: 'pre-wrap', fontSize: SC.TEXT_QUESTION_SIZE, lineHeight: SC.LINE_HEIGHT_BODY }}>
                 {oneQuestion || '—'}
               </p>
             </div>
