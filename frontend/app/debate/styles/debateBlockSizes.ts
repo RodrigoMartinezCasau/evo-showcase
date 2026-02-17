@@ -49,8 +49,8 @@ export const STYLE_CONTROLS = {
   SPACING_BETWEEN_SUBTITLE_AND_BODY: -31,
   SPACING_BETWEEN_BULLETS: 14,
   SPACING_BETWEEN_BLOCKS: 20,       // entre puntos (subtítulos)
-  SPACING_BETWEEN_SECTIONS: 35,     // Postura vs Contrapunto vs Pregunta
-  GAP_AFTER_PREGUNTA: 0,           // espacio entre Pregunta y Hechos científicos
+  SPACING_BETWEEN_SECTIONS: 30,     // Postura vs Contrapunto vs Pregunta
+  GAP_AFTER_PREGUNTA: -12,           // espacio entre Pregunta y Hechos científicos
   GAP_AFTER_MAIN_TITLE: -20,
   GAP_BEFORE_SUMMARY: 30,
 

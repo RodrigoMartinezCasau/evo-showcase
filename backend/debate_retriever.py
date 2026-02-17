@@ -601,6 +601,61 @@ class DebateRetriever:
             result = [(all_quotes[0], 0)]
         return result
 
+    def pad_verbatim_quotes_to_n(
+        self, quotes: List[VerbatimQuote], n: int = 3
+    ) -> List[VerbatimQuote]:
+        """
+        Ensure at least n quotes by appending from KB (sorted by id).
+        Skips duplicate quote id and author. Deterministic; no LLM; only picks from existing KB.
+        """
+        if len(quotes) >= n:
+            return list(quotes[:n])
+        all_q = self._quotes_loader.get_all()
+        seen_ids = {q.id for q in quotes}
+        seen_authors = {(q.author or "").strip().lower() for q in quotes}
+        rest = [q for q in all_q if q.id not in seen_ids]
+        rest.sort(key=lambda x: x.id)
+        out = list(quotes)
+        for q in rest:
+            if len(out) >= n:
+                break
+            author_key = (q.author or "").strip().lower()
+            if author_key in seen_authors:
+                continue
+            seen_authors.add(author_key)
+            seen_ids.add(q.id)
+            out.append(q)
+        return out
+
+    def get_padding_verbatim_quotes(
+        self,
+        existing_quote_ids: set,
+        existing_authors: set,
+        need: int,
+    ) -> List[VerbatimQuote]:
+        """
+        Return up to `need` quotes from KB (sorted by id), skipping ids and authors in the given sets.
+        Used to pad author_layer.quotes to 3 for display. Does not mutate the input sets.
+        """
+        if need <= 0:
+            return []
+        all_q = self._quotes_loader.get_all()
+        seen_ids = set(existing_quote_ids)
+        seen_authors = set(existing_authors)
+        rest = [q for q in all_q if q.id not in seen_ids]
+        rest.sort(key=lambda x: x.id)
+        out = []
+        for q in rest:
+            if len(out) >= need:
+                break
+            author_key = (q.author or "").strip().lower()
+            if author_key in seen_authors:
+                continue
+            seen_authors.add(author_key)
+            seen_ids.add(q.id)
+            out.append(q)
+        return out
+
 
 def debug_quote_retrieval(sample_prompts: List[str] | None = None) -> None:
     """

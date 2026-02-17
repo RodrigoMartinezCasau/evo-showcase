@@ -197,6 +197,7 @@ def _run_debate_pipeline(
             language=response_language,
         )
         verbatim_quotes_for_layer = [q for q, _ in verbatim_results]
+        verbatim_quotes_for_layer = retriever.pad_verbatim_quotes_to_n(verbatim_quotes_for_layer, 3)
         if verbatim_results:
             if logger.isEnabledFor(logging.DEBUG):
                 logger.debug(
@@ -827,9 +828,34 @@ def fetch_message_facts(message_id: str):
     return response
 
 
+def _pad_quotes_response_to_three(quotes_payload: dict, language: str = "en") -> dict:
+    """If quotes_payload['quotes'] has < 3 items, pad from KB (deterministic). Returns modified dict."""
+    current = list(quotes_payload.get("quotes") or [])
+    if len(current) >= 3:
+        return quotes_payload
+    from debate_retriever import DebateRetriever
+
+    existing_ids = {q.get("quote_id") for q in current if q.get("quote_id")}
+    existing_authors = {(q.get("author") or "").strip().lower() for q in current}
+    retriever = DebateRetriever()
+    padding = retriever.get_padding_verbatim_quotes(existing_ids, existing_authors, 3 - len(current))
+    for vq in padding:
+        text = (vq.text_es if language == "es" else None) or vq.text_en or vq.text_es or vq.text_original
+        current.append({
+            "quote_id": vq.id,
+            "author": vq.author,
+            "work": vq.work,
+            "quote": text or "",
+            "interpretation": vq.notes or "",
+            "relevance": "",
+        })
+    quotes_payload["quotes"] = current
+    return quotes_payload
+
+
 @app.post("/messages/{message_id}/quotes")
 def fetch_message_quotes(message_id: str):
-    """Lazy-load quotes for an assistant message. Returns from cache."""
+    """Lazy-load quotes for an assistant message. Returns from cache. Always returns 3 quotes when KB has enough."""
     from debate_db import get_message, get_or_create_message_details, upsert_message_details
 
     msg = get_message(message_id)
@@ -837,15 +863,17 @@ def fetch_message_quotes(message_id: str):
         raise HTTPException(status_code=404, detail="Assistant message not found")
     md = get_or_create_message_details(message_id)
     if md.quotes_json:
-        return json.loads(md.quotes_json)
+        payload = json.loads(md.quotes_json)
+        return _pad_quotes_response_to_three(payload, language="en")
     if msg.meta_json:
         meta = json.loads(msg.meta_json)
         dr = meta.get("debate_response")
         if isinstance(dr, dict) and dr.get("author_layer"):
-            quotes = dr["author_layer"]
+            quotes = dict(dr["author_layer"])
+            quotes = _pad_quotes_response_to_three(quotes, language="en")
             upsert_message_details(message_id, quotes_json=json.dumps(quotes))
             return quotes
-    return {"quotes": [], "quote_policy_note": ""}
+    return _pad_quotes_response_to_three({"quotes": [], "quote_policy_note": ""})
 
 
 @app.post("/messages/{message_id}/creator")
@@ -904,6 +932,7 @@ def _run_creator(topic: str, user_message: str):
         topic or "", user_message or "", top_n=3, language="en"
     )
     verbatim_quotes_for_layer = [q for q, _ in verbatim_results]
+    verbatim_quotes_for_layer = retriever.pad_verbatim_quotes_to_n(verbatim_quotes_for_layer, 3)
     if verbatim_quotes_for_layer:
         author_layer = AuthorLayer(
             quotes=[
@@ -1079,6 +1108,7 @@ def creator(payload: CreatorRequest):
             language=payload.lang or "en",
         )
         verbatim_quotes_for_layer = [q for q, _ in verbatim_results]
+        verbatim_quotes_for_layer = retriever.pad_verbatim_quotes_to_n(verbatim_quotes_for_layer, 3)
         if verbatim_quotes_for_layer:
             author_layer = AuthorLayer(
                 quotes=[

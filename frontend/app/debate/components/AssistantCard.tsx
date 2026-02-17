@@ -12,6 +12,79 @@ import { STYLE_CONTROLS } from '../styles/debateBlockSizes'
 
 const SC = STYLE_CONTROLS
 
+/** Labels editables del bloque "Hechos científicos" (solo display, sin tocar datos). */
+const SCI_FACTS_LABELS = {
+  contextTitle: 'CONTEXTO CIENTÍFICO',
+  contextTitleSuffix: '', // ej. "(GENERADO)" o "" para quitarlo
+  showNote: false,
+  noteText: 'Nota: esto es una explicación general generada por IA; puede contener errores y no sustituye verificación con fuentes.',
+  verifyTitle: 'CÓMO SE PODRÍA VERIFICAR',
+}
+
+/** Estilo del bloque de contexto (líneas): editable aquí. */
+const SCI_FACTS_CONTEXT_STYLE = {
+  fontSize: 13,
+  lineHeight: 1.5,
+  lineSpacingBottom: 6,
+  color: '#a3a3a3',
+}
+
+/**
+ * Divide el texto del contexto en líneas: respeta \n; si no hay, divide por . ; :
+ * Conserva el contenido; limpia espacios y elimina líneas vacías.
+ */
+function splitContextIntoLines(contextText: string): string[] {
+  const trimmed = contextText.trim()
+  if (!trimmed) return []
+  const raw = trimmed.includes('\n')
+    ? trimmed.split(/\n/)
+    : trimmed.split(/(?<=[.;:])\s+/)
+  return raw.map((s) => s.trim().replace(/\s{2,}/g, ' ')).filter((s) => s.length > 0)
+}
+
+/** Config único para la UI de "Citas textuales" (texto autor/obra). */
+const QUOTES_UI_CONFIG = {
+  authorWorkFontSize: 15,
+  authorWorkColor: '#737373',
+  authorWorkFontWeight: '600' as React.CSSProperties['fontWeight'],
+  authorWorkLineHeight: 1.35,
+  authorWorkSpacingBottom: 6,
+}
+
+/** Estrella del autor en Citas textuales: tamaño y posición independientes del texto. Todo editable aquí. */
+const CITAS_AUTHOR_STAR_CONFIG = {
+  authorStarSize: 30,
+  authorStarInsetLeft: -10,
+  authorStarInsetTop: -5,
+  authorStarOffsetX: 10,
+  authorStarOffsetY: 0,
+  authorStarToTextGap: 0,
+  authorStarImageSrc: '/estrella9.png',
+}
+
+/* ========= CREATOR IDEAS CONFIG ========= */
+const CREATOR_IDEAS_CONFIG = {
+  emptyStateText: 'Genera al pulsar el botón brillante',
+  emptyStateFontSize: 14,
+  emptyStateColor: '#a3a3a3',
+  emptyStateFontFamily: 'inherit',
+  emptyStateGapBelow: 12,
+  buttonImageSrc: '/BOTON2.png',
+  // ✅ EDITA AQUÍ: tamaño del botón Ideas de Creator (solo afecta al botón, no al texto)
+  buttonWidthPx: 200,
+  buttonHeightPx: 50,
+  buttonScale: 4,
+  buttonMarginTopPx: -10,
+  buttonMarginLeftPx: 0,
+  blockMarginTop: 0,
+  blockMarginBottom: 0,
+  blockBorderRadius: 0,
+  buttonHoverScale: 1.05,
+  buttonHoverBrightness: 1.15,
+  buttonShadowIntensity: 0,
+  buttonTransitionDurationMs: 200,
+}
+
 const STAR_ICON_SRC = '/estrella2.png'
 const POSTURA_TITLE_STAR_SRC = '/postura-star.png'
 const POSTURA_SUB_STAR_SRC = '/postura-sub-star.png'
@@ -169,6 +242,7 @@ export function AssistantCard({ message, messageIndex, creatorLoading, onGenerat
   const [factsLoading, setFactsLoading] = useState(false)
   const [quotesLoading, setQuotesLoading] = useState(false)
   const [creatorLoadingLocal, setCreatorLoadingLocal] = useState(false)
+  const [creatorButtonHover, setCreatorButtonHover] = useState(false)
 
   if (message.role !== 'assistant') return null
 
@@ -437,18 +511,38 @@ export function AssistantCard({ message, messageIndex, creatorLoading, onGenerat
                 <>
                   {factsData!.summary?.trim() && (
                     <>
-                      <div style={{ ...labelStyle, marginBottom: 2 }}>CONTEXTO CIENTÍFICO (GENERADO)</div>
-                      <p style={{ margin: '0 0 4px', fontSize: 12, color: '#a3a3a3' }}>
-                        Nota: esto es una explicación general generada por IA; puede contener errores y no sustituye verificación con fuentes.
-                      </p>
-                      <p style={{ margin: '0 0 8px', fontSize: 13, color: '#a3a3a3' }}>
-                        {factsData!.summary}
-                      </p>
+                      <div style={{ ...labelStyle, marginBottom: 2 }}>
+                        {SCI_FACTS_LABELS.contextTitle}
+                        {SCI_FACTS_LABELS.contextTitleSuffix ? ` ${SCI_FACTS_LABELS.contextTitleSuffix}` : ''}
+                      </div>
+                      {SCI_FACTS_LABELS.showNote && (
+                        <p style={{ margin: '0 0 4px', fontSize: 12, color: '#a3a3a3' }}>
+                          {SCI_FACTS_LABELS.noteText}
+                        </p>
+                      )}
+                      <div style={{ marginBottom: 8 }}>
+                        {(() => {
+                          const lines = splitContextIntoLines(factsData!.summary)
+                          return lines.map((line, i) => (
+                            <div
+                              key={i}
+                              style={{
+                                fontSize: SCI_FACTS_CONTEXT_STYLE.fontSize,
+                                lineHeight: SCI_FACTS_CONTEXT_STYLE.lineHeight,
+                                color: SCI_FACTS_CONTEXT_STYLE.color,
+                                marginBottom: i < lines.length - 1 ? SCI_FACTS_CONTEXT_STYLE.lineSpacingBottom : 0,
+                              }}
+                            >
+                              {line}
+                            </div>
+                          ))
+                        })()}
+                      </div>
                     </>
                   )}
                   {Array.isArray(factsData!.verification_points) && factsData!.verification_points.length > 0 && (
                     <div style={claimRowStyle}>
-                      <div style={{ ...labelStyle, marginBottom: 4 }}>Cómo se podría verificar</div>
+                      <div style={{ ...labelStyle, marginBottom: 4 }}>{SCI_FACTS_LABELS.verifyTitle}</div>
                       <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: '#e4e4e7' }}>
                         {factsData!.verification_points.map((v, idx) => (
                           <li key={idx} style={{ marginBottom: 4 }}>
@@ -483,20 +577,40 @@ export function AssistantCard({ message, messageIndex, creatorLoading, onGenerat
               {quotesLoading ? (
                 <p style={emptyStyle}>{t('assistantLoading')}</p>
               ) : hasQuotes ? (
-                quotesData!.quotes.map((q, j) => (
+                quotesData!.quotes.slice(0, 3).map((q, j) => (
                   <div key={q.quote_id ?? j} style={{ marginBottom: 10 }}>
-                    <div style={{ fontSize: 12, color: '#a3a3a3', marginBottom: 4 }}>
-                      {q.author}
-                      {q.work ? `, ${q.work}` : ''}
-                      {q.quote_id && (
-                        <span style={{ marginLeft: 6, color: '#737373' }}>#{q.quote_id}</span>
-                      )}
-                    </div>
-                    {q.relevance && (
-                      <div style={{ fontSize: 11, color: '#737373', marginBottom: 4 }}>
-                        {q.relevance}
+                    <div style={{ position: 'relative', marginBottom: QUOTES_UI_CONFIG.authorWorkSpacingBottom }}>
+                      <img
+                        src={CITAS_AUTHOR_STAR_CONFIG.authorStarImageSrc}
+                        alt=""
+                        role="presentation"
+                        style={{
+                          position: 'absolute',
+                          left: CITAS_AUTHOR_STAR_CONFIG.authorStarInsetLeft + CITAS_AUTHOR_STAR_CONFIG.authorStarOffsetX,
+                          top: CITAS_AUTHOR_STAR_CONFIG.authorStarInsetTop + CITAS_AUTHOR_STAR_CONFIG.authorStarOffsetY,
+                          width: CITAS_AUTHOR_STAR_CONFIG.authorStarSize,
+                          height: CITAS_AUTHOR_STAR_CONFIG.authorStarSize,
+                          margin: 0,
+                          display: 'block',
+                        }}
+                      />
+                      <div
+                        style={{
+                          marginLeft:
+                            CITAS_AUTHOR_STAR_CONFIG.authorStarInsetLeft +
+                            CITAS_AUTHOR_STAR_CONFIG.authorStarOffsetX +
+                            CITAS_AUTHOR_STAR_CONFIG.authorStarSize +
+                            CITAS_AUTHOR_STAR_CONFIG.authorStarToTextGap,
+                          fontSize: QUOTES_UI_CONFIG.authorWorkFontSize,
+                          color: QUOTES_UI_CONFIG.authorWorkColor,
+                          fontWeight: QUOTES_UI_CONFIG.authorWorkFontWeight,
+                          lineHeight: QUOTES_UI_CONFIG.authorWorkLineHeight,
+                        }}
+                      >
+                        {q.author}
+                        {q.work ? `, ${q.work}` : ''}
                       </div>
-                    )}
+                    </div>
                     <blockquote style={quoteBlockStyle}>{q.quote}</blockquote>
                   </div>
                 ))
@@ -535,24 +649,66 @@ export function AssistantCard({ message, messageIndex, creatorLoading, onGenerat
               ) : creatorLoading || creatorLoadingLocal ? (
                 <p style={emptyStyle}>{t('detailsGenerating')}</p>
               ) : (
-                <div>
-                  <p style={emptyStyle}>{t('assistantNoCreatorYet')}</p>
+                <div
+                  style={{
+                    marginTop: CREATOR_IDEAS_CONFIG.blockMarginTop,
+                    marginBottom: CREATOR_IDEAS_CONFIG.blockMarginBottom,
+                    borderRadius: CREATOR_IDEAS_CONFIG.blockBorderRadius,
+                  }}
+                >
+                  <p
+                    style={{
+                      margin: 0,
+                      marginBottom: CREATOR_IDEAS_CONFIG.emptyStateGapBelow,
+                      fontSize: CREATOR_IDEAS_CONFIG.emptyStateFontSize,
+                      color: CREATOR_IDEAS_CONFIG.emptyStateColor,
+                      fontFamily: CREATOR_IDEAS_CONFIG.emptyStateFontFamily,
+                    }}
+                  >
+                    {CREATOR_IDEAS_CONFIG.emptyStateText}
+                  </p>
                   <button
                     type="button"
                     onClick={handleGenerateCreator}
                     disabled={creatorLoading || creatorLoadingLocal}
+                    onMouseEnter={() => setCreatorButtonHover(true)}
+                    onMouseLeave={() => setCreatorButtonHover(false)}
                     style={{
-                      marginTop: 8,
-                      padding: '8px 14px',
-                      background: 'linear-gradient(90deg, #c7ff02 0%, #7000ff 100%)',
+                      display: 'block',
+                      marginTop: CREATOR_IDEAS_CONFIG.buttonMarginTopPx,
+                      marginLeft: CREATOR_IDEAS_CONFIG.buttonMarginLeftPx,
+                      padding: 0,
+                      width: CREATOR_IDEAS_CONFIG.buttonWidthPx,
+                      height: CREATOR_IDEAS_CONFIG.buttonHeightPx,
                       border: 'none',
-                      borderRadius: 8,
-                      color: '#fff',
-                      fontSize: 13,
-                      cursor: 'pointer',
+                      borderRadius: CREATOR_IDEAS_CONFIG.blockBorderRadius || 8,
+                      background: 'transparent',
+                      cursor: creatorLoading || creatorLoadingLocal ? 'not-allowed' : 'pointer',
+                      overflow: 'hidden',
+                      transform:
+                        creatorButtonHover && !creatorLoading && !creatorLoadingLocal
+                          ? `scale(${CREATOR_IDEAS_CONFIG.buttonScale * CREATOR_IDEAS_CONFIG.buttonHoverScale})`
+                          : `scale(${CREATOR_IDEAS_CONFIG.buttonScale})`,
+                      filter:
+                        creatorButtonHover && !creatorLoading && !creatorLoadingLocal
+                          ? `brightness(${CREATOR_IDEAS_CONFIG.buttonHoverBrightness}) drop-shadow(0 0 ${CREATOR_IDEAS_CONFIG.buttonShadowIntensity}px rgba(0,0,0,0.3))`
+                          : CREATOR_IDEAS_CONFIG.buttonShadowIntensity
+                            ? `drop-shadow(0 0 ${CREATOR_IDEAS_CONFIG.buttonShadowIntensity}px rgba(0,0,0,0.2))`
+                            : 'none',
+                      transition: `transform ${CREATOR_IDEAS_CONFIG.buttonTransitionDurationMs}ms ease, filter ${CREATOR_IDEAS_CONFIG.buttonTransitionDurationMs}ms ease`,
                     }}
                   >
-                    {t('assistantGenerateScript')}
+                    <img
+                      src={CREATOR_IDEAS_CONFIG.buttonImageSrc}
+                      alt={t('assistantGenerateScript')}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                        display: 'block',
+                        pointerEvents: 'none',
+                      }}
+                    />
                   </button>
                 </div>
               )}
