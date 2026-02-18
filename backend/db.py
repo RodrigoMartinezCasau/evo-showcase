@@ -1,3 +1,4 @@
+import os
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -7,8 +8,11 @@ from sqlmodel import Field, Session, SQLModel, create_engine
 
 from schemas import PhysicalSpec
 
-
-DB_PATH = Path(__file__).parent / "physics_copilot.db"
+# Vercel serverless: filesystem is read-only except /tmp
+if os.environ.get("VERCEL"):
+    DB_PATH = Path("/tmp") / "physics_copilot.db"
+else:
+    DB_PATH = Path(__file__).parent / "physics_copilot.db"
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})

@@ -7,7 +7,10 @@ import uuid
 from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+# Load .env only if present (Vercel has no .env file; env vars are set in dashboard)
+_env_path = Path(__file__).resolve().parent.parent / ".env"
+if _env_path.exists():
+    load_dotenv(_env_path)
 load_dotenv()
 
 from fastapi import FastAPI, HTTPException, Request
@@ -448,6 +451,11 @@ def _run_debate_pipeline(
                 ],
             ),
         )
+
+
+@app.get("/")
+def root():
+    return {"ok": True}
 
 
 @app.get("/health")
