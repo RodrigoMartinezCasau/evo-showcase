@@ -2,6 +2,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import time
 import uuid
 from dotenv import load_dotenv
 
@@ -9,8 +10,9 @@ logger = logging.getLogger(__name__)
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 load_dotenv()
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from checks import CheckRunner
@@ -31,6 +33,129 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- Minimal private beta protection: API key + rate limiting ---
+TESTER_API_KEY = os.environ.get("TESTER_API_KEY") or ""
+RATE_LIMIT_PER_MINUTE = 10
+_RATE_WINDOW_SECONDS = 60
+_rate_counters: dict[tuple[str, str], dict[str, float | int]] = {}
+
+# --- Daily quota (per API key, per day) ---
+DAILY_LIMIT = 30  # <-- edit this to change daily quota
+_daily_usage: dict[tuple[str, str], int] = {}
+
+
+def _get_client_ip(request: Request) -> str:
+    """Return client IP, honoring X-Forwarded-For (Vercel/Proxies)."""
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        # Use first IP in comma-separated list
+        return xff.split(",")[0].strip()
+    if request.client:
+        return request.client.host
+    return "unknown"
+
+
+@app.middleware("http")
+async def beta_protection_middleware(request: Request, call_next):
+    """
+    Simple API-key + rate-limit guard for private beta.
+    - Requires header x-api-key when TESTER_API_KEY is set.
+    - Enforces 10 req/min per IP+path.
+    """
+    path = request.url.path
+
+    # Skip health and CORS preflight
+    if path == "/health" or request.method == "OPTIONS":
+        return await call_next(request)
+
+    # API key check (when configured)
+    api_key = ""
+    if TESTER_API_KEY:
+        provided = request.headers.get("x-api-key") or ""
+        if not provided or provided != TESTER_API_KEY:
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Invalid or missing API key"},
+            )
+        api_key = provided or ""
+    else:
+        # For local dev without TESTER_API_KEY, group all usage under empty key
+        api_key = request.headers.get("x-api-key") or ""
+
+    # Rate limiting: per IP + path
+    ip = _get_client_ip(request)
+    key = (ip, path)
+    now = time.time()
+    bucket = _rate_counters.get(key)
+    if not bucket or now >= bucket["reset"]:  # type: ignore[index]
+        bucket = {"count": 1, "reset": now + _RATE_WINDOW_SECONDS}
+        _rate_counters[key] = bucket
+    else:
+        bucket["count"] = int(bucket["count"]) + 1  # type: ignore[index]
+        if bucket["count"] > RATE_LIMIT_PER_MINUTE:  # type: ignore[comparison-overlap]
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Rate limit exceeded. Please wait a minute before retrying."},
+            )
+
+    def _is_generation_endpoint(p: str, method: str) -> bool:
+        if method != "POST":
+            return False
+        # Core LLM pipelines
+        if p in {"/debate", "/debate/chat", "/creator"}:
+            return True
+        # Create debate (initial message)
+        if p == "/debates":
+            return True
+        # Persisted debate chat
+        if p.startswith("/debates/") and p.endswith("/chat"):
+            return True
+        # Lazy-loaded blocks (facts, quotes, creator) per message
+        if p.startswith("/messages/") and any(p.endswith(suffix) for suffix in ("/facts", "/quotes", "/creator")):
+            return True
+        return False
+
+    is_generation = _is_generation_endpoint(path, request.method)
+
+    # Daily quota check BEFORE executing the endpoint (only for generation routes)
+    if is_generation:
+        today = time.strftime("%Y-%m-%d", time.gmtime())
+        usage_key = (api_key, today)
+        used = _daily_usage.get(usage_key, 0)
+        if used >= DAILY_LIMIT:
+            return JSONResponse(
+                status_code=429,
+                content={"error": "Daily quota exceeded", "remaining": 0},
+            )
+
+    # Call downstream handler
+    response = await call_next(request)
+
+    # Increment quota ONLY after successful generation calls (and not for /usage)
+    if is_generation and response.status_code < 400:
+        today = time.strftime("%Y-%m-%d", time.gmtime())
+        usage_key = (api_key, today)
+        _daily_usage[usage_key] = _daily_usage.get(usage_key, 0) + 1
+
+    return response
+
+
+@app.get("/usage")
+def get_usage(request: Request):
+    """Return current daily usage for the calling API key."""
+    # API key has already been validated by middleware (if TESTER_API_KEY is set)
+    api_key = request.headers.get("x-api-key") or (TESTER_API_KEY or "")
+    today = time.strftime("%Y-%m-%d", time.gmtime())
+    usage_key = (api_key, today)
+    used = _daily_usage.get(usage_key, 0)
+    remaining = max(DAILY_LIMIT - used, 0)
+    return {
+        "dailyLimit": DAILY_LIMIT,
+        "used": used,
+        "remaining": remaining,
+        "date": today,
+    }
 
 
 @app.on_event("startup")

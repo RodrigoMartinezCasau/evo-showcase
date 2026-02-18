@@ -3,7 +3,6 @@
 import { t } from '@/src/i18n'
 import { HomeButton } from './HomeButton'
 import { ModelBadge } from './ModelBadge'
-
 const TOP_BAR_HEIGHT = 56
 
 /** Premium button image size — change this to resize the button (height in px; width scales automatically). */

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { t } from '@/src/i18n'
 import type { Thread } from '../types'
+import { UsageCounter } from './UsageCounter'
 
 const SIDEBAR_COLLAPSED_KEY = 'debate_sidebar_collapsed'
 const SIDEBAR_FAVORITES_OPEN_KEY = 'debate_sidebar_favorites_open'
@@ -1241,7 +1242,12 @@ export function Sidebar({
 
       <div style={collapsed ? userBlockCollapsedStyle : userBlockStyle}>
         <div style={avatarStyle}>R</div>
-        {!collapsed && <span>Rodrigo</span>}
+        {!collapsed && (
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span>Rodrigo</span>
+            <UsageCounter />
+          </div>
+        )}
       </div>
     </aside>
     {deleteConfirm && (deleteConfirm.type === 'debate' ? onDeleteDebateProp : onDeleteFolderProp) && (

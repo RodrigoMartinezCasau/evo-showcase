@@ -69,6 +69,56 @@ export const STYLE_CONTROLS = {
   BODY_PADDING_LEFT: 22,   // indent lista de bullets
 }
 
+export const USAGE_BADGE_UI_CONFIG = {
+  enabled: true,
+
+  row: {
+    heightPx: 22,
+    marginTopPx: 6,
+    marginLeftPx: 0,
+    marginRightPx: 0,
+    marginBottomPx: 0,
+  },
+
+  label: {
+    text: 'Usos:',
+    fontSizePx: 11,
+    color: 'rgba(255,255,255,0.65)',
+    fontWeight: 500,
+    topPx: 0,
+    leftPx: 0,
+    rightPx: null as number | null,
+    bottomPx: null as number | null,
+  },
+
+  value: {
+    fontSizePx: 16,
+    color: 'rgba(255,255,255,0.95)',
+    fontWeight: 600,
+    topPx: -9,
+    leftPx: 138,
+    rightPx: null as number | null,
+    bottomPx: null as number | null,
+    maxWidthPx: 60,
+    textAlign: 'left' as const,
+    overflow: 'hidden' as const,
+    textOverflow: 'ellipsis' as const,
+    whiteSpace: 'nowrap' as const,
+  },
+
+  icon: {
+    src: '/9.png',
+    sizePx: 45,
+    opacity: 1,
+    topPx: -22,
+    leftPx: 150,
+    rightPx: null as number | null,
+    bottomPx: -100,
+    nudgeXpx: 0,
+    nudgeYpx: 0,
+  },
+}
+
 /** @deprecated Use STYLE_CONTROLS */
 export const UI_TUNING = STYLE_CONTROLS
 

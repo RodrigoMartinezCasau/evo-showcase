@@ -6,11 +6,70 @@
 import type { AuthorLayer, CreatorResponse, DebateResponse, FactsLayer, Message, Thread } from './types'
 
 function getApiBaseUrl(): string {
-  const raw = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
-  return typeof raw === 'string' ? raw.replace(/\/$/, '') : 'http://localhost:8000'
+  const raw = process.env.NEXT_PUBLIC_API_URL
+  if (raw != null && raw !== '') {
+    return typeof raw === 'string' ? raw.replace(/\/$/, '') : ''
+  }
+  // Same-origin: backend mounted at /api (single Vercel project)
+  if (typeof window !== 'undefined') {
+    return window.location.origin + '/api'
+  }
+  return 'http://localhost:8000'
 }
 
 const API_URL = getApiBaseUrl()
+
+const TESTER_API_KEY = process.env.NEXT_PUBLIC_TESTER_API_KEY
+
+/** User-facing messages for API errors (401/403/429/500). */
+async function getApiErrorMessage(res: Response): Promise<string> {
+  const status = res.status
+  let body: { detail?: string; error?: string; message?: string } = {}
+  try {
+    const text = await res.text()
+    if (text) body = JSON.parse(text) as typeof body
+  } catch {
+    // ignore
+  }
+  const detail = body.detail ?? body.error ?? body.message
+  if (status === 401) return 'Clave de API inválida o faltante.'
+  if (status === 403) return detail && typeof detail === 'string' ? detail : 'Acceso denegado.'
+  if (status === 429) {
+    if (detail && typeof detail === 'string' && (detail.includes('quota') || detail.toLowerCase().includes('daily')))
+      return 'Te has quedado sin usos por hoy.'
+    return detail && typeof detail === 'string' ? detail : 'Demasiadas peticiones. Espera un momento.'
+  }
+  if (status >= 500) return 'Error del servidor. Inténtalo más tarde.'
+  return typeof detail === 'string' ? detail : res.statusText || `Error (${status})`
+}
+
+function withApiKey(init?: RequestInit): RequestInit | undefined {
+  const headers = new Headers(init?.headers ?? {})
+  if (TESTER_API_KEY) {
+    headers.set('x-api-key', TESTER_API_KEY)
+  }
+  if (headers.keys().next().done) {
+    // no headers set
+    return init
+  }
+  return { ...init, headers }
+}
+
+export type UsageInfo = {
+  dailyLimit: number
+  used: number
+  remaining: number
+  date: string
+}
+
+export async function fetchUsage(): Promise<UsageInfo> {
+  const url = `${API_URL}/usage`
+  const res = await fetch(url, withApiKey())
+  if (!res.ok) {
+    throw new Error(await getApiErrorMessage(res))
+  }
+  return res.json()
+}
 
 const isDev = typeof process !== 'undefined' && process.env.NODE_ENV === 'development'
 function logRequestFailure(url: string, status?: number, error?: string): void {
@@ -69,10 +128,10 @@ function mapApiMessage(m: FullDebate['messages'][0]): Message {
 
 export async function fetchDebates(): Promise<DebateListItem[]> {
   const url = `${API_URL}/debates`
-  const res = await fetch(url)
+  const res = await fetch(url, withApiKey())
   if (!res.ok) {
     logRequestFailure(url, res.status, res.statusText)
-    throw new Error('Failed to fetch debates')
+    throw new Error(await getApiErrorMessage(res))
   }
   const data = await res.json()
   return (data.debates || []) as DebateListItem[]
@@ -80,7 +139,7 @@ export async function fetchDebates(): Promise<DebateListItem[]> {
 
 export async function fetchFolders(): Promise<FolderListItem[]> {
   const url = `${API_URL}/folders`
-  const res = await fetch(url)
+  const res = await fetch(url, withApiKey())
   if (!res.ok) {
     logRequestFailure(url, res.status, res.statusText)
     throw new Error('Failed to fetch folders')
@@ -91,7 +150,10 @@ export async function fetchFolders(): Promise<FolderListItem[]> {
 
 export async function toggleFavorite(debateId: string): Promise<boolean> {
   const url = `${API_URL}/debates/${debateId}/favorite`
-  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+  const res = await fetch(
+    url,
+    withApiKey({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+  )
   if (!res.ok) throw new Error('Failed to toggle favorite')
   const data = await res.json()
   return data.favorited === true
@@ -99,11 +161,14 @@ export async function toggleFavorite(debateId: string): Promise<boolean> {
 
 export async function createFolder(name: string): Promise<FolderListItem> {
   const url = `${API_URL}/folders`
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: name || 'Nueva carpeta' }),
-  })
+  const res = await fetch(
+    url,
+    withApiKey({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name || 'Nueva carpeta' }),
+    })
+  )
   if (!res.ok) throw new Error('Failed to create folder')
   const data = await res.json()
   return { id: data.id, name: data.name, created_at: data.created_at || '', chatIds: data.chatIds || [] }
@@ -111,26 +176,32 @@ export async function createFolder(name: string): Promise<FolderListItem> {
 
 export async function updateFolderName(folderId: string, name: string): Promise<void> {
   const url = `${API_URL}/folders/${folderId}`
-  const res = await fetch(url, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name }),
-  })
+  const res = await fetch(
+    url,
+    withApiKey({
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
+  )
   if (!res.ok) throw new Error('Failed to rename folder')
 }
 
 export async function deleteFolder(folderId: string): Promise<void> {
-  const res = await fetch(`${API_URL}/folders/${folderId}`, { method: 'DELETE' })
+  const res = await fetch(`${API_URL}/folders/${folderId}`, withApiKey({ method: 'DELETE' }))
   if (!res.ok) throw new Error('Failed to delete folder')
 }
 
 export async function moveDebateToFolder(debateId: string, folderId: string | null): Promise<void> {
   const url = `${API_URL}/debates/${debateId}/move-to-folder`
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ folder_id: folderId }),
-  })
+  const res = await fetch(
+    url,
+    withApiKey({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folder_id: folderId }),
+    })
+  )
   if (!res.ok) throw new Error('Failed to move to folder')
 }
 
@@ -144,30 +215,35 @@ export async function createDebate(initialMessage?: string): Promise<{ id: strin
   const url = `${API_URL}/debates`
   let res: Response
   try {
-    res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        initial_message: initialMessage || null,
-      }),
-    })
+    res = await fetch(
+      url,
+      withApiKey({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          initial_message: initialMessage || null,
+        }),
+      })
+    ) as Response
   } catch (networkErr) {
     const msg = networkErr instanceof Error ? networkErr.message : 'Network error'
     logRequestFailure(url, undefined, msg)
     throw new Error(networkErrorMessage(msg))
   }
-  const data = await res.json().catch(() => ({} as any))
   if (!res.ok) {
-    const detail = typeof data?.detail === 'string' ? data.detail : data?.detail?.[0]?.msg ?? data?.message ?? res.statusText
-    logRequestFailure(url, res.status, detail)
-    throw new Error(detail || `Error del servidor (${res.status})`)
+    logRequestFailure(url, res.status, res.statusText)
+    throw new Error(await getApiErrorMessage(res))
   }
-  return { id: data.id, title: data.title }
+  const data = await res.json().catch(() => ({} as { id?: string; title?: string }))
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('usage-updated'))
+  }
+  return { id: data.id!, title: data.title! }
 }
 
 export async function getDebate(id: string): Promise<Thread | null> {
   const url = `${API_URL}/debates/${id}`
-  const res = await fetch(url)
+  const res = await fetch(url, withApiKey())
   if (res.status === 404) return null
   if (!res.ok) {
     logRequestFailure(url, res.status, res.statusText)
@@ -190,54 +266,74 @@ export async function sendMessage(
   const payload = { message }
   let res: Response
   try {
-    res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
+    res = await fetch(
+      url,
+      withApiKey({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+    ) as Response
   } catch (networkErr) {
     const msg = networkErr instanceof Error ? networkErr.message : 'Network error'
     logRequestFailure(url, undefined, msg)
     throw new Error(networkErrorMessage(msg))
   }
-  const responseBody = await res.json().catch(() => ({}))
   if (!res.ok) {
-    const detail = typeof responseBody?.detail === 'string' ? responseBody.detail : responseBody?.detail?.[0]?.msg ?? responseBody?.message ?? res.statusText
-    logRequestFailure(url, res.status, detail)
-    throw new Error(detail || `Error del servidor (${res.status})`)
+    logRequestFailure(url, res.status, res.statusText)
+    throw new Error(await getApiErrorMessage(res))
   }
-  return responseBody as SendMessageResponse
+  const responseBody = await res.json() as SendMessageResponse
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('usage-updated'))
+  }
+  return responseBody
 }
 
 export async function deleteDebate(id: string): Promise<void> {
-  const res = await fetch(`${API_URL}/debates/${id}`, { method: 'DELETE' })
+  const res = await fetch(`${API_URL}/debates/${id}`, withApiKey({ method: 'DELETE' }))
   if (!res.ok) throw new Error('Failed to delete debate')
 }
 
 export async function fetchMessageFacts(messageId: string): Promise<FactsLayer> {
-  const res = await fetch(`${API_URL}/messages/${messageId}/facts`, { method: 'POST' })
+  const res = await fetch(`${API_URL}/messages/${messageId}/facts`, withApiKey({ method: 'POST' }))
   if (!res.ok) throw new Error('Failed to fetch facts')
-  return res.json()
+  const data = await res.json()
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('usage-updated'))
+  }
+  return data
 }
 
 export async function fetchMessageQuotes(messageId: string): Promise<AuthorLayer> {
-  const res = await fetch(`${API_URL}/messages/${messageId}/quotes`, { method: 'POST' })
+  const res = await fetch(`${API_URL}/messages/${messageId}/quotes`, withApiKey({ method: 'POST' }))
   if (!res.ok) throw new Error('Failed to fetch quotes')
-  return res.json()
+  const data = await res.json()
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('usage-updated'))
+  }
+  return data
 }
 
 export async function fetchMessageCreator(messageId: string): Promise<CreatorResponse> {
-  const res = await fetch(`${API_URL}/messages/${messageId}/creator`, { method: 'POST' })
+  const res = await fetch(`${API_URL}/messages/${messageId}/creator`, withApiKey({ method: 'POST' }))
   if (!res.ok) throw new Error('Failed to fetch creator')
-  return res.json()
+  const data = await res.json()
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('usage-updated'))
+  }
+  return data
 }
 
 export async function updateDebateTitle(id: string, title: string): Promise<string> {
-  const res = await fetch(`${API_URL}/debates/${id}/title`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title }),
-  })
+  const res = await fetch(
+    `${API_URL}/debates/${id}/title`,
+    withApiKey({
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title }),
+    })
+  )
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     throw new Error(err.detail || 'Failed to update title')
