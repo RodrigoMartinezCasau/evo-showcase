@@ -1,18 +1,26 @@
 /**
  * Debates API client. Backend is source of truth.
  * GET /debates, POST /debates, GET /debates/{id}, POST /debates/{id}/chat, DELETE /debates/{id}
- * Base URL: NEXT_PUBLIC_API_URL (default http://localhost:8000), no trailing slash.
+ *
+ * Base URL:
+ * - Production (Vercel, single project): same-origin "/api" when NEXT_PUBLIC_API_URL is unset.
+ * - Production (Vercel, two projects): set NEXT_PUBLIC_API_URL to the API project URL (e.g. https://your-api.vercel.app).
+ * - Local dev: http://localhost:8000 when NEXT_PUBLIC_API_URL is unset.
  */
 import type { AuthorLayer, CreatorResponse, DebateResponse, FactsLayer, Message, Thread } from './types'
 
-function getApiBaseUrl(): string {
+export function getApiBaseUrl(): string {
   const raw = process.env.NEXT_PUBLIC_API_URL
   if (raw != null && raw !== '') {
     return typeof raw === 'string' ? raw.replace(/\/$/, '') : ''
   }
-  // Same-origin: backend mounted at /api (single Vercel project)
+  // Browser: same-origin backend at /api (single Vercel project)
   if (typeof window !== 'undefined') {
     return window.location.origin + '/api'
+  }
+  // Server / SSR (e.g. Vercel): same-origin /api when no env set
+  if (typeof process !== 'undefined' && process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}/api`
   }
   return 'http://localhost:8000'
 }
@@ -69,6 +77,16 @@ export async function fetchUsage(): Promise<UsageInfo> {
     throw new Error(await getApiErrorMessage(res))
   }
   return res.json()
+}
+
+/** Check backend is reachable. Use on load to show banner without blocking UI. */
+export async function fetchHealth(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}/health`, { method: 'GET', ...withApiKey() })
+    return res.ok
+  } catch {
+    return false
+  }
 }
 
 const isDev = typeof process !== 'undefined' && process.env.NODE_ENV === 'development'

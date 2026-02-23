@@ -11,6 +11,8 @@ import {
 import {
   fetchDebates,
   fetchFolders,
+  fetchHealth,
+  getApiBaseUrl,
   createDebate,
   getDebate,
   sendMessage,
@@ -45,6 +47,7 @@ export default function DebatePage() {
   const [loading, setLoading] = useState(false)
   const [loadingDebate, setLoadingDebate] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [connectionError, setConnectionError] = useState(false)
   const [creatorLoading, setCreatorLoading] = useState(false)
   const topBarLeftRef = useRef<HTMLDivElement>(null)
   const setLoadingRef = useRef(setLoading)
@@ -72,11 +75,18 @@ export default function DebatePage() {
       .then(([debates, folderList]) => {
         setDebateList(debates)
         setFolders(folderList)
+        setConnectionError(false)
       })
       .catch(() => {
         setDebateList([])
         setFolders([])
       })
+  }, [])
+
+  useEffect(() => {
+    fetchHealth()
+      .then((ok) => setConnectionError(!ok))
+      .catch(() => setConnectionError(true))
   }, [])
 
   const threads: Thread[] = debateList.map(toThreadItem)
@@ -237,6 +247,7 @@ export default function DebatePage() {
             ? t('errorConnection')
             : raw || t('errorCreateDebate')
         setError(msg)
+        setConnectionError(true)
         return
       }
     } else {
@@ -287,6 +298,7 @@ export default function DebatePage() {
         next[idx] = { role: 'assistant', ...fullPayload, content: '', streaming: true }
         return { ...prev, messages: next }
       })
+      setConnectionError(false)
       setLoadingRef.current(false)
 
       if (fullText.length === 0) {
@@ -411,7 +423,15 @@ export default function DebatePage() {
       onSend={handleSend}
       loading={loading}
       placeholder={currentThreadId ? t('placeholderInConversation') : t('placeholderDebateExample')}
-      error={error}
+      error={
+        error ||
+        (connectionError
+          ? t('errorConnection') +
+            (typeof window !== 'undefined'
+              ? ` Llamando a: ${getApiBaseUrl()} — comprueba que esa URL responda en /health. Si es la del frontend, crea el proyecto API y pon su URL en NEXT_PUBLIC_API_URL, luego Redeploy.`
+              : '')
+          : null)
+      }
       isEmptyChat={isEmptyChat}
       favorites={favorites}
       folders={folders}

@@ -3,6 +3,7 @@
 import { t } from '@/src/i18n'
 import { HomeButton } from './HomeButton'
 import { ModelBadge } from './ModelBadge'
+import { UsageCounter } from './UsageCounter'
 const TOP_BAR_HEIGHT = 56
 
 /** Premium button image size — change this to resize the button (height in px; width scales automatically). */
@@ -56,13 +57,16 @@ export function TopBar({ onGoHome, topBarLeftRef }: Props) {
           <ModelBadge />
         </span>
       </div>
-      <button type="button" style={premiumStyle} aria-label={t('premiumUpgrade')}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <UsageCounter inline />
+        <button type="button" style={premiumStyle} aria-label={t('premiumUpgrade')}>
         <img
           src="/premium-button.png"
           alt="Mejorar a Premium"
           style={{ display: 'block', height: PREMIUM_BUTTON_HEIGHT, width: 'auto', objectFit: 'contain' }}
         />
       </button>
+      </div>
     </header>
   )
 }
