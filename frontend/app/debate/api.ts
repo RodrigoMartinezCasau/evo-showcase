@@ -1,31 +1,18 @@
 /**
  * Debates API client. Backend is source of truth.
- * GET /debates, POST /debates, GET /debates/{id}, POST /debates/{id}/chat, DELETE /debates/{id}
- *
- * Base URL:
- * - Production (Vercel, single project): same-origin "/api" when NEXT_PUBLIC_API_URL is unset.
- * - Production (Vercel, two projects): set NEXT_PUBLIC_API_URL to the API project URL (e.g. https://your-api.vercel.app).
- * - Local dev: http://localhost:8000 when NEXT_PUBLIC_API_URL is unset.
+ * Base URL: ver frontend/src/lib/apiConfig.ts (única fuente de verdad).
  */
 import type { AuthorLayer, CreatorResponse, DebateResponse, FactsLayer, Message, Thread } from './types'
+import { getApiBaseUrl } from '@/src/lib/apiConfig'
 
-export function getApiBaseUrl(): string {
-  const raw = process.env.NEXT_PUBLIC_API_URL
-  if (raw != null && raw !== '') {
-    return typeof raw === 'string' ? raw.replace(/\/$/, '') : ''
-  }
-  // Browser: same-origin backend at /api (single Vercel project)
-  if (typeof window !== 'undefined') {
-    return window.location.origin + '/api'
-  }
-  // Server / SSR (e.g. Vercel): same-origin /api when no env set
-  if (typeof process !== 'undefined' && process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}/api`
-  }
-  return 'http://localhost:8000'
-}
+export { getApiBaseUrl }
 
 const API_URL = getApiBaseUrl()
+
+const isDev = typeof process !== 'undefined' && process.env.NODE_ENV === 'development'
+if (isDev && typeof window !== 'undefined') {
+  console.debug('[api] API_BASE_URL', API_URL)
+}
 
 const TESTER_API_KEY = process.env.NEXT_PUBLIC_TESTER_API_KEY
 
@@ -51,16 +38,16 @@ async function getApiErrorMessage(res: Response): Promise<string> {
   return typeof detail === 'string' ? detail : res.statusText || `Error (${status})`
 }
 
-function withApiKey(init?: RequestInit): RequestInit | undefined {
-  const headers = new Headers(init?.headers ?? {})
+function withApiKey(init?: RequestInit & { requestId?: string }): RequestInit {
+  const { requestId, ...rest } = init ?? {}
+  const headers = new Headers(rest?.headers ?? {})
   if (TESTER_API_KEY) {
     headers.set('x-api-key', TESTER_API_KEY)
   }
-  if (headers.keys().next().done) {
-    // no headers set
-    return init
+  if (requestId) {
+    headers.set('x-request-id', requestId)
   }
-  return { ...init, headers }
+  return { ...rest, headers }
 }
 
 export type UsageInfo = {
@@ -81,15 +68,18 @@ export async function fetchUsage(): Promise<UsageInfo> {
 
 /** Check backend is reachable. Use on load to show banner without blocking UI. */
 export async function fetchHealth(): Promise<boolean> {
+  const url = `${API_URL}/health`
+  if (isDev && typeof window !== 'undefined') {
+    console.debug('[api] fetchHealth', url)
+  }
   try {
-    const res = await fetch(`${API_URL}/health`, { method: 'GET', ...withApiKey() })
+    const res = await fetch(url, { method: 'GET', ...withApiKey() })
     return res.ok
   } catch {
     return false
   }
 }
 
-const isDev = typeof process !== 'undefined' && process.env.NODE_ENV === 'development'
 function logRequestFailure(url: string, status?: number, error?: string): void {
   if (isDev) console.error('[api] request failed', { url, status, error })
 }
@@ -229,7 +219,10 @@ function networkErrorMessage(msg: string): string {
     : msg
 }
 
-export async function createDebate(initialMessage?: string): Promise<{ id: string; title: string }> {
+export async function createDebate(
+  initialMessage?: string,
+  requestId?: string
+): Promise<{ id: string; title: string }> {
   const url = `${API_URL}/debates`
   let res: Response
   try {
@@ -241,6 +234,7 @@ export async function createDebate(initialMessage?: string): Promise<{ id: strin
         body: JSON.stringify({
           initial_message: initialMessage || null,
         }),
+        requestId,
       })
     ) as Response
   } catch (networkErr) {
@@ -278,7 +272,8 @@ export async function getDebate(id: string): Promise<Thread | null> {
 
 export async function sendMessage(
   debateId: string,
-  message: string
+  message: string,
+  requestId?: string
 ): Promise<SendMessageResponse> {
   const url = `${API_URL}/debates/${debateId}/chat`
   const payload = { message }
@@ -290,6 +285,7 @@ export async function sendMessage(
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+        requestId,
       })
     ) as Response
   } catch (networkErr) {

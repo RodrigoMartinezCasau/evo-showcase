@@ -2,8 +2,9 @@
 
 import { useState, useRef } from 'react'
 import { useAutoResizeTextarea } from '@/src/hooks/useAutoResizeTextarea'
+import { getApiBaseUrl } from '@/src/lib/apiConfig'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const API_URL = getApiBaseUrl()
 
 // --- Tipos alineados con PhysicalSpec (backend)
 type Variable = { name: string; meaning: string; unit: string }

@@ -75,21 +75,15 @@ const loadingIndicatorContainerStyle: React.CSSProperties = {
 type Props = {
   message: Message
   messageIndex: number
-  creatorLoading: boolean
-  onGenerateCreator: (messageIndex: number) => void
   onFactsLoaded?: (messageIndex: number, data: FactsLayer) => void
   onQuotesLoaded?: (messageIndex: number, data: AuthorLayer) => void
-  onCreatorLoaded?: (messageIndex: number, data: import('../types').CreatorResponse) => void
 }
 
 export function MessageBubble({
   message,
   messageIndex,
-  creatorLoading,
-  onGenerateCreator,
   onFactsLoaded,
   onQuotesLoaded,
-  onCreatorLoaded,
 }: Props) {
   if (message.role === 'user') {
     return (
@@ -138,11 +132,8 @@ export function MessageBubble({
       <AssistantCard
         message={message}
         messageIndex={messageIndex}
-        creatorLoading={creatorLoading}
-        onGenerateCreator={onGenerateCreator}
         onFactsLoaded={onFactsLoaded}
         onQuotesLoaded={onQuotesLoaded}
-        onCreatorLoaded={onCreatorLoaded}
       />
     </div>
   )

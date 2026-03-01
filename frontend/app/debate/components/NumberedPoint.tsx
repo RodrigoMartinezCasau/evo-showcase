@@ -12,27 +12,24 @@ type Props = {
 }
 
 /**
- * Punto numerado: estrella + número en gutter (absolutos), texto con TEXT_LEFT_PADDING.
- * Cambiar STAR_SUBTITLE_SIZE o NUMBER_SIZE no mueve el texto.
+ * Punto numerado: flex layout para evitar overlap entre icono, título y bullets.
  */
 export function NumberedPoint({ index, subtitle, bullets, starIconSrc }: Props) {
   return (
     <div style={{ marginBottom: SC.SPACING_BETWEEN_BLOCKS }}>
-      {/* Fila subtítulo: estrella absoluta + texto */}
       <div
         style={{
-          position: 'relative',
-          paddingLeft: SC.TEXT_LEFT_PADDING,
-          minHeight: SC.STAR_SUBTITLE_SIZE,
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 12,
         }}
       >
         <div
           style={{
-            position: 'absolute',
-            left: SC.STAR_SUBTITLE_LEFT_OFFSET,
-            top: SC.STAR_SUBTITLE_TOP_OFFSET,
+            flexShrink: 0,
             width: SC.STAR_SUBTITLE_SIZE,
             height: SC.STAR_SUBTITLE_SIZE,
+            position: 'relative',
           }}
           aria-hidden
         >
@@ -60,35 +57,38 @@ export function NumberedPoint({ index, subtitle, bullets, starIconSrc }: Props) 
             {index}
           </span>
         </div>
-        <p
-          style={{
-            margin: 0,
-            fontSize: SC.TEXT_SUBTITLE_SIZE,
-            lineHeight: SC.LINE_HEIGHT_MAIN,
-            color: '#a3a3a3',
-          }}
-        >
-          {subtitle}
-        </p>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p
+            style={{
+              margin: 0,
+              marginBottom: bullets.length > 0 ? SC.SPACING_BETWEEN_SUBTITLE_AND_BODY : 0,
+              fontSize: SC.TEXT_SUBTITLE_SIZE,
+              lineHeight: 1.4,
+              color: '#a3a3a3',
+            }}
+          >
+            {subtitle}
+          </p>
+          {bullets.length > 0 && (
+            <ul
+              style={{
+                margin: 0,
+                paddingLeft: SC.BODY_PADDING_LEFT,
+                listStyle: 'disc',
+                fontSize: SC.TEXT_BODY_SIZE,
+                lineHeight: SC.LINE_HEIGHT_BODY,
+                color: '#e4e4e7',
+              }}
+            >
+              {bullets.map((b, i) => (
+                <li key={i} style={{ marginBottom: SC.SPACING_BETWEEN_BULLETS }}>
+                  {typeof b === 'string' ? b : (b as { text: string }).text}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
-      {bullets.length > 0 && (
-        <ul
-          style={{
-            margin: `${SC.SPACING_BETWEEN_SUBTITLE_AND_BODY}px 0 0`,
-            paddingLeft: SC.BODY_PADDING_LEFT + SC.TEXT_LEFT_PADDING,
-            listStyle: 'disc',
-            fontSize: SC.TEXT_BODY_SIZE,
-            lineHeight: SC.LINE_HEIGHT_BODY,
-            color: '#e4e4e7',
-          }}
-        >
-          {bullets.map((b, i) => (
-            <li key={i} style={{ marginBottom: SC.SPACING_BETWEEN_BULLETS }}>
-              {typeof b === 'string' ? b : (b as { text: string }).text}
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   )
 }

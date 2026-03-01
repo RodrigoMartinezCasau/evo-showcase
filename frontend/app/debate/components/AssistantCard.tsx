@@ -4,13 +4,32 @@
 import { useEffect, useState } from 'react'
 import { t } from '@/src/i18n'
 import type { AuthorLayer, FactsLayer, Message } from '../types'
-import type { StructuredSection, QuestionSection } from '../types'
-import { fetchMessageCreator, fetchMessageFacts, fetchMessageQuotes } from '../api'
+import type { StructuredSection } from '../types'
+import { fetchMessageFacts, fetchMessageQuotes } from '../api'
 import { SectionHeaderWithIcon } from './SectionHeaderWithIcon'
 import { NumberedPoint } from './NumberedPoint'
 import { STYLE_CONTROLS } from '../styles/debateBlockSizes'
 
 const SC = STYLE_CONTROLS
+
+/** UI_CONFIG: colores, bordes, espaciado (editar aquí para ajustar al diseño). */
+const UI_CONFIG = {
+  posturaBorderColor: '#c7ff02',
+  posturaBorderWidth: 3,
+  contraposturaBorderColor: '#7000ff',
+  contraposturaBorderWidth: 3,
+  cardBorderRadius: 16,
+  cardBackground: '#262626',
+  cardPaddingV: 20,
+  cardPaddingH: 20,
+  gridGap: 0,
+  lowerSectionGap: 16,
+  titleSize: 22,
+  summaryLabelSize: 11,
+  posturaTitle: 'TU POSTURA',
+  contraposturaTitle: 'CONTRAPOSTURA',
+  preguntaTitle: 'PREGUNTA PARA REFLEXIONAR...',
+}
 
 /** Labels editables del bloque "Hechos científicos" (solo display, sin tocar datos). */
 const SCI_FACTS_LABELS = {
@@ -62,29 +81,6 @@ const CITAS_AUTHOR_STAR_CONFIG = {
   authorStarImageSrc: '/estrella9.png',
 }
 
-/* ========= CREATOR IDEAS CONFIG ========= */
-const CREATOR_IDEAS_CONFIG = {
-  emptyStateText: 'Genera al pulsar el botón brillante',
-  emptyStateFontSize: 14,
-  emptyStateColor: '#a3a3a3',
-  emptyStateFontFamily: 'inherit',
-  emptyStateGapBelow: 12,
-  buttonImageSrc: '/BOTON2.png',
-  // ✅ EDITA AQUÍ: tamaño del botón Ideas de Creator (solo afecta al botón, no al texto)
-  buttonWidthPx: 200,
-  buttonHeightPx: 50,
-  buttonScale: 4,
-  buttonMarginTopPx: -10,
-  buttonMarginLeftPx: 0,
-  blockMarginTop: 0,
-  blockMarginBottom: 0,
-  blockBorderRadius: 0,
-  buttonHoverScale: 1.05,
-  buttonHoverBrightness: 1.15,
-  buttonShadowIntensity: 0,
-  buttonTransitionDurationMs: 200,
-}
-
 const STAR_ICON_SRC = '/estrella2.png'
 const POSTURA_TITLE_STAR_SRC = '/postura-star.png'
 const POSTURA_SUB_STAR_SRC = '/postura-sub-star.png'
@@ -92,6 +88,15 @@ const CONTRAPOSTURA_TITLE_STAR_SRC = '/contrapostura-star.png'
 const CONTRAPOSTURA_SUB_STAR_SRC = '/contrapostura-sub-star.png'
 const PREGUNTA_TITLE_STAR_SRC = '/pregunta-star.png'
 const PREGUNTA_SUB_STAR_SRC = '/pregunta-sub-star.png'
+
+/**
+ * Elimina el prefijo "RESUMEN RÁPIDO" (y variantes) del texto para evitar duplicados con el encabezado gris.
+ */
+function sanitizeSummaryText(text: string): string {
+  const t = text.trim()
+  const prefix = /^resumen\s+r[aá]pido\s*[:\->→]?\s*/i
+  return t.replace(prefix, '').trim()
+}
 
 /**
  * Parsea texto plano (ensayo) en puntos: subtítulos (líneas que no son bullet ni "RESUMEN RÁPIDO")
@@ -122,24 +127,44 @@ function parseFlatTextToPoints(text: string): { points: { subtitle: string; bull
   return { points, summary }
 }
 
-const cardStyle: React.CSSProperties = {
-  width: '100%',
-  maxWidth: '100%',
+const baseCardStyle: React.CSSProperties = {
   minWidth: 0,
-  padding: `${SC.PAD_CONTAINER_V}px ${SC.PAD_CONTAINER_H}px`,
-  borderRadius: 18,
-  background: '#262626',
-  border: '1px solid #404040',
+  padding: `${UI_CONFIG.cardPaddingV}px ${UI_CONFIG.cardPaddingH}px`,
+  borderRadius: UI_CONFIG.cardBorderRadius,
+  background: UI_CONFIG.cardBackground,
   color: '#e4e4e7',
   boxSizing: 'border-box',
 }
 
-const blockStyle: React.CSSProperties = {
-  marginBottom: SC.SPACING_BETWEEN_SECTIONS,
+const cardPosturaStyle: React.CSSProperties = {
+  ...baseCardStyle,
+  border: `var(--debate-border-size) solid ${UI_CONFIG.posturaBorderColor}`,
 }
 
-const blockStylePregunta: React.CSSProperties = {
-  marginBottom: SC.GAP_AFTER_PREGUNTA,
+const cardContraposturaStyle: React.CSSProperties = {
+  ...baseCardStyle,
+  border: `var(--debate-border-size) solid ${UI_CONFIG.contraposturaBorderColor}`,
+}
+
+const twoColGridStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '1fr 1fr',
+  gap: 'var(--debate-border-size)',
+  width: '100%',
+  maxWidth: '100%',
+  marginBottom: UI_CONFIG.lowerSectionGap,
+}
+
+const lowerBlockStyle: React.CSSProperties = {
+  width: '100%',
+  maxWidth: '100%',
+  padding: `${SC.PAD_CONTAINER_V}px ${SC.PAD_CONTAINER_H}px`,
+  borderRadius: 12,
+  background: 'linear-gradient(180deg, #151515 0%, #1b1b1b 100%)',
+  border: '1px solid #333',
+  marginBottom: UI_CONFIG.lowerSectionGap,
+  color: '#e4e4e7',
+  boxSizing: 'border-box',
 }
 
 const labelStyle: React.CSSProperties = {
@@ -148,11 +173,6 @@ const labelStyle: React.CSSProperties = {
   letterSpacing: '0.05em',
   color: '#737373',
   marginBottom: 4,
-}
-
-const questionLabelStyle: React.CSSProperties = {
-  ...labelStyle,
-  marginTop: 8,
 }
 
 const accordionHeaderStyle: React.CSSProperties = {
@@ -228,28 +248,18 @@ const quoteBlockStyle: React.CSSProperties = {
 type Props = {
   message: Message
   messageIndex: number
-  creatorLoading: boolean
-  onGenerateCreator: (messageIndex: number) => void
   onFactsLoaded?: (messageIndex: number, data: FactsLayer) => void
   onQuotesLoaded?: (messageIndex: number, data: AuthorLayer) => void
-  onCreatorLoaded?: (messageIndex: number, data: import('../types').CreatorResponse) => void
 }
 
-export function AssistantCard({ message, messageIndex, creatorLoading, onGenerateCreator, onFactsLoaded, onQuotesLoaded, onCreatorLoaded }: Props) {
+export function AssistantCard({ message, messageIndex, onFactsLoaded, onQuotesLoaded }: Props) {
   const [factsOpen, setFactsOpen] = useState(false)
-  const [quotesOpen, setQuotesOpen] = useState(false)
-  const [creatorOpen, setCreatorOpen] = useState(false)
   const [factsLoading, setFactsLoading] = useState(false)
   const [quotesLoading, setQuotesLoading] = useState(false)
-  const [creatorLoadingLocal, setCreatorLoadingLocal] = useState(false)
-  const [creatorButtonHover, setCreatorButtonHover] = useState(false)
 
   if (message.role !== 'assistant') return null
 
   const dr = message.debateResponse
-  const labelPostura = t('assistantSteelman')
-  const labelContrapunto = t('assistantContrapunto')
-  const labelPregunta = t('assistantPregunta')
 
   const dl = dr?.debate_layer
   const steelman = dl?.steelman_of_user ?? ''
@@ -273,11 +283,17 @@ export function AssistantCard({ message, messageIndex, creatorLoading, onGenerat
   const factsSectionLabel = 'Hechos científicos'
   const factsEmptyText = isVerifiedFacts ? t('assistantNoFactsVerified') : t('assistantNoFacts')
   const hasQuotes = quotesData && (quotesData.quotes?.length ?? 0) > 0
-  const hasCreator =
-    message.creatorResponse &&
-    ((message.creatorResponse.title_options?.length ?? 0) > 0 ||
-      (message.creatorResponse.outline?.length ?? 0) > 0)
+  // Preload quotes when message has debateResponse (Cita block is always visible)
+  useEffect(() => {
+    if (dr && !quotesData && message.id && !quotesLoading) {
+      setQuotesLoading(true)
+      fetchMessageQuotes(message.id)
+        .then((d) => onQuotesLoaded?.(messageIndex, d))
+        .finally(() => setQuotesLoading(false))
+    }
+  }, [dr, quotesData, message.id, messageIndex, quotesLoading, onQuotesLoaded])
 
+  // Lazy-load facts when user opens Contexto científico (collapsible)
   useEffect(() => {
     if (factsOpen && !factsData && message.id && !factsLoading) {
       setFactsLoading(true)
@@ -286,26 +302,6 @@ export function AssistantCard({ message, messageIndex, creatorLoading, onGenerat
         .finally(() => setFactsLoading(false))
     }
   }, [factsOpen, factsData, message.id, messageIndex, factsLoading, onFactsLoaded])
-
-  useEffect(() => {
-    if (quotesOpen && !quotesData && message.id && !quotesLoading) {
-      setQuotesLoading(true)
-      fetchMessageQuotes(message.id)
-        .then((d) => onQuotesLoaded?.(messageIndex, d))
-        .finally(() => setQuotesLoading(false))
-    }
-  }, [quotesOpen, quotesData, message.id, messageIndex, quotesLoading, onQuotesLoaded])
-
-  const handleGenerateCreator = async () => {
-    if (!message.id || creatorLoadingLocal) return
-    setCreatorLoadingLocal(true)
-    try {
-      const d = await fetchMessageCreator(message.id)
-      onCreatorLoaded?.(messageIndex, d)
-    } finally {
-      setCreatorLoadingLocal(false)
-    }
-  }
 
   const mainContent = (message.content || '').trim()
 
@@ -341,7 +337,7 @@ export function AssistantCard({ message, messageIndex, creatorLoading, onGenerat
               RESUMEN RÁPIDO
             </strong>
             <p style={{ margin: '4px 0 0', color: '#e4e4e7', fontSize: SC.TEXT_SUMMARY_SIZE, lineHeight: SC.LINE_HEIGHT_BODY }}>
-              {section.quick_summary}
+              {sanitizeSummaryText(section.quick_summary)}
             </p>
           </div>
         )}
@@ -349,159 +345,196 @@ export function AssistantCard({ message, messageIndex, creatorLoading, onGenerat
     )
   }
 
-  function renderQuestionSection(qSection: QuestionSection) {
+  function renderQuestionContent(questionText: string) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        <div style={{ flexShrink: 0, width: SC.STAR_SUBTITLE_SIZE, height: SC.STAR_SUBTITLE_SIZE }} aria-hidden>
+          <img
+            src={PREGUNTA_SUB_STAR_SRC}
+            alt=""
+            width={SC.STAR_SUBTITLE_SIZE}
+            height={SC.STAR_SUBTITLE_SIZE}
+            style={{ display: 'block', width: SC.STAR_SUBTITLE_SIZE, height: SC.STAR_SUBTITLE_SIZE }}
+          />
+        </div>
+        <p style={{ flex: 1, minWidth: 0, margin: 0, whiteSpace: 'pre-wrap', fontSize: SC.TEXT_QUESTION_SIZE, lineHeight: 1.45 }}>
+          {questionText}
+        </p>
+      </div>
+    )
+  }
+
+  function renderPosturaContent() {
+    if (useStructured && dl?.stance_section) {
+      return renderStructuredSection(
+        { ...dl.stance_section, section_title: UI_CONFIG.posturaTitle },
+        POSTURA_TITLE_STAR_SRC,
+        POSTURA_SUB_STAR_SRC
+      )
+    }
+    const raw = steelman || mainContent || '—'
+    const { points, summary } = parseFlatTextToPoints(raw)
     return (
       <>
-        <SectionHeaderWithIcon title={qSection.section_title} iconSrc={PREGUNTA_TITLE_STAR_SRC} />
-        {/* Pregunta: estrella en gutter (absoluta), texto con TEXT_LEFT_PADDING */}
-        <div
-          style={{
-            position: 'relative',
-            paddingLeft: SC.TEXT_LEFT_PADDING,
-            minHeight: SC.STAR_SUBTITLE_SIZE,
-          }}
-        >
-          <div
-            style={{
-              position: 'absolute',
-              left: SC.STAR_SUBTITLE_LEFT_OFFSET,
-              top: SC.STAR_SUBTITLE_TOP_OFFSET,
-              width: SC.STAR_SUBTITLE_SIZE,
-              height: SC.STAR_SUBTITLE_SIZE,
-            }}
-            aria-hidden
-          >
-            <img
-              src={PREGUNTA_SUB_STAR_SRC}
-              alt=""
-              width={SC.STAR_SUBTITLE_SIZE}
-              height={SC.STAR_SUBTITLE_SIZE}
-              style={{ display: 'block', width: SC.STAR_SUBTITLE_SIZE, height: SC.STAR_SUBTITLE_SIZE }}
-            />
+        <SectionHeaderWithIcon title={UI_CONFIG.posturaTitle} iconSrc={POSTURA_TITLE_STAR_SRC} />
+        {points.map((p, i) => (
+          <NumberedPoint
+            key={i}
+            index={i + 1}
+            subtitle={p.subtitle}
+            bullets={p.bullets.map((t) => ({ text: t }))}
+            starIconSrc={POSTURA_SUB_STAR_SRC}
+          />
+        ))}
+        {summary != null && summary.trim() && (
+          <div style={quickSummaryStyle}>
+            <strong style={{ color: '#737373', fontSize: UI_CONFIG.summaryLabelSize, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              RESUMEN RÁPIDO
+            </strong>
+            <p style={{ margin: '4px 0 0', whiteSpace: 'pre-wrap', color: '#e4e4e7', fontSize: SC.TEXT_SUMMARY_SIZE, lineHeight: SC.LINE_HEIGHT_BODY }}>
+              {sanitizeSummaryText(summary)}
+            </p>
           </div>
-          <p style={{ margin: 0, minWidth: 0, whiteSpace: 'pre-wrap', fontSize: SC.TEXT_QUESTION_SIZE, lineHeight: SC.LINE_HEIGHT_BODY }}>
-            {qSection.socratic_question}
-          </p>
-        </div>
+        )}
+      </>
+    )
+  }
+
+  function renderContraposturaContent() {
+    if (useStructured && dl?.counter_section) {
+      return renderStructuredSection(
+        { ...dl.counter_section, section_title: UI_CONFIG.contraposturaTitle },
+        CONTRAPOSTURA_TITLE_STAR_SRC,
+        CONTRAPOSTURA_SUB_STAR_SRC
+      )
+    }
+    const raw = contrarian || '—'
+    const { points, summary } = parseFlatTextToPoints(raw)
+    return (
+      <>
+        <SectionHeaderWithIcon title={UI_CONFIG.contraposturaTitle} iconSrc={CONTRAPOSTURA_TITLE_STAR_SRC} />
+        {points.map((p, i) => (
+          <NumberedPoint
+            key={i}
+            index={i + 1}
+            subtitle={p.subtitle}
+            bullets={p.bullets.map((t) => ({ text: t }))}
+            starIconSrc={CONTRAPOSTURA_SUB_STAR_SRC}
+          />
+        ))}
+        {summary != null && summary.trim() && (
+          <div style={quickSummaryStyle}>
+            <strong style={{ color: '#737373', fontSize: UI_CONFIG.summaryLabelSize, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              RESUMEN RÁPIDO
+            </strong>
+            <p style={{ margin: '4px 0 0', whiteSpace: 'pre-wrap', color: '#e4e4e7', fontSize: SC.TEXT_SUMMARY_SIZE, lineHeight: SC.LINE_HEIGHT_BODY }}>
+              {sanitizeSummaryText(summary)}
+            </p>
+          </div>
+        )}
       </>
     )
   }
 
   return (
-    <div style={cardStyle} className="debate-assistant-body">
-      {useStructured ? (
-        <>
-          <div style={blockStyle}>
-            {renderStructuredSection(dl!.stance_section!, POSTURA_TITLE_STAR_SRC, POSTURA_SUB_STAR_SRC)}
-          </div>
-          <div style={blockStyle}>
-            {renderStructuredSection(dl!.counter_section!, CONTRAPOSTURA_TITLE_STAR_SRC, CONTRAPOSTURA_SUB_STAR_SRC)}
-          </div>
-          <div style={blockStylePregunta}>
-            {renderQuestionSection(dl!.question_section!)}
-          </div>
-        </>
-      ) : (
-        <>
-          <div style={blockStyle}>
-            <SectionHeaderWithIcon title={labelPostura} iconSrc={POSTURA_TITLE_STAR_SRC} />
-            {(() => {
-              const raw = steelman || mainContent || '—'
-              const { points, summary } = parseFlatTextToPoints(raw)
-              return (
-                <>
-                  {points.map((p, i) => (
-                    <NumberedPoint
-                      key={i}
-                      index={i + 1}
-                      subtitle={p.subtitle}
-                      bullets={p.bullets.map((t) => ({ text: t }))}
-                      starIconSrc={POSTURA_SUB_STAR_SRC}
-                    />
-                  ))}
-                  {summary != null && summary.trim() && (
-                    <div style={quickSummaryStyle}>
-                      <p style={{ margin: 0, whiteSpace: 'pre-wrap', color: '#e4e4e7', fontSize: SC.TEXT_SUMMARY_SIZE, lineHeight: SC.LINE_HEIGHT_BODY }}>
-                        {summary}
-                      </p>
-                    </div>
+    <div style={{ width: '100%', maxWidth: '100%', minWidth: 0 }} className="debate-assistant-body">
+      {/* Two-column: Postura | Contrapostura */}
+      <div style={twoColGridStyle}>
+        <div style={cardPosturaStyle}>{renderPosturaContent()}</div>
+        <div style={cardContraposturaStyle}>{renderContraposturaContent()}</div>
+      </div>
+
+      {/* Lower section: Pregunta (always visible) */}
+      <div style={lowerBlockStyle}>
+        <SectionHeaderWithIcon title={UI_CONFIG.preguntaTitle} iconSrc={PREGUNTA_TITLE_STAR_SRC} />
+        {renderQuestionContent(useStructured && dl?.question_section ? dl.question_section.socratic_question : oneQuestion || '—')}
+      </div>
+
+      {/* Cita textual (always visible) */}
+      {dr && (
+        <div style={lowerBlockStyle}>
+          <SectionHeaderWithIcon title={t('tabQuotes')} iconSrc={PREGUNTA_TITLE_STAR_SRC} />
+          {quotesLoading ? (
+            <p style={emptyStyle}>{t('assistantLoading')}</p>
+          ) : hasQuotes ? (
+            quotesData!.quotes.slice(0, 1).map((q, j) => (
+              <div key={q.quote_id ?? j}>
+                <div style={{ position: 'relative', marginBottom: QUOTES_UI_CONFIG.authorWorkSpacingBottom }}>
+                  <img
+                    src={CITAS_AUTHOR_STAR_CONFIG.authorStarImageSrc}
+                    alt=""
+                    role="presentation"
+                    style={{
+                      position: 'absolute',
+                      left: CITAS_AUTHOR_STAR_CONFIG.authorStarInsetLeft + CITAS_AUTHOR_STAR_CONFIG.authorStarOffsetX,
+                      top: CITAS_AUTHOR_STAR_CONFIG.authorStarInsetTop + CITAS_AUTHOR_STAR_CONFIG.authorStarOffsetY,
+                      width: CITAS_AUTHOR_STAR_CONFIG.authorStarSize,
+                      height: CITAS_AUTHOR_STAR_CONFIG.authorStarSize,
+                      margin: 0,
+                      display: 'block',
+                    }}
+                  />
+                  <div
+                    style={{
+                      marginLeft:
+                        CITAS_AUTHOR_STAR_CONFIG.authorStarInsetLeft +
+                        CITAS_AUTHOR_STAR_CONFIG.authorStarOffsetX +
+                        CITAS_AUTHOR_STAR_CONFIG.authorStarSize +
+                        CITAS_AUTHOR_STAR_CONFIG.authorStarToTextGap,
+                      fontSize: QUOTES_UI_CONFIG.authorWorkFontSize,
+                      color: QUOTES_UI_CONFIG.authorWorkColor,
+                      fontWeight: QUOTES_UI_CONFIG.authorWorkFontWeight,
+                      lineHeight: QUOTES_UI_CONFIG.authorWorkLineHeight,
+                    }}
+                  >
+                    {q.author}
+                    {q.work ? ` ${q.work}` : ''}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+                  <blockquote style={{ ...quoteBlockStyle, flex: '1 1 200px', minWidth: 0 }}>{q.quote}</blockquote>
+                  {j === 0 && (
+                    <span
+                      style={{
+                        flexShrink: 0,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: '#a855f7',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      ¡Nueva frase desbloqueada!
+                    </span>
                   )}
-                </>
-              )
-            })()}
-          </div>
-          <div style={blockStyle}>
-            <SectionHeaderWithIcon title={labelContrapunto} iconSrc={CONTRAPOSTURA_TITLE_STAR_SRC} />
-            {(() => {
-              const raw = contrarian || '—'
-              const { points, summary } = parseFlatTextToPoints(raw)
-              return (
-                <>
-                  {points.map((p, i) => (
-                    <NumberedPoint
-                      key={i}
-                      index={i + 1}
-                      subtitle={p.subtitle}
-                      bullets={p.bullets.map((t) => ({ text: t }))}
-                      starIconSrc={CONTRAPOSTURA_SUB_STAR_SRC}
-                    />
-                  ))}
-                  {summary != null && summary.trim() && (
-                    <div style={quickSummaryStyle}>
-                      <p style={{ margin: 0, whiteSpace: 'pre-wrap', color: '#e4e4e7', fontSize: SC.TEXT_SUMMARY_SIZE, lineHeight: SC.LINE_HEIGHT_BODY }}>
-                        {summary}
-                      </p>
-                    </div>
-                  )}
-                </>
-              )
-            })()}
-          </div>
-          <div style={blockStylePregunta}>
-            <SectionHeaderWithIcon title={labelPregunta} iconSrc={PREGUNTA_TITLE_STAR_SRC} />
-            <div
-              style={{
-                position: 'relative',
-                paddingLeft: SC.TEXT_LEFT_PADDING,
-                minHeight: SC.STAR_SUBTITLE_SIZE,
-              }}
-            >
-              <div
-                style={{
-                  position: 'absolute',
-                  left: SC.STAR_SUBTITLE_LEFT_OFFSET,
-                  top: SC.STAR_SUBTITLE_TOP_OFFSET,
-                  width: SC.STAR_SUBTITLE_SIZE,
-                  height: SC.STAR_SUBTITLE_SIZE,
-                }}
-                aria-hidden
-              >
-                <img
-                  src={PREGUNTA_SUB_STAR_SRC}
-                  alt=""
-                  width={SC.STAR_SUBTITLE_SIZE}
-                  height={SC.STAR_SUBTITLE_SIZE}
-                  style={{ display: 'block', width: SC.STAR_SUBTITLE_SIZE, height: SC.STAR_SUBTITLE_SIZE }}
-                />
+                </div>
               </div>
-              <p style={{ margin: 0, minWidth: 0, whiteSpace: 'pre-wrap', fontSize: SC.TEXT_QUESTION_SIZE, lineHeight: SC.LINE_HEIGHT_BODY }}>
-                {oneQuestion || '—'}
-              </p>
-            </div>
-          </div>
-        </>
+            ))
+          ) : (
+            <p style={emptyStyle}>{t('assistantNoQuotes')}</p>
+          )}
+        </div>
       )}
 
+      {/* Contexto científico (ÚNICO collapsible) */}
       {dr && (
-        <>
+        <div style={lowerBlockStyle}>
           <button
             type="button"
-            style={accordionHeaderStyle}
+            style={{
+              ...accordionHeaderStyle,
+              width: '100%',
+              justifyContent: 'flex-start',
+              padding: '12px 0',
+              fontSize: 14,
+              color: '#e4e4e7',
+            }}
             onClick={() => setFactsOpen((o) => !o)}
             aria-expanded={factsOpen}
           >
-            <span style={{ fontSize: 14 }}>{factsOpen ? '▼' : '▶'}</span>
-            {factsSectionLabel}
+            <span style={{ fontSize: 12, marginRight: 8 }}>{factsOpen ? '▼' : '▶'}</span>
+            {SCI_FACTS_LABELS.contextTitle} (DESPLEGABLE)
           </button>
           {factsOpen && (
             <div style={accordionContentStyle}>
@@ -562,160 +595,9 @@ export function AssistantCard({ message, messageIndex, creatorLoading, onGenerat
               )}
             </div>
           )}
-
-          <button
-            type="button"
-            style={accordionHeaderStyle}
-            onClick={() => setQuotesOpen((o) => !o)}
-            aria-expanded={quotesOpen}
-          >
-            <span style={{ fontSize: 14 }}>{quotesOpen ? '▼' : '▶'}</span>
-            {t('tabQuotes')}
-          </button>
-          {quotesOpen && (
-            <div style={accordionContentStyle}>
-              {quotesLoading ? (
-                <p style={emptyStyle}>{t('assistantLoading')}</p>
-              ) : hasQuotes ? (
-                quotesData!.quotes.slice(0, 3).map((q, j) => (
-                  <div key={q.quote_id ?? j} style={{ marginBottom: 10 }}>
-                    <div style={{ position: 'relative', marginBottom: QUOTES_UI_CONFIG.authorWorkSpacingBottom }}>
-                      <img
-                        src={CITAS_AUTHOR_STAR_CONFIG.authorStarImageSrc}
-                        alt=""
-                        role="presentation"
-                        style={{
-                          position: 'absolute',
-                          left: CITAS_AUTHOR_STAR_CONFIG.authorStarInsetLeft + CITAS_AUTHOR_STAR_CONFIG.authorStarOffsetX,
-                          top: CITAS_AUTHOR_STAR_CONFIG.authorStarInsetTop + CITAS_AUTHOR_STAR_CONFIG.authorStarOffsetY,
-                          width: CITAS_AUTHOR_STAR_CONFIG.authorStarSize,
-                          height: CITAS_AUTHOR_STAR_CONFIG.authorStarSize,
-                          margin: 0,
-                          display: 'block',
-                        }}
-                      />
-                      <div
-                        style={{
-                          marginLeft:
-                            CITAS_AUTHOR_STAR_CONFIG.authorStarInsetLeft +
-                            CITAS_AUTHOR_STAR_CONFIG.authorStarOffsetX +
-                            CITAS_AUTHOR_STAR_CONFIG.authorStarSize +
-                            CITAS_AUTHOR_STAR_CONFIG.authorStarToTextGap,
-                          fontSize: QUOTES_UI_CONFIG.authorWorkFontSize,
-                          color: QUOTES_UI_CONFIG.authorWorkColor,
-                          fontWeight: QUOTES_UI_CONFIG.authorWorkFontWeight,
-                          lineHeight: QUOTES_UI_CONFIG.authorWorkLineHeight,
-                        }}
-                      >
-                        {q.author}
-                        {q.work ? `, ${q.work}` : ''}
-                      </div>
-                    </div>
-                    <blockquote style={quoteBlockStyle}>{q.quote}</blockquote>
-                  </div>
-                ))
-              ) : (
-                <p style={emptyStyle}>{t('assistantNoQuotes')}</p>
-              )}
-            </div>
-          )}
-
-          <button
-            type="button"
-            style={accordionHeaderStyle}
-            onClick={() => setCreatorOpen((o) => !o)}
-            aria-expanded={creatorOpen}
-          >
-            <span style={{ fontSize: 14 }}>{creatorOpen ? '▼' : '▶'}</span>
-            {t('tabCreator')}
-          </button>
-          {creatorOpen && (
-            <div style={accordionContentStyle}>
-              {hasCreator ? (
-                <>
-                  <div style={{ ...labelStyle, marginBottom: 6 }}>{t('detailsTitleOptions')}</div>
-                  <ul style={{ margin: '0 0 10px', paddingLeft: 20, color: '#e4e4e7', fontSize: 13 }}>
-                    {message.creatorResponse!.title_options.map((t, j) => (
-                      <li key={j} style={{ marginBottom: 4 }}>{t}</li>
-                    ))}
-                  </ul>
-                  <div style={{ ...labelStyle, marginBottom: 6 }}>{t('detailsOutline')}</div>
-                  <ul style={{ margin: 0, paddingLeft: 20, color: '#e4e4e7', fontSize: 13 }}>
-                    {message.creatorResponse!.outline.map((item, j) => (
-                      <li key={j} style={{ marginBottom: 4 }}>{item}</li>
-                    ))}
-                  </ul>
-                </>
-              ) : creatorLoading || creatorLoadingLocal ? (
-                <p style={emptyStyle}>{t('detailsGenerating')}</p>
-              ) : (
-                <div
-                  style={{
-                    marginTop: CREATOR_IDEAS_CONFIG.blockMarginTop,
-                    marginBottom: CREATOR_IDEAS_CONFIG.blockMarginBottom,
-                    borderRadius: CREATOR_IDEAS_CONFIG.blockBorderRadius,
-                  }}
-                >
-                  <p
-                    style={{
-                      margin: 0,
-                      marginBottom: CREATOR_IDEAS_CONFIG.emptyStateGapBelow,
-                      fontSize: CREATOR_IDEAS_CONFIG.emptyStateFontSize,
-                      color: CREATOR_IDEAS_CONFIG.emptyStateColor,
-                      fontFamily: CREATOR_IDEAS_CONFIG.emptyStateFontFamily,
-                    }}
-                  >
-                    {CREATOR_IDEAS_CONFIG.emptyStateText}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleGenerateCreator}
-                    disabled={creatorLoading || creatorLoadingLocal}
-                    onMouseEnter={() => setCreatorButtonHover(true)}
-                    onMouseLeave={() => setCreatorButtonHover(false)}
-                    style={{
-                      display: 'block',
-                      marginTop: CREATOR_IDEAS_CONFIG.buttonMarginTopPx,
-                      marginLeft: CREATOR_IDEAS_CONFIG.buttonMarginLeftPx,
-                      padding: 0,
-                      width: CREATOR_IDEAS_CONFIG.buttonWidthPx,
-                      height: CREATOR_IDEAS_CONFIG.buttonHeightPx,
-                      border: 'none',
-                      borderRadius: CREATOR_IDEAS_CONFIG.blockBorderRadius || 8,
-                      background: 'transparent',
-                      cursor: creatorLoading || creatorLoadingLocal ? 'not-allowed' : 'pointer',
-                      overflow: 'hidden',
-                      transform:
-                        creatorButtonHover && !creatorLoading && !creatorLoadingLocal
-                          ? `scale(${CREATOR_IDEAS_CONFIG.buttonScale * CREATOR_IDEAS_CONFIG.buttonHoverScale})`
-                          : `scale(${CREATOR_IDEAS_CONFIG.buttonScale})`,
-                      filter:
-                        creatorButtonHover && !creatorLoading && !creatorLoadingLocal
-                          ? `brightness(${CREATOR_IDEAS_CONFIG.buttonHoverBrightness}) drop-shadow(0 0 ${CREATOR_IDEAS_CONFIG.buttonShadowIntensity}px rgba(0,0,0,0.3))`
-                          : CREATOR_IDEAS_CONFIG.buttonShadowIntensity
-                            ? `drop-shadow(0 0 ${CREATOR_IDEAS_CONFIG.buttonShadowIntensity}px rgba(0,0,0,0.2))`
-                            : 'none',
-                      transition: `transform ${CREATOR_IDEAS_CONFIG.buttonTransitionDurationMs}ms ease, filter ${CREATOR_IDEAS_CONFIG.buttonTransitionDurationMs}ms ease`,
-                    }}
-                  >
-                    <img
-                      src={CREATOR_IDEAS_CONFIG.buttonImageSrc}
-                      alt={t('assistantGenerateScript')}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'contain',
-                        display: 'block',
-                        pointerEvents: 'none',
-                      }}
-                    />
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </>
+        </div>
       )}
+
     </div>
   )
 }

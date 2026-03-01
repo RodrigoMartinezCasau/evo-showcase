@@ -10,27 +10,23 @@ type Props = {
 }
 
 /**
- * Cabecera de sección con estrella en gutter (posición absoluta).
- * El texto usa TEXT_LEFT_PADDING; cambiar STAR_MAIN_SIZE no mueve el texto.
+ * Cabecera de sección con estrella. Flex layout evita overlap con títulos largos.
  */
 export function SectionHeaderWithIcon({ title, iconSrc }: Props) {
   return (
     <div
       style={{
-        position: 'relative',
-        paddingLeft: SC.TEXT_LEFT_PADDING,
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 12,
         marginBottom: SC.GAP_AFTER_MAIN_TITLE,
-        minHeight: SC.STAR_MAIN_SIZE,
       }}
       role="heading"
       aria-level={2}
     >
-      {/* Estrella: absoluta, no afecta flujo del texto */}
       <div
         style={{
-          position: 'absolute',
-          left: SC.STAR_MAIN_LEFT_OFFSET,
-          top: SC.STAR_MAIN_TOP_OFFSET,
+          flexShrink: 0,
           width: SC.STAR_MAIN_SIZE,
           height: SC.STAR_MAIN_SIZE,
         }}
@@ -46,8 +42,10 @@ export function SectionHeaderWithIcon({ title, iconSrc }: Props) {
       </div>
       <span
         style={{
+          flex: 1,
+          minWidth: 0,
           fontSize: SC.TEXT_MAIN_TITLE_SIZE,
-          lineHeight: SC.LINE_HEIGHT_MAIN,
+          lineHeight: 1.35,
           fontWeight: 600,
           color: '#e4e4e7',
           display: 'block',

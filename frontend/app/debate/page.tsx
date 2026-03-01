@@ -6,7 +6,6 @@ import {
   type Message,
   type Thread,
   type DebateResponse,
-  type CreatorResponse,
 } from './types'
 import {
   fetchDebates,
@@ -48,7 +47,6 @@ export default function DebatePage() {
   const [loadingDebate, setLoadingDebate] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [connectionError, setConnectionError] = useState(false)
-  const [creatorLoading, setCreatorLoading] = useState(false)
   const topBarLeftRef = useRef<HTMLDivElement>(null)
   const setLoadingRef = useRef(setLoading)
   setLoadingRef.current = setLoading
@@ -221,6 +219,7 @@ export default function DebatePage() {
     const text = (message || '').trim()
     if (!text || loading) return
 
+    const requestId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : undefined
     setInput('')
     setError(null)
     const userMsg: Message = { role: 'user', content: text }
@@ -229,7 +228,7 @@ export default function DebatePage() {
     if (!debateId) {
       if (isDev) console.debug('[debate] Home send: creating conversation then sending', { text: text.slice(0, 40) })
       try {
-        const { id, title } = await createDebate(text)
+        const { id, title } = await createDebate(text, requestId)
         debateId = id
         if (isDev) console.debug('[debate] conversation created', { id, title })
         setDebateList((prev) => [{ id, title, updated_at: new Date().toISOString() }, ...prev])
@@ -276,7 +275,7 @@ export default function DebatePage() {
     if (isDev) console.debug('[debate] message send called', { debateId, textLength: text.length })
 
     try {
-      const data = await sendMessage(debateId!, text)
+      const data = await sendMessage(debateId!, text, requestId)
       const fullText = data.assistant_text ?? ''
       fullTextRef.current = fullText
       const realId = data.message_id
@@ -362,10 +361,6 @@ export default function DebatePage() {
     }
   }, [loading, currentThreadId])
 
-  const handleGenerateCreator = useCallback((_messageIndex: number) => {
-    // Creator is now fetched via AssistantCard -> fetchMessageCreator
-  }, [])
-
   const handleFactsLoaded = useCallback((messageIndex: number, data: import('./types').FactsLayer) => {
     setCurrentThread((prev) => {
       if (!prev) return prev
@@ -388,20 +383,6 @@ export default function DebatePage() {
         messages: prev.messages.map((m, i) =>
           i === messageIndex && m.role === 'assistant'
             ? { ...m, quotesCache: data }
-            : m
-        ),
-      }
-    })
-  }, [])
-
-  const handleCreatorLoaded = useCallback((messageIndex: number, data: CreatorResponse) => {
-    setCurrentThread((prev) => {
-      if (!prev) return prev
-      return {
-        ...prev,
-        messages: prev.messages.map((m, i) =>
-          i === messageIndex && m.role === 'assistant'
-            ? { ...m, creatorResponse: data }
             : m
         ),
       }
@@ -445,11 +426,8 @@ export default function DebatePage() {
       <ChatView
         messages={messages}
         loading={loading || loadingDebate}
-        creatorLoading={creatorLoading}
-        onGenerateCreator={handleGenerateCreator}
         onFactsLoaded={handleFactsLoaded}
         onQuotesLoaded={handleQuotesLoaded}
-        onCreatorLoaded={handleCreatorLoaded}
       />
     </MainLayout>
   )

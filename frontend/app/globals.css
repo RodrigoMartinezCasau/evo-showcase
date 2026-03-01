@@ -1,4 +1,5 @@
 :root {
+  --debate-border-size: 3px;
   --sidebar-icon-size: 30px;
   --sidebar-icon-size-favorite: 32px;   /* estrella favorito en cada fila de debate */
   --sidebar-icon-size-pencil: 17px;     /* lápiz editar en cada fila de debate */

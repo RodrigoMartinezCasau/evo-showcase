@@ -56,21 +56,15 @@ const messagesWrapStyle: React.CSSProperties = {
 type Props = {
   messages: Message[]
   loading: boolean
-  creatorLoading: boolean
-  onGenerateCreator: (messageIndex: number) => void
   onFactsLoaded?: (messageIndex: number, data: import('../types').FactsLayer) => void
   onQuotesLoaded?: (messageIndex: number, data: import('../types').AuthorLayer) => void
-  onCreatorLoaded?: (messageIndex: number, data: import('../types').CreatorResponse) => void
 }
 
 export function ChatView({
   messages,
   loading,
-  creatorLoading,
-  onGenerateCreator,
   onFactsLoaded,
   onQuotesLoaded,
-  onCreatorLoaded,
 }: Props) {
   const endRef = useRef<HTMLDivElement>(null)
 
@@ -98,11 +92,8 @@ export function ChatView({
                   key={i}
                   message={m}
                   messageIndex={i}
-                  creatorLoading={creatorLoading}
-                  onGenerateCreator={onGenerateCreator}
                   onFactsLoaded={onFactsLoaded}
                   onQuotesLoaded={onQuotesLoaded}
-                  onCreatorLoaded={onCreatorLoaded}
                 />
               ))}
               <div ref={endRef} />

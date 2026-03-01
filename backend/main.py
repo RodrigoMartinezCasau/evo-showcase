@@ -4,7 +4,12 @@ import os
 from pathlib import Path
 import time
 import uuid
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except Exception:  # pragma: no cover
+    # Optional dependency for local dev; backend can still run with env vars.
+    def load_dotenv(*args, **kwargs):  # type: ignore[no-redef]
+        return False
 
 logger = logging.getLogger(__name__)
 # Load .env only if present (Vercel has no .env file; env vars are set in dashboard)
@@ -25,16 +30,18 @@ from schemas import PhysicalSpec
 
 app = FastAPI(title="Physics Copilot API")
 
-# CORS: allow frontend origins so browser can call this API (e.g. Next.js on 3000)
+# CORS: allow frontend origins (Next.js on 3000 in local; Vercel URL in prod)
 _cors_origins = os.environ.get("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").strip()
-_cors_list = [o.strip() for o in _cors_origins.split(",") if o.strip()] or ["http://localhost:3000", "http://127.0.0.1:3000"]
-
+_cors_list = [o.strip() for o in _cors_origins.split(",") if o.strip()] or [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_list,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "x-api-key", "x-request-id", "Accept"],
 )
 
 # --- Minimal private beta protection: API key + rate limiting ---
@@ -46,6 +53,8 @@ _rate_counters: dict[tuple[str, str], dict[str, float | int]] = {}
 # --- Daily quota (per API key, per day) ---
 DAILY_LIMIT = 30  # <-- edit this to change daily quota
 _daily_usage: dict[tuple[str, str], int] = {}
+# Idempotency: only count once per (api_key, date, request_id)
+_counted_request_ids: set[tuple[str, str, str]] = set()
 
 
 def _get_client_ip(request: Request) -> str:
@@ -108,15 +117,14 @@ async def beta_protection_middleware(request: Request, call_next):
         # Core LLM pipelines
         if p in {"/debate", "/debate/chat", "/creator"}:
             return True
-        # Create debate (initial message)
+        # Create debate (initial message) — same logical "message" as first /chat, use X-Request-Id
         if p == "/debates":
             return True
-        # Persisted debate chat
+        # Persisted debate chat — main reply per user message; use X-Request-Id for idempotency
         if p.startswith("/debates/") and p.endswith("/chat"):
             return True
-        # Lazy-loaded blocks (facts, quotes, creator) per message
-        if p.startswith("/messages/") and any(p.endswith(suffix) for suffix in ("/facts", "/quotes", "/creator")):
-            return True
+        # Lazy-loaded blocks (facts, quotes, creator): do NOT count toward daily quota (1 use = main reply only)
+        # if p.startswith("/messages/") and any(...): return True  # disabled
         return False
 
     is_generation = _is_generation_endpoint(path, request.method)
@@ -135,11 +143,24 @@ async def beta_protection_middleware(request: Request, call_next):
     # Call downstream handler
     response = await call_next(request)
 
-    # Increment quota ONLY after successful generation calls (and not for /usage)
+    # Increment quota ONLY after successful generation calls (and not for /usage, /health)
     if is_generation and response.status_code < 400:
         today = time.strftime("%Y-%m-%d", time.gmtime())
         usage_key = (api_key, today)
-        _daily_usage[usage_key] = _daily_usage.get(usage_key, 0) + 1
+        request_id_raw = request.headers.get("x-request-id")
+        request_id = (request_id_raw or "").strip()
+        should_count = True
+        if request_id:
+            id_key = (api_key, today, request_id)
+            if id_key in _counted_request_ids:
+                should_count = False
+            else:
+                _counted_request_ids.add(id_key)
+                # Prune old days to avoid unbounded growth (mutate in place, no rebinding)
+                to_remove = {k for k in _counted_request_ids if k[1] != today}
+                _counted_request_ids.difference_update(to_remove)
+        if should_count:
+            _daily_usage[usage_key] = _daily_usage.get(usage_key, 0) + 1
 
     return response
 
@@ -321,11 +342,11 @@ def _run_debate_pipeline(
         verbatim_results = retriever.retrieve_verbatim_quotes(
             payload.topic or "",
             payload.user_message or "",
-            top_n=3,
+            top_n=1,
             language=response_language,
         )
         verbatim_quotes_for_layer = [q for q, _ in verbatim_results]
-        verbatim_quotes_for_layer = retriever.pad_verbatim_quotes_to_n(verbatim_quotes_for_layer, 3)
+        verbatim_quotes_for_layer = retriever.pad_verbatim_quotes_to_n(verbatim_quotes_for_layer, 1)
         if verbatim_results:
             if logger.isEnabledFor(logging.DEBUG):
                 logger.debug(
@@ -459,7 +480,8 @@ def root():
 
 
 @app.get("/health")
-def health():
+def health(request: Request):
+    logger.info("GET /health")
     return {"status": "ok"}
 
 
@@ -668,6 +690,7 @@ def list_debates(mode: str | None = None):
 @app.post("/debates")
 def create_debate(payload: CreateDebateRequest):
     """POST /debates -> create debate. If initial_message provided, generate short title. Optional mode."""
+    logger.info("POST /debates")
     from debate_db import create_debate as _create
     from short_title import generate_short_title
 
@@ -698,6 +721,7 @@ def debate_chat_persisted(debate_id: str, payload: DebateChatPayload):
     POST /debates/{id}/chat: append user message, run pipeline with memory,
     append assistant message, update memory. Returns assistant_text, debate_response, etc.
     """
+    logger.info("POST /debates/%s/chat", debate_id)
     from debate_db import (
         append_message,
         get_debate,
@@ -961,17 +985,18 @@ def fetch_message_facts(message_id: str):
     return response
 
 
-def _pad_quotes_response_to_three(quotes_payload: dict, language: str = "en") -> dict:
-    """If quotes_payload['quotes'] has < 3 items, pad from KB (deterministic). Returns modified dict."""
-    current = list(quotes_payload.get("quotes") or [])
-    if len(current) >= 3:
+def _pad_quotes_response_to_one(quotes_payload: dict, language: str = "en") -> dict:
+    """Return at most 1 quote. If empty, pad from KB (deterministic). Returns modified dict."""
+    current = list(quotes_payload.get("quotes") or [])[:1]
+    if len(current) >= 1:
+        quotes_payload["quotes"] = current
         return quotes_payload
     from debate_retriever import DebateRetriever
 
     existing_ids = {q.get("quote_id") for q in current if q.get("quote_id")}
     existing_authors = {(q.get("author") or "").strip().lower() for q in current}
     retriever = DebateRetriever()
-    padding = retriever.get_padding_verbatim_quotes(existing_ids, existing_authors, 3 - len(current))
+    padding = retriever.get_padding_verbatim_quotes(existing_ids, existing_authors, 1 - len(current))
     for vq in padding:
         text = (vq.text_es if language == "es" else None) or vq.text_en or vq.text_es or vq.text_original
         current.append({
@@ -997,16 +1022,16 @@ def fetch_message_quotes(message_id: str):
     md = get_or_create_message_details(message_id)
     if md.quotes_json:
         payload = json.loads(md.quotes_json)
-        return _pad_quotes_response_to_three(payload, language="en")
+        return _pad_quotes_response_to_one(payload, language="en")
     if msg.meta_json:
         meta = json.loads(msg.meta_json)
         dr = meta.get("debate_response")
         if isinstance(dr, dict) and dr.get("author_layer"):
             quotes = dict(dr["author_layer"])
-            quotes = _pad_quotes_response_to_three(quotes, language="en")
+            quotes = _pad_quotes_response_to_one(quotes, language="en")
             upsert_message_details(message_id, quotes_json=json.dumps(quotes))
             return quotes
-    return _pad_quotes_response_to_three({"quotes": [], "quote_policy_note": ""})
+    return _pad_quotes_response_to_one({"quotes": [], "quote_policy_note": ""})
 
 
 @app.post("/messages/{message_id}/creator")
@@ -1062,10 +1087,10 @@ def _run_creator(topic: str, user_message: str):
     philosophy_quotes = [q for q, _ in philosophy_results]
     facts_layer = generate_facts_layer(topic, user_message, science_entries, llm_client=llm)
     verbatim_results = retriever.retrieve_verbatim_quotes(
-        topic or "", user_message or "", top_n=3, language="en"
+        topic or "", user_message or "", top_n=1, language="en"
     )
     verbatim_quotes_for_layer = [q for q, _ in verbatim_results]
-    verbatim_quotes_for_layer = retriever.pad_verbatim_quotes_to_n(verbatim_quotes_for_layer, 3)
+    verbatim_quotes_for_layer = retriever.pad_verbatim_quotes_to_n(verbatim_quotes_for_layer, 1)
     if verbatim_quotes_for_layer:
         author_layer = AuthorLayer(
             quotes=[
@@ -1237,11 +1262,11 @@ def creator(payload: CreatorRequest):
         verbatim_results = retriever.retrieve_verbatim_quotes(
             payload.topic or "",
             payload.user_message or "",
-            top_n=3,
+            top_n=1,
             language=payload.lang or "en",
         )
         verbatim_quotes_for_layer = [q for q, _ in verbatim_results]
-        verbatim_quotes_for_layer = retriever.pad_verbatim_quotes_to_n(verbatim_quotes_for_layer, 3)
+        verbatim_quotes_for_layer = retriever.pad_verbatim_quotes_to_n(verbatim_quotes_for_layer, 1)
         if verbatim_quotes_for_layer:
             author_layer = AuthorLayer(
                 quotes=[

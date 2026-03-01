@@ -46,12 +46,12 @@ export const STYLE_CONTROLS = {
   LINE_HEIGHT_BODY: 1.4,
 
   // --- Espaciado vertical ---
-  SPACING_BETWEEN_SUBTITLE_AND_BODY: -31,
+  SPACING_BETWEEN_SUBTITLE_AND_BODY: 12,   // espacio entre título del punto y bullets (evitar overlap)
   SPACING_BETWEEN_BULLETS: 14,
   SPACING_BETWEEN_BLOCKS: 20,       // entre puntos (subtítulos)
   SPACING_BETWEEN_SECTIONS: 30,     // Postura vs Contrapunto vs Pregunta
   GAP_AFTER_PREGUNTA: -12,           // espacio entre Pregunta y Hechos científicos
-  GAP_AFTER_MAIN_TITLE: -20,
+  GAP_AFTER_MAIN_TITLE: 16,         // espacio bajo header (evitar overlap con contenido)
   GAP_BEFORE_SUMMARY: 30,
 
   // --- Divider (resumen rápido) ---
@@ -60,8 +60,8 @@ export const STYLE_CONTROLS = {
   DIVIDER_PADDING_TOP: 8,
 
   // --- Gutter: texto NUNCA invade área de iconos ---
-  TEXT_LEFT_PADDING: 38,   // padding-left del texto (independiente del tamaño de estrella)
-  ICON_GUTTER_WIDTH: 38,   // ancho del canal izquierdo para iconos
+  TEXT_LEFT_PADDING: 52,   // padding-left del texto (icono 70px ancho; evita overlap)
+  ICON_GUTTER_WIDTH: 52,   // ancho del canal izquierdo para iconos
 
   // --- Card ---
   PAD_CONTAINER_V: 14,
