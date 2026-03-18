@@ -1,12 +1,14 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { evoconnColors } from '@evoconn/theme/colors';
+import { bottomBarIcons } from '@evoconn/assets/icons/bottomBar';
+import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
 
 const TABS = [
   { id: 'siguiendo', label: 'SIGUIENDO' },
   { id: 'mas-votadas', label: 'MAS VOTADAS' },
   { id: 'para-ti', label: 'PARA TI' },
-  { id: 'search', label: '🔍' },
+  { id: 'search', label: 'SEARCH' },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -25,7 +27,29 @@ export function BottomCommunityTabs({ activeTab, onTabChange }: BottomCommunityT
           onPress={() => onTabChange(tab.id)}
           style={[styles.tab, activeTab === tab.id && styles.tabActive]}
         >
-          <Text style={[styles.label, activeTab === tab.id && styles.labelActive]}>{tab.label}</Text>
+          {tab.id === 'search' ? (
+            <View
+              style={[
+                styles.searchFrame,
+                {
+                  width: Math.round(BOTTOM_BAR_LAYOUT.BOTTOM_BAR_ICON_SIZE * BOTTOM_BAR_LAYOUT.SEARCH_ICON_FRAME_SCALE),
+                  height: Math.round(BOTTOM_BAR_LAYOUT.BOTTOM_BAR_ICON_SIZE * BOTTOM_BAR_LAYOUT.SEARCH_ICON_FRAME_SCALE),
+                  transform: [
+                    { translateX: BOTTOM_BAR_LAYOUT.SEARCH_ICON_OFFSET_X },
+                    { translateY: BOTTOM_BAR_LAYOUT.SEARCH_ICON_OFFSET_Y },
+                  ],
+                },
+              ]}
+            >
+              <Image
+                source={activeTab === 'search' ? bottomBarIcons.searchActive : bottomBarIcons.searchInactive}
+                style={styles.searchIcon}
+                resizeMode="contain"
+              />
+            </View>
+          ) : (
+            <Text style={[styles.label, activeTab === tab.id && styles.labelActive]}>{tab.label}</Text>
+          )}
         </TouchableOpacity>
       ))}
     </View>
@@ -42,6 +66,8 @@ const styles = StyleSheet.create({
   },
   tab: { flex: 1, alignItems: 'center', paddingVertical: 6 },
   tabActive: { borderBottomWidth: 2, borderBottomColor: evoconnColors.neonGreen },
-  label: { color: evoconnColors.muted, fontSize: 11, fontWeight: '600' },
+  label: { color: evoconnColors.muted, fontSize: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_TEXT_SIZE, fontWeight: '600' },
   labelActive: { color: evoconnColors.neonGreen },
+  searchFrame: { alignItems: 'center', justifyContent: 'center' },
+  searchIcon: { width: '100%', height: '100%' },
 });

@@ -12,10 +12,9 @@ import { mockFeedPosts } from '@evoconn/data/mockCommunity';
 import { mockConversations } from '@evoconn/data/mockConversations';
 import type { CommunityPost } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
+import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
 
 type TabId = 'siguiendo' | 'mas-votadas' | 'para-ti' | 'search';
-
-const COMMUNITY_TABS_HEIGHT = 52;
 
 export default function CommunityScreen() {
   const router = useRouter();
@@ -58,11 +57,27 @@ export default function CommunityScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={[
           styles.list,
-          { paddingBottom: COMMUNITY_TABS_HEIGHT + insets.bottom + 16 },
+          {
+            paddingBottom:
+              BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
+              insets.bottom +
+              BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
+              16,
+          },
         ]}
         style={styles.listStyle}
       />
-      <View style={[styles.bottomTabsWrap, { paddingBottom: insets.bottom }]}>
+      <View
+        style={[
+          styles.bottomTabsWrap,
+          {
+            paddingBottom: insets.bottom + BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION,
+            paddingHorizontal: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HORIZONTAL_PADDING,
+            bottom: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_BOTTOM_OFFSET,
+            borderRadius: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_BORDER_RADIUS,
+          },
+        ]}
+      >
         <BottomCommunityTabs
           activeTab={activeTab}
           onTabChange={(tab) => setActiveTab(tab as TabId)}
