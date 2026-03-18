@@ -68,7 +68,7 @@ export function AppTopBar({
   const handleClanPress = () => (onClanPress ? onClanPress() : router.push('/profile'));
   const clanLabel =
     clanShortLabel ??
-    (mockCurrentUser.clanId === 'nihilista' ? '??' : mockCurrentUser.clanId.slice(0, 2).toUpperCase());
+    (mockCurrentUser.clanId ? mockCurrentUser.clanId.slice(0, 2).toUpperCase() : '??');
 
   const pencilCount = counts?.pencil ?? mockUserStats.unlockedPhrases;
   const fireCount = counts?.fire ?? mockUserStats.streak;

@@ -3,7 +3,8 @@ export type Rank = 'aprendiz' | 'maestro' | 'filosofo'
 export type User = {
   id: string
   username: string
-  clanId: string
+  /** Null when user is pre-assignment (no clan yet). */
+  clanId: string | null
   rank: Rank
   avatarUri?: string
 }

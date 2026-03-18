@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { View, FlatList, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   AppTopBar,
   CommunityPostCard,
@@ -14,8 +15,11 @@ import { evoconnColors } from '@evoconn/theme/colors';
 
 type TabId = 'siguiendo' | 'mas-votadas' | 'para-ti' | 'search';
 
+const COMMUNITY_TABS_HEIGHT = 52;
+
 export default function CommunityScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('para-ti');
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,17 +52,22 @@ export default function CommunityScreen() {
         onMenuPress={() => setSidebarOpen(true)}
         onClanPress={() => router.push('/profile')}
       />
-      <BottomCommunityTabs
-        activeTab={activeTab}
-        onTabChange={(tab) => setActiveTab(tab as TabId)}
-      />
       <FlatList
         data={mockFeedPosts}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[
+          styles.list,
+          { paddingBottom: COMMUNITY_TABS_HEIGHT + insets.bottom + 16 },
+        ]}
         style={styles.listStyle}
       />
+      <View style={[styles.bottomTabsWrap, { paddingBottom: insets.bottom }]}>
+        <BottomCommunityTabs
+          activeTab={activeTab}
+          onTabChange={(tab) => setActiveTab(tab as TabId)}
+        />
+      </View>
       <SidebarDrawer
         visible={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
@@ -72,6 +81,15 @@ export default function CommunityScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: evoconnColors.background },
-  list: { paddingBottom: 24 },
+  list: { paddingTop: 8 },
   listStyle: { flex: 1 },
+  bottomTabsWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: evoconnColors.background,
+    borderTopWidth: 1,
+    borderTopColor: evoconnColors.border,
+  },
 });

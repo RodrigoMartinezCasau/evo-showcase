@@ -20,7 +20,11 @@ export default function ProfileScreen() {
         <View style={styles.header}>
           <Text style={styles.username}>{user.username}</Text>
           <View style={styles.badges}>
-            <ClanBanner clanId={user.clanId} shortLabel={user.clanId.toUpperCase()} />
+            {user.clanId ? (
+              <ClanBanner clanId={user.clanId} shortLabel={user.clanId.toUpperCase()} />
+            ) : (
+              <Text style={styles.unassigned}>??</Text>
+            )}
             <RankBadge rank={user.rank} />
           </View>
         </View>
@@ -43,7 +47,9 @@ export default function ProfileScreen() {
           <Text style={styles.quoteText}>"La vida es lo que pasa mientras diseñas tu reflexión."</Text>
         </View>
         <View style={[styles.parchment, { borderColor: clanColor }]}>
-          <Text style={styles.parchmentTitle}>Clan {user.clanId}</Text>
+          <Text style={styles.parchmentTitle}>
+            {user.clanId ? `Clan ${user.clanId}` : 'Sin clan'}
+          </Text>
           <Text style={styles.parchmentBody}>Contenido del clan y filosofía.</Text>
         </View>
       </ScrollView>
@@ -58,6 +64,7 @@ const styles = StyleSheet.create({
   header: { marginBottom: 20 },
   username: { color: evoconnColors.text, fontSize: 24, fontWeight: '700', marginBottom: 8 },
   badges: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  unassigned: { color: evoconnColors.text, fontWeight: '800', fontSize: 16 },
   stats: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 24, paddingVertical: 16, backgroundColor: evoconnColors.card, borderRadius: 12 },
   stat: { alignItems: 'center' },
   statValue: { color: evoconnColors.neonGreen, fontSize: 20, fontWeight: '700' },

@@ -3,7 +3,8 @@ import type { User, UserStats } from '../types'
 export const mockCurrentUser: User = {
   id: 'me',
   username: 'RODRIGOMARTINEZ',
-  clanId: 'nihilista',
+  // Pre-assignment default: no clan yet.
+  clanId: null,
   rank: 'aprendiz',
 }
 

@@ -101,7 +101,7 @@ export function SidebarDrawer({
               <View style={[styles.clanDot, { backgroundColor: evoconnColors.accent }]} />
               <View>
                 <Text style={styles.username}>{user.username}</Text>
-                <Text style={styles.clanName}>{user.clanId}</Text>
+                <Text style={styles.clanName}>{user.clanId ? user.clanId : 'Sin clan'}</Text>
               </View>
             </TouchableOpacity>
             <View style={styles.rankRow}>
