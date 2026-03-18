@@ -34,6 +34,27 @@ function iconFrame(size: number, scale: number) {
   return { width: s, height: s };
 }
 
+function HamburgerIcon({
+  size,
+}: {
+  size: number;
+}) {
+  // Drawn bars are more stable than a font glyph across reloads.
+  const w = size;
+  const h = size;
+  const barH = Math.max(2, Math.round(size * 0.11));
+  const gap = Math.max(2, Math.round(size * 0.16));
+  const barW = Math.round(size * 0.78);
+
+  return (
+    <View style={[styles.hamburgerFrame, { width: w, height: h }]}>
+      <View style={[styles.hamburgerBar, { width: barW, height: barH, marginBottom: gap }]} />
+      <View style={[styles.hamburgerBar, { width: barW, height: barH, marginBottom: gap }]} />
+      <View style={[styles.hamburgerBar, { width: barW, height: barH }]} />
+    </View>
+  );
+}
+
 export function AppTopBar({
   onMenuPress,
   onClanPress,
@@ -47,11 +68,13 @@ export function AppTopBar({
   const handleClanPress = () => (onClanPress ? onClanPress() : router.push('/profile'));
   const clanLabel =
     clanShortLabel ??
-    (mockCurrentUser.clanId === 'nihilista' ? 'NH' : mockCurrentUser.clanId.slice(0, 2).toUpperCase());
+    (mockCurrentUser.clanId === 'nihilista' ? '??' : mockCurrentUser.clanId.slice(0, 2).toUpperCase());
 
   const pencilCount = counts?.pencil ?? mockUserStats.unlockedPhrases;
   const fireCount = counts?.fire ?? mockUserStats.streak;
   const heartCount = counts?.heart ?? mockUserStats.dailyUsesLeft;
+  const shieldFrame = iconFrame(TOP_BAR_LAYOUT.SHIELD_SIZE, topBarIconFrameScale.shield);
+  const counterIconFrame = iconFrame(TOP_BAR_LAYOUT.COUNTER_ICON_SIZE, 1);
 
   return (
     <View
@@ -78,22 +101,15 @@ export function AppTopBar({
           </View>
         </TouchableOpacity>
         <TouchableOpacity onPress={onMenuPress} style={styles.iconBtn} hitSlop={14}>
-          <Text style={[styles.hamburger, { fontSize: TOP_BAR_LAYOUT.MENU_SIZE }, nudgeStyle('menu')]}>≡</Text>
+          <View style={[styles.iconFrame, nudgeStyle('menu')]}>
+            <HamburgerIcon size={TOP_BAR_LAYOUT.MENU_SIZE} />
+          </View>
         </TouchableOpacity>
       </View>
 
       <View style={styles.centerCluster} pointerEvents="box-none">
         {showClanIcon && (
           <TouchableOpacity onPress={handleClanPress} style={styles.centerPress} hitSlop={12}>
-            <Text
-              style={[
-                styles.clanMark,
-                { fontSize: TOP_BAR_LAYOUT.CLAN_MARK_SIZE },
-                nudgeStyle('clanQLeft'),
-              ]}
-            >
-              ?
-            </Text>
             <View
               style={[
                 styles.iconFrame,
@@ -103,24 +119,15 @@ export function AppTopBar({
             >
               <Image source={topBarIcons.shield} style={styles.iconImage} resizeMode="contain" />
             </View>
-            <Text
-              style={[
-                styles.clanMark,
-                { fontSize: TOP_BAR_LAYOUT.CLAN_MARK_SIZE },
-                nudgeStyle('clanQRight'),
-              ]}
-            >
-              ?
-            </Text>
-            <Text
-              style={[
-                styles.clanLabel,
-                { fontSize: TOP_BAR_LAYOUT.COUNTER_TEXT_SIZE + 1 },
-                nudgeStyle('clanLabel'),
-              ]}
-            >
-              {clanLabel}
-            </Text>
+            <View style={[styles.textBox, { height: shieldFrame.height }, nudgeStyle('clanLabel')]}>
+              <Text
+                style={[styles.clanLabel, { fontSize: TOP_BAR_LAYOUT.COUNTER_TEXT_SIZE + 1 }]}
+                numberOfLines={1}
+                ellipsizeMode="clip"
+              >
+                {clanLabel}
+              </Text>
+            </View>
           </TouchableOpacity>
         )}
       </View>
@@ -137,15 +144,11 @@ export function AppTopBar({
             <Image source={topBarIcons.pencil} style={styles.iconImage} resizeMode="contain" />
           </View>
           {showCounters && (
-            <Text
-              style={[
-                styles.counterText,
-                { fontSize: TOP_BAR_LAYOUT.COUNTER_TEXT_SIZE },
-                nudgeStyle('pencilText'),
-              ]}
-            >
-              {pencilCount}
-            </Text>
+            <View style={[styles.textBox, { height: counterIconFrame.height }, nudgeStyle('pencilText')]}>
+              <Text style={[styles.counterText, { fontSize: TOP_BAR_LAYOUT.COUNTER_TEXT_SIZE }]}>
+                {pencilCount}
+              </Text>
+            </View>
           )}
         </TouchableOpacity>
         <TouchableOpacity onPress={() => router.push('/streak')} style={styles.counterBtn} hitSlop={14}>
@@ -159,15 +162,11 @@ export function AppTopBar({
             <Image source={topBarIcons.fire} style={styles.iconImage} resizeMode="contain" />
           </View>
           {showCounters && (
-            <Text
-              style={[
-                styles.counterText,
-                { fontSize: TOP_BAR_LAYOUT.COUNTER_TEXT_SIZE },
-                nudgeStyle('fireText'),
-              ]}
-            >
-              {fireCount}
-            </Text>
+            <View style={[styles.textBox, { height: counterIconFrame.height }, nudgeStyle('fireText')]}>
+              <Text style={[styles.counterText, { fontSize: TOP_BAR_LAYOUT.COUNTER_TEXT_SIZE }]}>
+                {fireCount}
+              </Text>
+            </View>
           )}
         </TouchableOpacity>
         <TouchableOpacity onPress={() => router.push('/daily-uses')} style={styles.counterBtn} hitSlop={14}>
@@ -181,15 +180,11 @@ export function AppTopBar({
             <Image source={topBarIcons.heart} style={styles.iconImage} resizeMode="contain" />
           </View>
           {showCounters && (
-            <Text
-              style={[
-                styles.counterText,
-                { fontSize: TOP_BAR_LAYOUT.COUNTER_TEXT_SIZE },
-                nudgeStyle('heartText'),
-              ]}
-            >
-              {heartCount}
-            </Text>
+            <View style={[styles.textBox, { height: counterIconFrame.height }, nudgeStyle('heartText')]}>
+              <Text style={[styles.counterText, { fontSize: TOP_BAR_LAYOUT.COUNTER_TEXT_SIZE }]}>
+                {heartCount}
+              </Text>
+            </View>
           )}
         </TouchableOpacity>
       </View>
@@ -216,9 +211,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     gap: TOP_BAR_LAYOUT.COUNTER_PAIR_GAP,
   },
+  textBox: {
+    justifyContent: 'center',
+    // Don't affect icon positioning; only centers text within its own box.
+  },
   iconFrame: { alignItems: 'center', justifyContent: 'center' },
   iconImage: { width: '100%', height: '100%' },
-  hamburger: { color: evoconnColors.text, fontWeight: '800' },
+  hamburgerFrame: { alignItems: 'center', justifyContent: 'center' },
+  hamburgerBar: {
+    backgroundColor: evoconnColors.text,
+    borderRadius: 999,
+  },
   centerPress: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -226,7 +229,17 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 8,
   },
-  clanMark: { color: evoconnColors.text, fontWeight: '800' },
-  clanLabel: { color: evoconnColors.text, fontWeight: '800', letterSpacing: 0.5 },
-  counterText: { color: evoconnColors.text, fontWeight: '800', minWidth: 22, textAlign: 'left' },
+  clanLabel: {
+    color: evoconnColors.text,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    includeFontPadding: false,
+  },
+  counterText: {
+    color: evoconnColors.text,
+    fontWeight: '800',
+    minWidth: 22,
+    textAlign: 'left',
+    includeFontPadding: false,
+  },
 });
