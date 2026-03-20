@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
   bar: {
     backgroundColor: evoconnColors.background,
     borderBottomWidth: 1,
-    borderBottomColor: evoconnColors.border,
+    borderBottomColor: evoconnColors.background,
   },
   barRow: {
     flexDirection: 'row',

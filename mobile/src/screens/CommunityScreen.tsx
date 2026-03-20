@@ -105,6 +105,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: evoconnColors.background,
     borderTopWidth: 1,
-    borderTopColor: evoconnColors.border,
+    borderTopColor: evoconnColors.background,
   },
 });
