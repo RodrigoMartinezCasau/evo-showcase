@@ -32,8 +32,12 @@ export function BottomCommunityTabs({ activeTab, onTabChange }: BottomCommunityT
               style={[
                 styles.searchFrame,
                 {
-                  width: Math.round(BOTTOM_BAR_LAYOUT.BOTTOM_BAR_ICON_SIZE * BOTTOM_BAR_LAYOUT.SEARCH_ICON_FRAME_SCALE),
-                  height: Math.round(BOTTOM_BAR_LAYOUT.BOTTOM_BAR_ICON_SIZE * BOTTOM_BAR_LAYOUT.SEARCH_ICON_FRAME_SCALE),
+                  width: Math.round(
+                    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SEARCH_ICON_SIZE * BOTTOM_BAR_LAYOUT.SEARCH_ICON_FRAME_SCALE
+                  ),
+                  height: Math.round(
+                    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SEARCH_ICON_SIZE * BOTTOM_BAR_LAYOUT.SEARCH_ICON_FRAME_SCALE
+                  ),
                   transform: [
                     { translateX: BOTTOM_BAR_LAYOUT.SEARCH_ICON_OFFSET_X },
                     { translateY: BOTTOM_BAR_LAYOUT.SEARCH_ICON_OFFSET_Y },
@@ -66,7 +70,7 @@ const styles = StyleSheet.create({
   },
   tab: { flex: 1, alignItems: 'center', paddingVertical: 6 },
   tabActive: { borderBottomWidth: 2, borderBottomColor: evoconnColors.neonGreen },
-  label: { color: evoconnColors.muted, fontSize: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_TEXT_SIZE, fontWeight: '600' },
+  label: { color: evoconnColors.muted, fontSize: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_TAB_TEXT_SIZE, fontWeight: '600' },
   labelActive: { color: evoconnColors.neonGreen },
   searchFrame: { alignItems: 'center', justifyContent: 'center' },
   searchIcon: { width: '100%', height: '100%' },

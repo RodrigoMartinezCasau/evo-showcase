@@ -1,16 +1,16 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { getClanCardColor } from '@evoconn/theme/theme';
+import { getClanColor } from '@evoconn/constants/clanColors';
 
 type ClanBannerProps = {
-  clanId: string;
+  clanId: string | null;
   shortLabel: string;
   onPress?: () => void;
   small?: boolean;
 };
 
 export function ClanBanner({ clanId, shortLabel, onPress, small }: ClanBannerProps) {
-  const color = getClanCardColor(clanId);
+  const color = getClanColor(clanId);
   const Wrapper = onPress ? TouchableOpacity : View;
 
   return (

@@ -88,6 +88,14 @@ export function AppTopBar({
         },
       ]}
     >
+      <View
+        style={[
+          styles.barRow,
+          {
+            transform: [{ translateY: TOP_BAR_LAYOUT.TOPBAR_WHOLE_SHIFT_Y }],
+          },
+        ]}
+      >
       <View style={[styles.leftCluster, { gap: TOP_BAR_LAYOUT.LEFT_CLUSTER_GAP }]}>
         <TouchableOpacity onPress={onMenuPress} style={styles.iconBtn} hitSlop={14}>
           <View
@@ -188,17 +196,21 @@ export function AppTopBar({
           )}
         </TouchableOpacity>
       </View>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   bar: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
     backgroundColor: evoconnColors.background,
     borderBottomWidth: 1,
     borderBottomColor: evoconnColors.border,
+  },
+  barRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    width: '100%',
   },
   leftCluster: { flexDirection: 'row', alignItems: 'flex-end' },
   centerCluster: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },

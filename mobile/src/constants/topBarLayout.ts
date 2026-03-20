@@ -16,8 +16,15 @@ export const TOP_BAR_LAYOUT = {
   // Added on top of safe-area inset (Dynamic Island / notch)
   SAFE_TOP_OFFSET: -18,
 
+  /**
+   * Desplaza **todo** el contenido de la barra (izquierda + centro + derecha) junto.
+   * Positivo = hacia abajo, negativo = hacia arriba.
+   * No altera `PER_ITEM_OFFSETS` ni gaps: solo mueve el bloque entero como una unidad.
+   */
+  TOPBAR_WHOLE_SHIFT_Y: 12,
+
   TOPBAR_PADDING_HORIZONTAL: 15,
-  TOPBAR_PADDING_BOTTOM: 0,
+  TOPBAR_PADDING_BOTTOM: 10,
 
   // Minimum height excluding safe-area paddingTop
   TOPBAR_MIN_HEIGHT: -50,

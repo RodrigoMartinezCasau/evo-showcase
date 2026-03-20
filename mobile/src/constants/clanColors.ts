@@ -11,6 +11,7 @@ export type ClanId =
 export const CLAN_TO_COLOR: Record<ClanId, string> = {
   nihilista: '#0E0E12',
   cientista: '#50D6D3',
+  // Estoicos = olive green (not gray)
   estoico: '#7B8342',
   existencialista: '#C93A3A',
   trascendentalista: '#C56BEA',
@@ -38,5 +39,15 @@ export function getClanColor(clanId: string | null | undefined): string {
 export function getClanBgAsset(clanId: string | null | undefined): number | undefined {
   if (!clanId) return undefined;
   return (CLAN_TO_BG_ASSET as Record<string, number | undefined>)[clanId];
+}
+
+// Debug: expose mapping once in Metro logs so you can verify.
+const anyGlobal = globalThis as unknown as Record<string, unknown>;
+if (!anyGlobal.__EVOCONN_CLAN_COLOR_DEBUG_PRINTED__) {
+  anyGlobal.__EVOCONN_CLAN_COLOR_DEBUG_PRINTED__ = true;
+  // eslint-disable-next-line no-console
+  console.log('[EVOCONN] CLAN_TO_COLOR', CLAN_TO_COLOR);
+  // eslint-disable-next-line no-console
+  console.log('[EVOCONN] CLAN_TO_BG_ASSET keys', Object.keys(CLAN_TO_BG_ASSET));
 }
 
