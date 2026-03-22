@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ImageBackground } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ImageBackground, Image, useWindowDimensions } from 'react-native';
 import type { CommunityPost } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getClanBgAsset, getClanColor } from '@evoconn/constants/clanColors';
@@ -7,6 +7,12 @@ import { VoteWidget } from './VoteWidget';
 import { CARD_LAYOUT_SHARED, cardLayoutBlockForTier } from '@evoconn/constants/cardLayout';
 import { ClanBanner } from './ClanBanner';
 import { getCardMaxLinesForTier, getReflectionCardTier } from '@evoconn/utils/getCardSizeFromText';
+import { getSmallClanBackgroundAsset } from '@evoconn/assets/cards/smallClanBackgrounds';
+import { getSmallClanBannerAsset } from '@evoconn/assets/cards/smallClanBanners';
+import { getMediumClanBackgroundAsset } from '@evoconn/assets/cards/mediumClanBackgrounds';
+import { getMediumClanBannerAsset } from '@evoconn/assets/cards/mediumClanBanners';
+import { CARD_ASSET_LAYOUT } from '@evoconn/constants/cardAssetLayout';
+import { smallStatsIcons } from '@evoconn/assets/icons/smallStats';
 
 const S = CARD_LAYOUT_SHARED;
 
@@ -19,6 +25,8 @@ type CommunityPostCardProps = {
 
 export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }: CommunityPostCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const [smallUpvoted, setSmallUpvoted] = useState(false);
+  const [smallSaved, setSmallSaved] = useState(false);
   const [measuredBlackBoxContentHeight, setMeasuredBlackBoxContentHeight] = useState<number | null>(null);
   const [measuredColoredHeaderHeight, setMeasuredColoredHeaderHeight] = useState<number | null>(null);
   const isReflection = post.type === 'reflection';
@@ -39,7 +47,7 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
   const collapsedBodyMaxLines = getCardMaxLinesForTier(cardTier);
 
   const handleCardPress = () => {
-    if (isReflection && !expanded) {
+    if (isReflection && cardTier === 'large' && !expanded) {
       setExpanded(true);
       return;
     }
@@ -64,10 +72,68 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
     );
   }
 
-  const Outer = outerAsset ? ImageBackground : View;
-  const outerProps = outerAsset
-    ? { source: outerAsset, resizeMode: 'stretch' as const }
+  const isSmallCard = cardTier === 'small';
+  const isMediumCard = cardTier === 'medium';
+  const isCanvaCard = isSmallCard || isMediumCard;
+
+  const smallClanBgAsset = isSmallCard ? getSmallClanBackgroundAsset(post.author.clanId) : undefined;
+  const mediumClanBgAsset = isMediumCard ? getMediumClanBackgroundAsset(post.author.clanId) : undefined;
+
+  if (isSmallCard && !smallClanBgAsset) {
+    throw new Error(
+      `Missing SMALL clan background asset for clan "${String(post.author.clanId)}" on post "${post.id}".`
+    );
+  }
+  if (isMediumCard && !mediumClanBgAsset) {
+    throw new Error(
+      `Missing MEDIUM clan background asset for clan "${String(post.author.clanId)}" on post "${post.id}".`
+    );
+  }
+
+  const canvaBgAsset = isSmallCard ? smallClanBgAsset : isMediumCard ? mediumClanBgAsset : undefined;
+  const resolvedOuterAsset = isCanvaCard ? canvaBgAsset : outerAsset;
+  const Outer = resolvedOuterAsset ? ImageBackground : View;
+  const outerProps = resolvedOuterAsset
+    ? { source: resolvedOuterAsset, resizeMode: 'stretch' as const }
     : {};
+
+  const canvaBannerAsset = isSmallCard
+    ? getSmallClanBannerAsset(post.author.clanId)
+    : isMediumCard
+      ? getMediumClanBannerAsset(post.author.clanId)
+      : undefined;
+
+  if (isCanvaCard && !canvaBannerAsset) {
+    throw new Error(
+      `Missing ${cardTier.toUpperCase()} clan banner asset for clan "${String(post.author.clanId)}" on post "${post.id}".`
+    );
+  }
+
+  const canvaAssetScale = isSmallCard
+    ? CARD_ASSET_LAYOUT.SMALL.SMALL_CARD_ASSET_SCALE
+    : CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_ASSET_SCALE;
+  const canvaAssetWidthAdjust = isSmallCard
+    ? CARD_ASSET_LAYOUT.SMALL.SMALL_CARD_ASSET_WIDTH_ADJUST
+    : CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_ASSET_WIDTH_ADJUST;
+  const canvaAssetHeightAdjust = isSmallCard
+    ? CARD_ASSET_LAYOUT.SMALL.SMALL_CARD_ASSET_HEIGHT_ADJUST
+    : CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_ASSET_HEIGHT_ADJUST;
+  const canvaAssetOffsetX = isSmallCard
+    ? CARD_ASSET_LAYOUT.SMALL.SMALL_CARD_ASSET_OFFSET_X
+    : CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_ASSET_OFFSET_X;
+  const canvaAssetOffsetY = isSmallCard
+    ? CARD_ASSET_LAYOUT.SMALL.SMALL_CARD_ASSET_OFFSET_Y
+    : CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_ASSET_OFFSET_Y;
+
+  const feedUpvoteIcon = smallUpvoted ? smallStatsIcons.upvoteActive : smallStatsIcons.upvoteInactive;
+  const feedSaveIcon = smallSaved ? smallStatsIcons.saveActive : smallStatsIcons.saveInactive;
+
+  const { width: screenWidth } = useWindowDimensions();
+  const MEDIUM_PNG_ASPECT = 1024 / 576;
+  const cardWidth = screenWidth - 24;
+  const mediumScaledHeight = isMediumCard
+    ? Math.round((cardWidth / MEDIUM_PNG_ASPECT) * canvaAssetScale) + canvaAssetHeightAdjust
+    : 0;
 
   const contentHeightForOuterSizing = measuredBlackBoxContentHeight ?? L.INNER_BOX_MIN_HEIGHT;
   const coloredHeaderHeightForOuterSizing = measuredColoredHeaderHeight ?? L.HEADER_HEIGHT;
@@ -80,7 +146,9 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
     L.OUTER_CARD_EXTRA_HEIGHT +
     dynamicGrowthExtra;
 
-  const bottomSpacerHeight = Math.max(0, baseBottomSpacerHeight - L.OUTER_CARD_BOTTOM_TRIM);
+  const bottomSpacerHeight = isCanvaCard
+    ? 0
+    : Math.max(0, baseBottomSpacerHeight - L.OUTER_CARD_BOTTOM_TRIM);
 
   const outerMinHeightFromContent =
     coloredHeaderHeightForOuterSizing +
@@ -92,7 +160,9 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
   const minHeightGap = Math.max(0, L.OUTER_CARD_MIN_HEIGHT - outerMinHeightFromContent);
   // Collapsed: fixed clan-color outer height per tier (SMALL/MEDIUM/LARGE).
   // Expanded: grow with full content; minHeight gap still redistributes to top spacer.
-  const topSpacerHeight = expanded ? topSpacerHeightBase + minHeightGap : topSpacerHeightBase;
+  const topSpacerHeight = isCanvaCard
+    ? 0
+    : (expanded ? topSpacerHeightBase + minHeightGap : topSpacerHeightBase);
   const desiredOuterMinHeight = outerMinHeightFromContent + minHeightGap;
 
   return (
@@ -102,15 +172,54 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
         style={[
           styles.outerBase,
           {
-            backgroundColor: outerColor,
+            backgroundColor: isCanvaCard ? 'transparent' : outerColor,
             paddingHorizontal: L.OUTER_PADDING_HORIZONTAL,
             paddingVertical: L.OUTER_PADDING_VERTICAL,
-            ...(expanded
-              ? { minHeight: desiredOuterMinHeight, height: undefined }
-              : { height: L.OUTER_COLORED_COLLAPSED_HEIGHT, minHeight: undefined }),
+            ...(isCanvaCard
+              ? {
+                  transform: [
+                    { translateX: L.CARD_GROUP_OFFSET_X },
+                    { translateY: L.CARD_GROUP_OFFSET_Y },
+                  ],
+                }
+              : null),
+            ...(isCanvaCard
+              ? {
+                  height: L.OUTER_COLORED_COLLAPSED_HEIGHT,
+                  minHeight: undefined,
+                }
+              : (expanded
+                ? { minHeight: desiredOuterMinHeight, height: undefined }
+                : { height: L.OUTER_COLORED_COLLAPSED_HEIGHT, minHeight: undefined })),
           },
         ]}
-        imageStyle={styles.outerImage}
+        imageStyle={[
+          styles.outerImage,
+          isSmallCard
+            ? {
+                left: -canvaAssetWidthAdjust / 2,
+                right: -canvaAssetWidthAdjust / 2,
+                top: -canvaAssetHeightAdjust / 2,
+                bottom: -canvaAssetHeightAdjust / 2,
+                transform: [
+                  { translateX: canvaAssetOffsetX },
+                  { translateY: canvaAssetOffsetY },
+                  { scale: canvaAssetScale },
+                ],
+              }
+            : isMediumCard
+              ? {
+                  left: -canvaAssetWidthAdjust / 2,
+                  right: -canvaAssetWidthAdjust / 2,
+                  top: -canvaAssetHeightAdjust / 2,
+                  bottom: -canvaAssetHeightAdjust / 2,
+                  transform: [
+                    { translateX: canvaAssetOffsetX },
+                    { translateY: canvaAssetOffsetY },
+                  ],
+                }
+              : null,
+        ]}
       >
         {topSpacerHeight > 0 ? <View style={{ height: topSpacerHeight }} /> : null}
 
@@ -138,7 +247,28 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
               <Text style={styles.usernameHeader}>{post.author.username}</Text>
             </TouchableOpacity>
           </View>
-          {authorClanId ? (
+          {isCanvaCard && authorClanId ? (
+            <View
+              pointerEvents="none"
+              style={{
+                transform: [{ translateX: L.BANNER_OFFSET_X }, { translateY: L.BANNER_OFFSET_Y }],
+              }}
+            >
+              <Image
+                source={canvaBannerAsset}
+                resizeMode="contain"
+                style={[
+                  styles.canvaBanner,
+                  {
+                    width: L.BANNER_WIDTH,
+                    height: L.BANNER_HEIGHT,
+                    transform: [{ scale: L.BANNER_SCALE }],
+                  },
+                ]}
+              />
+            </View>
+          ) : null}
+          {!isCanvaCard && authorClanId ? (
             <TouchableOpacity onPress={onClanPress}>
               <ClanBanner clanId={authorClanId} shortLabel={authorClanId.toUpperCase()} small />
             </TouchableOpacity>
@@ -146,27 +276,29 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
         </View>
 
         <View style={styles.cardBody}>
-          <ImageBackground
-            source={innerAsset}
-            resizeMode="stretch"
-            pointerEvents="none"
-            imageStyle={styles.blackBgImage}
-            style={[
-              styles.blackBg,
-              {
-                top: L.INNER_BLACK_INSET_TOP - L.INNER_BLACK_EXPAND_Y / 2,
-                bottom: L.INNER_BLACK_INSET_BOTTOM - L.INNER_BLACK_EXPAND_Y / 2,
-                left: L.INNER_BLACK_INSET_LEFT - L.INNER_BLACK_EXPAND_X / 2,
-                right: L.INNER_BLACK_INSET_RIGHT - L.INNER_BLACK_EXPAND_X / 2,
-                borderRadius: S.INNER_BLACK_BOX_RADIUS,
-                minHeight: contentHeightForOuterSizing,
-                transform: [
-                  { translateX: L.INNER_BLACK_NUDGE_X },
-                  { translateY: L.INNER_BLACK_NUDGE_Y },
-                ],
-              },
-            ]}
-          />
+          {!isCanvaCard ? (
+            <ImageBackground
+              source={innerAsset}
+              resizeMode="stretch"
+              pointerEvents="none"
+              imageStyle={styles.blackBgImage}
+              style={[
+                styles.blackBg,
+                {
+                  top: L.INNER_BLACK_INSET_TOP - L.INNER_BLACK_EXPAND_Y / 2,
+                  bottom: L.INNER_BLACK_INSET_BOTTOM - L.INNER_BLACK_EXPAND_Y / 2,
+                  left: L.INNER_BLACK_INSET_LEFT - L.INNER_BLACK_EXPAND_X / 2,
+                  right: L.INNER_BLACK_INSET_RIGHT - L.INNER_BLACK_EXPAND_X / 2,
+                  borderRadius: S.INNER_BLACK_BOX_RADIUS,
+                  minHeight: contentHeightForOuterSizing,
+                  transform: [
+                    { translateX: L.INNER_BLACK_NUDGE_X },
+                    { translateY: L.INNER_BLACK_NUDGE_Y },
+                  ],
+                },
+              ]}
+            />
+          ) : null}
 
           <View
             style={[
@@ -187,21 +319,113 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
             }}
           >
             {post.title ? (
-              <Text style={styles.title} numberOfLines={S.CARD_REFLECTION_TITLE_MAX_LINES}>
-                {post.title}
-              </Text>
+              <View
+                style={{
+                  transform: [{ translateX: L.TITLE_OFFSET_X }, { translateY: L.TITLE_OFFSET_Y }],
+                }}
+              >
+                <Text style={styles.title} numberOfLines={S.CARD_REFLECTION_TITLE_MAX_LINES}>
+                  {post.title}
+                </Text>
+              </View>
             ) : null}
 
-            <Text
-              style={styles.bodyInner}
-              numberOfLines={expanded ? undefined : collapsedBodyMaxLines}
+            <View
+              style={{
+                transform: [{ translateX: L.BODY_OFFSET_X }, { translateY: L.BODY_OFFSET_Y }],
+              }}
             >
-              {post.body}
-            </Text>
-
-            <View style={styles.footer}>
-              <VoteWidget stats={post.voteStats} compact />
+              <Text
+                style={styles.bodyInner}
+                numberOfLines={isCanvaCard ? collapsedBodyMaxLines : (expanded ? undefined : collapsedBodyMaxLines)}
+              >
+                {post.body}
+              </Text>
             </View>
+
+            {isCanvaCard ? (
+              <View
+                style={[
+                  styles.feedStatsRow,
+                  {
+                    gap: L.STATS_GAP,
+                    alignSelf: 'flex-end',
+                    transform: [
+                      { translateX: L.STATS_ROW_OFFSET_X + L.STATS_OFFSET_X },
+                      { translateY: L.STATS_ROW_OFFSET_Y + L.STATS_OFFSET_Y },
+                    ],
+                  },
+                ]}
+              >
+                <View style={styles.feedStatItem}>
+                  <TouchableOpacity
+                    onPress={() => setSmallUpvoted((prev) => !prev)}
+                    style={styles.feedStatPress}
+                    hitSlop={8}
+                  >
+                    <View
+                      style={{
+                        transform: [{ translateX: L.UPVOTE_OFFSET_X }, { translateY: L.UPVOTE_OFFSET_Y }],
+                      }}
+                    >
+                      <Image
+                        source={feedUpvoteIcon}
+                        resizeMode="contain"
+                        style={{ width: L.UPVOTE_ICON_WIDTH, height: L.UPVOTE_ICON_HEIGHT }}
+                      />
+                    </View>
+                  </TouchableOpacity>
+                  <View
+                    style={{
+                      transform: [
+                        { translateX: L.UPVOTE_COUNT_OFFSET_X },
+                        { translateY: L.UPVOTE_COUNT_OFFSET_Y },
+                      ],
+                    }}
+                  >
+                    <Text style={styles.feedStatCount}>{post.voteStats.up}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.feedStatItem}>
+                  <TouchableOpacity
+                    onPress={() => setSmallSaved((prev) => !prev)}
+                    style={styles.feedStatPress}
+                    hitSlop={8}
+                  >
+                    <View
+                      style={{
+                        transform: [{ translateX: L.SAVE_OFFSET_X }, { translateY: L.SAVE_OFFSET_Y }],
+                      }}
+                    >
+                      <Image
+                        source={feedSaveIcon}
+                        resizeMode="contain"
+                        style={{ width: L.SAVE_ICON_WIDTH, height: L.SAVE_ICON_HEIGHT }}
+                      />
+                    </View>
+                  </TouchableOpacity>
+                  <View
+                    style={{
+                      transform: [{ translateX: L.SAVE_COUNT_OFFSET_X }, { translateY: L.SAVE_COUNT_OFFSET_Y }],
+                    }}
+                  >
+                    <Text style={styles.feedStatCount}>{post.voteStats.save}</Text>
+                  </View>
+                </View>
+              </View>
+            ) : (
+              <View
+                style={[
+                  styles.footer,
+                  {
+                    transform: [{ translateX: L.STATS_OFFSET_X }, { translateY: L.STATS_OFFSET_Y }],
+                  },
+                ]}
+              >
+                <VoteWidget stats={post.voteStats} compact />
+              </View>
+            )}
           </View>
         </View>
 
@@ -262,7 +486,30 @@ const styles = StyleSheet.create({
   blackBgImage: {
     borderRadius: S.INNER_BLACK_BOX_RADIUS,
   },
-  blackBoxContent: {},
+  blackBoxContent: { overflow: 'hidden' },
+  feedStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  feedStatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  feedStatPress: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  feedStatCount: {
+    color: evoconnColors.muted,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  canvaBanner: {
+    width: 120,
+    height: 42,
+  },
   title: { color: evoconnColors.text, fontWeight: '800', fontSize: 18, marginBottom: 8 },
   body: { color: evoconnColors.muted, fontSize: 14, lineHeight: 20, marginBottom: 10 },
   bodyInner: { color: evoconnColors.text, fontSize: 14, lineHeight: 20, marginBottom: 12 },

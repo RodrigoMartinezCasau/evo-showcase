@@ -1,10 +1,10 @@
 import type { CommunityPost, User } from '../types'
 
 const authors: User[] = [
-  { id: '1', username: 'DIEGOLLUBERES', clanId: 'racionalista', rank: 'maestro' },
-  { id: '2', username: 'ALEJANDROSERRANO', clanId: 'humanista', rank: 'filosofo' },
-  { id: '3', username: 'RODRIGOMARTINEZ', clanId: 'estoico', rank: 'filosofo' },
-  { id: '4', username: 'HERNANCHACON', clanId: 'cientista', rank: 'aprendiz' },
+  { id: '1', username: '@DIEGOLLUBERES', clanId: 'racionalista', rank: 'maestro' },
+  { id: '2', username: '@ALEJANDROSERRANO', clanId: 'humanista', rank: 'filosofo' },
+  { id: '3', username: '@RODRIGOMARTINEZ', clanId: 'estoico', rank: 'filosofo' },
+  { id: '4', username: '@HERNANCHACON', clanId: 'cientista', rank: 'aprendiz' },
 ]
 
 export const mockFeedPosts: CommunityPost[] = [
@@ -22,7 +22,7 @@ export const mockFeedPosts: CommunityPost[] = [
     type: 'reflection',
     author: authors[1],
     title: 'EL EXITO ES UNA MIERDA',
-    body: 'Creen que el éxito es ir más lejos que los demás. Pero el verdadero éxito es silencioso: despertar, sentir que tu vida pertenece a ti, y elegir con calma cada paso. A veces duele admitirlo, pero libera. Cuando entiendes eso, el ruido deja de mandar.',
+    body: 'Creen que el éxito es ir más lejos que los demás. Pero el verdadero éxito es silencioso: despertar, sentir que tu vida pertenece a ti, y elegir con calma cada paso. A veces duele admitirlo, pero libera. C',
     voteStats: { up: 867, down: 12, save: 23 },
     createdAt: new Date().toISOString(),
   },
@@ -39,7 +39,7 @@ export const mockFeedPosts: CommunityPost[] = [
     type: 'reflection',
     author: authors[3],
     title: 'NO TENGAS MIEDO PRECIOSA',
-    body: 'El miedo tiene una forma curiosa de mentirnos. Nos dice que no estamos preparados, que no es el momento, que todo saldrá mal. Pero mira alrededor: cada paso que das con miedo es un entrenamiento. Respira, insiste, y deja que la duda se vuelva camino. No necesitas certeza, necesitas movimiento. Cuando falles, no significa que estás roto. Significa que estás aprendiendo. Las veces que te caes te enseñan a sostenerte. Practica, observa y vuelve a intentarlo hasta que el miedo pierda su voz y te deje actuar.',
+    body: 'El miedo tiene una forma curiosa de mentirnos. Nos dice que no estamos preparados, que todo saldrá mal. ',
     voteStats: { up: 420, down: 12, save: 88 },
     createdAt: new Date().toISOString(),
   },
