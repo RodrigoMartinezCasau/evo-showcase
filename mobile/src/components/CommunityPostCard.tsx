@@ -128,6 +128,39 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
   const feedUpvoteIcon = smallUpvoted ? smallStatsIcons.upvoteActive : smallStatsIcons.upvoteInactive;
   const feedSaveIcon = smallSaved ? smallStatsIcons.saveActive : smallStatsIcons.saveInactive;
 
+  const renderFeedStats = () => (
+    <>
+      <View style={styles.feedStatItem}>
+        <TouchableOpacity
+          onPress={() => setSmallUpvoted((prev) => !prev)}
+          style={styles.feedStatPress}
+          hitSlop={8}
+        >
+          <View style={{ transform: [{ translateX: L.UPVOTE_OFFSET_X }, { translateY: L.UPVOTE_OFFSET_Y }] }}>
+            <Image source={feedUpvoteIcon} resizeMode="contain" style={{ width: L.UPVOTE_ICON_WIDTH, height: L.UPVOTE_ICON_HEIGHT }} />
+          </View>
+        </TouchableOpacity>
+        <View style={{ transform: [{ translateX: L.UPVOTE_COUNT_OFFSET_X }, { translateY: L.UPVOTE_COUNT_OFFSET_Y }] }}>
+          <Text style={styles.feedStatCount}>{post.voteStats.up}</Text>
+        </View>
+      </View>
+      <View style={styles.feedStatItem}>
+        <TouchableOpacity
+          onPress={() => setSmallSaved((prev) => !prev)}
+          style={styles.feedStatPress}
+          hitSlop={8}
+        >
+          <View style={{ transform: [{ translateX: L.SAVE_OFFSET_X }, { translateY: L.SAVE_OFFSET_Y }] }}>
+            <Image source={feedSaveIcon} resizeMode="contain" style={{ width: L.SAVE_ICON_WIDTH, height: L.SAVE_ICON_HEIGHT }} />
+          </View>
+        </TouchableOpacity>
+        <View style={{ transform: [{ translateX: L.SAVE_COUNT_OFFSET_X }, { translateY: L.SAVE_COUNT_OFFSET_Y }] }}>
+          <Text style={styles.feedStatCount}>{post.voteStats.save}</Text>
+        </View>
+      </View>
+    </>
+  );
+
   const { width: screenWidth } = useWindowDimensions();
   const MEDIUM_PNG_ASPECT = 1024 / 576;
   const cardWidth = screenWidth - 24;
@@ -343,7 +376,7 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
               </Text>
             </View>
 
-            {isCanvaCard ? (
+            {isCanvaCard && L.STATS_ABSOLUTE_BOTTOM < 0 ? (
               <View
                 style={[
                   styles.feedStatsRow,
@@ -357,64 +390,9 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
                   },
                 ]}
               >
-                <View style={styles.feedStatItem}>
-                  <TouchableOpacity
-                    onPress={() => setSmallUpvoted((prev) => !prev)}
-                    style={styles.feedStatPress}
-                    hitSlop={8}
-                  >
-                    <View
-                      style={{
-                        transform: [{ translateX: L.UPVOTE_OFFSET_X }, { translateY: L.UPVOTE_OFFSET_Y }],
-                      }}
-                    >
-                      <Image
-                        source={feedUpvoteIcon}
-                        resizeMode="contain"
-                        style={{ width: L.UPVOTE_ICON_WIDTH, height: L.UPVOTE_ICON_HEIGHT }}
-                      />
-                    </View>
-                  </TouchableOpacity>
-                  <View
-                    style={{
-                      transform: [
-                        { translateX: L.UPVOTE_COUNT_OFFSET_X },
-                        { translateY: L.UPVOTE_COUNT_OFFSET_Y },
-                      ],
-                    }}
-                  >
-                    <Text style={styles.feedStatCount}>{post.voteStats.up}</Text>
-                  </View>
-                </View>
-
-                <View style={styles.feedStatItem}>
-                  <TouchableOpacity
-                    onPress={() => setSmallSaved((prev) => !prev)}
-                    style={styles.feedStatPress}
-                    hitSlop={8}
-                  >
-                    <View
-                      style={{
-                        transform: [{ translateX: L.SAVE_OFFSET_X }, { translateY: L.SAVE_OFFSET_Y }],
-                      }}
-                    >
-                      <Image
-                        source={feedSaveIcon}
-                        resizeMode="contain"
-                        style={{ width: L.SAVE_ICON_WIDTH, height: L.SAVE_ICON_HEIGHT }}
-                      />
-                    </View>
-                  </TouchableOpacity>
-                  <View
-                    style={{
-                      transform: [{ translateX: L.SAVE_COUNT_OFFSET_X }, { translateY: L.SAVE_COUNT_OFFSET_Y }],
-                    }}
-                  >
-                    <Text style={styles.feedStatCount}>{post.voteStats.save}</Text>
-                  </View>
-                </View>
+                {renderFeedStats()}
               </View>
-            ) : (
+            ) : !isCanvaCard ? (
               <View
                 style={[
                   styles.footer,
@@ -425,9 +403,24 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
               >
                 <VoteWidget stats={post.voteStats} compact />
               </View>
-            )}
+            ) : null}
           </View>
         </View>
+
+        {isCanvaCard && L.STATS_ABSOLUTE_BOTTOM >= 0 ? (
+          <View
+            style={[
+              styles.feedStatsRowAbsolute,
+              {
+                bottom: L.STATS_ABSOLUTE_BOTTOM + L.STATS_OFFSET_Y,
+                right: L.STATS_ABSOLUTE_RIGHT - L.STATS_OFFSET_X,
+                gap: L.STATS_GAP,
+              },
+            ]}
+          >
+            {renderFeedStats()}
+          </View>
+        ) : null}
 
         <View style={{ height: bottomSpacerHeight }} />
       </Outer>
@@ -491,6 +484,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 4,
+  },
+  feedStatsRowAbsolute: {
+    position: 'absolute',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   feedStatItem: {
     flexDirection: 'row',

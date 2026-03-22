@@ -36,6 +36,9 @@ export type CardTierLayout = {
   /** Solo el bloque de stats/votos/saves */
   STATS_OFFSET_X: number;
   STATS_OFFSET_Y: number;
+  /** Anchor stats to bottom-right of container (absolute positioning). -1 = use flex flow instead. */
+  STATS_ABSOLUTE_BOTTOM: number;
+  STATS_ABSOLUTE_RIGHT: number;
   /** Solo el estandarte PNG del clan en SMALL */
   BANNER_OFFSET_X: number;
   BANNER_OFFSET_Y: number;
@@ -106,6 +109,8 @@ const tierDefaults: CardTierLayout = {
   BODY_OFFSET_Y: 0,
   STATS_OFFSET_X: 0,
   STATS_OFFSET_Y: 0,
+  STATS_ABSOLUTE_BOTTOM: -1,
+  STATS_ABSOLUTE_RIGHT: -1,
   BANNER_OFFSET_X: 0,
   BANNER_OFFSET_Y: 0,
   BANNER_WIDTH: 120,
@@ -174,8 +179,10 @@ export const CARD_LAYOUT = {
     TITLE_OFFSET_Y: 0,
     BODY_OFFSET_X: -3,
     BODY_OFFSET_Y: -6,
-    STATS_OFFSET_X: 0,
-    STATS_OFFSET_Y: -16,
+    STATS_OFFSET_X: -9,
+    STATS_OFFSET_Y: -0,
+    STATS_ABSOLUTE_BOTTOM: 8,
+    STATS_ABSOLUTE_RIGHT: 10,
     BANNER_OFFSET_X: -14,
     BANNER_OFFSET_Y: 15,
     BANNER_WIDTH: 120,
