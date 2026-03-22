@@ -42,7 +42,22 @@ export const CARD_ASSET_LAYOUT = {
 
     /** Fine-tune image position within the (already correctly-sized) container. */
     MEDIUM_CARD_ASSET_OFFSET_X: 28,
-    MEDIUM_CARD_ASSET_OFFSET_Y: -65,
+    MEDIUM_CARD_ASSET_OFFSET_Y: 0,
+
+    /**
+     * Crop: hide part of the asset visually WITHOUT changing its base size.
+     * Positive values = px hidden from that edge.
+     */
+    MEDIUM_CARD_CROP_TOP: 75,
+    MEDIUM_CARD_CROP_BOTTOM: 140,
+
+    /**
+     * Adjust total space the MEDIUM item occupies in the feed.
+     * Negative = less space (pulls next card closer).
+     * Positive = more space (pushes next card further).
+     * Does NOT change the asset base size.
+     */
+    MEDIUM_FEED_SPACING_BOTTOM: 0,
   },
 } as const;
 

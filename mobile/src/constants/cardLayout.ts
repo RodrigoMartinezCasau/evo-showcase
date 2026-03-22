@@ -210,8 +210,8 @@ export const CARD_LAYOUT = {
     INNER_BOX_MIN_HEIGHT: 0,
     INNER_BLACK_EXPAND_Y: 220,
     OUTER_BOTTOM_FRAME: 0,
-    /** Fixed height for MEDIUM cards. Edit to adjust the card's visible height. */
-    OUTER_COLORED_COLLAPSED_HEIGHT: 350,
+    /** Base height for MEDIUM cards. Use crop/spacing editors to control visible area + feed spacing. */
+    OUTER_COLORED_COLLAPSED_HEIGHT: 500,
     INNER_BLACK_PADDING_VERTICAL: 0,
     INNER_BLACK_CONTENT_MARGIN_TOP: 12,
     INNER_BLACK_CONTENT_MARGIN_BOTTOM: 12,
@@ -226,7 +226,7 @@ export const CARD_LAYOUT = {
     TITLE_OFFSET_Y: 0,
 
     BODY_OFFSET_X: 0,
-    BODY_OFFSET_Y: 0,
+    BODY_OFFSET_Y: 80,
 
     BANNER_OFFSET_X: 0,
     BANNER_OFFSET_Y: 0,

@@ -198,8 +198,12 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
     : (expanded ? topSpacerHeightBase + minHeightGap : topSpacerHeightBase);
   const desiredOuterMinHeight = outerMinHeightFromContent + minHeightGap;
 
-  return (
-    <TouchableOpacity activeOpacity={0.92} onPress={handleCardPress}>
+  const medCropTop = isMediumCard ? CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_CROP_TOP : 0;
+  const medCropBottom = isMediumCard ? CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_CROP_BOTTOM : 0;
+  const medFeedSpacing = isMediumCard ? CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_FEED_SPACING_BOTTOM : 0;
+  const needsMediumCropWrapper = isMediumCard && (medCropTop > 0 || medCropBottom > 0 || medFeedSpacing !== 0);
+
+  const cardContent = (
       <Outer
         {...outerProps}
         style={[
@@ -424,6 +428,25 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
 
         <View style={{ height: bottomSpacerHeight }} />
       </Outer>
+  );
+
+  return (
+    <TouchableOpacity activeOpacity={0.92} onPress={handleCardPress}>
+      {needsMediumCropWrapper ? (
+        <View
+          style={{
+            overflow: 'hidden',
+            height: L.OUTER_COLORED_COLLAPSED_HEIGHT - medCropTop - medCropBottom,
+            marginBottom: medFeedSpacing,
+          }}
+        >
+          <View style={{ marginTop: -medCropTop }}>
+            {cardContent}
+          </View>
+        </View>
+      ) : (
+        cardContent
+      )}
     </TouchableOpacity>
   );
 }
