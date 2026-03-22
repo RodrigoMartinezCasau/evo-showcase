@@ -24,6 +24,20 @@ export const CARD_ASSET_LAYOUT = {
      */
     SMALL_CARD_ASSET_OFFSET_X: 26,
     SMALL_CARD_ASSET_OFFSET_Y: 70,
+
+    /**
+     * Crop: hide part of the asset visually WITHOUT changing its base size.
+     * Positive values = px hidden from that edge.
+     */
+    SMALL_CARD_CROP_TOP: -8,
+    SMALL_CARD_CROP_BOTTOM: 15,
+    /**
+     * Adjust total space the SMALL item occupies in the feed.
+     * Negative = less space (pulls next card closer).
+     * Positive = more space (pushes next card further).
+     * Does NOT change the asset base size.
+     */
+    SMALL_FEED_SPACING_BOTTOM: 0,
   },
 
   MEDIUM: {
@@ -48,7 +62,7 @@ export const CARD_ASSET_LAYOUT = {
      * Crop: hide part of the asset visually WITHOUT changing its base size.
      * Positive values = px hidden from that edge.
      */
-    MEDIUM_CARD_CROP_TOP: 75,
+    MEDIUM_CARD_CROP_TOP: 70,
     MEDIUM_CARD_CROP_BOTTOM: 140,
 
     /**

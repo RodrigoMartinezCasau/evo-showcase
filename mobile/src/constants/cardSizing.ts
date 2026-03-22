@@ -1,29 +1,28 @@
-export type CardSizeTier = 'small' | 'medium' | 'large';
+export type CardSizeTier = 'small' | 'medium' | 'quote';
 
 /**
- * TEMP: force reflection tiers by author username (lowercase) for layout tuning in simulator.
- * Set to false to use word-count detection only.
+ * TEMP: force reflection tiers by author username (lowercase, without @) for layout tuning.
+ * Set to false to use automatic detection only.
  */
-export const CARD_SIZE_TEST_OVERRIDES_ENABLED = true;
+export const CARD_SIZE_TEST_OVERRIDES_ENABLED = false;
 
 export const CARD_SIZE_TEST_USERNAME_TO_TIER: Record<string, CardSizeTier> = {
   hernanchacon: 'small',
   alejandroserrano: 'medium',
-  diegolluberes: 'large',
+  diegolluberes: 'medium',
 };
 
 /**
- * Reflection card sizing thresholds (word-count based).
- * Edit these to control which posts fall into each tier.
+ * Reflection card sizing thresholds.
+ * A post becomes MEDIUM if it exceeds EITHER the word OR the character threshold.
  */
 export const CARD_WORD_THRESHOLD_SMALL = 30;
-export const CARD_WORD_THRESHOLD_MEDIUM = 70;
+export const CARD_CHAR_THRESHOLD_SMALL = 92;
 
 /**
- * Collapsed (non-expanded) reflection body text limits per tier.
- * When expanded, we show the full reflection (numberOfLines = undefined).
+ * Body text line limits per tier.
+ * SMALL: undefined = no truncation (short texts always fit).
+ * MEDIUM: truncate with "..." after this many lines.
  */
-export const CARD_MAX_LINES_SMALL = 3;
-export const CARD_MAX_LINES_MEDIUM = 5;
-export const CARD_MAX_LINES_LARGE = 7;
-
+export const CARD_MAX_LINES_SMALL: undefined = undefined;
+export const CARD_MAX_LINES_MEDIUM = 10;

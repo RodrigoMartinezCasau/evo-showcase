@@ -24,7 +24,6 @@ type CommunityPostCardProps = {
 };
 
 export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }: CommunityPostCardProps) {
-  const [expanded, setExpanded] = useState(false);
   const [smallUpvoted, setSmallUpvoted] = useState(false);
   const [smallSaved, setSmallSaved] = useState(false);
   const [measuredBlackBoxContentHeight, setMeasuredBlackBoxContentHeight] = useState<number | null>(null);
@@ -47,10 +46,6 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
   const collapsedBodyMaxLines = getCardMaxLinesForTier(cardTier);
 
   const handleCardPress = () => {
-    if (isReflection && cardTier === 'large' && !expanded) {
-      setExpanded(true);
-      return;
-    }
     onPress();
   };
 
@@ -191,17 +186,19 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
     L.OUTER_PADDING_VERTICAL * 2;
 
   const minHeightGap = Math.max(0, L.OUTER_CARD_MIN_HEIGHT - outerMinHeightFromContent);
-  // Collapsed: fixed clan-color outer height per tier (SMALL/MEDIUM/LARGE).
-  // Expanded: grow with full content; minHeight gap still redistributes to top spacer.
-  const topSpacerHeight = isCanvaCard
-    ? 0
-    : (expanded ? topSpacerHeightBase + minHeightGap : topSpacerHeightBase);
+  const topSpacerHeight = isCanvaCard ? 0 : topSpacerHeightBase;
   const desiredOuterMinHeight = outerMinHeightFromContent + minHeightGap;
 
-  const medCropTop = isMediumCard ? CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_CROP_TOP : 0;
-  const medCropBottom = isMediumCard ? CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_CROP_BOTTOM : 0;
-  const medFeedSpacing = isMediumCard ? CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_FEED_SPACING_BOTTOM : 0;
-  const needsMediumCropWrapper = isMediumCard && (medCropTop > 0 || medCropBottom > 0 || medFeedSpacing !== 0);
+  const cropTop = isSmallCard
+    ? CARD_ASSET_LAYOUT.SMALL.SMALL_CARD_CROP_TOP
+    : isMediumCard ? CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_CROP_TOP : 0;
+  const cropBottom = isSmallCard
+    ? CARD_ASSET_LAYOUT.SMALL.SMALL_CARD_CROP_BOTTOM
+    : isMediumCard ? CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_CROP_BOTTOM : 0;
+  const feedSpacing = isSmallCard
+    ? CARD_ASSET_LAYOUT.SMALL.SMALL_FEED_SPACING_BOTTOM
+    : isMediumCard ? CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_FEED_SPACING_BOTTOM : 0;
+  const needsCropWrapper = isCanvaCard && (cropTop > 0 || cropBottom > 0 || feedSpacing !== 0);
 
   const cardContent = (
       <Outer
@@ -225,9 +222,7 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
                   height: L.OUTER_COLORED_COLLAPSED_HEIGHT,
                   minHeight: undefined,
                 }
-              : (expanded
-                ? { minHeight: desiredOuterMinHeight, height: undefined }
-                : { height: L.OUTER_COLORED_COLLAPSED_HEIGHT, minHeight: undefined })),
+              : { height: L.OUTER_COLORED_COLLAPSED_HEIGHT, minHeight: undefined }),
           },
         ]}
         imageStyle={[
@@ -339,7 +334,7 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
 
           <View
             style={[
-              styles.blackBoxContent,
+              isCanvaCard ? styles.blackBoxContentCanva : styles.blackBoxContent,
               {
                 marginTop: L.INNER_BLACK_CONTENT_MARGIN_TOP,
                 marginBottom: L.INNER_BLACK_CONTENT_MARGIN_BOTTOM,
@@ -374,7 +369,7 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
             >
               <Text
                 style={styles.bodyInner}
-                numberOfLines={isCanvaCard ? collapsedBodyMaxLines : (expanded ? undefined : collapsedBodyMaxLines)}
+                numberOfLines={collapsedBodyMaxLines}
               >
                 {post.body}
               </Text>
@@ -390,6 +385,7 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
                     transform: [
                       { translateX: L.STATS_ROW_OFFSET_X + L.STATS_OFFSET_X },
                       { translateY: L.STATS_ROW_OFFSET_Y + L.STATS_OFFSET_Y },
+                      { scale: L.STATS_SCALE },
                     ],
                   },
                 ]}
@@ -419,6 +415,7 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
                 bottom: L.STATS_ABSOLUTE_BOTTOM + L.STATS_OFFSET_Y,
                 right: L.STATS_ABSOLUTE_RIGHT - L.STATS_OFFSET_X,
                 gap: L.STATS_GAP,
+                transform: [{ scale: L.STATS_SCALE }],
               },
             ]}
           >
@@ -432,15 +429,15 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
 
   return (
     <TouchableOpacity activeOpacity={0.92} onPress={handleCardPress}>
-      {needsMediumCropWrapper ? (
+      {needsCropWrapper ? (
         <View
           style={{
             overflow: 'hidden',
-            height: L.OUTER_COLORED_COLLAPSED_HEIGHT - medCropTop - medCropBottom,
-            marginBottom: medFeedSpacing,
+            height: L.OUTER_COLORED_COLLAPSED_HEIGHT - cropTop - cropBottom,
+            marginBottom: feedSpacing,
           }}
         >
-          <View style={{ marginTop: -medCropTop }}>
+          <View style={{ marginTop: -cropTop }}>
             {cardContent}
           </View>
         </View>
@@ -503,6 +500,7 @@ const styles = StyleSheet.create({
     borderRadius: S.INNER_BLACK_BOX_RADIUS,
   },
   blackBoxContent: { overflow: 'hidden' },
+  blackBoxContentCanva: { overflow: 'visible' },
   feedStatsRow: {
     flexDirection: 'row',
     alignItems: 'center',

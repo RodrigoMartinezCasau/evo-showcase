@@ -1,14 +1,14 @@
 import type { ClanId } from '@evoconn/constants/clanColors';
 
 export const MEDIUM_CLAN_BANNERS: Record<ClanId, number> = {
-  racionalista: require('./small/banners/racionalista.png'),
-  realista: require('./small/banners/realista.png'),
-  existencialista: require('./small/banners/existencialista.png'),
-  estoico: require('./small/banners/estoico.png'),
-  humanista: require('./small/banners/humanista.png'),
-  trascendentalista: require('./small/banners/trascendentalista.png'),
-  cientista: require('./small/banners/cientista.png'),
-  nihilista: require('./small/banners/nihilista.png'),
+  racionalista: require('./medium/banners/racionalista.png'),
+  realista: require('./medium/banners/realista.png'),
+  existencialista: require('./medium/banners/existencialista.png'),
+  estoico: require('./medium/banners/estoico.png'),
+  humanista: require('./medium/banners/humanista.png'),
+  trascendentalista: require('./medium/banners/trascendentalista.png'),
+  cientista: require('./medium/banners/cientista.png'),
+  nihilista: require('./medium/banners/nihilista.png'),
 };
 
 export function getMediumClanBannerAsset(clanId: string | null | undefined): number | undefined {

@@ -2,7 +2,7 @@ import type { CardSizeTier } from './cardSizing';
 
 /**
  * Valores realmente compartidos (marco exterior / radios globales).
- * El posicionamiento de la inner card negra va solo en SMALL | MEDIUM | LARGE.
+ * El posicionamiento de la inner card negra va solo en SMALL | MEDIUM.
  */
 export const CARD_LAYOUT_SHARED = {
   CARD_BORDER_RADIUS: 18,
@@ -45,6 +45,8 @@ export type CardTierLayout = {
   BANNER_WIDTH: number;
   BANNER_HEIGHT: number;
   BANNER_SCALE: number;
+  /** Scale the entire stats block (icons + counts). 1 = normal, 2 = double, etc. */
+  STATS_SCALE: number;
   STATS_ROW_OFFSET_X: number;
   STATS_ROW_OFFSET_Y: number;
   STATS_GAP: number;
@@ -116,6 +118,7 @@ const tierDefaults: CardTierLayout = {
   BANNER_WIDTH: 120,
   BANNER_HEIGHT: 42,
   BANNER_SCALE: 1,
+  STATS_SCALE: 1.0,
   STATS_ROW_OFFSET_X: 0,
   STATS_ROW_OFFSET_Y: 0,
   STATS_GAP: 14,
@@ -175,7 +178,7 @@ export const CARD_LAYOUT = {
     USERNAME_OFFSET_Y: 14,
     CARD_GROUP_OFFSET_X: 0,
     CARD_GROUP_OFFSET_Y: -26,
-    TITLE_OFFSET_X: -6,
+    TITLE_OFFSET_X: -3,
     TITLE_OFFSET_Y: 0,
     BODY_OFFSET_X: -3,
     BODY_OFFSET_Y: -6,
@@ -184,7 +187,7 @@ export const CARD_LAYOUT = {
     STATS_ABSOLUTE_BOTTOM: 8,
     STATS_ABSOLUTE_RIGHT: 10,
     BANNER_OFFSET_X: -14,
-    BANNER_OFFSET_Y: 15,
+    BANNER_OFFSET_Y: 11,
     BANNER_WIDTH: 120,
     BANNER_HEIGHT: 42,
     BANNER_SCALE: 4,
@@ -219,23 +222,25 @@ export const CARD_LAYOUT = {
     CARD_GROUP_OFFSET_X: 0,
     CARD_GROUP_OFFSET_Y: 0,
 
-    USERNAME_OFFSET_X: 0,
-    USERNAME_OFFSET_Y: 0,
+    USERNAME_OFFSET_X: 8,
+    USERNAME_OFFSET_Y: 63,
 
     TITLE_OFFSET_X: 0,
-    TITLE_OFFSET_Y: 0,
+    TITLE_OFFSET_Y: 52,
 
     BODY_OFFSET_X: 0,
-    BODY_OFFSET_Y: 80,
+    BODY_OFFSET_Y: 47,
 
-    BANNER_OFFSET_X: 0,
-    BANNER_OFFSET_Y: 0,
+    BANNER_OFFSET_X: -14,
+    BANNER_OFFSET_Y: 63,
     BANNER_WIDTH: 120,
     BANNER_HEIGHT: 42,
-    BANNER_SCALE: 3,
+    BANNER_SCALE: 4,
 
-    STATS_OFFSET_X: 0,
-    STATS_OFFSET_Y: 0,
+    STATS_OFFSET_X: -5,
+    STATS_OFFSET_Y: 12,
+    STATS_ABSOLUTE_BOTTOM: 150,
+    STATS_ABSOLUTE_RIGHT: 14,
     STATS_ROW_OFFSET_X: 0,
     STATS_ROW_OFFSET_Y: 0,
     STATS_GAP: 14,
@@ -255,29 +260,6 @@ export const CARD_LAYOUT = {
     SAVE_COUNT_OFFSET_Y: 0,
   } satisfies CardTierLayout,
 
-  LARGE: {
-    ...tierDefaults,
-    INNER_BOX_MIN_HEIGHT: 260,
-    INNER_BLACK_EXPAND_Y: 335,
-    OUTER_BOTTOM_FRAME: 0,
-    OUTER_COLORED_COLLAPSED_HEIGHT: 380,
-    INNER_BLACK_PADDING_VERTICAL: 80,
-    USERNAME_OFFSET_X: 0,
-    USERNAME_OFFSET_Y: -10,
-    CARD_GROUP_OFFSET_X: 0,
-    CARD_GROUP_OFFSET_Y: 0,
-    TITLE_OFFSET_X: 0,
-    TITLE_OFFSET_Y: 0,
-    BODY_OFFSET_X: 0,
-    BODY_OFFSET_Y: 0,
-    STATS_OFFSET_X: 0,
-    STATS_OFFSET_Y: 0,
-    BANNER_OFFSET_X: 0,
-    BANNER_OFFSET_Y: 0,
-    BANNER_WIDTH: 120,
-    BANNER_HEIGHT: 42,
-    BANNER_SCALE: 1,
-  } satisfies CardTierLayout,
 } as const;
 
 export type CardLayoutRoot = typeof CARD_LAYOUT;
@@ -288,8 +270,8 @@ export function cardLayoutBlockForTier(tier: CardSizeTier): CardTierLayout {
       return CARD_LAYOUT.SMALL;
     case 'medium':
       return CARD_LAYOUT.MEDIUM;
-    case 'large':
-      return CARD_LAYOUT.LARGE;
+    case 'quote':
+      return CARD_LAYOUT.MEDIUM;
     default:
       return CARD_LAYOUT.MEDIUM;
   }
