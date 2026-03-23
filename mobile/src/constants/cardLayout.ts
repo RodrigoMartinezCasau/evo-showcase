@@ -260,6 +260,56 @@ export const CARD_LAYOUT = {
     SAVE_COUNT_OFFSET_Y: 0,
   } satisfies CardTierLayout,
 
+  QUOTE: {
+    ...tierDefaults,
+    INNER_BOX_MIN_HEIGHT: 180,
+    INNER_BLACK_EXPAND_Y: 140,
+    OUTER_BOTTOM_FRAME: 0,
+    OUTER_COLORED_COLLAPSED_HEIGHT: 150,
+    INNER_BLACK_CONTENT_MARGIN_TOP: 8,
+    INNER_BLACK_CONTENT_MARGIN_BOTTOM: -57,
+    INNER_BLACK_PADDING_VERTICAL: 0,
+
+    USERNAME_OFFSET_X: 3,
+    USERNAME_OFFSET_Y: 14,
+    CARD_GROUP_OFFSET_X: 0,
+    CARD_GROUP_OFFSET_Y: -26,
+
+    TITLE_OFFSET_X: 2,
+    TITLE_OFFSET_Y: 0,
+
+    BODY_OFFSET_X: 0,
+    BODY_OFFSET_Y: 1,
+
+    BANNER_OFFSET_X: -14,
+    BANNER_OFFSET_Y: 10,
+    BANNER_WIDTH: 120,
+    BANNER_HEIGHT: 42,
+    BANNER_SCALE: 4,
+
+    STATS_OFFSET_X: -5,
+    STATS_OFFSET_Y: 40,
+    STATS_ABSOLUTE_BOTTOM: 8,
+    STATS_ABSOLUTE_RIGHT: 10,
+    STATS_SCALE: 1,
+    STATS_ROW_OFFSET_X: 0,
+    STATS_ROW_OFFSET_Y: 0,
+    STATS_GAP: 14,
+
+    UPVOTE_OFFSET_X: 0,
+    UPVOTE_OFFSET_Y: 0,
+    UPVOTE_ICON_WIDTH: 18,
+    UPVOTE_ICON_HEIGHT: 18,
+    UPVOTE_COUNT_OFFSET_X: 0,
+    UPVOTE_COUNT_OFFSET_Y: 0,
+    SAVE_OFFSET_X: 0,
+    SAVE_OFFSET_Y: 0,
+    SAVE_ICON_WIDTH: 18,
+    SAVE_ICON_HEIGHT: 18,
+    SAVE_COUNT_OFFSET_X: 0,
+    SAVE_COUNT_OFFSET_Y: 0,
+  } satisfies CardTierLayout,
+
 } as const;
 
 export type CardLayoutRoot = typeof CARD_LAYOUT;
@@ -271,7 +321,7 @@ export function cardLayoutBlockForTier(tier: CardSizeTier): CardTierLayout {
     case 'medium':
       return CARD_LAYOUT.MEDIUM;
     case 'quote':
-      return CARD_LAYOUT.MEDIUM;
+      return CARD_LAYOUT.QUOTE;
     default:
       return CARD_LAYOUT.MEDIUM;
   }

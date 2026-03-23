@@ -7,10 +7,13 @@ import { VoteWidget } from './VoteWidget';
 import { CARD_LAYOUT_SHARED, cardLayoutBlockForTier } from '@evoconn/constants/cardLayout';
 import { ClanBanner } from './ClanBanner';
 import { getCardMaxLinesForTier, getReflectionCardTier } from '@evoconn/utils/getCardSizeFromText';
+import { formatNumber } from '@evoconn/utils/formatNumber';
 import { getSmallClanBackgroundAsset } from '@evoconn/assets/cards/smallClanBackgrounds';
 import { getSmallClanBannerAsset } from '@evoconn/assets/cards/smallClanBanners';
 import { getMediumClanBackgroundAsset } from '@evoconn/assets/cards/mediumClanBackgrounds';
 import { getMediumClanBannerAsset } from '@evoconn/assets/cards/mediumClanBanners';
+import { getQuoteClanBackgroundAsset } from '@evoconn/assets/cards/quoteClanBackgrounds';
+import { getQuoteClanBannerAsset } from '@evoconn/assets/cards/quoteClanBanners';
 import { CARD_ASSET_LAYOUT } from '@evoconn/constants/cardAssetLayout';
 import { smallStatsIcons } from '@evoconn/assets/icons/smallStats';
 
@@ -38,8 +41,11 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
   );
 
   const cardTier = useMemo(
-    () => getReflectionCardTier(post.author.username, post.title ?? '', post.body ?? ''),
-    [post.author.username, post.title, post.body]
+    () => {
+      if (!isReflection) return 'quote' as const;
+      return getReflectionCardTier(post.author.username, post.title ?? '', post.body ?? '');
+    },
+    [isReflection, post.author.username, post.title, post.body]
   );
 
   const L = useMemo(() => cardLayoutBlockForTier(cardTier), [cardTier]);
@@ -49,30 +55,14 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
     onPress();
   };
 
-  if (!isReflection) {
-    return (
-      <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={[styles.phraseCard]}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={onAuthorPress}>
-            <Text style={styles.username}>{post.author.username}</Text>
-          </TouchableOpacity>
-        </View>
-        <Text style={styles.body} numberOfLines={4}>
-          {post.body}
-        </Text>
-        <View style={styles.footer}>
-          <VoteWidget stats={post.voteStats} compact />
-        </View>
-      </TouchableOpacity>
-    );
-  }
-
   const isSmallCard = cardTier === 'small';
   const isMediumCard = cardTier === 'medium';
-  const isCanvaCard = isSmallCard || isMediumCard;
+  const isQuoteCard = cardTier === 'quote';
+  const isCanvaCard = isSmallCard || isMediumCard || isQuoteCard;
 
   const smallClanBgAsset = isSmallCard ? getSmallClanBackgroundAsset(post.author.clanId) : undefined;
   const mediumClanBgAsset = isMediumCard ? getMediumClanBackgroundAsset(post.author.clanId) : undefined;
+  const quoteClanBgAsset = isQuoteCard ? getQuoteClanBackgroundAsset(post.author.clanId) : undefined;
 
   if (isSmallCard && !smallClanBgAsset) {
     throw new Error(
@@ -84,8 +74,13 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
       `Missing MEDIUM clan background asset for clan "${String(post.author.clanId)}" on post "${post.id}".`
     );
   }
+  if (isQuoteCard && !quoteClanBgAsset) {
+    throw new Error(
+      `Missing QUOTE clan background asset for clan "${String(post.author.clanId)}" on post "${post.id}".`
+    );
+  }
 
-  const canvaBgAsset = isSmallCard ? smallClanBgAsset : isMediumCard ? mediumClanBgAsset : undefined;
+  const canvaBgAsset = isSmallCard ? smallClanBgAsset : isMediumCard ? mediumClanBgAsset : isQuoteCard ? quoteClanBgAsset : undefined;
   const resolvedOuterAsset = isCanvaCard ? canvaBgAsset : outerAsset;
   const Outer = resolvedOuterAsset ? ImageBackground : View;
   const outerProps = resolvedOuterAsset
@@ -96,7 +91,9 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
     ? getSmallClanBannerAsset(post.author.clanId)
     : isMediumCard
       ? getMediumClanBannerAsset(post.author.clanId)
-      : undefined;
+      : isQuoteCard
+        ? getQuoteClanBannerAsset(post.author.clanId)
+        : undefined;
 
   if (isCanvaCard && !canvaBannerAsset) {
     throw new Error(
@@ -104,21 +101,27 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
     );
   }
 
+  const QA = CARD_ASSET_LAYOUT.QUOTE;
   const canvaAssetScale = isSmallCard
     ? CARD_ASSET_LAYOUT.SMALL.SMALL_CARD_ASSET_SCALE
-    : CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_ASSET_SCALE;
+    : isMediumCard ? CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_ASSET_SCALE
+    : QA.QUOTE_CARD_ASSET_SCALE;
   const canvaAssetWidthAdjust = isSmallCard
     ? CARD_ASSET_LAYOUT.SMALL.SMALL_CARD_ASSET_WIDTH_ADJUST
-    : CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_ASSET_WIDTH_ADJUST;
+    : isMediumCard ? CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_ASSET_WIDTH_ADJUST
+    : QA.QUOTE_CARD_ASSET_WIDTH_ADJUST;
   const canvaAssetHeightAdjust = isSmallCard
     ? CARD_ASSET_LAYOUT.SMALL.SMALL_CARD_ASSET_HEIGHT_ADJUST
-    : CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_ASSET_HEIGHT_ADJUST;
+    : isMediumCard ? CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_ASSET_HEIGHT_ADJUST
+    : QA.QUOTE_CARD_ASSET_HEIGHT_ADJUST;
   const canvaAssetOffsetX = isSmallCard
     ? CARD_ASSET_LAYOUT.SMALL.SMALL_CARD_ASSET_OFFSET_X
-    : CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_ASSET_OFFSET_X;
+    : isMediumCard ? CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_ASSET_OFFSET_X
+    : QA.QUOTE_CARD_ASSET_OFFSET_X;
   const canvaAssetOffsetY = isSmallCard
     ? CARD_ASSET_LAYOUT.SMALL.SMALL_CARD_ASSET_OFFSET_Y
-    : CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_ASSET_OFFSET_Y;
+    : isMediumCard ? CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_ASSET_OFFSET_Y
+    : QA.QUOTE_CARD_ASSET_OFFSET_Y;
 
   const feedUpvoteIcon = smallUpvoted ? smallStatsIcons.upvoteActive : smallStatsIcons.upvoteInactive;
   const feedSaveIcon = smallSaved ? smallStatsIcons.saveActive : smallStatsIcons.saveInactive;
@@ -136,7 +139,9 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
           </View>
         </TouchableOpacity>
         <View style={{ transform: [{ translateX: L.UPVOTE_COUNT_OFFSET_X }, { translateY: L.UPVOTE_COUNT_OFFSET_Y }] }}>
-          <Text style={styles.feedStatCount}>{post.voteStats.up}</Text>
+          <Text style={styles.feedStatCount}>
+            {isQuoteCard ? formatNumber(post.voteStats.up) : post.voteStats.up}
+          </Text>
         </View>
       </View>
       <View style={styles.feedStatItem}>
@@ -150,7 +155,9 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
           </View>
         </TouchableOpacity>
         <View style={{ transform: [{ translateX: L.SAVE_COUNT_OFFSET_X }, { translateY: L.SAVE_COUNT_OFFSET_Y }] }}>
-          <Text style={styles.feedStatCount}>{post.voteStats.save}</Text>
+          <Text style={styles.feedStatCount}>
+            {isQuoteCard ? formatNumber(post.voteStats.save) : post.voteStats.save}
+          </Text>
         </View>
       </View>
     </>
@@ -191,13 +198,16 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
 
   const cropTop = isSmallCard
     ? CARD_ASSET_LAYOUT.SMALL.SMALL_CARD_CROP_TOP
-    : isMediumCard ? CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_CROP_TOP : 0;
+    : isMediumCard ? CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_CROP_TOP
+    : isQuoteCard ? QA.QUOTE_CARD_CROP_TOP : 0;
   const cropBottom = isSmallCard
     ? CARD_ASSET_LAYOUT.SMALL.SMALL_CARD_CROP_BOTTOM
-    : isMediumCard ? CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_CROP_BOTTOM : 0;
+    : isMediumCard ? CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_CROP_BOTTOM
+    : isQuoteCard ? QA.QUOTE_CARD_CROP_BOTTOM : 0;
   const feedSpacing = isSmallCard
     ? CARD_ASSET_LAYOUT.SMALL.SMALL_FEED_SPACING_BOTTOM
-    : isMediumCard ? CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_FEED_SPACING_BOTTOM : 0;
+    : isMediumCard ? CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_FEED_SPACING_BOTTOM
+    : isQuoteCard ? QA.QUOTE_FEED_SPACING_BOTTOM : 0;
   const needsCropWrapper = isCanvaCard && (cropTop > 0 || cropBottom > 0 || feedSpacing !== 0);
 
   const cardContent = (
@@ -250,7 +260,19 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
                     { translateY: canvaAssetOffsetY },
                   ],
                 }
-              : null,
+              : isQuoteCard
+                ? {
+                    left: -canvaAssetWidthAdjust / 2,
+                    right: -canvaAssetWidthAdjust / 2,
+                    top: -canvaAssetHeightAdjust / 2,
+                    bottom: -canvaAssetHeightAdjust / 2,
+                    transform: [
+                      { translateX: canvaAssetOffsetX },
+                      { translateY: canvaAssetOffsetY },
+                      { scale: canvaAssetScale },
+                    ],
+                  }
+                : null,
         ]}
       >
         {topSpacerHeight > 0 ? <View style={{ height: topSpacerHeight }} /> : null}
@@ -368,7 +390,7 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
               }}
             >
               <Text
-                style={styles.bodyInner}
+                style={[styles.bodyInner, isQuoteCard && { fontWeight: '700' as const, fontStyle: 'italic' as const }]}
                 numberOfLines={collapsedBodyMaxLines}
               >
                 {post.body}

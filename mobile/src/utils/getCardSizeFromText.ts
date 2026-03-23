@@ -1,6 +1,7 @@
 import {
   CARD_CHAR_THRESHOLD_SMALL,
   CARD_MAX_LINES_MEDIUM,
+  CARD_MAX_LINES_QUOTE,
   CARD_MAX_LINES_SMALL,
   CARD_SIZE_TEST_OVERRIDES_ENABLED,
   CARD_SIZE_TEST_USERNAME_TO_TIER,
@@ -39,7 +40,7 @@ export function getCardMaxLinesForTier(tier: CardSizeTier): number | undefined {
     case 'medium':
       return CARD_MAX_LINES_MEDIUM;
     case 'quote':
-      return undefined;
+      return CARD_MAX_LINES_QUOTE;
     default:
       return CARD_MAX_LINES_MEDIUM;
   }

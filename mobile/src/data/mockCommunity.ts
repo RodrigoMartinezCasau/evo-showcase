@@ -43,6 +43,22 @@ export const mockFeedPosts: CommunityPost[] = [
     voteStats: { up: 420, down: 12, save: 88 },
     createdAt: new Date().toISOString(),
   },
+  {
+    id: 'p5',
+    type: 'phrase',
+    author: authors[0],
+    body: 'La duda es el principio de la sabiduría.',
+    voteStats: { up: 2340, down: 45, save: 190 },
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'p6',
+    type: 'phrase',
+    author: authors[1],
+    body: 'No busques la felicidad fuera. Construye el camino desde dentro.',
+    voteStats: { up: 1870, down: 22, save: 145 },
+    createdAt: new Date().toISOString(),
+  },
 ]
 
 export function getPostById(id: string): CommunityPost | undefined {
