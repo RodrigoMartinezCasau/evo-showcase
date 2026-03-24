@@ -7,9 +7,14 @@ import {
   Modal,
   Pressable,
   ScrollView,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { evoconnColors } from '@evoconn/theme/colors';
+import { SIDEBAR_HEADER_LAYOUT as SH } from '@evoconn/constants/sidebarHeaderLayout';
+import { SIDEBAR_COMMUNITY_LAYOUT as SC } from '@evoconn/constants/sidebarCommunityLayout';
+import { getStarByHouse, SIDEBAR_DEFAULT_STAR } from '@evoconn/utils/getSidebarStar';
+import { getCommunityButtonByHouse } from '@evoconn/utils/getSidebarCommunityButton';
 import { ConversationListItem } from './ConversationListItem';
 import { RankBadge } from './RankBadge';
 import type { ConversationItem as ConvItem } from '@evoconn/types';
@@ -32,6 +37,12 @@ export function SidebarDrawer({
 }: SidebarDrawerProps) {
   const router = useRouter();
   const user = mockCurrentUser;
+  const closeSidebar = onClose;
+  const starSource =
+    user.clanId != null && user.clanId !== ''
+      ? getStarByHouse(user.clanId)
+      : SIDEBAR_DEFAULT_STAR;
+  const communityButtonSource = getCommunityButtonByHouse(user.clanId);
   const filtered = searchQuery
     ? conversations.filter((c) => c.title.toLowerCase().includes(searchQuery.toLowerCase()))
     : conversations;
@@ -40,17 +51,104 @@ export function SidebarDrawer({
     <Modal visible={visible} animationType="slide" transparent>
       <Pressable style={styles.overlay} onPress={onClose}>
         <View style={styles.drawer} onStartShouldSetResponder={() => true}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={onClose}>
-              <Text style={styles.close}>✕</Text>
+          <View
+            style={[
+              styles.header,
+              {
+                paddingTop: SH.SIDEBAR_HEADER_PADDING_TOP,
+                paddingLeft: SH.SIDEBAR_HEADER_PADDING_LEFT,
+                minHeight: SH.SIDEBAR_HEADER_HEIGHT,
+              },
+            ]}
+          >
+            <TouchableOpacity onPress={closeSidebar} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Cerrar menú">
+              <Image
+                source={starSource}
+                style={{
+                  width: SH.SIDEBAR_STAR_SIZE,
+                  height: SH.SIDEBAR_STAR_SIZE,
+                  transform: [
+                    { translateX: SH.SIDEBAR_STAR_OFFSET_X },
+                    { translateY: SH.SIDEBAR_STAR_OFFSET_Y },
+                  ],
+                }}
+                resizeMode="contain"
+              />
             </TouchableOpacity>
-            <Text style={styles.title}>Menú</Text>
+            <View
+              style={[
+                styles.sidebarHeaderTextRow,
+                {
+                  transform: [
+                    { translateX: SH.SIDEBAR_TEXT_OFFSET_X },
+                    { translateY: SH.SIDEBAR_TEXT_OFFSET_Y },
+                  ],
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.sidebarHeaderTitle,
+                  { fontSize: SH.SIDEBAR_TITLE_FONT_SIZE, marginRight: SH.SIDEBAR_TEXT_GAP },
+                ]}
+              >
+                {SH.SIDEBAR_TITLE_TEXT}
+              </Text>
+              <Text style={[styles.sidebarHeaderVersion, { fontSize: SH.SIDEBAR_VERSION_FONT_SIZE }]}>
+                {SH.SIDEBAR_VERSION_TEXT}
+              </Text>
+            </View>
           </View>
           <TouchableOpacity
-            style={styles.menuRow}
+            style={styles.communityMenuRow}
             onPress={() => { onClose(); router.push('/(tabs)'); }}
+            activeOpacity={0.88}
+            accessibilityRole="button"
+            accessibilityLabel="Comunidad"
           >
-            <Text style={styles.menuActive}>Comunidad</Text>
+            <View
+              style={{
+                transform: [
+                  { translateX: SC.SIDEBAR_COMMUNITY_BLOCK_OFFSET_X },
+                  { translateY: SC.SIDEBAR_COMMUNITY_BLOCK_OFFSET_Y },
+                  { scale: SC.SIDEBAR_COMMUNITY_BLOCK_SCALE },
+                ],
+              }}
+            >
+              <View
+                style={{
+                  width: SC.SIDEBAR_COMMUNITY_BUTTON_WIDTH,
+                  height: SC.SIDEBAR_COMMUNITY_BUTTON_HEIGHT,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  transform: [
+                    { translateX: SC.SIDEBAR_COMMUNITY_BUTTON_OFFSET_X },
+                    { translateY: SC.SIDEBAR_COMMUNITY_BUTTON_OFFSET_Y },
+                  ],
+                }}
+              >
+                <Image
+                  source={communityButtonSource}
+                  style={StyleSheet.absoluteFillObject}
+                  resizeMode="contain"
+                />
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontWeight: '700',
+                    fontSize: SC.SIDEBAR_COMMUNITY_TEXT_FONT_SIZE,
+                    letterSpacing: SC.SIDEBAR_COMMUNITY_TEXT_LETTER_SPACING,
+                    textTransform: 'uppercase',
+                    transform: [
+                      { translateX: SC.SIDEBAR_COMMUNITY_TEXT_OFFSET_X },
+                      { translateY: SC.SIDEBAR_COMMUNITY_TEXT_OFFSET_Y },
+                    ],
+                  }}
+                >
+                  COMUNIDAD
+                </Text>
+              </View>
+            </View>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.menuRow}
@@ -130,12 +228,31 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: 48,
   },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 16 },
-  close: { color: evoconnColors.text, fontSize: 22, marginRight: 12 },
-  title: { color: evoconnColors.text, fontSize: 18, fontWeight: '700' },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sidebarHeaderTextRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  sidebarHeaderTitle: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  sidebarHeaderVersion: {
+    color: '#9CA3AF',
+  },
+  communityMenuRow: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: evoconnColors.border,
+    alignItems: 'center',
+  },
   menuRow: { paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: evoconnColors.border },
   menuText: { color: evoconnColors.text, fontSize: 16 },
-  menuActive: { color: evoconnColors.neonGreen, fontSize: 16, fontWeight: '600' },
   section: { flex: 1, marginTop: 16, paddingHorizontal: 16 },
   sectionTitle: { color: evoconnColors.muted, fontSize: 12, marginBottom: 8 },
   convList: { maxHeight: 200 },
