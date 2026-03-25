@@ -12,9 +12,14 @@ import {
 import { useRouter } from 'expo-router';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { SIDEBAR_HEADER_LAYOUT as SH } from '@evoconn/constants/sidebarHeaderLayout';
-import { SIDEBAR_COMMUNITY_LAYOUT as SC } from '@evoconn/constants/sidebarCommunityLayout';
 import { getStarByHouse, SIDEBAR_DEFAULT_STAR } from '@evoconn/utils/getSidebarStar';
 import { getCommunityButtonByHouse } from '@evoconn/utils/getSidebarCommunityButton';
+import { getNewReflectionButtonByHouse } from '@evoconn/utils/getSidebarNewReflectionButton';
+import {
+  SidebarPngMenuButton,
+  getCommunityPngMenuConfig,
+  getNewReflectionPngMenuConfig,
+} from './SidebarPngMenuButton';
 import { ConversationListItem } from './ConversationListItem';
 import { RankBadge } from './RankBadge';
 import type { ConversationItem as ConvItem } from '@evoconn/types';
@@ -43,6 +48,7 @@ export function SidebarDrawer({
       ? getStarByHouse(user.clanId)
       : SIDEBAR_DEFAULT_STAR;
   const communityButtonSource = getCommunityButtonByHouse(user.clanId);
+  const newReflectionButtonSource = getNewReflectionButtonByHouse(user.clanId);
   const filtered = searchQuery
     ? conversations.filter((c) => c.title.toLowerCase().includes(searchQuery.toLowerCase()))
     : conversations;
@@ -99,63 +105,22 @@ export function SidebarDrawer({
               </Text>
             </View>
           </View>
-          <TouchableOpacity
-            style={styles.communityMenuRow}
-            onPress={() => { onClose(); router.push('/(tabs)'); }}
-            activeOpacity={0.88}
-            accessibilityRole="button"
+          <SidebarPngMenuButton
+            config={getCommunityPngMenuConfig()}
+            source={communityButtonSource}
+            label="COMUNIDAD"
             accessibilityLabel="Comunidad"
-          >
-            <View
-              style={{
-                transform: [
-                  { translateX: SC.SIDEBAR_COMMUNITY_BLOCK_OFFSET_X },
-                  { translateY: SC.SIDEBAR_COMMUNITY_BLOCK_OFFSET_Y },
-                  { scale: SC.SIDEBAR_COMMUNITY_BLOCK_SCALE },
-                ],
-              }}
-            >
-              <View
-                style={{
-                  width: SC.SIDEBAR_COMMUNITY_BUTTON_WIDTH,
-                  height: SC.SIDEBAR_COMMUNITY_BUTTON_HEIGHT,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  transform: [
-                    { translateX: SC.SIDEBAR_COMMUNITY_BUTTON_OFFSET_X },
-                    { translateY: SC.SIDEBAR_COMMUNITY_BUTTON_OFFSET_Y },
-                  ],
-                }}
-              >
-                <Image
-                  source={communityButtonSource}
-                  style={StyleSheet.absoluteFillObject}
-                  resizeMode="contain"
-                />
-                <Text
-                  style={{
-                    color: '#FFFFFF',
-                    fontWeight: '700',
-                    fontSize: SC.SIDEBAR_COMMUNITY_TEXT_FONT_SIZE,
-                    letterSpacing: SC.SIDEBAR_COMMUNITY_TEXT_LETTER_SPACING,
-                    textTransform: 'uppercase',
-                    transform: [
-                      { translateX: SC.SIDEBAR_COMMUNITY_TEXT_OFFSET_X },
-                      { translateY: SC.SIDEBAR_COMMUNITY_TEXT_OFFSET_Y },
-                    ],
-                  }}
-                >
-                  COMUNIDAD
-                </Text>
-              </View>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.menuRow}
+            menuRowStyle={styles.communityMenuRow}
+            onPress={() => { onClose(); router.push('/(tabs)'); }}
+          />
+          <SidebarPngMenuButton
+            config={getNewReflectionPngMenuConfig()}
+            source={newReflectionButtonSource}
+            label="NUEVA REFLEXIÓN"
+            accessibilityLabel="Nueva reflexión"
+            menuRowStyle={styles.communityMenuRow}
             onPress={() => { onClose(); router.push('/reflection'); }}
-          >
-            <Text style={styles.menuText}>Nueva reflexión</Text>
-          </TouchableOpacity>
+          />
           <TouchableOpacity
             style={styles.menuRow}
             onPress={() => { onClose(); router.push('/phrase'); }}
