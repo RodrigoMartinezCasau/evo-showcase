@@ -13,12 +13,26 @@ import { useRouter } from 'expo-router';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { SIDEBAR_HEADER_LAYOUT as SH } from '@evoconn/constants/sidebarHeaderLayout';
 import { getStarByHouse, SIDEBAR_DEFAULT_STAR } from '@evoconn/utils/getSidebarStar';
-import { getCommunityButtonByHouse } from '@evoconn/utils/getSidebarCommunityButton';
+import {
+  getCommunityButtonByHouse,
+  SIDEBAR_COMMUNITY_MENU_STAR,
+} from '@evoconn/utils/getSidebarCommunityButton';
+import { SIDEBAR_COMMUNITY_LAYOUT as SCL } from '@evoconn/constants/sidebarCommunityLayout';
 import { getNewReflectionButtonByHouse } from '@evoconn/utils/getSidebarNewReflectionButton';
+import {
+  getNewReflectionPlusIconByHouse,
+  getNewReflectionPlusLayoutByHouse,
+} from '@evoconn/utils/getSidebarNewReflectionPlusIcon';
+import { getNewPhraseButtonByHouse } from '@evoconn/utils/getSidebarNewPhraseButton';
+import {
+  getNewPhrasePlusIconByHouse,
+  getNewPhrasePlusLayoutByHouse,
+} from '@evoconn/utils/getSidebarNewPhrasePlusIcon';
 import {
   SidebarPngMenuButton,
   getCommunityPngMenuConfig,
   getNewReflectionPngMenuConfig,
+  getNewPhrasePngMenuConfig,
 } from './SidebarPngMenuButton';
 import { ConversationListItem } from './ConversationListItem';
 import { RankBadge } from './RankBadge';
@@ -49,6 +63,11 @@ export function SidebarDrawer({
       : SIDEBAR_DEFAULT_STAR;
   const communityButtonSource = getCommunityButtonByHouse(user.clanId);
   const newReflectionButtonSource = getNewReflectionButtonByHouse(user.clanId);
+  const newReflectionPlusSource = getNewReflectionPlusIconByHouse(user.clanId);
+  const newReflectionPlusLayout = getNewReflectionPlusLayoutByHouse(user.clanId);
+  const newPhraseButtonSource = getNewPhraseButtonByHouse(user.clanId);
+  const newPhrasePlusSource = getNewPhrasePlusIconByHouse(user.clanId);
+  const newPhrasePlusLayout = getNewPhrasePlusLayoutByHouse(user.clanId);
   const filtered = searchQuery
     ? conversations.filter((c) => c.title.toLowerCase().includes(searchQuery.toLowerCase()))
     : conversations;
@@ -111,6 +130,14 @@ export function SidebarDrawer({
             label="COMUNIDAD"
             accessibilityLabel="Comunidad"
             menuRowStyle={styles.communityMenuRow}
+            leftOverlay={{
+              source: SIDEBAR_COMMUNITY_MENU_STAR,
+              x: SCL.SIDEBAR_COMMUNITY_STAR_OFFSET_X,
+              y: SCL.SIDEBAR_COMMUNITY_STAR_OFFSET_Y,
+              width: SCL.SIDEBAR_COMMUNITY_STAR_WIDTH,
+              height: SCL.SIDEBAR_COMMUNITY_STAR_HEIGHT,
+              scale: SCL.SIDEBAR_COMMUNITY_STAR_SCALE,
+            }}
             onPress={() => { onClose(); router.push('/(tabs)'); }}
           />
           <SidebarPngMenuButton
@@ -119,14 +146,31 @@ export function SidebarDrawer({
             label="NUEVA REFLEXIÓN"
             accessibilityLabel="Nueva reflexión"
             menuRowStyle={styles.communityMenuRow}
+            textAdjustsFontSizeToFit={false}
+            leftOverlay={{
+              source: newReflectionPlusSource,
+              x: newReflectionPlusLayout.x,
+              y: newReflectionPlusLayout.y,
+              width: newReflectionPlusLayout.width,
+              height: newReflectionPlusLayout.height,
+            }}
             onPress={() => { onClose(); router.push('/reflection'); }}
           />
-          <TouchableOpacity
-            style={styles.menuRow}
+          <SidebarPngMenuButton
+            config={getNewPhrasePngMenuConfig()}
+            source={newPhraseButtonSource}
+            label="NUEVA FRASE"
+            accessibilityLabel="Nueva frase"
+            menuRowStyle={styles.communityMenuRow}
+            leftOverlay={{
+              source: newPhrasePlusSource,
+              x: newPhrasePlusLayout.x,
+              y: newPhrasePlusLayout.y,
+              width: newPhrasePlusLayout.width,
+              height: newPhrasePlusLayout.height,
+            }}
             onPress={() => { onClose(); router.push('/phrase'); }}
-          >
-            <Text style={styles.menuText}>Nueva frase</Text>
-          </TouchableOpacity>
+          />
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>TUS PENSAMIENTOS</Text>
             <ScrollView style={styles.convList}>

@@ -10,8 +10,9 @@ import {
 } from 'react-native';
 import { SIDEBAR_COMMUNITY_LAYOUT as SC } from '@evoconn/constants/sidebarCommunityLayout';
 import { SIDEBAR_NEW_REFLECTION_LAYOUT as SR } from '@evoconn/constants/sidebarNewReflectionLayout';
+import { SIDEBAR_NEW_PHRASE_LAYOUT as SP } from '@evoconn/constants/sidebarNewPhraseLayout';
 
-/** Config normalizada: misma forma para COMUNIDAD y NUEVA REFLEXIÓN. */
+/** Config normalizada: misma forma para COMUNIDAD, NUEVA REFLEXIÓN y NUEVA FRASE. */
 export type SidebarPngMenuButtonConfig = {
   blockOffsetX: number;
   blockOffsetY: number;
@@ -33,6 +34,17 @@ export type SidebarPngMenuButtonConfig = {
   textOffsetY: number;
   textFontSize: number;
   textLetterSpacing: number;
+};
+
+/** Capa opcional (p. ej. "+" en Nueva reflexión): coordenadas en el mismo espacio que el área visible recortada del botón. */
+export type SidebarPngMenuButtonLeftOverlay = {
+  source: ImageSourcePropType;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Opcional; 1 por defecto. Escala desde el centro del rect del overlay. */
+  scale?: number;
 };
 
 export function getCommunityPngMenuConfig(): SidebarPngMenuButtonConfig {
@@ -85,6 +97,31 @@ export function getNewReflectionPngMenuConfig(): SidebarPngMenuButtonConfig {
   };
 }
 
+export function getNewPhrasePngMenuConfig(): SidebarPngMenuButtonConfig {
+  return {
+    blockOffsetX: SP.SIDEBAR_NEW_PHRASE_BLOCK_OFFSET_X,
+    blockOffsetY: SP.SIDEBAR_NEW_PHRASE_BLOCK_OFFSET_Y,
+    blockScale: SP.SIDEBAR_NEW_PHRASE_BLOCK_SCALE,
+    imageWidth: SP.SIDEBAR_NEW_PHRASE_IMAGE_WIDTH,
+    imageHeight: SP.SIDEBAR_NEW_PHRASE_IMAGE_HEIGHT,
+    buttonOffsetX: SP.SIDEBAR_NEW_PHRASE_BUTTON_OFFSET_X,
+    buttonOffsetY: SP.SIDEBAR_NEW_PHRASE_BUTTON_OFFSET_Y,
+    cropTop: SP.SIDEBAR_NEW_PHRASE_CROP_TOP,
+    cropBottom: SP.SIDEBAR_NEW_PHRASE_CROP_BOTTOM,
+    cropLeft: SP.SIDEBAR_NEW_PHRASE_CROP_LEFT,
+    cropRight: SP.SIDEBAR_NEW_PHRASE_CROP_RIGHT,
+    horizontalStretch: SP.SIDEBAR_NEW_PHRASE_HORIZONTAL_STRETCH,
+    textBoxWidth: SP.SIDEBAR_NEW_PHRASE_TEXT_BOX_WIDTH,
+    textBoxHeight: SP.SIDEBAR_NEW_PHRASE_TEXT_BOX_HEIGHT,
+    textContainerOffsetX: SP.SIDEBAR_NEW_PHRASE_TEXT_CONTAINER_OFFSET_X,
+    textContainerOffsetY: SP.SIDEBAR_NEW_PHRASE_TEXT_CONTAINER_OFFSET_Y,
+    textOffsetX: SP.SIDEBAR_NEW_PHRASE_TEXT_OFFSET_X,
+    textOffsetY: SP.SIDEBAR_NEW_PHRASE_TEXT_OFFSET_Y,
+    textFontSize: SP.SIDEBAR_NEW_PHRASE_TEXT_FONT_SIZE,
+    textLetterSpacing: SP.SIDEBAR_NEW_PHRASE_TEXT_LETTER_SPACING,
+  };
+}
+
 type SidebarPngMenuButtonProps = {
   config: SidebarPngMenuButtonConfig;
   source: ImageSourcePropType;
@@ -92,6 +129,12 @@ type SidebarPngMenuButtonProps = {
   accessibilityLabel: string;
   menuRowStyle: StyleProp<ViewStyle>;
   onPress: () => void;
+  /**
+   * Si es false, el tamaño del texto no se re-mide para encajar en la caja (solo `fontSize` fijo del config).
+   * Evita saltos entre el primer frame y recargas/hot reload cuando `adjustsFontSizeToFit` dispara un segundo layout nativo.
+   */
+  textAdjustsFontSizeToFit?: boolean;
+  leftOverlay?: SidebarPngMenuButtonLeftOverlay | null;
 };
 
 export function SidebarPngMenuButton({
@@ -101,6 +144,8 @@ export function SidebarPngMenuButton({
   accessibilityLabel,
   menuRowStyle,
   onPress,
+  textAdjustsFontSizeToFit = true,
+  leftOverlay = null,
 }: SidebarPngMenuButtonProps) {
   const imgW = config.imageWidth;
   const imgH = config.imageHeight;
@@ -188,6 +233,25 @@ export function SidebarPngMenuButton({
                 </View>
               </View>
             </View>
+            {leftOverlay != null ? (
+              <View
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  left: leftOverlay.x,
+                  top: leftOverlay.y,
+                  width: leftOverlay.width,
+                  height: leftOverlay.height,
+                  transform: [{ scale: leftOverlay.scale ?? 1 }],
+                }}
+              >
+                <Image
+                  source={leftOverlay.source}
+                  style={{ width: leftOverlay.width, height: leftOverlay.height }}
+                  resizeMode="contain"
+                />
+              </View>
+            ) : null}
             <View
               pointerEvents="none"
               style={{
@@ -202,8 +266,8 @@ export function SidebarPngMenuButton({
             >
               <Text
                 numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.5}
+                adjustsFontSizeToFit={textAdjustsFontSizeToFit}
+                minimumFontScale={textAdjustsFontSizeToFit ? 0.5 : 1}
                 style={{
                   color: '#FFFFFF',
                   fontWeight: '700',

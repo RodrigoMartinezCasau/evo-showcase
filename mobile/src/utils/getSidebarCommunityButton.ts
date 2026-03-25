@@ -15,6 +15,9 @@ const COMMUNITY_BY_CLAN: Record<ClanId, ImageSourcePropType> = {
 
 export const SIDEBAR_DEFAULT_COMMUNITY_BUTTON: ImageSourcePropType = require('../assets/sidebar/community/community_default.png');
 
+/** Estrella fija del botón COMUNIDAD (no depende del clan). */
+export const SIDEBAR_COMMUNITY_MENU_STAR: ImageSourcePropType = require('../assets/sidebar/community/sidebar_community_star.png');
+
 /** Misma lógica que la estrella del header: `clanId` del usuario o default si no hay casa. */
 export function getCommunityButtonByHouse(house?: string | null): ImageSourcePropType {
   if (house == null || house === '') {
