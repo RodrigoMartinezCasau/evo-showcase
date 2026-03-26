@@ -15,6 +15,10 @@ import { SIDEBAR_CONVERSATIONS_LAYOUT as L } from '@evoconn/constants/sidebarCon
 import { getConversationsFrameByHouse } from '@evoconn/utils/getSidebarConversationsFrameByHouse';
 import type { ConversationItem, SidebarFolder } from '@evoconn/types';
 
+const SECTION_ICON_FAVORITES = require('../assets/sidebar/conversationsSections/section_favorites_star.png');
+const SECTION_ICON_FOLDERS = require('../assets/sidebar/conversationsSections/section_folders_folder.png');
+const SECTION_ICON_THOUGHTS = require('../assets/sidebar/conversationsSections/section_thoughts_triangle.png');
+
 type TabId = 'favorites' | 'folders' | 'thoughts';
 
 type SidebarConversationsPanelProps = {
@@ -179,10 +183,7 @@ export function SidebarConversationsPanel({
     setNewFolderConvId(null);
   }, [newFolderName, newFolderConvId, folders, conversations, onFoldersChange, onConversationsChange]);
 
-  const sectionStyle = (tab: TabId) => ({
-    color: !q && activeTab === tab ? '#FFFFFF' : '#9CA3AF',
-    fontWeight: (!q && activeTab === tab ? '700' : '500') as '700' | '500',
-  });
+  const sectionHeaderText = { color: '#FFFFFF' as const, fontWeight: '700' as const };
 
   const rowH = Math.max(
     L.SIDEBAR_CONVERSATIONS_ITEM_TEXT_HEIGHT,
@@ -267,65 +268,156 @@ export function SidebarConversationsPanel({
             }}
           >
             {!q ? (
-              <View
-                style={{
-                  paddingLeft: L.SIDEBAR_CONVERSATIONS_SECTION_OFFSET_X,
-                  paddingTop: L.SIDEBAR_CONVERSATIONS_SECTION_OFFSET_Y,
-                }}
-              >
-                <TouchableOpacity
-                  style={{ marginBottom: L.SIDEBAR_CONVERSATIONS_SECTION_GAP_Y }}
-                  onPress={() => onTab('favorites')}
-                  hitSlop={6}
+              <View style={{ marginBottom: L.SIDEBAR_CONVERSATIONS_SECTIONS_TO_LIST_GAP_Y }}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    marginLeft: L.SIDEBAR_FAVORITES_OFFSET_X,
+                    marginTop: L.SIDEBAR_FAVORITES_OFFSET_Y,
+                    marginBottom: L.SIDEBAR_CONVERSATIONS_SECTION_GAP_Y,
+                  }}
                 >
-                  <Text
-                    style={[
-                      styles.sectionLabel,
-                      sectionStyle('favorites'),
-                      {
-                        fontSize: L.SIDEBAR_CONVERSATIONS_SECTION_FONT_SIZE,
-                        letterSpacing: L.SIDEBAR_CONVERSATIONS_SECTION_LETTER_SPACING,
-                      },
-                    ]}
+                  <View
+                    style={{
+                      marginLeft: L.FAVORITES_ICON_OFFSET_X,
+                      marginTop: L.FAVORITES_ICON_OFFSET_Y,
+                      transform: [{ scale: L.FAVORITES_ICON_SCALE }],
+                    }}
                   >
-                    FAVORITOS
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={{ marginBottom: L.SIDEBAR_CONVERSATIONS_SECTION_GAP_Y }}
-                  onPress={() => onTab('folders')}
-                  hitSlop={6}
+                    <Image
+                      source={SECTION_ICON_FAVORITES}
+                      style={{
+                        width: L.FAVORITES_ICON_BASE_SIZE,
+                        height: L.FAVORITES_ICON_BASE_SIZE,
+                      }}
+                      resizeMode="contain"
+                    />
+                  </View>
+                  <TouchableOpacity
+                    style={{
+                      marginLeft: L.FAVORITES_ICON_TEXT_GAP_X,
+                      transform: [{ scale: L.SIDEBAR_FAVORITES_SCALE }],
+                    }}
+                    onPress={() => onTab('favorites')}
+                    hitSlop={6}
+                  >
+                    <Text
+                      style={[
+                        styles.sectionLabel,
+                        sectionHeaderText,
+                        {
+                          fontSize: L.SIDEBAR_FAVORITES_FONT_SIZE,
+                          letterSpacing: L.SIDEBAR_FAVORITES_LETTER_SPACING,
+                        },
+                      ]}
+                    >
+                      FAVORITOS
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    marginLeft: L.SIDEBAR_FOLDERS_OFFSET_X,
+                    marginTop: L.SIDEBAR_FOLDERS_OFFSET_Y,
+                    marginBottom: L.SIDEBAR_CONVERSATIONS_SECTION_GAP_Y,
+                  }}
                 >
-                  <Text
-                    style={[
-                      styles.sectionLabel,
-                      sectionStyle('folders'),
-                      {
-                        fontSize: L.SIDEBAR_CONVERSATIONS_SECTION_FONT_SIZE,
-                        letterSpacing: L.SIDEBAR_CONVERSATIONS_SECTION_LETTER_SPACING,
-                      },
-                    ]}
+                  <View
+                    style={{
+                      marginLeft: L.FOLDERS_ICON_OFFSET_X,
+                      marginTop: L.FOLDERS_ICON_OFFSET_Y,
+                      transform: [{ scale: L.FOLDERS_ICON_SCALE }],
+                    }}
                   >
-                    CARPETAS
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => onTab('thoughts')} hitSlop={6}>
-                  <Text
-                    style={[
-                      styles.sectionLabel,
-                      sectionStyle('thoughts'),
-                      {
-                        fontSize: L.SIDEBAR_CONVERSATIONS_SECTION_FONT_SIZE,
-                        letterSpacing: L.SIDEBAR_CONVERSATIONS_SECTION_LETTER_SPACING,
-                      },
-                    ]}
+                    <Image
+                      source={SECTION_ICON_FOLDERS}
+                      style={{
+                        width: L.FOLDERS_ICON_BASE_SIZE,
+                        height: L.FOLDERS_ICON_BASE_SIZE,
+                      }}
+                      resizeMode="contain"
+                    />
+                  </View>
+                  <TouchableOpacity
+                    style={{
+                      marginLeft: L.FOLDERS_ICON_TEXT_GAP_X,
+                      transform: [{ scale: L.SIDEBAR_FOLDERS_SCALE }],
+                    }}
+                    onPress={() => onTab('folders')}
+                    hitSlop={6}
                   >
-                    TUS PENSAMIENTOS
-                  </Text>
-                </TouchableOpacity>
+                    <Text
+                      style={[
+                        styles.sectionLabel,
+                        sectionHeaderText,
+                        {
+                          fontSize: L.SIDEBAR_FOLDERS_FONT_SIZE,
+                          letterSpacing: L.SIDEBAR_FOLDERS_LETTER_SPACING,
+                        },
+                      ]}
+                    >
+                      CARPETAS
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    marginLeft: L.SIDEBAR_THOUGHTS_OFFSET_X,
+                    marginTop: L.SIDEBAR_THOUGHTS_OFFSET_Y,
+                  }}
+                >
+                  <View
+                    style={{
+                      marginLeft: L.THOUGHTS_ICON_OFFSET_X,
+                      marginTop: L.THOUGHTS_ICON_OFFSET_Y,
+                      transform: [{ scale: L.THOUGHTS_ICON_SCALE }],
+                    }}
+                  >
+                    <Image
+                      source={SECTION_ICON_THOUGHTS}
+                      style={{
+                        width: L.THOUGHTS_ICON_BASE_SIZE,
+                        height: L.THOUGHTS_ICON_BASE_SIZE,
+                      }}
+                      resizeMode="contain"
+                    />
+                  </View>
+                  <TouchableOpacity
+                    style={{
+                      marginLeft: L.THOUGHTS_ICON_TEXT_GAP_X,
+                      transform: [{ scale: L.SIDEBAR_THOUGHTS_SCALE }],
+                    }}
+                    onPress={() => onTab('thoughts')}
+                    hitSlop={6}
+                  >
+                    <Text
+                      style={[
+                        styles.sectionLabel,
+                        sectionHeaderText,
+                        {
+                          fontSize: L.SIDEBAR_THOUGHTS_FONT_SIZE,
+                          letterSpacing: L.SIDEBAR_THOUGHTS_LETTER_SPACING,
+                        },
+                      ]}
+                    >
+                      PENSAMIENTOS
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             ) : (
-              <View style={{ paddingLeft: 4, paddingTop: 4 }}>
+              <View
+                style={{
+                  paddingLeft: 4,
+                  paddingTop: 4,
+                  marginBottom: L.SIDEBAR_CONVERSATIONS_SECTIONS_TO_LIST_GAP_Y,
+                }}
+              >
                 <Text style={styles.searchHint}>Resultados</Text>
               </View>
             )}
@@ -333,9 +425,11 @@ export function SidebarConversationsPanel({
             <ScrollView
               style={styles.scroll}
               contentContainerStyle={{
-                paddingTop: 4,
+                paddingTop: 0,
                 paddingBottom: 8,
                 paddingLeft: L.SIDEBAR_CONVERSATIONS_ITEM_OFFSET_X,
+                paddingRight: 4,
+                alignItems: 'stretch',
               }}
               showsVerticalScrollIndicator
               keyboardShouldPersistTaps="handled"
@@ -375,18 +469,23 @@ export function SidebarConversationsPanel({
                 listConversations.map((item) => (
                   <View
                     key={item.id}
-                    style={{
-                      marginBottom: L.SIDEBAR_CONVERSATIONS_ITEM_GAP_Y,
-                      minHeight: rowH,
-                      position: 'relative',
-                    }}
+                    style={[
+                      styles.convRow,
+                      {
+                        marginBottom: L.SIDEBAR_CONVERSATIONS_ITEM_GAP_Y,
+                        minHeight: rowH,
+                      },
+                    ]}
                   >
                     <TouchableOpacity
                       onPress={() => onConversationPress(item.id)}
-                      style={{
-                        paddingTop: L.SIDEBAR_CONVERSATIONS_ITEM_OFFSET_Y,
-                        maxWidth: L.SIDEBAR_CONVERSATIONS_ITEM_TEXT_WIDTH,
-                      }}
+                      style={[
+                        styles.convRowTitleWrap,
+                        {
+                          paddingTop: L.SIDEBAR_CONVERSATIONS_ITEM_OFFSET_Y,
+                          marginRight: L.SIDEBAR_CONVERSATIONS_TITLE_ICONS_GAP_X,
+                        },
+                      ]}
                     >
                       <Text
                         numberOfLines={2}
@@ -394,49 +493,70 @@ export function SidebarConversationsPanel({
                           styles.rowTitle,
                           {
                             fontSize: L.SIDEBAR_CONVERSATIONS_ITEM_TEXT_FONT_SIZE,
-                            maxWidth: L.SIDEBAR_CONVERSATIONS_ITEM_TEXT_WIDTH,
+                            color: L.SIDEBAR_CONVERSATIONS_ITEM_TITLE_COLOR,
                             minHeight: L.SIDEBAR_CONVERSATIONS_ITEM_TEXT_HEIGHT,
                           },
                         ]}
                       >
                         {item.title}
                       </Text>
-                      <Text style={styles.rowMeta}>
-                        {item.type === 'reflection' ? 'Reflexión' : 'Frase'}
-                      </Text>
                     </TouchableOpacity>
-                    <TouchableOpacity
+                    <View
                       style={[
-                        styles.iconHit,
+                        styles.convRowIcons,
                         {
-                          position: 'absolute',
-                          left: L.SIDEBAR_CONVERSATIONS_STAR_OFFSET_X,
-                          top: L.SIDEBAR_CONVERSATIONS_STAR_OFFSET_Y,
-                          width: L.SIDEBAR_CONVERSATIONS_STAR_SIZE,
-                          height: L.SIDEBAR_CONVERSATIONS_STAR_SIZE,
+                          marginRight: L.SIDEBAR_CONVERSATIONS_ICONS_STRIP_MARGIN_END,
+                          paddingTop:
+                            L.SIDEBAR_CONVERSATIONS_ITEM_OFFSET_Y +
+                            Math.min(
+                              L.SIDEBAR_CONVERSATIONS_STAR_OFFSET_Y,
+                              L.SIDEBAR_CONVERSATIONS_PENCIL_OFFSET_Y
+                            ),
+                          gap: L.SIDEBAR_CONVERSATIONS_ICONS_INNER_GAP_X,
                         },
                       ]}
-                      onPress={() => toggleFavorite(item.id)}
-                      hitSlop={6}
                     >
-                      <Text style={styles.iconText}>{item.isFavorite ? '★' : '☆'}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.iconHit,
-                        {
-                          position: 'absolute',
-                          left: L.SIDEBAR_CONVERSATIONS_PENCIL_OFFSET_X,
-                          top: L.SIDEBAR_CONVERSATIONS_PENCIL_OFFSET_Y,
-                          width: L.SIDEBAR_CONVERSATIONS_PENCIL_SIZE,
-                          height: L.SIDEBAR_CONVERSATIONS_PENCIL_SIZE,
-                        },
-                      ]}
-                      onPress={() => openEditMenu(item)}
-                      hitSlop={6}
-                    >
-                      <Text style={styles.iconText}>✎</Text>
-                    </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.iconHit,
+                          {
+                            width: L.SIDEBAR_CONVERSATIONS_STAR_SIZE,
+                            height: L.SIDEBAR_CONVERSATIONS_STAR_SIZE,
+                          },
+                        ]}
+                        onPress={() => toggleFavorite(item.id)}
+                        hitSlop={6}
+                      >
+                        <Text
+                          style={[
+                            styles.iconText,
+                            { fontSize: L.SIDEBAR_CONVERSATIONS_STAR_SIZE * 0.68 },
+                          ]}
+                        >
+                          {item.isFavorite ? '★' : '☆'}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.iconHit,
+                          {
+                            width: L.SIDEBAR_CONVERSATIONS_PENCIL_SIZE,
+                            height: L.SIDEBAR_CONVERSATIONS_PENCIL_SIZE,
+                          },
+                        ]}
+                        onPress={() => openEditMenu(item)}
+                        hitSlop={6}
+                      >
+                        <Text
+                          style={[
+                            styles.iconText,
+                            { fontSize: L.SIDEBAR_CONVERSATIONS_PENCIL_SIZE * 0.68 },
+                          ]}
+                        >
+                          ✎
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 ))}
 
@@ -508,14 +628,28 @@ export function SidebarConversationsPanel({
 const styles = StyleSheet.create({
   sectionLabel: { textTransform: 'uppercase' },
   searchHint: { color: '#9CA3AF', fontSize: 11, fontWeight: '600' },
-  scroll: { flex: 1, minHeight: 0, marginTop: 4 },
-  rowTitle: { color: '#F3F4F6', fontWeight: '600' },
-  rowMeta: { color: '#6B7280', fontSize: 10, marginTop: 2 },
+  scroll: { flex: 1, minHeight: 0, marginTop: 0 },
+  /** Color base para carpetas; los títulos de conversación lo sobrescriben con el layout. */
+  rowTitle: { fontWeight: '600', color: '#F3F4F6' },
   folderRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   folderIcon: { fontSize: 16 },
   backLink: { color: '#A78BFA', fontSize: 12, fontWeight: '600' },
+  convRow: {
+    flexDirection: 'row',
+    alignSelf: 'stretch',
+    alignItems: 'flex-start',
+  },
+  convRowTitleWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  convRowIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
   iconHit: { justifyContent: 'center', alignItems: 'center' },
-  iconText: { color: '#D1D5DB', fontSize: 16 },
+  iconText: { color: '#D1D5DB' },
   empty: { color: '#6B7280', fontSize: 12, marginTop: 12 },
   modalBackdrop: {
     flex: 1,
