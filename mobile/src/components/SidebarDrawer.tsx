@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   StyleSheet,
   Modal,
   Pressable,
-  ScrollView,
   Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -34,10 +33,12 @@ import {
   getNewReflectionPngMenuConfig,
   getNewPhrasePngMenuConfig,
 } from './SidebarPngMenuButton';
-import { ConversationListItem } from './ConversationListItem';
 import { RankBadge } from './RankBadge';
+import { SidebarSearchBar } from './SidebarSearchBar';
+import { SidebarConversationsPanel } from './SidebarConversationsPanel';
 import type { ConversationItem as ConvItem } from '@evoconn/types';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
+import { mockSidebarFolders } from '@evoconn/data/mockSidebarFolders';
 
 type SidebarDrawerProps = {
   visible: boolean;
@@ -52,11 +53,18 @@ export function SidebarDrawer({
   onClose,
   conversations,
   onConversationPress,
-  searchQuery = '',
+  searchQuery: _searchQuery = '',
 }: SidebarDrawerProps) {
   const router = useRouter();
   const user = mockCurrentUser;
   const closeSidebar = onClose;
+  const [drawerSearch, setDrawerSearch] = useState('');
+  const [convState, setConvState] = useState(conversations);
+  const [folderState, setFolderState] = useState(() => mockSidebarFolders.map((f) => ({ ...f })));
+
+  useEffect(() => {
+    setConvState(conversations);
+  }, [conversations]);
   const starSource =
     user.clanId != null && user.clanId !== ''
       ? getStarByHouse(user.clanId)
@@ -68,10 +76,6 @@ export function SidebarDrawer({
   const newPhraseButtonSource = getNewPhraseButtonByHouse(user.clanId);
   const newPhrasePlusSource = getNewPhrasePlusIconByHouse(user.clanId);
   const newPhrasePlusLayout = getNewPhrasePlusLayoutByHouse(user.clanId);
-  const filtered = searchQuery
-    ? conversations.filter((c) => c.title.toLowerCase().includes(searchQuery.toLowerCase()))
-    : conversations;
-
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <Pressable style={styles.overlay} onPress={onClose}>
@@ -171,17 +175,20 @@ export function SidebarDrawer({
             }}
             onPress={() => { onClose(); router.push('/phrase'); }}
           />
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>TUS PENSAMIENTOS</Text>
-            <ScrollView style={styles.convList}>
-              {filtered.map((item) => (
-                <ConversationListItem
-                  key={item.id}
-                  item={item}
-                  onPress={() => { onClose(); onConversationPress(item.id); }}
-                />
-              ))}
-            </ScrollView>
+          <View style={styles.sidebarLowerBlock}>
+            <SidebarSearchBar value={drawerSearch} onChangeText={setDrawerSearch} />
+            <SidebarConversationsPanel
+              clanId={user.clanId}
+              conversations={convState}
+              onConversationsChange={setConvState}
+              folders={folderState}
+              onFoldersChange={setFolderState}
+              drawerSearch={drawerSearch}
+              onConversationPress={(id) => {
+                onClose();
+                onConversationPress(id);
+              }}
+            />
           </View>
           <View style={styles.iconsRow}>
             <TouchableOpacity onPress={() => { onClose(); router.push('/profile'); }}>
@@ -260,9 +267,7 @@ const styles = StyleSheet.create({
   },
   menuRow: { paddingVertical: 12, paddingHorizontal: 16 },
   menuText: { color: evoconnColors.text, fontSize: 16 },
-  section: { flex: 1, marginTop: 16, paddingHorizontal: 16 },
-  sectionTitle: { color: evoconnColors.muted, fontSize: 12, marginBottom: 8 },
-  convList: { maxHeight: 200 },
+  sidebarLowerBlock: { flex: 1, minHeight: 0, marginTop: 8, paddingHorizontal: 10 },
   iconsRow: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 20 },
   bigIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: evoconnColors.card, alignItems: 'center', justifyContent: 'center' },
   bigIconText: { fontSize: 24 },

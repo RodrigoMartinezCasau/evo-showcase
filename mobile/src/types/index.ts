@@ -58,3 +58,8 @@ export type ConversationItem = {
   isFavorite?: boolean
   folderId?: string | null
 }
+
+export type SidebarFolder = {
+  id: string
+  name: string
+}
