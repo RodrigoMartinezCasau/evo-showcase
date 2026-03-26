@@ -33,8 +33,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: evoconnColors.border,
   },
   main: { flex: 1 },
   title: { color: evoconnColors.text, fontSize: 14, fontWeight: '600' },

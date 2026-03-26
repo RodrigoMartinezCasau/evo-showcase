@@ -4,13 +4,13 @@
  */
 export const SIDEBAR_COMMUNITY_LAYOUT = {
   // A) Bloque completo (traslación + escala respecto al punto de anclaje del menú)
-  SIDEBAR_COMMUNITY_BLOCK_OFFSET_X: -15,
+  SIDEBAR_COMMUNITY_BLOCK_OFFSET_X: -5,
   SIDEBAR_COMMUNITY_BLOCK_OFFSET_Y: -60,
   SIDEBAR_COMMUNITY_BLOCK_SCALE: 1,
 
   // B) PNG del botón: el asset se estira a este rectángulo; los CROP_* recortan píxeles de verdad.
   // Ajusta ancho/alto a la proporción del PNG si no quieres deformación leve.
-  SIDEBAR_COMMUNITY_BUTTON_WIDTH: 268,
+  SIDEBAR_COMMUNITY_BUTTON_WIDTH: 290,
   SIDEBAR_COMMUNITY_BUTTON_HEIGHT: 145,
   SIDEBAR_COMMUNITY_BUTTON_OFFSET_X: 0,
   SIDEBAR_COMMUNITY_BUTTON_OFFSET_Y: 0,
@@ -31,7 +31,7 @@ export const SIDEBAR_COMMUNITY_LAYOUT = {
   SIDEBAR_COMMUNITY_TEXT_BOX_WIDTH: 220,
   SIDEBAR_COMMUNITY_TEXT_BOX_HEIGHT: 48,
   /** Desplaza la caja de texto respecto al centro del área visible recortada. */
-  SIDEBAR_COMMUNITY_TEXT_CONTAINER_OFFSET_X: -42,
+  SIDEBAR_COMMUNITY_TEXT_CONTAINER_OFFSET_X: -51,
   SIDEBAR_COMMUNITY_TEXT_CONTAINER_OFFSET_Y: -0,
   SIDEBAR_COMMUNITY_TEXT_OFFSET_X: 0,
   SIDEBAR_COMMUNITY_TEXT_OFFSET_Y: 0,
