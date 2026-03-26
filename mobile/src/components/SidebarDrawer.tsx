@@ -36,6 +36,9 @@ import {
 import { RankBadge } from './RankBadge';
 import { SidebarSearchBar } from './SidebarSearchBar';
 import { SidebarConversationsPanel } from './SidebarConversationsPanel';
+import { SidebarClanButton } from './SidebarClanButton';
+import { FrasesButton } from './FrasesButton';
+import { RachaButton } from './RachaButton';
 import type { ConversationItem as ConvItem } from '@evoconn/types';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { mockSidebarFolders } from '@evoconn/data/mockSidebarFolders';
@@ -76,6 +79,10 @@ export function SidebarDrawer({
   const newPhraseButtonSource = getNewPhraseButtonByHouse(user.clanId);
   const newPhrasePlusSource = getNewPhrasePlusIconByHouse(user.clanId);
   const newPhrasePlusLayout = getNewPhrasePlusLayoutByHouse(user.clanId);
+  const clanRouteSlug =
+    user.clanId != null && String(user.clanId).trim() !== ''
+      ? String(user.clanId).trim().toLowerCase()
+      : 'evocon';
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <Pressable style={styles.overlay} onPress={onClose}>
@@ -190,26 +197,27 @@ export function SidebarDrawer({
               }}
             />
           </View>
-          <View style={styles.iconsRow}>
-            <TouchableOpacity onPress={() => { onClose(); router.push('/profile'); }}>
-              <View style={styles.bigIcon}>
-                <View style={[styles.clanDot, { backgroundColor: evoconnColors.accent }]} />
-              </View>
-              <Text style={styles.iconLabel}>Clan</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => { onClose(); router.push('/phrases-domains'); }}>
-              <View style={styles.bigIcon}>
-                <Text style={styles.bigIconText}>✎</Text>
-              </View>
-              <Text style={styles.iconLabel}>Frases</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => { onClose(); router.push('/streak'); }}>
-              <View style={styles.bigIcon}>
-                <Text style={styles.bigIconText}>🔥</Text>
-              </View>
-              <Text style={styles.iconLabel}>Racha</Text>
-            </TouchableOpacity>
-          </View>
+          <SidebarClanButton
+            clanId={user.clanId}
+            onPress={() => {
+              onClose();
+              router.push(`/clan/${clanRouteSlug}`);
+            }}
+          />
+          <FrasesButton
+            clanId={user.clanId}
+            onPress={() => {
+              onClose();
+              router.push('/frases');
+            }}
+          />
+          <RachaButton
+            clanId={user.clanId}
+            onPress={() => {
+              onClose();
+              router.push('/racha');
+            }}
+          />
           <View style={styles.footer}>
             <TouchableOpacity onPress={() => { onClose(); router.push('/profile'); }} style={styles.footerRow}>
               <View style={[styles.clanDot, { backgroundColor: evoconnColors.accent }]} />
@@ -238,11 +246,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   drawer: {
+    position: 'relative',
     width: '85%',
     maxWidth: 320,
     backgroundColor: '#000000',
     flex: 1,
     paddingTop: 48,
+    overflow: 'visible',
   },
   header: {
     flexDirection: 'row',
@@ -268,11 +278,7 @@ const styles = StyleSheet.create({
   menuRow: { paddingVertical: 12, paddingHorizontal: 16 },
   menuText: { color: evoconnColors.text, fontSize: 16 },
   sidebarLowerBlock: { flex: 1, minHeight: 0, marginTop: 8, paddingHorizontal: 10 },
-  iconsRow: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 20 },
-  bigIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: evoconnColors.card, alignItems: 'center', justifyContent: 'center' },
-  bigIconText: { fontSize: 24 },
   clanDot: { width: 32, height: 32, borderRadius: 16 },
-  iconLabel: { color: evoconnColors.muted, fontSize: 11, marginTop: 4, textAlign: 'center' },
   footer: { padding: 16 },
   footerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   username: { color: evoconnColors.text, fontWeight: '600', marginLeft: 8 },
