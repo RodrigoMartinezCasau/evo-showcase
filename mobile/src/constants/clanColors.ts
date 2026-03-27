@@ -1,3 +1,5 @@
+import { evoconnColors } from '../theme/colors';
+
 export type ClanId =
   | 'nihilista'
   | 'cientista'
@@ -34,6 +36,14 @@ export const CLAN_TO_BG_ASSET: Partial<Record<ClanId, number>> = {
 export function getClanColor(clanId: string | null | undefined): string {
   if (!clanId) return CLAN_TO_COLOR.nihilista;
   return (CLAN_TO_COLOR as Record<string, string>)[clanId] ?? CLAN_TO_COLOR.nihilista;
+}
+
+/** Color de la línea de clan en el footer del sidebar: Evocon (`neonGreen`) si aún no hay clan asignado. */
+export function getSidebarFooterClanLineColor(clanId: string | null | undefined): string {
+  if (clanId == null || String(clanId).trim() === '') {
+    return evoconnColors.neonGreen;
+  }
+  return getClanColor(clanId);
 }
 
 export function getClanBgAsset(clanId: string | null | undefined): number | undefined {

@@ -9,7 +9,6 @@ import {
   Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { evoconnColors } from '@evoconn/theme/colors';
 import { SIDEBAR_HEADER_LAYOUT as SH } from '@evoconn/constants/sidebarHeaderLayout';
 import { getStarByHouse, SIDEBAR_DEFAULT_STAR } from '@evoconn/utils/getSidebarStar';
 import {
@@ -33,10 +32,12 @@ import {
   getNewReflectionPngMenuConfig,
   getNewPhrasePngMenuConfig,
 } from './SidebarPngMenuButton';
-import { RankBadge } from './RankBadge';
 import { SidebarSearchBar } from './SidebarSearchBar';
 import { SidebarConversationsPanel } from './SidebarConversationsPanel';
 import { SidebarClanButton } from './SidebarClanButton';
+import { SidebarClanInsignia } from './SidebarClanInsignia';
+import { SidebarFooterProfileText } from './SidebarFooterProfileText';
+import { SidebarSettingsIcon } from './SidebarSettingsIcon';
 import { FrasesButton } from './FrasesButton';
 import { RachaButton } from './RachaButton';
 import type { ConversationItem as ConvItem } from '@evoconn/types';
@@ -218,21 +219,33 @@ export function SidebarDrawer({
               router.push('/racha');
             }}
           />
-          <View style={styles.footer}>
-            <TouchableOpacity onPress={() => { onClose(); router.push('/profile'); }} style={styles.footerRow}>
-              <View style={[styles.clanDot, { backgroundColor: evoconnColors.accent }]} />
-              <View>
-                <Text style={styles.username}>{user.username}</Text>
-                <Text style={styles.clanName}>{user.clanId ? user.clanId : 'Sin clan'}</Text>
-              </View>
-            </TouchableOpacity>
-            <View style={styles.rankRow}>
-              <RankBadge rank={user.rank} small />
-            </View>
-            <TouchableOpacity onPress={() => { onClose(); router.push('/settings'); }}>
-              <Text style={styles.settings}>⚙ Ajustes</Text>
-            </TouchableOpacity>
-          </View>
+          <SidebarClanInsignia
+            clanId={user.clanId}
+            onPress={() => {
+              onClose();
+              router.push('/profile');
+            }}
+          />
+          <SidebarFooterProfileText
+            username={user.username}
+            clanId={user.clanId}
+            rank={user.rank}
+            onPressProfile={() => {
+              onClose();
+              router.push('/profile');
+            }}
+            onPressClan={() => {
+              onClose();
+              router.push(`/clan/${clanRouteSlug}`);
+            }}
+          />
+          <SidebarSettingsIcon
+            onPress={() => {
+              onClose();
+              router.push('/settings');
+            }}
+          />
+          <View style={styles.footer} />
         </View>
       </Pressable>
     </Modal>
@@ -275,14 +288,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     alignItems: 'center',
   },
-  menuRow: { paddingVertical: 12, paddingHorizontal: 16 },
-  menuText: { color: evoconnColors.text, fontSize: 16 },
   sidebarLowerBlock: { flex: 1, minHeight: 0, marginTop: 8, paddingHorizontal: 10 },
-  clanDot: { width: 32, height: 32, borderRadius: 16 },
-  footer: { padding: 16 },
-  footerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  username: { color: evoconnColors.text, fontWeight: '600', marginLeft: 8 },
-  clanName: { color: evoconnColors.muted, fontSize: 12, marginLeft: 8 },
-  rankRow: { marginBottom: 8 },
-  settings: { color: evoconnColors.muted, fontSize: 14 },
+  footer: {},
 });
