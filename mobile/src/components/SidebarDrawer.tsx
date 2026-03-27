@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   Modal,
   Pressable,
   Image,
+  Animated,
+  Easing,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SIDEBAR_HEADER_LAYOUT as SH } from '@evoconn/constants/sidebarHeaderLayout';
@@ -69,6 +71,34 @@ export function SidebarDrawer({
   useEffect(() => {
     setConvState(conversations);
   }, [conversations]);
+
+  const anim = useRef(new Animated.Value(0)).current;
+  const [modalVisible, setModalVisible] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      anim.setValue(0);
+      setModalVisible(true);
+    } else if (modalVisible) {
+      Animated.timing(anim, {
+        toValue: 0,
+        duration: 260,
+        easing: Easing.inOut(Easing.cubic),
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished) setModalVisible(false);
+      });
+    }
+  }, [visible]);
+
+  const handleModalShow = () => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 280,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  };
   const starSource =
     user.clanId != null && user.clanId !== ''
       ? getStarByHouse(user.clanId)
@@ -84,10 +114,20 @@ export function SidebarDrawer({
     user.clanId != null && String(user.clanId).trim() !== ''
       ? String(user.clanId).trim().toLowerCase()
       : 'evocon';
+  const drawerTranslateX = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-340, 0],
+  });
+
   return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <View style={styles.drawer} onStartShouldSetResponder={() => true}>
+    <Modal visible={modalVisible} animationType="none" transparent onShow={handleModalShow}>
+      <View style={styles.overlayRoot}>
+        <Animated.View style={[styles.overlayBg, { opacity: anim }]} />
+        <Pressable style={StyleSheet.absoluteFillObject} onPress={onClose} />
+        <Animated.View
+          style={[styles.drawer, { transform: [{ translateX: drawerTranslateX }] }]}
+          onStartShouldSetResponder={() => true}
+        >
           <View
             style={[
               styles.header,
@@ -246,17 +286,20 @@ export function SidebarDrawer({
             }}
           />
           <View style={styles.footer} />
-        </View>
-      </Pressable>
+        </Animated.View>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
+  overlayRoot: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     flexDirection: 'row',
+  },
+  overlayBg: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   drawer: {
     position: 'relative',
