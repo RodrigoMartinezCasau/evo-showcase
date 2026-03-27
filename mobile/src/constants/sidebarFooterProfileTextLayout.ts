@@ -42,7 +42,7 @@ export const SIDEBAR_FOOTER_PROFILE_TEXT_LAYOUT = {
   SIDEBAR_FOOTER_PROFILE_TEXT_BLOCK_POS_Y: 40,
 
   /** Escala global del bloque: multiplica tamaños de fuente y offsets de cada línea. */
-  SIDEBAR_FOOTER_PROFILE_TEXT_BLOCK_SCALE: 1.4,
+  SIDEBAR_FOOTER_PROFILE_TEXT_BLOCK_SCALE: 1.2,
 
   // ── B) Línea 1 — nombre (sans, gris) ───────────────────────────────────────
   SIDEBAR_FOOTER_PROFILE_TEXT_LINE1_OFFSET_X: 0,
