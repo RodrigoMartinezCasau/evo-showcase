@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type ReactNode } from 'react';
 import {
   View,
   Text,
@@ -36,9 +36,7 @@ export type SidebarPngMenuButtonConfig = {
   textLetterSpacing: number;
 };
 
-/** Capa opcional (p. ej. "+" en Nueva reflexión): coordenadas en el mismo espacio que el área visible recortada del botón. */
-export type SidebarPngMenuButtonLeftOverlay = {
-  source: ImageSourcePropType;
+type SidebarPngMenuButtonLeftOverlayBase = {
   x: number;
   y: number;
   width: number;
@@ -46,6 +44,17 @@ export type SidebarPngMenuButtonLeftOverlay = {
   /** Opcional; 1 por defecto. Escala desde el centro del rect del overlay. */
   scale?: number;
 };
+
+/** Capa opcional (p. ej. "+" en Nueva reflexión): coordenadas en el mismo espacio que el área visible recortada del botón. */
+export type SidebarPngMenuButtonLeftOverlay =
+  | (SidebarPngMenuButtonLeftOverlayBase & {
+      source: ImageSourcePropType;
+      element?: undefined;
+    })
+  | (SidebarPngMenuButtonLeftOverlayBase & {
+      element: ReactNode;
+      source?: undefined;
+    });
 
 export function getCommunityPngMenuConfig(): SidebarPngMenuButtonConfig {
   return {
@@ -245,11 +254,15 @@ export function SidebarPngMenuButton({
                   transform: [{ scale: leftOverlay.scale ?? 1 }],
                 }}
               >
-                <Image
-                  source={leftOverlay.source}
-                  style={{ width: leftOverlay.width, height: leftOverlay.height }}
-                  resizeMode="contain"
-                />
+                {'source' in leftOverlay ? (
+                  <Image
+                    source={leftOverlay.source}
+                    style={{ width: leftOverlay.width, height: leftOverlay.height }}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  leftOverlay.element
+                )}
               </View>
             ) : null}
             <View

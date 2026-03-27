@@ -13,10 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 import { SIDEBAR_HEADER_LAYOUT as SH } from '@evoconn/constants/sidebarHeaderLayout';
 import { getStarByHouse, SIDEBAR_DEFAULT_STAR } from '@evoconn/utils/getSidebarStar';
-import {
-  getCommunityButtonByHouse,
-  SIDEBAR_COMMUNITY_MENU_STAR,
-} from '@evoconn/utils/getSidebarCommunityButton';
+import { getCommunityButtonByHouse } from '@evoconn/utils/getSidebarCommunityButton';
 import { SIDEBAR_COMMUNITY_LAYOUT as SCL } from '@evoconn/constants/sidebarCommunityLayout';
 import { getNewReflectionButtonByHouse } from '@evoconn/utils/getSidebarNewReflectionButton';
 import {
@@ -34,6 +31,7 @@ import {
   getNewReflectionPngMenuConfig,
   getNewPhrasePngMenuConfig,
 } from './SidebarPngMenuButton';
+import EstrellaComunidadSvg from '../assets/sidebar/estrellaComunidadSvg/estrellaComunidad.svg';
 import { SidebarSearchBar } from './SidebarSearchBar';
 import { SidebarConversationsPanel } from './SidebarConversationsPanel';
 import { SidebarClanButton } from './SidebarClanButton';
@@ -183,7 +181,12 @@ export function SidebarDrawer({
             accessibilityLabel="Comunidad"
             menuRowStyle={styles.communityMenuRow}
             leftOverlay={{
-              source: SIDEBAR_COMMUNITY_MENU_STAR,
+              element: (
+                <EstrellaComunidadSvg
+                  width={SCL.SIDEBAR_COMMUNITY_STAR_WIDTH}
+                  height={SCL.SIDEBAR_COMMUNITY_STAR_HEIGHT}
+                />
+              ),
               x: SCL.SIDEBAR_COMMUNITY_STAR_OFFSET_X,
               y: SCL.SIDEBAR_COMMUNITY_STAR_OFFSET_Y,
               width: SCL.SIDEBAR_COMMUNITY_STAR_WIDTH,

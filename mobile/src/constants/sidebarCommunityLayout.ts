@@ -39,10 +39,10 @@ export const SIDEBAR_COMMUNITY_LAYOUT = {
   SIDEBAR_COMMUNITY_TEXT_LETTER_SPACING: 0,
 
   /** Estrella fija a la izquierda del botón (misma capa absoluta que otros overlays del menú PNG). */
-  SIDEBAR_COMMUNITY_STAR_OFFSET_X: 6,
+  SIDEBAR_COMMUNITY_STAR_OFFSET_X: 8,
   SIDEBAR_COMMUNITY_STAR_OFFSET_Y: 20,
   SIDEBAR_COMMUNITY_STAR_WIDTH: 26,
   SIDEBAR_COMMUNITY_STAR_HEIGHT: 26,
   /** Escala uniforme de la estrella (1 = tamaño base según WIDTH/HEIGHT). */
-  SIDEBAR_COMMUNITY_STAR_SCALE: 1.8,
+  SIDEBAR_COMMUNITY_STAR_SCALE: 0.9,
 } as const;
