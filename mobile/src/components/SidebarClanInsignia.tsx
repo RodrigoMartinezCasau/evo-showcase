@@ -33,7 +33,6 @@ export function SidebarClanInsignia({ clanId, onPress }: SidebarClanInsigniaProp
         activeOpacity={0.88}
         accessibilityRole="button"
         accessibilityLabel="Perfil"
-        hitSlop={10}
         style={{ backgroundColor: 'transparent' }}
       >
         <Insignia

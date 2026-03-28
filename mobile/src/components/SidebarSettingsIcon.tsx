@@ -49,7 +49,7 @@ export function SidebarSettingsIcon({ onPress }: SidebarSettingsIconProps) {
         activeOpacity={0.88}
         accessibilityRole="button"
         accessibilityLabel="Ajustes"
-        hitSlop={10}
+        hitSlop={4}
         style={{ backgroundColor: 'transparent' }}
       >
         <SettingsSvg

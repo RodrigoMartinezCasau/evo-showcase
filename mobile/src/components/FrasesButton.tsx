@@ -45,37 +45,44 @@ export function FrasesButton({ clanId, onPress }: FrasesButtonProps) {
         position: 'absolute',
         left: L.FRASES_BUTTON_OFFSET_X,
         top: L.FRASES_BUTTON_OFFSET_Y,
+        width: outW,
+        height: outH,
         zIndex: 19,
       }}
     >
+      <View
+        pointerEvents="none"
+        style={{
+          width: outW,
+          height: outH,
+          overflow: 'hidden',
+          backgroundColor: 'transparent',
+        }}
+      >
+        <FrasesIcon
+          width={imgW * s * sc}
+          height={imgH * s * sc}
+          style={{
+            position: 'absolute',
+            left: (-cropL * s + centerOx) * sc,
+            top: (-cropT * s + centerOy) * sc,
+            backgroundColor: 'transparent',
+          }}
+        />
+      </View>
       <TouchableOpacity
         onPress={onPress}
         activeOpacity={0.88}
         accessibilityRole="button"
         accessibilityLabel="Frases"
-        hitSlop={8}
-        style={{ width: outW, height: outH }}
-      >
-        <View
-          style={{
-            width: outW,
-            height: outH,
-            overflow: 'hidden',
-            backgroundColor: 'transparent',
-          }}
-        >
-          <FrasesIcon
-            width={imgW * s * sc}
-            height={imgH * s * sc}
-            style={{
-              position: 'absolute',
-              left: (-cropL * s + centerOx) * sc,
-              top: (-cropT * s + centerOy) * sc,
-              backgroundColor: 'transparent',
-            }}
-          />
-        </View>
-      </TouchableOpacity>
+        style={{
+          position: 'absolute',
+          left: centerOx * sc,
+          top: centerOy * sc,
+          width: drawnW * sc,
+          height: drawnH * sc,
+        }}
+      />
     </View>
   );
 }

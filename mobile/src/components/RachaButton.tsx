@@ -45,37 +45,44 @@ export function RachaButton({ clanId, onPress }: RachaButtonProps) {
         position: 'absolute',
         left: L.RACHA_BUTTON_OFFSET_X,
         top: L.RACHA_BUTTON_OFFSET_Y,
+        width: outW,
+        height: outH,
         zIndex: 18,
       }}
     >
+      <View
+        pointerEvents="none"
+        style={{
+          width: outW,
+          height: outH,
+          overflow: 'hidden',
+          backgroundColor: 'transparent',
+        }}
+      >
+        <RachaIcon
+          width={imgW * s * sc}
+          height={imgH * s * sc}
+          style={{
+            position: 'absolute',
+            left: (-cropL * s + centerOx) * sc,
+            top: (-cropT * s + centerOy) * sc,
+            backgroundColor: 'transparent',
+          }}
+        />
+      </View>
       <TouchableOpacity
         onPress={onPress}
         activeOpacity={0.88}
         accessibilityRole="button"
         accessibilityLabel="Racha"
-        hitSlop={8}
-        style={{ width: outW, height: outH }}
-      >
-        <View
-          style={{
-            width: outW,
-            height: outH,
-            overflow: 'hidden',
-            backgroundColor: 'transparent',
-          }}
-        >
-          <RachaIcon
-            width={imgW * s * sc}
-            height={imgH * s * sc}
-            style={{
-              position: 'absolute',
-              left: (-cropL * s + centerOx) * sc,
-              top: (-cropT * s + centerOy) * sc,
-              backgroundColor: 'transparent',
-            }}
-          />
-        </View>
-      </TouchableOpacity>
+        style={{
+          position: 'absolute',
+          left: centerOx * sc,
+          top: centerOy * sc,
+          width: drawnW * sc,
+          height: drawnH * sc,
+        }}
+      />
     </View>
   );
 }
