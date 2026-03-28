@@ -21,7 +21,7 @@ export const TOP_BAR_LAYOUT = {
    * Positivo = hacia abajo, negativo = hacia arriba.
    * No altera `PER_ITEM_OFFSETS` ni gaps: solo mueve el bloque entero como una unidad.
    */
-  TOPBAR_WHOLE_SHIFT_Y: 12,
+  TOPBAR_WHOLE_SHIFT_Y: 14,
 
   TOPBAR_PADDING_HORIZONTAL: 15,
   TOPBAR_PADDING_BOTTOM: 10,
@@ -90,7 +90,7 @@ export const TOP_BAR_ICON_EDITOR: Record<
   shield: { offsetX: -35, offsetY: -1, scale: 1 },
   clanLabel: { offsetX: -30, offsetY: 0, scale: 1.2 },
   pencilIcon: { offsetX: -62, offsetY: -9, scale: 2 },
-  pencilText: { offsetX: -43, offsetY: 0, scale: 1.2 },
+  pencilText: { offsetX: -45, offsetY: 0, scale: 1.2 },
   fireIcon: { offsetX: -35, offsetY: -11, scale: 2.2 },
   fireText: { offsetX: -20, offsetY: 0, scale: 1.2 },
   heartIcon: { offsetX: -5, offsetY: -14, scale: 2 },

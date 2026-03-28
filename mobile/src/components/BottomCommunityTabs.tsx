@@ -1,11 +1,14 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getSidebarFooterClanLineColor } from '@evoconn/constants/clanColors';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
-import { bottomBarIcons } from '@evoconn/assets/icons/bottomBar';
 import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
+import {
+  BOTTOM_BAR_DEFAULT_LUPITA,
+  getBottomBarLupitaByHouse,
+} from '@evoconn/utils/getBottomBarLupitaByHouse';
 
 const TABS = [
   { id: 'siguiendo', label: 'SIGUIENDO' },
@@ -24,6 +27,18 @@ type BottomCommunityTabsProps = {
 export function BottomCommunityTabs({ activeTab, onTabChange }: BottomCommunityTabsProps) {
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const selectedColor = getSidebarFooterClanLineColor(activeClan);
+  const LupitaIcon = useMemo(() => {
+    if (activeTab !== 'search') {
+      return BOTTOM_BAR_DEFAULT_LUPITA;
+    }
+    return getBottomBarLupitaByHouse(activeClan);
+  }, [activeTab, activeClan]);
+  const lupEd = BOTTOM_BAR_LAYOUT.BOTTOM_BAR_LUPITA_EDITOR;
+  const lupitaPx = Math.round(
+    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SEARCH_ICON_SIZE *
+      BOTTOM_BAR_LAYOUT.SEARCH_ICON_FRAME_SCALE *
+      lupEd.scale
+  );
 
   return (
     <View style={styles.bar}>
@@ -42,24 +57,13 @@ export function BottomCommunityTabs({ activeTab, onTabChange }: BottomCommunityT
               style={[
                 styles.searchFrame,
                 {
-                  width: Math.round(
-                    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SEARCH_ICON_SIZE * BOTTOM_BAR_LAYOUT.SEARCH_ICON_FRAME_SCALE
-                  ),
-                  height: Math.round(
-                    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SEARCH_ICON_SIZE * BOTTOM_BAR_LAYOUT.SEARCH_ICON_FRAME_SCALE
-                  ),
-                  transform: [
-                    { translateX: BOTTOM_BAR_LAYOUT.SEARCH_ICON_OFFSET_X },
-                    { translateY: BOTTOM_BAR_LAYOUT.SEARCH_ICON_OFFSET_Y },
-                  ],
+                  width: lupitaPx,
+                  height: lupitaPx,
+                  transform: [{ translateX: lupEd.offsetX }, { translateY: lupEd.offsetY }],
                 },
               ]}
             >
-              <Image
-                source={activeTab === 'search' ? bottomBarIcons.searchActive : bottomBarIcons.searchInactive}
-                style={styles.searchIcon}
-                resizeMode="contain"
-              />
+              <LupitaIcon width={lupitaPx} height={lupitaPx} />
             </View>
           ) : (
             <Text style={[styles.label, activeTab === tab.id && { color: selectedColor }]}>{tab.label}</Text>
@@ -82,5 +86,4 @@ const styles = StyleSheet.create({
   tabActiveUnderline: { borderBottomWidth: 2 },
   label: { color: evoconnColors.muted, fontSize: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_TAB_TEXT_SIZE, fontWeight: '600' },
   searchFrame: { alignItems: 'center', justifyContent: 'center' },
-  searchIcon: { width: '100%', height: '100%' },
 });

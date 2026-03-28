@@ -18,14 +18,20 @@ export const BOTTOM_BAR_LAYOUT = {
   /** Tamaño de fuente de las 3 pestañas de texto (activa e inactiva). */
   BOTTOM_BAR_TAB_TEXT_SIZE: 14,
 
-  // ----- Icono búsqueda (lupa) -----
-  /** Tamaño base (px) del marco de la lupa; se multiplica por SEARCH_ICON_FRAME_SCALE. */
+  // ----- Icono búsqueda (lupa, SVG por clan) -----
+  /** Tamaño base (px) del marco de la lupa; se multiplica por SEARCH_ICON_FRAME_SCALE y por `BOTTOM_BAR_LUPITA_EDITOR.scale`. */
   BOTTOM_BAR_SEARCH_ICON_SIZE: 20,
 
-  /** Per-icon scaling (for PNGs with transparent padding). */
+  /** Escala base del asset (padding transparente del SVG). */
   SEARCH_ICON_FRAME_SCALE: 1.0,
 
-  /** Fine-tune search icon relative position (px). */
-  SEARCH_ICON_OFFSET_X: -10,
-  SEARCH_ICON_OFFSET_Y: -2,
+  /**
+   * Editor independiente: solo la lupa (no afecta a SIGUIENDO / MÁS VOTADAS / PARA TI).
+   * Valores iniciales = offsets que antes eran SEARCH_ICON_OFFSET_*.
+   */
+  BOTTOM_BAR_LUPITA_EDITOR: {
+    offsetX: -10,
+    offsetY: -2,
+    scale: 1,
+  },
 } as const;

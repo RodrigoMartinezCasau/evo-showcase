@@ -152,8 +152,15 @@ export default function CommunityScreen() {
 
   const handleTabChange = useCallback(
     (tab: string) => {
-      if (tab === 'search') return;
       const tabId = tab as TabId;
+
+      if (tabId === 'search') {
+        if (detailFeed) {
+          closeDetailFeed();
+        }
+        setActiveTab('search');
+        return;
+      }
 
       if (tabId === 'para-ti') {
         openDetailFeed('foryou');

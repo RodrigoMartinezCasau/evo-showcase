@@ -97,7 +97,10 @@ export default function DetailFeedScreen() {
 
   const handleTabChange = useCallback(
     (tab: string) => {
-      if (tab === 'search') return;
+      if (tab === 'search') {
+        router.replace('/(tabs)');
+        return;
+      }
       const newMode: FeedMode =
         tab === 'siguiendo' ? 'following' : tab === 'mas-votadas' ? 'top' : 'foryou';
 
