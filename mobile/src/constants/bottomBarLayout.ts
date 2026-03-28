@@ -18,6 +18,20 @@ export const BOTTOM_BAR_LAYOUT = {
   /** Tamaño de fuente de las 3 pestañas de texto (activa e inactiva). */
   BOTTOM_BAR_TAB_TEXT_SIZE: 14,
 
+  // ----- Línea bajo tab activa -----
+  /** Grosor de la línea (px). */
+  BOTTOM_BAR_UNDERLINE_THICKNESS: 2,
+  /**
+   * Largo de la línea (px). `null` = todo el ancho de la columna de esa tab (como hasta ahora).
+   * Solo afecta a SIGUIENDO / MÁS VOTADAS / PARA TI.
+   */
+  BOTTOM_BAR_UNDERLINE_WIDTH_TEXT: 80,
+  /**
+   * Largo de la línea bajo la lupa (px). `null` = ancho completo de la columna.
+   * Pon un valor cercano al tamaño del icono (p. ej. 20–28) para que no sobresalga.
+   */
+  BOTTOM_BAR_UNDERLINE_WIDTH_SEARCH: 60,
+
   // ----- Icono búsqueda (lupa, SVG por clan) -----
   /** Tamaño base (px) del marco de la lupa; se multiplica por SEARCH_ICON_FRAME_SCALE y por `BOTTOM_BAR_LUPITA_EDITOR.scale`. */
   BOTTOM_BAR_SEARCH_ICON_SIZE: 20,
@@ -33,5 +47,13 @@ export const BOTTOM_BAR_LAYOUT = {
     offsetX: -10,
     offsetY: -2,
     scale: 1,
+  },
+
+  /**
+   * Solo la línea bajo la lupa: posición horizontal relativa (px).
+   * Positivo = derecha, negativo = izquierda. No afecta a SIGUIENDO / MÁS VOTADAS / PARA TI.
+   */
+  BOTTOM_BAR_LUPITA_UNDERLINE_EDITOR: {
+    offsetX: -10,
   },
 } as const;

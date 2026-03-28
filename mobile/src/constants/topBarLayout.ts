@@ -24,7 +24,7 @@ export const TOP_BAR_LAYOUT = {
   TOPBAR_WHOLE_SHIFT_Y: 14,
 
   TOPBAR_PADDING_HORIZONTAL: 15,
-  TOPBAR_PADDING_BOTTOM: 10,
+  TOPBAR_PADDING_BOTTOM: 15,
 
   // Minimum height excluding safe-area paddingTop
   TOPBAR_MIN_HEIGHT: -50,

@@ -24,6 +24,12 @@ type BottomCommunityTabsProps = {
   onTabChange: (tab: TabId) => void;
 };
 
+function underlineWidthForTab(tabId: TabId): number | null {
+  return tabId === 'search'
+    ? BOTTOM_BAR_LAYOUT.BOTTOM_BAR_UNDERLINE_WIDTH_SEARCH
+    : BOTTOM_BAR_LAYOUT.BOTTOM_BAR_UNDERLINE_WIDTH_TEXT;
+}
+
 export function BottomCommunityTabs({ activeTab, onTabChange }: BottomCommunityTabsProps) {
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const selectedColor = getSidebarFooterClanLineColor(activeClan);
@@ -42,34 +48,61 @@ export function BottomCommunityTabs({ activeTab, onTabChange }: BottomCommunityT
 
   return (
     <View style={styles.bar}>
-      {TABS.map((tab) => (
-        <TouchableOpacity
-          key={tab.id}
-          onPress={() => onTabChange(tab.id)}
-          style={[
-            styles.tab,
-            activeTab === tab.id && styles.tabActiveUnderline,
-            activeTab === tab.id && { borderBottomColor: selectedColor },
-          ]}
-        >
-          {tab.id === 'search' ? (
-            <View
-              style={[
-                styles.searchFrame,
-                {
-                  width: lupitaPx,
-                  height: lupitaPx,
-                  transform: [{ translateX: lupEd.offsetX }, { translateY: lupEd.offsetY }],
-                },
-              ]}
-            >
-              <LupitaIcon width={lupitaPx} height={lupitaPx} />
-            </View>
-          ) : (
-            <Text style={[styles.label, activeTab === tab.id && { color: selectedColor }]}>{tab.label}</Text>
-          )}
-        </TouchableOpacity>
-      ))}
+      {TABS.map((tab) => {
+        const isActive = activeTab === tab.id;
+        const uw = underlineWidthForTab(tab.id);
+        const th = BOTTOM_BAR_LAYOUT.BOTTOM_BAR_UNDERLINE_THICKNESS;
+        const lupUnderlineShiftX =
+          tab.id === 'search' ? BOTTOM_BAR_LAYOUT.BOTTOM_BAR_LUPITA_UNDERLINE_EDITOR.offsetX : 0;
+        return (
+          <TouchableOpacity
+            key={tab.id}
+            onPress={() => onTabChange(tab.id)}
+            style={styles.tab}
+          >
+            {tab.id === 'search' ? (
+              <View
+                style={[
+                  styles.searchFrame,
+                  {
+                    width: lupitaPx,
+                    height: lupitaPx,
+                    transform: [{ translateX: lupEd.offsetX }, { translateY: lupEd.offsetY }],
+                  },
+                ]}
+              >
+                <LupitaIcon width={lupitaPx} height={lupitaPx} />
+              </View>
+            ) : (
+              <Text style={[styles.label, isActive && { color: selectedColor }]}>{tab.label}</Text>
+            )}
+            {isActive && (
+              <View
+                style={[
+                  styles.tabUnderline,
+                  uw == null
+                    ? {
+                        left: 0,
+                        right: 0,
+                        backgroundColor: selectedColor,
+                        height: th,
+                        ...(lupUnderlineShiftX !== 0
+                          ? { transform: [{ translateX: lupUnderlineShiftX }] }
+                          : {}),
+                      }
+                    : {
+                        width: uw,
+                        height: th,
+                        backgroundColor: selectedColor,
+                        left: '50%',
+                        marginLeft: -uw / 2 + lupUnderlineShiftX,
+                      },
+                ]}
+              />
+            )}
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 }
@@ -82,8 +115,8 @@ const styles = StyleSheet.create({
     backgroundColor: evoconnColors.background,
     paddingVertical: 8,
   },
-  tab: { flex: 1, alignItems: 'center', paddingVertical: 6 },
-  tabActiveUnderline: { borderBottomWidth: 2 },
+  tab: { flex: 1, alignItems: 'center', paddingVertical: 6, position: 'relative' },
+  tabUnderline: { position: 'absolute', bottom: 0 },
   label: { color: evoconnColors.muted, fontSize: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_TAB_TEXT_SIZE, fontWeight: '600' },
   searchFrame: { alignItems: 'center', justifyContent: 'center' },
 });
