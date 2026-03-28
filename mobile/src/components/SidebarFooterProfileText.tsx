@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { SIDEBAR_CLAN_INSIGNIA_LAYOUT as INS } from '@evoconn/constants/sidebarClanInsigniaLayout';
 import { SIDEBAR_FOOTER_PROFILE_TEXT_LAYOUT as L } from '@evoconn/constants/sidebarFooterProfileTextLayout';
@@ -62,6 +62,32 @@ export function SidebarFooterProfileText({
   const clanLine = useMemo(() => formatClanLine(clanId), [clanId]);
   const clanColor = useMemo(() => getSidebarFooterClanLineColor(clanId), [clanId]);
   const rankLine = RANK_LABEL[rank] ?? rank.toUpperCase();
+  const clanTextEditor = {
+    offsetX: L.SIDEBAR_FOOTER_PROFILE_TEXT_CLAN_LINE_EDITOR_OFFSET_X,
+    offsetY: L.SIDEBAR_FOOTER_PROFILE_TEXT_CLAN_LINE_EDITOR_OFFSET_Y,
+    scale: L.SIDEBAR_FOOTER_PROFILE_TEXT_CLAN_LINE_EDITOR_SCALE,
+  };
+
+  /** Ancho del texto sin `scale`; corrige el anclaje porque RN escala respecto al centro del layout. */
+  const [clanTextLayoutW, setClanTextLayoutW] = useState(0);
+
+  const clanLineTransform = useMemo(() => {
+    const s = clanTextEditor.scale;
+    const w = clanTextLayoutW;
+    const fixX = w > 0 ? (w * (s - 1)) / 2 : 0;
+    return [
+      { translateX: clanTextEditor.offsetX * bs },
+      { translateY: clanTextEditor.offsetY * bs },
+      { scale: s },
+      { translateX: fixX },
+    ];
+  }, [
+    bs,
+    clanTextEditor.offsetX,
+    clanTextEditor.offsetY,
+    clanTextEditor.scale,
+    clanTextLayoutW,
+  ]);
 
   const serif = { fontFamily: INRIA_SERIF_FONT_FAMILY };
 
@@ -101,31 +127,44 @@ export function SidebarFooterProfileText({
         </Text>
       </TouchableOpacity>
 
-      <TouchableOpacity
-        onPress={onPressClan}
-        activeOpacity={0.85}
-        accessibilityRole="button"
-        accessibilityLabel="Clan"
-        hitSlop={6}
-        style={{
-          marginLeft: L.SIDEBAR_FOOTER_PROFILE_TEXT_LINE2_OFFSET_X * bs,
-          marginTop: L.SIDEBAR_FOOTER_PROFILE_TEXT_LINE2_OFFSET_Y * bs,
-        }}
+      <View
+        style={[
+          styles.clanLineRowShell,
+          {
+            marginLeft: L.SIDEBAR_FOOTER_PROFILE_TEXT_LINE2_OFFSET_X * bs,
+            marginTop: L.SIDEBAR_FOOTER_PROFILE_TEXT_LINE2_OFFSET_Y * bs,
+          },
+        ]}
       >
-        <Text
-          style={[
-            styles.lineSerif,
-            serif,
-            {
-              fontSize: L.SIDEBAR_FOOTER_PROFILE_TEXT_LINE2_FONT_SIZE * bs,
-              color: clanColor,
-            },
-          ]}
-          numberOfLines={1}
-        >
-          {clanLine}
-        </Text>
-      </TouchableOpacity>
+        <View style={[styles.clanLineTransformWrap, { transform: clanLineTransform }]}>
+          <TouchableOpacity
+            onPress={onPressClan}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Clan"
+            hitSlop={6}
+            style={styles.clanLinePressable}
+          >
+            <Text
+              onLayout={(e) => {
+                const w = e.nativeEvent.layout.width;
+                if (w > 0) setClanTextLayoutW(w);
+              }}
+              style={[
+                styles.lineSerif,
+                styles.clanLineText,
+                serif,
+                {
+                  fontSize: L.SIDEBAR_FOOTER_PROFILE_TEXT_LINE2_FONT_SIZE * bs,
+                  color: clanColor,
+                },
+              ]}
+            >
+              {clanLine}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       <TouchableOpacity
         onPress={onPressProfile}
@@ -160,8 +199,23 @@ const styles = StyleSheet.create({
   wrap: {
     position: 'absolute',
     zIndex: 17,
-    maxWidth: 200,
     backgroundColor: 'transparent',
+    alignItems: 'flex-start',
+    maxWidth: '100%',
+  },
+  clanLineRowShell: {
+    alignSelf: 'flex-start',
+    width: '100%',
+  },
+  clanLineTransformWrap: {
+    alignSelf: 'flex-start',
+  },
+  clanLinePressable: {
+    alignSelf: 'flex-start',
+  },
+  clanLineText: {
+    textAlign: 'left',
+    flexShrink: 0,
   },
   line1: {
     fontWeight: '700',

@@ -43,6 +43,7 @@ import { RachaButton } from './RachaButton';
 import type { ConversationItem as ConvItem } from '@evoconn/types';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { mockSidebarFolders } from '@evoconn/data/mockSidebarFolders';
+import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 
 type SidebarDrawerProps = {
   visible: boolean;
@@ -60,7 +61,8 @@ export function SidebarDrawer({
   searchQuery: _searchQuery = '',
 }: SidebarDrawerProps) {
   const router = useRouter();
-  const user = mockCurrentUser;
+  const activeClan = useActiveClan(mockCurrentUser.clanId);
+  const user = { ...mockCurrentUser, clanId: activeClan };
   const closeSidebar = onClose;
   const [drawerSearch, setDrawerSearch] = useState('');
   const [convState, setConvState] = useState(conversations);

@@ -3,15 +3,15 @@ import type { StyleProp, ViewStyle } from 'react-native';
 
 import type { ClanId } from '@evoconn/constants/clanColors';
 
-import Svg111 from '../assets/sidebar/rachaButtonSvg/111.svg';
-import Svg112 from '../assets/sidebar/rachaButtonSvg/112.svg';
-import Svg113 from '../assets/sidebar/rachaButtonSvg/113.svg';
-import Svg114 from '../assets/sidebar/rachaButtonSvg/114.svg';
-import Svg115 from '../assets/sidebar/rachaButtonSvg/115.svg';
-import Svg116 from '../assets/sidebar/rachaButtonSvg/116.svg';
-import Svg117 from '../assets/sidebar/rachaButtonSvg/117.svg';
-import Svg118 from '../assets/sidebar/rachaButtonSvg/118.svg';
-import Svg119 from '../assets/sidebar/rachaButtonSvg/119.svg';
+import Svg111 from '../assets/sidebar/iconoFueguitoSvg/111.svg';
+import Svg112 from '../assets/sidebar/iconoFueguitoSvg/112.svg';
+import Svg113 from '../assets/sidebar/iconoFueguitoSvg/113.svg';
+import Svg114 from '../assets/sidebar/iconoFueguitoSvg/114.svg';
+import Svg115 from '../assets/sidebar/iconoFueguitoSvg/115.svg';
+import Svg116 from '../assets/sidebar/iconoFueguitoSvg/116.svg';
+import Svg117 from '../assets/sidebar/iconoFueguitoSvg/117.svg';
+import Svg118 from '../assets/sidebar/iconoFueguitoSvg/118.svg';
+import Svg119 from '../assets/sidebar/iconoFueguitoSvg/119.svg';
 
 export type SidebarRachaSvgProps = {
   width?: number;
@@ -20,7 +20,7 @@ export type SidebarRachaSvgProps = {
 };
 
 /**
- * Botón RACHA (SVG 111–119, carpeta `Boton racha 2`). Mismo orden de clanes que 129–137.
+ * Botón RACHA (SVG 111–119, carpeta `iconoFueguitoSvg` / icono fueguito). Mismo orden de clanes que 129–137.
  */
 const RACHA_BUTTON_BY_CLAN: Record<ClanId, FC<SidebarRachaSvgProps>> = {
   racionalista: Svg112,

@@ -11,7 +11,8 @@ export type ClanId =
   | 'racionalista';
 
 export const CLAN_TO_COLOR: Record<ClanId, string> = {
-  nihilista: '#0E0E12',
+  /** Acento legible sobre fondo oscuro (mismo token que `evoconnColors.accent` / cards nihilista). */
+  nihilista: evoconnColors.accent,
   cientista: '#50D6D3',
   // Estoicos = olive green (not gray)
   estoico: '#7B8342',
@@ -49,6 +50,31 @@ export function getSidebarFooterClanLineColor(clanId: string | null | undefined)
 export function getClanBgAsset(clanId: string | null | undefined): number | undefined {
   if (!clanId) return undefined;
   return (CLAN_TO_BG_ASSET as Record<string, number | undefined>)[clanId];
+}
+
+/**
+ * Tinte del icono de estrellas en la barra superior (mapping explícito; no deriva de `CLAN_TO_COLOR`).
+ */
+export const CLAN_TO_TOP_BAR_STAR_COLOR: Record<ClanId, string> = {
+  nihilista: '#D6CBB3',
+  racionalista: '#4A6CFF',
+  estoico: '#8A9A5B',
+  humanista: '#F2C94C',
+  existencialista: '#E74C3C',
+  trascendentalista: '#A66DD4',
+  cientista: '#4FD1C5',
+  realista: '#B0B0B0',
+};
+
+/** Sin clan / Evocon — mismo verde lima que `evoconnColors.neonGreen`. */
+export const TOP_BAR_STAR_DEFAULT_COLOR = evoconnColors.neonGreen;
+
+export function getTopBarStarColor(clanId: string | null | undefined): string {
+  if (clanId == null || String(clanId).trim() === '') {
+    return TOP_BAR_STAR_DEFAULT_COLOR;
+  }
+  const key = clanId.trim().toLowerCase();
+  return (CLAN_TO_TOP_BAR_STAR_COLOR as Record<string, string>)[key] ?? TOP_BAR_STAR_DEFAULT_COLOR;
 }
 
 // Debug: expose mapping once in Metro logs so you can verify.

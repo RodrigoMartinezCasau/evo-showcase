@@ -5,11 +5,13 @@ import { evoconnColors } from '@evoconn/theme/colors';
 import { mockCurrentUser, mockUserStats } from '@evoconn/data/mockUser';
 import { AppTopBar, RankBadge, ClanBanner } from '@evoconn/components';
 import { getClanCardColor } from '@evoconn/theme/theme';
+import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 
 export default function ProfileScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const isOwn = !id || id === mockCurrentUser.id;
-  const user = mockCurrentUser;
+  const activeClan = useActiveClan(mockCurrentUser.clanId);
+  const user = { ...mockCurrentUser, clanId: activeClan };
   const stats = mockUserStats;
   const clanColor = getClanCardColor(user.clanId);
 

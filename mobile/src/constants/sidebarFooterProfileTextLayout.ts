@@ -55,6 +55,16 @@ export const SIDEBAR_FOOTER_PROFILE_TEXT_LAYOUT = {
   SIDEBAR_FOOTER_PROFILE_TEXT_LINE2_OFFSET_Y: 4,
   SIDEBAR_FOOTER_PROFILE_TEXT_LINE2_FONT_SIZE: 13,
 
+  /**
+   * Editor independiente: SOLO el texto del clan (línea 2).
+   * Se aplica con `transform` sobre esa fila; no afecta usuario, rango ni insignia.
+   * Los offsets se multiplican por `BLOCK_SCALE` igual que los márgenes de línea.
+   */
+  SIDEBAR_FOOTER_PROFILE_TEXT_CLAN_LINE_EDITOR_OFFSET_X: -5,
+  SIDEBAR_FOOTER_PROFILE_TEXT_CLAN_LINE_EDITOR_OFFSET_Y: 0,
+  /** 1 = sin escala extra (no multiplica `BLOCK_SCALE`). */
+  SIDEBAR_FOOTER_PROFILE_TEXT_CLAN_LINE_EDITOR_SCALE: 0.7,
+
   // ── D) Línea 3 — rango (Inria Serif, blanco) ───────────────────────────────
   SIDEBAR_FOOTER_PROFILE_TEXT_LINE3_OFFSET_X: 0,
   SIDEBAR_FOOTER_PROFILE_TEXT_LINE3_OFFSET_Y: 2,

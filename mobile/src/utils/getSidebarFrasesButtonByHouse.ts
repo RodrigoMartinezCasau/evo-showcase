@@ -3,15 +3,15 @@ import type { StyleProp, ViewStyle } from 'react-native';
 
 import type { ClanId } from '@evoconn/constants/clanColors';
 
-import Svg102 from '../assets/sidebar/frasesButtonSvg/102.svg';
-import Svg103 from '../assets/sidebar/frasesButtonSvg/103.svg';
-import Svg104 from '../assets/sidebar/frasesButtonSvg/104.svg';
-import Svg105 from '../assets/sidebar/frasesButtonSvg/105.svg';
-import Svg106 from '../assets/sidebar/frasesButtonSvg/106.svg';
-import Svg107 from '../assets/sidebar/frasesButtonSvg/107.svg';
-import Svg108 from '../assets/sidebar/frasesButtonSvg/108.svg';
-import Svg109 from '../assets/sidebar/frasesButtonSvg/109.svg';
-import Svg110 from '../assets/sidebar/frasesButtonSvg/110.svg';
+import Svg102 from '../assets/sidebar/iconoLapizSvg/102.svg';
+import Svg103 from '../assets/sidebar/iconoLapizSvg/103.svg';
+import Svg104 from '../assets/sidebar/iconoLapizSvg/104.svg';
+import Svg105 from '../assets/sidebar/iconoLapizSvg/105.svg';
+import Svg106 from '../assets/sidebar/iconoLapizSvg/106.svg';
+import Svg107 from '../assets/sidebar/iconoLapizSvg/107.svg';
+import Svg108 from '../assets/sidebar/iconoLapizSvg/108.svg';
+import Svg109 from '../assets/sidebar/iconoLapizSvg/109.svg';
+import Svg110 from '../assets/sidebar/iconoLapizSvg/110.svg';
 
 export type SidebarFrasesSvgProps = {
   width?: number;
@@ -20,7 +20,7 @@ export type SidebarFrasesSvgProps = {
 };
 
 /**
- * Botón FRASES (SVG por clan, archivos 102–110 en `Boton frases 2`).
+ * Botón FRASES (SVG por clan, archivos 102–110 en `iconoLapizSvg` / ICONO LAPIZ).
  * Mismo criterio de ids que el botón CLAN (129–137).
  */
 const FRASES_BUTTON_BY_CLAN: Record<ClanId, FC<SidebarFrasesSvgProps>> = {
