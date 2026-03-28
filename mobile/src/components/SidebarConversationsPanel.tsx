@@ -122,6 +122,10 @@ export function SidebarConversationsPanel({
           },
         },
         {
+          text: item.isFavorite ? 'Quitar de favoritos' : 'Marcar como favorito',
+          onPress: () => toggleFavorite(item.id),
+        },
+        {
           text: 'Añadir a carpeta',
           onPress: () => {
             if (folders.length === 0) {
@@ -167,7 +171,7 @@ export function SidebarConversationsPanel({
         { text: 'Cancelar', style: 'cancel' },
       ]);
     },
-    [conversations, folders, onConversationsChange, deleteConv]
+    [conversations, folders, onConversationsChange, deleteConv, toggleFavorite]
   );
 
   const createFolderAndAssign = useCallback(() => {
@@ -187,7 +191,7 @@ export function SidebarConversationsPanel({
 
   const rowH = Math.max(
     L.SIDEBAR_CONVERSATIONS_ITEM_TEXT_HEIGHT,
-    L.SIDEBAR_CONVERSATIONS_STAR_SIZE + L.SIDEBAR_CONVERSATIONS_STAR_OFFSET_Y
+    L.SIDEBAR_CONVERSATIONS_PENCIL_SIZE + L.SIDEBAR_CONVERSATIONS_PENCIL_OFFSET_Y
   );
 
   return (
@@ -508,34 +512,10 @@ export function SidebarConversationsPanel({
                           marginRight: L.SIDEBAR_CONVERSATIONS_ICONS_STRIP_MARGIN_END,
                           paddingTop:
                             L.SIDEBAR_CONVERSATIONS_ITEM_OFFSET_Y +
-                            Math.min(
-                              L.SIDEBAR_CONVERSATIONS_STAR_OFFSET_Y,
-                              L.SIDEBAR_CONVERSATIONS_PENCIL_OFFSET_Y
-                            ),
-                          gap: L.SIDEBAR_CONVERSATIONS_ICONS_INNER_GAP_X,
+                            L.SIDEBAR_CONVERSATIONS_PENCIL_OFFSET_Y,
                         },
                       ]}
                     >
-                      <TouchableOpacity
-                        style={[
-                          styles.iconHit,
-                          {
-                            width: L.SIDEBAR_CONVERSATIONS_STAR_SIZE,
-                            height: L.SIDEBAR_CONVERSATIONS_STAR_SIZE,
-                          },
-                        ]}
-                        onPress={() => toggleFavorite(item.id)}
-                        hitSlop={6}
-                      >
-                        <Text
-                          style={[
-                            styles.iconText,
-                            { fontSize: L.SIDEBAR_CONVERSATIONS_STAR_SIZE * 0.68 },
-                          ]}
-                        >
-                          {item.isFavorite ? '★' : '☆'}
-                        </Text>
-                      </TouchableOpacity>
                       <TouchableOpacity
                         style={[
                           styles.iconHit,

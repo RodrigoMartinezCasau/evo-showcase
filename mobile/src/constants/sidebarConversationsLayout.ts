@@ -85,19 +85,21 @@ export const SIDEBAR_CONVERSATIONS_LAYOUT = {
   /** Hueco horizontal entre el título y la franja de iconos (fila flex). */
   SIDEBAR_CONVERSATIONS_TITLE_ICONS_GAP_X: 6,
   /**
-   * Desplaza la franja (estrella + lápiz) hacia la izquierda respecto al borde derecho de la fila.
+   * Desplaza la franja del lápiz hacia la izquierda respecto al borde derecho de la fila.
    * Valores mayores = más a la izquierda (más hueco respecto al borde del viewport).
    */
   SIDEBAR_CONVERSATIONS_ICONS_STRIP_MARGIN_END: 34,
-  /** Separación entre estrella y lápiz (más negativo = más juntos; más positivo = más separados). */
+  /** Reservado; la fila solo muestra el lápiz (favorito va en su menú). */
   SIDEBAR_CONVERSATIONS_ICONS_INNER_GAP_X: -2,
 
-  /** Ajuste vertical fino de la franja de iconos respecto al título (fila flex). */
+  /** Referencia histórica (estrella retirada de la fila). */
   SIDEBAR_CONVERSATIONS_STAR_OFFSET_Y: -4,
-  SIDEBAR_CONVERSATIONS_PENCIL_OFFSET_Y: 2,
+  /** Ajuste vertical fino del lápiz respecto al título (fila flex). */
+  SIDEBAR_CONVERSATIONS_PENCIL_OFFSET_Y: -5,
 
+  /** Referencia histórica (estrella retirada de la fila). */
   SIDEBAR_CONVERSATIONS_STAR_SIZE: 20,
-  SIDEBAR_CONVERSATIONS_PENCIL_SIZE: 20,
+  SIDEBAR_CONVERSATIONS_PENCIL_SIZE: 23,
 
   /**
    * Referencia histórica (layout absoluto). La lista usa fila flex; no se leen en `SidebarConversationsPanel`.
