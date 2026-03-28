@@ -1,6 +1,9 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { evoconnColors } from '@evoconn/theme/colors';
+import { getSidebarFooterClanLineColor } from '@evoconn/constants/clanColors';
+import { mockCurrentUser } from '@evoconn/data/mockUser';
+import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { bottomBarIcons } from '@evoconn/assets/icons/bottomBar';
 import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
 
@@ -19,13 +22,20 @@ type BottomCommunityTabsProps = {
 };
 
 export function BottomCommunityTabs({ activeTab, onTabChange }: BottomCommunityTabsProps) {
+  const activeClan = useActiveClan(mockCurrentUser.clanId);
+  const selectedColor = getSidebarFooterClanLineColor(activeClan);
+
   return (
     <View style={styles.bar}>
       {TABS.map((tab) => (
         <TouchableOpacity
           key={tab.id}
           onPress={() => onTabChange(tab.id)}
-          style={[styles.tab, activeTab === tab.id && styles.tabActive]}
+          style={[
+            styles.tab,
+            activeTab === tab.id && styles.tabActiveUnderline,
+            activeTab === tab.id && { borderBottomColor: selectedColor },
+          ]}
         >
           {tab.id === 'search' ? (
             <View
@@ -52,7 +62,7 @@ export function BottomCommunityTabs({ activeTab, onTabChange }: BottomCommunityT
               />
             </View>
           ) : (
-            <Text style={[styles.label, activeTab === tab.id && styles.labelActive]}>{tab.label}</Text>
+            <Text style={[styles.label, activeTab === tab.id && { color: selectedColor }]}>{tab.label}</Text>
           )}
         </TouchableOpacity>
       ))}
@@ -69,9 +79,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   tab: { flex: 1, alignItems: 'center', paddingVertical: 6 },
-  tabActive: { borderBottomWidth: 2, borderBottomColor: evoconnColors.neonGreen },
+  tabActiveUnderline: { borderBottomWidth: 2 },
   label: { color: evoconnColors.muted, fontSize: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_TAB_TEXT_SIZE, fontWeight: '600' },
-  labelActive: { color: evoconnColors.neonGreen },
   searchFrame: { alignItems: 'center', justifyContent: 'center' },
   searchIcon: { width: '100%', height: '100%' },
 });

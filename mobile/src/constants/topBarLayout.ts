@@ -91,9 +91,9 @@ export const TOP_BAR_ICON_EDITOR: Record<
   clanLabel: { offsetX: -30, offsetY: 0, scale: 1.2 },
   pencilIcon: { offsetX: -62, offsetY: -9, scale: 2 },
   pencilText: { offsetX: -43, offsetY: 0, scale: 1.2 },
-  fireIcon: { offsetX: -35, offsetY: -9, scale: 2.2 },
+  fireIcon: { offsetX: -35, offsetY: -11, scale: 2.2 },
   fireText: { offsetX: -20, offsetY: 0, scale: 1.2 },
-  heartIcon: { offsetX: -5, offsetY: -11, scale: 2 },
+  heartIcon: { offsetX: -5, offsetY: -14, scale: 2 },
   heartText: { offsetX: 15, offsetY: 0, scale: 1.2 },
 };
 
