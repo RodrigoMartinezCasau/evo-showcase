@@ -4,7 +4,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Modal,
   Pressable,
   Image,
   Animated,
@@ -44,6 +43,7 @@ import type { ConversationItem as ConvItem } from '@evoconn/types';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { mockSidebarFolders } from '@evoconn/data/mockSidebarFolders';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
+import { SIDEBAR_DRAWER_OFFSCREEN_TRANSLATE_X } from '@evoconn/constants/communityDrawerGesture';
 
 type SidebarDrawerProps = {
   visible: boolean;
@@ -51,6 +51,12 @@ type SidebarDrawerProps = {
   conversations: ConvItem[];
   onConversationPress: (id: string) => void;
   searchQuery?: string;
+  /**
+   * External animated progress (0 = closed, 1 = open).
+   * When provided, the parent controls all animation; the drawer just follows.
+   * When omitted, the drawer self-animates based on `visible`.
+   */
+  openProgress?: Animated.Value;
 };
 
 export function SidebarDrawer({
@@ -59,6 +65,7 @@ export function SidebarDrawer({
   conversations,
   onConversationPress,
   searchQuery: _searchQuery = '',
+  openProgress: openProgressProp,
 }: SidebarDrawerProps) {
   const router = useRouter();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
@@ -72,33 +79,37 @@ export function SidebarDrawer({
     setConvState(conversations);
   }, [conversations]);
 
-  const anim = useRef(new Animated.Value(0)).current;
-  const [modalVisible, setModalVisible] = useState(false);
+  const internalAnim = useRef(new Animated.Value(0)).current;
+  const drive = openProgressProp ?? internalAnim;
+
+  const [interactable, setInteractable] = useState(false);
 
   useEffect(() => {
+    const id = drive.addListener(({ value }) => {
+      setInteractable(value > 0.01);
+    });
+    return () => drive.removeListener(id);
+  }, [drive]);
+
+  useEffect(() => {
+    if (openProgressProp) return;
     if (visible) {
-      anim.setValue(0);
-      setModalVisible(true);
-    } else if (modalVisible) {
-      Animated.timing(anim, {
+      Animated.timing(internalAnim, {
+        toValue: 1,
+        duration: 280,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(internalAnim, {
         toValue: 0,
         duration: 260,
         easing: Easing.inOut(Easing.cubic),
         useNativeDriver: true,
-      }).start(({ finished }) => {
-        if (finished) setModalVisible(false);
-      });
+      }).start();
     }
-  }, [visible]);
+  }, [visible, openProgressProp]);
 
-  const handleModalShow = () => {
-    Animated.timing(anim, {
-      toValue: 1,
-      duration: 280,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-  };
   const starSource =
     user.clanId != null && user.clanId !== ''
       ? getStarByHouse(user.clanId)
@@ -114,193 +125,192 @@ export function SidebarDrawer({
     user.clanId != null && String(user.clanId).trim() !== ''
       ? String(user.clanId).trim().toLowerCase()
       : 'evocon';
-  const drawerTranslateX = anim.interpolate({
+  const drawerTranslateX = drive.interpolate({
     inputRange: [0, 1],
-    outputRange: [-340, 0],
+    outputRange: [SIDEBAR_DRAWER_OFFSCREEN_TRANSLATE_X, 0],
   });
 
   return (
-    <Modal visible={modalVisible} animationType="none" transparent onShow={handleModalShow}>
-      <View style={styles.overlayRoot}>
-        <Animated.View style={[styles.overlayBg, { opacity: anim }]} />
-        <Pressable style={StyleSheet.absoluteFillObject} onPress={onClose} />
-        <Animated.View
-          style={[styles.drawer, { transform: [{ translateX: drawerTranslateX }] }]}
-          onStartShouldSetResponder={() => true}
+    <View style={styles.overlayRoot} pointerEvents={interactable ? 'box-none' : 'none'}>
+      <Animated.View style={[styles.overlayBg, { opacity: drive }]} />
+      <Pressable style={StyleSheet.absoluteFillObject} onPress={onClose} />
+      <Animated.View
+        style={[styles.drawer, { transform: [{ translateX: drawerTranslateX }] }]}
+        onStartShouldSetResponder={() => true}
+      >
+        <View
+          style={[
+            styles.header,
+            {
+              paddingTop: SH.SIDEBAR_HEADER_PADDING_TOP,
+              paddingLeft: SH.SIDEBAR_HEADER_PADDING_LEFT,
+              minHeight: SH.SIDEBAR_HEADER_HEIGHT,
+            },
+          ]}
         >
+          <TouchableOpacity onPress={closeSidebar} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Cerrar menú">
+            <Image
+              source={starSource}
+              style={{
+                width: SH.SIDEBAR_STAR_SIZE,
+                height: SH.SIDEBAR_STAR_SIZE,
+                transform: [
+                  { translateX: SH.SIDEBAR_STAR_OFFSET_X },
+                  { translateY: SH.SIDEBAR_STAR_OFFSET_Y },
+                ],
+              }}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
           <View
             style={[
-              styles.header,
+              styles.sidebarHeaderTextRow,
               {
-                paddingTop: SH.SIDEBAR_HEADER_PADDING_TOP,
-                paddingLeft: SH.SIDEBAR_HEADER_PADDING_LEFT,
-                minHeight: SH.SIDEBAR_HEADER_HEIGHT,
+                transform: [
+                  { translateX: SH.SIDEBAR_TEXT_OFFSET_X },
+                  { translateY: SH.SIDEBAR_TEXT_OFFSET_Y },
+                ],
               },
             ]}
           >
-            <TouchableOpacity onPress={closeSidebar} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Cerrar menú">
-              <Image
-                source={starSource}
-                style={{
-                  width: SH.SIDEBAR_STAR_SIZE,
-                  height: SH.SIDEBAR_STAR_SIZE,
-                  transform: [
-                    { translateX: SH.SIDEBAR_STAR_OFFSET_X },
-                    { translateY: SH.SIDEBAR_STAR_OFFSET_Y },
-                  ],
-                }}
-                resizeMode="contain"
-              />
-            </TouchableOpacity>
-            <View
+            <Text
               style={[
-                styles.sidebarHeaderTextRow,
-                {
-                  transform: [
-                    { translateX: SH.SIDEBAR_TEXT_OFFSET_X },
-                    { translateY: SH.SIDEBAR_TEXT_OFFSET_Y },
-                  ],
-                },
+                styles.sidebarHeaderTitle,
+                { fontSize: SH.SIDEBAR_TITLE_FONT_SIZE, marginRight: SH.SIDEBAR_TEXT_GAP },
               ]}
             >
-              <Text
-                style={[
-                  styles.sidebarHeaderTitle,
-                  { fontSize: SH.SIDEBAR_TITLE_FONT_SIZE, marginRight: SH.SIDEBAR_TEXT_GAP },
-                ]}
-              >
-                {SH.SIDEBAR_TITLE_TEXT}
-              </Text>
-              <Text style={[styles.sidebarHeaderVersion, { fontSize: SH.SIDEBAR_VERSION_FONT_SIZE }]}>
-                {SH.SIDEBAR_VERSION_TEXT}
-              </Text>
-            </View>
+              {SH.SIDEBAR_TITLE_TEXT}
+            </Text>
+            <Text style={[styles.sidebarHeaderVersion, { fontSize: SH.SIDEBAR_VERSION_FONT_SIZE }]}>
+              {SH.SIDEBAR_VERSION_TEXT}
+            </Text>
           </View>
-          <SidebarPngMenuButton
-            config={getCommunityPngMenuConfig()}
-            source={communityButtonSource}
-            label="COMUNIDAD"
-            accessibilityLabel="Comunidad"
-            menuRowStyle={styles.communityMenuRow}
-            leftOverlay={{
-              element: (
-                <EstrellaComunidadSvg
-                  width={SCL.SIDEBAR_COMMUNITY_STAR_WIDTH}
-                  height={SCL.SIDEBAR_COMMUNITY_STAR_HEIGHT}
-                />
-              ),
-              x: SCL.SIDEBAR_COMMUNITY_STAR_OFFSET_X,
-              y: SCL.SIDEBAR_COMMUNITY_STAR_OFFSET_Y,
-              width: SCL.SIDEBAR_COMMUNITY_STAR_WIDTH,
-              height: SCL.SIDEBAR_COMMUNITY_STAR_HEIGHT,
-              scale: SCL.SIDEBAR_COMMUNITY_STAR_SCALE,
-            }}
-            onPress={() => { onClose(); router.push('/(tabs)'); }}
-          />
-          <SidebarPngMenuButton
-            config={getNewReflectionPngMenuConfig()}
-            source={newReflectionButtonSource}
-            label="NUEVA REFLEXIÓN"
-            accessibilityLabel="Nueva reflexión"
-            menuRowStyle={styles.communityMenuRow}
-            textAdjustsFontSizeToFit={false}
-            leftOverlay={{
-              source: newReflectionPlusSource,
-              x: newReflectionPlusLayout.x,
-              y: newReflectionPlusLayout.y,
-              width: newReflectionPlusLayout.width,
-              height: newReflectionPlusLayout.height,
-            }}
-            onPress={() => { onClose(); router.push('/reflection'); }}
-          />
-          <SidebarPngMenuButton
-            config={getNewPhrasePngMenuConfig()}
-            source={newPhraseButtonSource}
-            label="NUEVA FRASE"
-            accessibilityLabel="Nueva frase"
-            menuRowStyle={styles.communityMenuRow}
-            leftOverlay={{
-              source: newPhrasePlusSource,
-              x: newPhrasePlusLayout.x,
-              y: newPhrasePlusLayout.y,
-              width: newPhrasePlusLayout.width,
-              height: newPhrasePlusLayout.height,
-            }}
-            onPress={() => { onClose(); router.push('/phrase'); }}
-          />
-          <View style={styles.sidebarLowerBlock}>
-            <SidebarSearchBar value={drawerSearch} onChangeText={setDrawerSearch} />
-            <SidebarConversationsPanel
-              clanId={user.clanId}
-              conversations={convState}
-              onConversationsChange={setConvState}
-              folders={folderState}
-              onFoldersChange={setFolderState}
-              drawerSearch={drawerSearch}
-              onConversationPress={(id) => {
-                onClose();
-                onConversationPress(id);
-              }}
-            />
-          </View>
-          <SidebarClanButton
+        </View>
+        <SidebarPngMenuButton
+          config={getCommunityPngMenuConfig()}
+          source={communityButtonSource}
+          label="COMUNIDAD"
+          accessibilityLabel="Comunidad"
+          menuRowStyle={styles.communityMenuRow}
+          leftOverlay={{
+            element: (
+              <EstrellaComunidadSvg
+                width={SCL.SIDEBAR_COMMUNITY_STAR_WIDTH}
+                height={SCL.SIDEBAR_COMMUNITY_STAR_HEIGHT}
+              />
+            ),
+            x: SCL.SIDEBAR_COMMUNITY_STAR_OFFSET_X,
+            y: SCL.SIDEBAR_COMMUNITY_STAR_OFFSET_Y,
+            width: SCL.SIDEBAR_COMMUNITY_STAR_WIDTH,
+            height: SCL.SIDEBAR_COMMUNITY_STAR_HEIGHT,
+            scale: SCL.SIDEBAR_COMMUNITY_STAR_SCALE,
+          }}
+          onPress={() => { onClose(); router.push('/(tabs)'); }}
+        />
+        <SidebarPngMenuButton
+          config={getNewReflectionPngMenuConfig()}
+          source={newReflectionButtonSource}
+          label="NUEVA REFLEXIÓN"
+          accessibilityLabel="Nueva reflexión"
+          menuRowStyle={styles.communityMenuRow}
+          textAdjustsFontSizeToFit={false}
+          leftOverlay={{
+            source: newReflectionPlusSource,
+            x: newReflectionPlusLayout.x,
+            y: newReflectionPlusLayout.y,
+            width: newReflectionPlusLayout.width,
+            height: newReflectionPlusLayout.height,
+          }}
+          onPress={() => { onClose(); router.push('/reflection'); }}
+        />
+        <SidebarPngMenuButton
+          config={getNewPhrasePngMenuConfig()}
+          source={newPhraseButtonSource}
+          label="NUEVA FRASE"
+          accessibilityLabel="Nueva frase"
+          menuRowStyle={styles.communityMenuRow}
+          leftOverlay={{
+            source: newPhrasePlusSource,
+            x: newPhrasePlusLayout.x,
+            y: newPhrasePlusLayout.y,
+            width: newPhrasePlusLayout.width,
+            height: newPhrasePlusLayout.height,
+          }}
+          onPress={() => { onClose(); router.push('/phrase'); }}
+        />
+        <View style={styles.sidebarLowerBlock}>
+          <SidebarSearchBar value={drawerSearch} onChangeText={setDrawerSearch} />
+          <SidebarConversationsPanel
             clanId={user.clanId}
-            onPress={() => {
+            conversations={convState}
+            onConversationsChange={setConvState}
+            folders={folderState}
+            onFoldersChange={setFolderState}
+            drawerSearch={drawerSearch}
+            onConversationPress={(id) => {
               onClose();
-              router.push(`/clan/${clanRouteSlug}`);
+              onConversationPress(id);
             }}
           />
-          <FrasesButton
-            clanId={user.clanId}
-            onPress={() => {
-              onClose();
-              router.push('/frases');
-            }}
-          />
-          <RachaButton
-            clanId={user.clanId}
-            onPress={() => {
-              onClose();
-              router.push('/racha');
-            }}
-          />
-          <SidebarClanInsignia
-            clanId={user.clanId}
-            onPress={() => {
-              onClose();
-              router.push('/profile');
-            }}
-          />
-          <SidebarFooterProfileText
-            username={user.username}
-            clanId={user.clanId}
-            rank={user.rank}
-            onPressProfile={() => {
-              onClose();
-              router.push('/profile');
-            }}
-            onPressClan={() => {
-              onClose();
-              router.push(`/clan/${clanRouteSlug}`);
-            }}
-          />
-          <SidebarSettingsIcon
-            onPress={() => {
-              onClose();
-              router.push('/settings');
-            }}
-          />
-          <View style={styles.footer} />
-        </Animated.View>
-      </View>
-    </Modal>
+        </View>
+        <SidebarClanButton
+          clanId={user.clanId}
+          onPress={() => {
+            onClose();
+            router.push(`/clan/${clanRouteSlug}`);
+          }}
+        />
+        <FrasesButton
+          clanId={user.clanId}
+          onPress={() => {
+            onClose();
+            router.push('/frases');
+          }}
+        />
+        <RachaButton
+          clanId={user.clanId}
+          onPress={() => {
+            onClose();
+            router.push('/racha');
+          }}
+        />
+        <SidebarClanInsignia
+          clanId={user.clanId}
+          onPress={() => {
+            onClose();
+            router.push('/profile');
+          }}
+        />
+        <SidebarFooterProfileText
+          username={user.username}
+          clanId={user.clanId}
+          rank={user.rank}
+          onPressProfile={() => {
+            onClose();
+            router.push('/profile');
+          }}
+          onPressClan={() => {
+            onClose();
+            router.push(`/clan/${clanRouteSlug}`);
+          }}
+        />
+        <SidebarSettingsIcon
+          onPress={() => {
+            onClose();
+            router.push('/settings');
+          }}
+        />
+        <View style={styles.footer} />
+      </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   overlayRoot: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     flexDirection: 'row',
+    zIndex: 200,
   },
   overlayBg: {
     ...StyleSheet.absoluteFillObject,

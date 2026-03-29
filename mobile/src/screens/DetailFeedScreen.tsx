@@ -1,10 +1,14 @@
-import React, { useRef, useCallback, useMemo } from 'react';
+import React, { useRef, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   FlatList,
   StyleSheet,
+  Animated,
+  Easing,
   useWindowDimensions,
 } from 'react-native';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
@@ -14,6 +18,10 @@ import { ReflectionDetailItem } from '@evoconn/components/ReflectionDetailItem';
 import { AppTopBar, SidebarDrawer, BottomCommunityTabs } from '@evoconn/components';
 import { mockConversations } from '@evoconn/data/mockConversations';
 import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
+import {
+  COMMUNITY_DRAWER_EDGE_ZONE_WIDTH,
+  COMMUNITY_DRAWER_GESTURE_RANGE_X,
+} from '@evoconn/constants/communityDrawerGesture';
 
 type FeedMode = 'following' | 'top' | 'foryou';
 
@@ -58,6 +66,8 @@ export default function DetailFeedScreen() {
   const initialIndex = Math.max(0, parseInt(params.initialIndex ?? '0', 10) || 0);
 
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  const drawerOpenProgress = useRef(new Animated.Value(0)).current;
+  const gestureCommittingRef = useRef(false);
   const activeTab = modeToTab(mode) as 'siguiendo' | 'mas-votadas' | 'para-ti' | 'search';
 
   const data = useMemo(() => getDataForMode(mode), [mode]);
@@ -115,7 +125,77 @@ export default function DetailFeedScreen() {
     [mode, router],
   );
 
+  useEffect(() => {
+    if (sidebarOpen) {
+      if (gestureCommittingRef.current) {
+        gestureCommittingRef.current = false;
+        Animated.spring(drawerOpenProgress, {
+          toValue: 1,
+          useNativeDriver: true,
+          friction: 9,
+          tension: 68,
+        }).start();
+      } else {
+        Animated.timing(drawerOpenProgress, {
+          toValue: 1,
+          duration: 280,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }).start();
+      }
+    } else {
+      Animated.timing(drawerOpenProgress, {
+        toValue: 0,
+        duration: 260,
+        easing: Easing.inOut(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [sidebarOpen, drawerOpenProgress]);
+
+  const setProgressJS = useCallback(
+    (p: number) => { drawerOpenProgress.setValue(p); },
+    [drawerOpenProgress],
+  );
+
+  const commitGestureOpenJS = useCallback(() => {
+    gestureCommittingRef.current = true;
+    setSidebarOpen(true);
+  }, []);
+
+  const cancelGestureJS = useCallback(() => {
+    Animated.timing(drawerOpenProgress, {
+      toValue: 0,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [drawerOpenProgress]);
+
+  const edgeOpenGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(!sidebarOpen)
+        .activeOffsetX(12)
+        .failOffsetY([-32, 32])
+        .onUpdate((e: { translationX: number }) => {
+          const p = Math.min(1, Math.max(0, e.translationX / COMMUNITY_DRAWER_GESTURE_RANGE_X));
+          runOnJS(setProgressJS)(p);
+        })
+        .onEnd((e: { translationX: number; velocityX: number }) => {
+          const p = Math.min(1, Math.max(0, e.translationX / COMMUNITY_DRAWER_GESTURE_RANGE_X));
+          const shouldOpen = p > 0.32 || e.velocityX > 520;
+          if (shouldOpen) {
+            runOnJS(commitGestureOpenJS)();
+          } else {
+            runOnJS(cancelGestureJS)();
+          }
+        }),
+    [sidebarOpen, setProgressJS, commitGestureOpenJS, cancelGestureJS],
+  );
+
   return (
+    <GestureHandlerRootView style={styles.gestureRoot}>
     <View style={styles.container}>
       <AppTopBar
         onMenuPress={() => setSidebarOpen(true)}
@@ -153,18 +233,45 @@ export default function DetailFeedScreen() {
         />
       </View>
 
+      {!sidebarOpen ? (
+        <GestureDetector gesture={edgeOpenGesture}>
+          <View
+            style={[
+              styles.edgeHitStrip,
+              {
+                top: topBarHeight,
+                width: COMMUNITY_DRAWER_EDGE_ZONE_WIDTH,
+                bottom:
+                  BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
+                  insets.bottom +
+                  BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
+                  8,
+              },
+            ]}
+          />
+        </GestureDetector>
+      ) : null}
+
       <SidebarDrawer
         visible={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         conversations={mockConversations}
         onConversationPress={() => {}}
+        openProgress={drawerOpenProgress}
       />
     </View>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
+  gestureRoot: { flex: 1 },
   container: { flex: 1, backgroundColor: evoconnColors.background },
+  edgeHitStrip: {
+    position: 'absolute',
+    left: 0,
+    zIndex: 250,
+  },
   list: { flex: 1 },
   bottomBar: {
     position: 'absolute',
