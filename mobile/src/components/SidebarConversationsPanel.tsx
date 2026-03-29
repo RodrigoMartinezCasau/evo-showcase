@@ -436,7 +436,8 @@ export function SidebarConversationsPanel({
                 alignItems: 'stretch',
               }}
               showsVerticalScrollIndicator
-              keyboardShouldPersistTaps="handled"
+              keyboardShouldPersistTaps="always"
+              keyboardDismissMode="on-drag"
             >
               {activeTab === 'folders' && !q && !foldersBrowseId
                 ? folders.map((f) => (

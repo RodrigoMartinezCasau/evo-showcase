@@ -2,12 +2,14 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   StyleSheet,
   Pressable,
   Image,
   Animated,
   Easing,
+  Keyboard,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SIDEBAR_HEADER_LAYOUT as SH } from '@evoconn/constants/sidebarHeaderLayout';
@@ -71,6 +73,7 @@ export function SidebarDrawer({
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const user = { ...mockCurrentUser, clanId: activeClan };
   const closeSidebar = onClose;
+  const searchInputRef = useRef<TextInput>(null);
   const [drawerSearch, setDrawerSearch] = useState('');
   const [convState, setConvState] = useState(conversations);
   const [folderState, setFolderState] = useState(() => mockSidebarFolders.map((f) => ({ ...f })));
@@ -78,6 +81,13 @@ export function SidebarDrawer({
   useEffect(() => {
     setConvState(conversations);
   }, [conversations]);
+
+  useEffect(() => {
+    if (!visible) {
+      searchInputRef.current?.blur();
+      Keyboard.dismiss();
+    }
+  }, [visible]);
 
   const internalAnim = useRef(new Animated.Value(0)).current;
   const drive = openProgressProp ?? internalAnim;
@@ -137,6 +147,7 @@ export function SidebarDrawer({
       <Animated.View
         style={[styles.drawer, { transform: [{ translateX: drawerTranslateX }] }]}
         onStartShouldSetResponder={() => true}
+        onResponderRelease={() => Keyboard.dismiss()}
       >
         <View
           style={[
@@ -238,8 +249,10 @@ export function SidebarDrawer({
           }}
           onPress={() => { onClose(); router.push('/phrase'); }}
         />
-        <View style={styles.sidebarLowerBlock}>
-          <SidebarSearchBar value={drawerSearch} onChangeText={setDrawerSearch} />
+        <View style={styles.searchBarLayer}>
+          <SidebarSearchBar ref={searchInputRef} value={drawerSearch} onChangeText={setDrawerSearch} />
+        </View>
+        <View style={styles.sidebarLowerBlock} onStartShouldSetResponder={() => true}>
           <SidebarConversationsPanel
             clanId={user.clanId}
             conversations={convState}
@@ -346,6 +359,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     alignItems: 'center',
   },
-  sidebarLowerBlock: { flex: 1, minHeight: 0, marginTop: 8, paddingHorizontal: 10 },
+  searchBarLayer: { zIndex: 25, marginTop: 8, paddingHorizontal: 10 },
+  sidebarLowerBlock: { flex: 1, minHeight: 0, paddingHorizontal: 10 },
   footer: {},
 });

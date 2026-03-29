@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Image, TextInput, StyleSheet } from 'react-native';
+import React, { forwardRef, useCallback, useRef } from 'react';
+import { View, Image, TextInput, Pressable, StyleSheet } from 'react-native';
 import { SIDEBAR_SEARCH_BAR_LAYOUT as L } from '@evoconn/constants/sidebarSearchBarLayout';
 
 const SEARCH_BAR_SOURCE = require('../assets/sidebar/searchBar/sidebar_search_bar.png');
@@ -9,7 +9,17 @@ type SidebarSearchBarProps = {
   onChangeText: (t: string) => void;
 };
 
-export function SidebarSearchBar({ value, onChangeText }: SidebarSearchBarProps) {
+export const SidebarSearchBar = forwardRef<TextInput, SidebarSearchBarProps>(function SidebarSearchBar({ value, onChangeText }, ref) {
+  const inputRef = useRef<TextInput>(null);
+  const setInputRef = useCallback(
+    (node: TextInput | null) => {
+      inputRef.current = node;
+      if (typeof ref === 'function') ref(node);
+      else if (ref) (ref as React.MutableRefObject<TextInput | null>).current = node;
+    },
+    [ref],
+  );
+
   const imgW = L.SEARCH_BAR_IMAGE_WIDTH;
   const imgH = L.SEARCH_BAR_IMAGE_HEIGHT;
   const cropL = L.SEARCH_BAR_CROP_LEFT;
@@ -44,7 +54,10 @@ export function SidebarSearchBar({ value, onChangeText }: SidebarSearchBarProps)
           ],
         }}
       >
-        <View style={{ position: 'relative', width: layoutW, height: visibleH, alignSelf: 'center' }}>
+        <Pressable
+          style={{ position: 'relative', width: layoutW, height: visibleH, alignSelf: 'center' }}
+          onPress={() => inputRef.current?.focus()}
+        >
           <View
             style={{
               position: 'absolute',
@@ -101,6 +114,7 @@ export function SidebarSearchBar({ value, onChangeText }: SidebarSearchBarProps)
             }}
           >
             <TextInput
+              ref={setInputRef}
               value={value}
               onChangeText={(t) => {
                 if (t.length <= L.SEARCH_BAR_TEXT_MAX_CHARS) onChangeText(t);
@@ -125,11 +139,11 @@ export function SidebarSearchBar({ value, onChangeText }: SidebarSearchBarProps)
               autoCapitalize="none"
             />
           </View>
-        </View>
+        </Pressable>
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   input: {
