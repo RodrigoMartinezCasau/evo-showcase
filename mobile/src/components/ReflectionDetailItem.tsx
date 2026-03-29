@@ -1,9 +1,19 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import type { CommunityPost } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getClanColor } from '@evoconn/constants/clanColors';
-import { ClanBanner, RankBadge, VoteWidget } from '@evoconn/components';
+import { ClanBanner, RankBadge } from '@evoconn/components';
+import { ReflectionBackground } from './ReflectionBackground';
+import { DetailActionColumn } from './DetailActionColumn';
+import {
+  REFLECTION_PANEL_LAYOUT as RP,
+  COMMENTS_PANEL_LAYOUT as CP,
+  PANELS_GAP,
+  PANELS_BOTTOM_RESERVE,
+} from '@evoconn/constants/reflectionPanelsLayout';
+import { DETAIL_ACTION_COLUMN_LAYOUT as COL } from '@evoconn/constants/detailActionColumnLayout';
+import { mockComments } from '@evoconn/data/mockComments';
 
 type ReflectionDetailItemProps = {
   post: CommunityPost;
@@ -21,45 +31,157 @@ export function ReflectionDetailItem({
 }: ReflectionDetailItemProps) {
   const clanColor = getClanColor(post.author.clanId);
 
+  const [voted, setVoted] = useState<'up' | 'down' | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  const handleUpvote = useCallback(() => {
+    setVoted((v) => (v === 'up' ? null : 'up'));
+  }, []);
+  const handleDownvote = useCallback(() => {
+    setVoted((v) => (v === 'down' ? null : 'down'));
+  }, []);
+  const handleSave = useCallback(() => {
+    setSaved((s) => !s);
+  }, []);
+
+  const headerHeight = 52;
+  const panelsAvailable =
+    itemHeight - headerHeight - PANELS_BOTTOM_RESERVE - PANELS_GAP - 16;
+  const commentsH = CP.height != null
+    ? CP.height
+    : Math.max(80, panelsAvailable * (1 - RP.heightRatio));
+  const reflectionH = Math.max(80, panelsAvailable - commentsH);
+
   return (
     <View style={[styles.container, { height: itemHeight }]}>
-      <View style={styles.headerRow}>
-        <TouchableOpacity onPress={() => onAuthorPress(post.author.id)}>
-          <Text style={styles.username}>{post.author.username}</Text>
-        </TouchableOpacity>
-        <View style={styles.badges}>
-          {post.author.clanId ? (
-            <TouchableOpacity onPress={() => onClanPress(post.author.clanId!)}>
-              <ClanBanner clanId={post.author.clanId} shortLabel={post.author.clanId.toUpperCase()} small />
+      <ReflectionBackground clan={post.author.clanId}>
+        <View style={styles.content}>
+          {/* ── Header ── */}
+          <View style={styles.headerRow}>
+            <TouchableOpacity onPress={() => onAuthorPress(post.author.id)}>
+              <Text style={styles.username}>{post.author.username}</Text>
             </TouchableOpacity>
-          ) : null}
-          <RankBadge rank={post.author.rank} small />
+            <View style={styles.badges}>
+              {post.author.clanId ? (
+                <TouchableOpacity onPress={() => onClanPress(post.author.clanId!)}>
+                  <ClanBanner clanId={post.author.clanId} shortLabel={post.author.clanId.toUpperCase()} small />
+                </TouchableOpacity>
+              ) : null}
+              <RankBadge rank={post.author.rank} small />
+            </View>
+          </View>
+
+          {/* ── Reflection panel (upper black box) ── */}
+          <View
+            style={[
+              styles.reflectionPanel,
+              {
+                height: reflectionH,
+                borderRadius: RP.borderRadius,
+                backgroundColor: RP.backgroundColor,
+                paddingHorizontal: RP.paddingHorizontal,
+                paddingVertical: RP.paddingVertical,
+                borderLeftColor: clanColor,
+                transform: [
+                  { translateX: RP.offsetX },
+                  { translateY: RP.offsetY },
+                  { scaleX: RP.widthScale },
+                ],
+              },
+            ]}
+          >
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              nestedScrollEnabled
+              keyboardShouldPersistTaps="handled"
+            >
+              {post.title ? <Text style={styles.title}>{post.title}</Text> : null}
+              <Text style={styles.bodyText}>{post.body}</Text>
+            </ScrollView>
+          </View>
+
+          <View style={{ height: PANELS_GAP }} />
+
+          {/* ── Comments panel (lower black box) ── */}
+          <View
+            style={[
+              styles.commentsPanel,
+              {
+                height: commentsH,
+                borderRadius: CP.borderRadius,
+                backgroundColor: CP.backgroundColor,
+                paddingHorizontal: CP.paddingHorizontal,
+                paddingVertical: CP.paddingVertical,
+                transform: [
+                  { translateX: CP.offsetX },
+                  { translateY: CP.offsetY },
+                  { scaleX: CP.widthScale },
+                ],
+              },
+            ]}
+          >
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              nestedScrollEnabled
+              keyboardShouldPersistTaps="handled"
+            >
+              {mockComments.map((c) => (
+                <View key={c.id} style={styles.commentRow}>
+                  <Text style={styles.commentAuthor}>@{c.author.username}</Text>
+                  <Text style={styles.commentBody}>{c.body}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+
+          {/* ── Action column (absolute, independent layer) ── */}
+          <View
+            pointerEvents="box-none"
+            style={[
+              styles.actionCol,
+              {
+                transform: [
+                  { translateX: COL.offsetX },
+                  { translateY: COL.offsetY },
+                ],
+              },
+            ]}
+          >
+            <DetailActionColumn
+              clanId={post.author.clanId}
+              upCount={post.voteStats.up}
+              downCount={post.voteStats.down}
+              saved={saved}
+              voted={voted}
+              onUpvote={handleUpvote}
+              onDownvote={handleDownvote}
+              onSave={handleSave}
+              onClanPress={() => {
+                if (post.author.clanId) onClanPress(post.author.clanId);
+              }}
+            />
+          </View>
         </View>
-      </View>
-
-      <View style={[styles.body, { borderLeftColor: clanColor }]}>
-        {post.title ? <Text style={styles.title}>{post.title}</Text> : null}
-        <Text style={styles.bodyText}>{post.body}</Text>
-      </View>
-
-      <View style={styles.actions}>
-        <VoteWidget stats={post.voteStats} />
-      </View>
+      </ReflectionBackground>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    overflow: 'hidden',
+  },
+  content: {
+    flex: 1,
     paddingHorizontal: 16,
-    paddingTop: 16,
-    justifyContent: 'flex-start',
+    paddingTop: 12,
+    zIndex: 1,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 10,
     flexWrap: 'wrap',
   },
   username: {
@@ -73,14 +195,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  body: {
+
+  actionCol: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+
+  reflectionPanel: {
     borderLeftWidth: 4,
-    paddingLeft: 14,
-    paddingVertical: 16,
-    backgroundColor: evoconnColors.card,
-    borderRadius: 12,
-    marginBottom: 16,
-    flex: 1,
+    overflow: 'hidden',
   },
   title: {
     color: evoconnColors.text,
@@ -93,7 +221,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
   },
-  actions: {
-    paddingVertical: 12,
+
+  commentsPanel: {
+    overflow: 'hidden',
+  },
+  commentRow: {
+    marginBottom: 10,
+  },
+  commentAuthor: {
+    color: evoconnColors.text,
+    fontWeight: '700',
+    fontSize: 13,
+    marginBottom: 2,
+  },
+  commentBody: {
+    color: '#CCCCCC',
+    fontSize: 14,
+    lineHeight: 20,
   },
 });
