@@ -62,7 +62,7 @@ export const DETAIL_MORE_BUTTON_LAYOUT = {
 
 /** Número de upvotes. */
 export const DETAIL_UPVOTE_COUNT_LAYOUT = {
-  offsetX: 60,
+  offsetX: 75,
   offsetY: 125,
   scale: 1.1,
   fontSize: 13,
@@ -73,8 +73,8 @@ export const DETAIL_UPVOTE_COUNT_LAYOUT = {
 
 /** Número de downvotes. */
 export const DETAIL_DOWNVOTE_COUNT_LAYOUT = {
-  offsetX: 64,
-  offsetY: 300,
+  offsetX: 75,
+  offsetY: 304,
   scale: 1.1,
   fontSize: 13,
   fontWeight: '700' as const,
@@ -84,8 +84,8 @@ export const DETAIL_DOWNVOTE_COUNT_LAYOUT = {
 
 /** Porcentaje de aprobación. */
 export const DETAIL_APPROVAL_PERCENT_LAYOUT = {
-  offsetX: 64,
-  offsetY: 213,
+  offsetX: 75,
+  offsetY: 215,
   scale: 1.1,
   fontSize: 12,
   fontWeight: '800' as const,

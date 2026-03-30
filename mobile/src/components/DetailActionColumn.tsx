@@ -201,56 +201,72 @@ export const DetailActionColumn = forwardRef<DetailActionColumnHandle, DetailAct
         </TouchableOpacity>
       </View>
 
-      {/* ── Stats (absolute, 100% independent) ── */}
-      <Text
+      {/* ── Stats (absolute, centered on their anchor point) ── */}
+      <View
         pointerEvents="none"
         style={{
           position: 'absolute',
-          left: UP_C.offsetX,
+          left: UP_C.offsetX - STAT_BOX_W / 2,
           top: UP_C.offsetY,
-          color: voted === 'up' ? UP_C.colorActive : UP_C.colorInactive,
-          fontSize: UP_C.fontSize,
-          fontWeight: UP_C.fontWeight,
+          width: STAT_BOX_W,
           transform: [{ scale: UP_C.scale }],
         }}
       >
-        {formatCount(upCount)}
-      </Text>
+        <Text style={{
+          color: voted === 'up' ? UP_C.colorActive : UP_C.colorInactive,
+          fontSize: UP_C.fontSize,
+          fontWeight: UP_C.fontWeight,
+          textAlign: 'center',
+        }}>
+          {formatCount(upCount)}
+        </Text>
+      </View>
 
-      <Text
+      <View
         pointerEvents="none"
         style={{
           position: 'absolute',
-          left: APPR.offsetX,
+          left: APPR.offsetX - STAT_BOX_W / 2,
           top: APPR.offsetY,
-          color: getApprovalColor(approvalPct),
-          fontSize: APPR.fontSize,
-          fontWeight: APPR.fontWeight,
+          width: STAT_BOX_W,
           transform: [{ scale: APPR.scale }],
         }}
       >
-        {approvalPct}%
-      </Text>
+        <Text style={{
+          color: getApprovalColor(approvalPct),
+          fontSize: APPR.fontSize,
+          fontWeight: APPR.fontWeight,
+          textAlign: 'center',
+        }}>
+          {approvalPct}%
+        </Text>
+      </View>
 
-      <Text
+      <View
         pointerEvents="none"
         style={{
           position: 'absolute',
-          left: DOWN_C.offsetX,
+          left: DOWN_C.offsetX - STAT_BOX_W / 2,
           top: DOWN_C.offsetY,
-          color: voted === 'down' ? DOWN_C.colorActive : DOWN_C.colorInactive,
-          fontSize: DOWN_C.fontSize,
-          fontWeight: DOWN_C.fontWeight,
+          width: STAT_BOX_W,
           transform: [{ scale: DOWN_C.scale }],
         }}
       >
-        {formatCount(downCount)}
-      </Text>
+        <Text style={{
+          color: voted === 'down' ? DOWN_C.colorActive : DOWN_C.colorInactive,
+          fontSize: DOWN_C.fontSize,
+          fontWeight: DOWN_C.fontWeight,
+          textAlign: 'center',
+        }}>
+          {formatCount(downCount)}
+        </Text>
+      </View>
     </View>
   );
 });
 
 const COL_FIXED_WIDTH = COL.iconSize * CLAN_L.scale;
+const STAT_BOX_W = 80;
 
 const styles = StyleSheet.create({
   root: {
