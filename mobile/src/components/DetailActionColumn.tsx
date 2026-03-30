@@ -6,6 +6,7 @@ import {
   DETAIL_UPVOTE_BUTTON_LAYOUT as UP_L,
   DETAIL_DOWNVOTE_BUTTON_LAYOUT as DOWN_L,
   DETAIL_SAVE_BUTTON_LAYOUT as SAVE_L,
+  DETAIL_MORE_BUTTON_LAYOUT as MORE_L,
   DETAIL_UPVOTE_COUNT_LAYOUT as UP_C,
   DETAIL_DOWNVOTE_COUNT_LAYOUT as DOWN_C,
   DETAIL_APPROVAL_PERCENT_LAYOUT as APPR,
@@ -60,6 +61,7 @@ type DetailActionColumnProps = {
   onDownvote: () => void;
   onSave: () => void;
   onClanPress: () => void;
+  onMorePress: () => void;
 };
 
 export function DetailActionColumn({
@@ -72,6 +74,7 @@ export function DetailActionColumn({
   onDownvote,
   onSave,
   onClanPress,
+  onMorePress,
 }: DetailActionColumnProps) {
   const InsigniaIcon = useMemo(() => getTopBarInsigniaByHouse(clanId), [clanId]);
   const sz = COL.iconSize;
@@ -220,6 +223,23 @@ export function DetailActionColumn({
           )}
         </Animated.View>
       </TouchableOpacity>
+
+      {/* More (three dots) */}
+      <TouchableOpacity
+        onPress={onMorePress}
+        activeOpacity={0.7}
+        hitSlop={8}
+        style={{
+          transform: [
+            { translateX: MORE_L.offsetX },
+            { translateY: MORE_L.offsetY },
+          ],
+        }}
+      >
+        <Text style={[styles.moreDots, { fontSize: 22 * MORE_L.scale }]}>
+          ···
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -228,5 +248,11 @@ const styles = StyleSheet.create({
   column: {
     alignItems: 'center',
     justifyContent: 'flex-start',
+  },
+  moreDots: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    textAlign: 'center',
+    letterSpacing: 2,
   },
 });

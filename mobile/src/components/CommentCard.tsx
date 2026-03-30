@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { View, Text, TouchableOpacity, Animated, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Animated, StyleSheet, Alert } from 'react-native';
 import { getClanColor } from '@evoconn/constants/clanColors';
 import { evoconnColors } from '@evoconn/theme/colors';
 import {
@@ -17,6 +17,8 @@ type CommentCardProps = {
   upvotes: number;
   isUpvoted?: boolean;
   onUpvote?: () => void;
+  onReport?: () => void;
+  onBlockUser?: () => void;
 };
 
 export function CommentCard({
@@ -26,6 +28,8 @@ export function CommentCard({
   upvotes,
   isUpvoted = false,
   onUpvote,
+  onReport,
+  onBlockUser,
 }: CommentCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [needsTruncation, setNeedsTruncation] = useState(false);
@@ -43,12 +47,49 @@ export function CommentCard({
     onUpvote?.();
   }, [bounceScale, onUpvote]);
 
+  const handleLongPress = useCallback(() => {
+    Alert.alert(`@${username}`, undefined, [
+      {
+        text: 'Denunciar comentario',
+        onPress: () => {
+          onReport?.();
+          Alert.alert('Comentario denunciado', 'Gracias por tu reporte.');
+        },
+      },
+      {
+        text: 'Bloquear usuario',
+        style: 'destructive',
+        onPress: () => {
+          Alert.alert(
+            'Bloquear usuario',
+            `¿Bloquear a @${username}?`,
+            [
+              { text: 'Cancelar', style: 'cancel' },
+              {
+                text: 'Bloquear',
+                style: 'destructive',
+                onPress: () => {
+                  onBlockUser?.();
+                  Alert.alert('Usuario bloqueado', `@${username} ha sido bloqueado.`);
+                },
+              },
+            ],
+          );
+        },
+      },
+      { text: 'Cancelar', style: 'cancel' },
+    ]);
+  }, [username, onReport, onBlockUser]);
+
   const iconSz = 24 * UP.scale;
   const upColor = isUpvoted ? UP.colorActive : UP.colorInactive;
 
   return (
     <View style={styles.wrapper}>
-      <View
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onLongPress={handleLongPress}
+        delayLongPress={500}
         style={[
           styles.card,
           {
@@ -85,7 +126,7 @@ export function CommentCard({
             </Text>
           </TouchableOpacity>
         )}
-      </View>
+      </TouchableOpacity>
 
       {/* Upvote button — anchored to card, centered vertically */}
       <View

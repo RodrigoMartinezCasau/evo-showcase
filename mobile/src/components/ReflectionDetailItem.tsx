@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Share } from 'react-native';
 import type { CommunityPost, Rank } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getClanColor } from '@evoconn/constants/clanColors';
@@ -56,6 +56,55 @@ export function ReflectionDetailItem({
   const toggleCommentVote = useCallback((commentId: string) => {
     setCommentVotes((prev) => ({ ...prev, [commentId]: !prev[commentId] }));
   }, []);
+
+  const [blockedUsers, setBlockedUsers] = useState<Set<string>>(new Set());
+
+  const handleBlockUser = useCallback((userId: string) => {
+    setBlockedUsers((prev) => new Set(prev).add(userId));
+  }, []);
+
+  const handleMorePress = useCallback(() => {
+    Alert.alert(post.title ?? 'Publicación', undefined, [
+      {
+        text: 'Compartir',
+        onPress: async () => {
+          try {
+            await Share.share({
+              message: `${post.author.username}: "${post.body}"`,
+            });
+          } catch (_) { /* user cancelled */ }
+        },
+      },
+      {
+        text: 'Denunciar publicación',
+        onPress: () => {
+          Alert.alert('Publicación denunciada', 'Gracias por tu reporte.');
+        },
+      },
+      {
+        text: 'Bloquear usuario',
+        style: 'destructive',
+        onPress: () => {
+          Alert.alert(
+            'Bloquear usuario',
+            `¿Bloquear a @${post.author.username}?`,
+            [
+              { text: 'Cancelar', style: 'cancel' },
+              {
+                text: 'Bloquear',
+                style: 'destructive',
+                onPress: () => {
+                  handleBlockUser(post.author.id);
+                  Alert.alert('Usuario bloqueado', `@${post.author.username} ha sido bloqueado.`);
+                },
+              },
+            ],
+          );
+        },
+      },
+      { text: 'Cancelar', style: 'cancel' },
+    ]);
+  }, [post, handleBlockUser]);
 
   const headerHeight = 52;
   const panelsAvailable =
@@ -160,7 +209,9 @@ export function ReflectionDetailItem({
                 paddingRight: COMMENTS_CONTENT_INSETS.right,
               }}
             >
-              {mockComments.map((c) => (
+              {mockComments
+                .filter((c) => !blockedUsers.has(c.author.id))
+                .map((c) => (
                 <CommentCard
                   key={c.id}
                   username={c.author.username}
@@ -171,6 +222,8 @@ export function ReflectionDetailItem({
                   }
                   isUpvoted={!!commentVotes[c.id]}
                   onUpvote={() => toggleCommentVote(c.id)}
+                  onReport={() => console.log(`Reported comment ${c.id}`)}
+                  onBlockUser={() => handleBlockUser(c.author.id)}
                 />
               ))}
             </ScrollView>
@@ -201,6 +254,7 @@ export function ReflectionDetailItem({
               onClanPress={() => {
                 if (post.author.clanId) onClanPress(post.author.clanId);
               }}
+              onMorePress={handleMorePress}
             />
           </View>
         </View>

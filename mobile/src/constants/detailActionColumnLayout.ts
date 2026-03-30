@@ -8,7 +8,7 @@ export const DETAIL_ACTION_COLUMN_LAYOUT = {
   /** Desplazamiento X de toda la columna respecto al borde derecho del display. */
   offsetX: 0,
   /** Desplazamiento Y de toda la columna. */
-  offsetY: -117,
+  offsetY: -110,
   /** Espacio vertical entre botones (px). */
   gap: 6,
   /** Tamaño base de cada icono (px). Los editores de scale lo multiplican. */
@@ -41,6 +41,13 @@ export const DETAIL_SAVE_BUTTON_LAYOUT = {
   offsetX: 18,
   offsetY: 0,
   scale: 1.6,
+} as const;
+
+/** Botón MÁS (tres puntitos). */
+export const DETAIL_MORE_BUTTON_LAYOUT = {
+  offsetX: 18,
+  offsetY: -10,
+  scale: 2,
 } as const;
 
 /* ──────────────────────────────────────────────
