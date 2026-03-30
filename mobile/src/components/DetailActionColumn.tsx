@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useCallback } from 'react';
+import React, { useMemo, useRef, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { View, Text, TouchableOpacity, Animated, StyleSheet } from 'react-native';
 import {
   DETAIL_ACTION_COLUMN_LAYOUT as COL,
@@ -64,24 +64,34 @@ type DetailActionColumnProps = {
   onMorePress: () => void;
 };
 
-export function DetailActionColumn({
-  clanId,
-  upCount,
-  downCount,
-  saved,
-  voted,
-  onUpvote,
-  onDownvote,
-  onSave,
-  onClanPress,
-  onMorePress,
-}: DetailActionColumnProps) {
+export type DetailActionColumnHandle = {
+  triggerUpvoteBounce: () => void;
+};
+
+export const DetailActionColumn = forwardRef<DetailActionColumnHandle, DetailActionColumnProps>(
+  function DetailActionColumn(
+    {
+      clanId,
+      upCount,
+      downCount,
+      saved,
+      voted,
+      onUpvote,
+      onDownvote,
+      onSave,
+      onClanPress,
+      onMorePress,
+    },
+    ref,
+  ) {
   const InsigniaIcon = useMemo(() => getTopBarInsigniaByHouse(clanId), [clanId]);
   const sz = COL.iconSize;
 
   const upBounce = useBounce();
   const downBounce = useBounce();
   const saveBounce = useBounce();
+
+  useImperativeHandle(ref, () => ({ triggerUpvoteBounce: upBounce.trigger }), [upBounce]);
 
   const handleUp = useCallback(() => { upBounce.trigger(); onUpvote(); }, [upBounce, onUpvote]);
   const handleDown = useCallback(() => { downBounce.trigger(); onDownvote(); }, [downBounce, onDownvote]);
@@ -120,6 +130,7 @@ export function DetailActionColumn({
           fontSize: UP_C.fontSize,
           fontWeight: UP_C.fontWeight,
           textAlign: 'center',
+          minWidth: STAT_MIN_WIDTH,
           transform: [
             { translateX: UP_C.offsetX },
             { translateY: UP_C.offsetY },
@@ -157,6 +168,7 @@ export function DetailActionColumn({
           fontSize: APPR.fontSize,
           fontWeight: APPR.fontWeight,
           textAlign: 'center',
+          minWidth: STAT_MIN_WIDTH,
           transform: [
             { translateX: APPR.offsetX },
             { translateY: APPR.offsetY },
@@ -194,6 +206,7 @@ export function DetailActionColumn({
           fontSize: DOWN_C.fontSize,
           fontWeight: DOWN_C.fontWeight,
           textAlign: 'center',
+          minWidth: STAT_MIN_WIDTH,
           transform: [
             { translateX: DOWN_C.offsetX },
             { translateY: DOWN_C.offsetY },
@@ -242,7 +255,9 @@ export function DetailActionColumn({
       </TouchableOpacity>
     </View>
   );
-}
+});
+
+const STAT_MIN_WIDTH = 40;
 
 const styles = StyleSheet.create({
   column: {

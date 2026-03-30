@@ -81,6 +81,17 @@ export function CommentCard({
     ]);
   }, [username, onReport, onBlockUser]);
 
+  const lastTap = useRef(0);
+  const handleDoubleTap = useCallback(() => {
+    const now = Date.now();
+    if (now - lastTap.current < 300) {
+      handleUpvote();
+      lastTap.current = 0;
+    } else {
+      lastTap.current = now;
+    }
+  }, [handleUpvote]);
+
   const iconSz = 24 * UP.scale;
   const upColor = isUpvoted ? UP.colorActive : UP.colorInactive;
 
@@ -88,8 +99,9 @@ export function CommentCard({
     <View style={styles.wrapper}>
       <TouchableOpacity
         activeOpacity={0.8}
+        onPress={handleDoubleTap}
         onLongPress={handleLongPress}
-        delayLongPress={500}
+        delayLongPress={2000}
         style={[
           styles.card,
           {

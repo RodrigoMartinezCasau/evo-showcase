@@ -1,11 +1,12 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Share } from 'react-native';
+import React, { useState, useCallback, useRef } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Pressable, StyleSheet, Alert, Share } from 'react-native';
 import type { CommunityPost } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getClanColor } from '@evoconn/constants/clanColors';
 import { ReflectionBackground } from './ReflectionBackground';
 import { DETAIL_HEADER_ROW_OFFSET_Y } from '@evoconn/constants/reflectionDetailRankBadgeLayout';
 import { DetailActionColumn } from './DetailActionColumn';
+import type { DetailActionColumnHandle } from './DetailActionColumn';
 import { CommentCard } from './CommentCard';
 import {
   REFLECTION_PANEL_LAYOUT as RP,
@@ -16,6 +17,19 @@ import {
 } from '@evoconn/constants/reflectionPanelsLayout';
 import { DETAIL_ACTION_COLUMN_LAYOUT as COL } from '@evoconn/constants/detailActionColumnLayout';
 import { mockComments } from '@evoconn/data/mockComments';
+
+function useDoubleTap(callback: () => void, delay = 300) {
+  const lastTap = useRef(0);
+  return useCallback(() => {
+    const now = Date.now();
+    if (now - lastTap.current < delay) {
+      callback();
+      lastTap.current = 0;
+    } else {
+      lastTap.current = now;
+    }
+  }, [callback, delay]);
+}
 
 type ReflectionDetailItemProps = {
   post: CommunityPost;
@@ -32,6 +46,7 @@ export function ReflectionDetailItem({
   onClanPress,
 }: ReflectionDetailItemProps) {
   const clanColor = getClanColor(post.author.clanId);
+  const actionColRef = useRef<DetailActionColumnHandle>(null);
 
   const [voted, setVoted] = useState<'up' | 'down' | null>(null);
   const [saved, setSaved] = useState(false);
@@ -56,6 +71,12 @@ export function ReflectionDetailItem({
   const handleBlockUser = useCallback((userId: string) => {
     setBlockedUsers((prev) => new Set(prev).add(userId));
   }, []);
+
+  const handlePostDoubleTapUpvote = useCallback(() => {
+    actionColRef.current?.triggerUpvoteBounce();
+    handleUpvote();
+  }, [handleUpvote]);
+  const handlePostDoubleTap = useDoubleTap(handlePostDoubleTapUpvote);
 
   const handleMorePress = useCallback(() => {
     Alert.alert(post.title ?? 'Publicación', undefined, [
@@ -120,7 +141,10 @@ export function ReflectionDetailItem({
           </View>
 
           {/* ── Reflection panel (upper black box) ── */}
-          <View
+          <Pressable
+            onPress={handlePostDoubleTap}
+            onLongPress={handleMorePress}
+            delayLongPress={500}
             style={[
               styles.reflectionPanel,
               {
@@ -146,7 +170,7 @@ export function ReflectionDetailItem({
               {post.title ? <Text style={styles.title}>{post.title}</Text> : null}
               <Text style={styles.bodyText}>{post.body}</Text>
             </ScrollView>
-          </View>
+          </Pressable>
 
           <View style={{ height: PANELS_GAP }} />
 
@@ -213,6 +237,7 @@ export function ReflectionDetailItem({
             ]}
           >
             <DetailActionColumn
+              ref={actionColRef}
               clanId={post.author.clanId}
               upCount={post.voteStats.up}
               downCount={post.voteStats.down}
