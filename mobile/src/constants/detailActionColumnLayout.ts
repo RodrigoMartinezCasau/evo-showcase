@@ -8,9 +8,9 @@ export const DETAIL_ACTION_COLUMN_LAYOUT = {
   /** Desplazamiento X de toda la columna respecto al borde derecho del display. */
   offsetX: 0,
   /** Desplazamiento Y de toda la columna. */
-  offsetY: -110,
+  offsetY: -125,
   /** Espacio vertical entre botones (px). */
-  gap: 6,
+  gap: 7.5,
   /** Tamaño base de cada icono (px). Los editores de scale lo multiplican. */
   iconSize: 36,
 } as const;
