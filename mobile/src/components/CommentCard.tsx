@@ -5,6 +5,7 @@ import { evoconnColors } from '@evoconn/theme/colors';
 import {
   COMMENT_CARD_LAYOUT as CARD,
   COMMENT_UPVOTE_LAYOUT as UP,
+  COMMENT_EXPANSION_CONFIG as EXP,
 } from '@evoconn/constants/commentCardLayout';
 
 import UpvoteInactive from '../assets/detailActions/31.svg';
@@ -31,8 +32,12 @@ export function CommentCard({
   onReport,
   onBlockUser,
 }: CommentCardProps) {
-  const [expanded, setExpanded] = useState(false);
-  const [needsTruncation, setNeedsTruncation] = useState(false);
+  const [charLimit, setCharLimit] = useState(EXP.initialLimit);
+  const isLong = text.length > EXP.initialLimit;
+  const isFullyExpanded = charLimit >= Math.min(text.length, EXP.maxLimit);
+  const visibleText = isLong && !isFullyExpanded
+    ? text.slice(0, charLimit) + '…'
+    : text.slice(0, Math.min(text.length, EXP.maxLimit));
   const clanColor = getClanColor(clanId);
 
   const bounceScale = useRef(new Animated.Value(1)).current;
@@ -82,15 +87,23 @@ export function CommentCard({
   }, [username, onReport, onBlockUser]);
 
   const lastTap = useRef(0);
-  const handleDoubleTap = useCallback(() => {
+  const singleTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleTap = useCallback(() => {
     const now = Date.now();
     if (now - lastTap.current < 300) {
-      handleUpvote();
+      if (singleTapTimer.current) clearTimeout(singleTapTimer.current);
       lastTap.current = 0;
+      handleUpvote();
     } else {
       lastTap.current = now;
+      singleTapTimer.current = setTimeout(() => {
+        if (isLong && !isFullyExpanded) {
+          setCharLimit((prev) => Math.min(prev + EXP.step, EXP.maxLimit));
+        }
+      }, 300);
     }
-  }, [handleUpvote]);
+  }, [handleUpvote, isLong, isFullyExpanded]);
 
   const iconSz = 24 * UP.scale;
   const upColor = isUpvoted ? UP.colorActive : UP.colorInactive;
@@ -99,7 +112,7 @@ export function CommentCard({
     <View style={styles.wrapper}>
       <TouchableOpacity
         activeOpacity={0.8}
-        onPress={handleDoubleTap}
+        onPress={handleTap}
         onLongPress={handleLongPress}
         delayLongPress={2000}
         style={[
@@ -117,27 +130,9 @@ export function CommentCard({
         <Text style={[styles.username, { fontSize: CARD.usernameFontSize }]}>
           @{username}
         </Text>
-        <Text
-          style={[styles.body, { fontSize: CARD.bodyFontSize }]}
-          numberOfLines={expanded ? undefined : CARD.maxLines}
-          onTextLayout={(e) => {
-            if (!expanded && e.nativeEvent.lines.length > CARD.maxLines) {
-              setNeedsTruncation(true);
-            }
-          }}
-        >
-          {text}
+        <Text style={[styles.body, { fontSize: CARD.bodyFontSize }]}>
+          {visibleText}
         </Text>
-        {needsTruncation && (
-          <TouchableOpacity
-            onPress={() => setExpanded((v) => !v)}
-            activeOpacity={0.6}
-          >
-            <Text style={styles.readMore}>
-              {expanded ? 'Leer menos' : 'Leer más'}
-            </Text>
-          </TouchableOpacity>
-        )}
       </TouchableOpacity>
 
       {/* Upvote button — anchored to card, centered vertically */}
@@ -192,12 +187,6 @@ const styles = StyleSheet.create({
   body: {
     color: '#CCCCCC',
     lineHeight: 18,
-  },
-  readMore: {
-    color: evoconnColors.neonGreen,
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 4,
   },
   upvoteAnchor: {
     position: 'absolute',

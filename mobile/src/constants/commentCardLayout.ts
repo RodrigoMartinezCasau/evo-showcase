@@ -21,6 +21,16 @@ export const COMMENT_CARD_LAYOUT = {
   bodyFontSize: 13,
 } as const;
 
+/** Expansión progresiva del texto del comentario. */
+export const COMMENT_EXPANSION_CONFIG = {
+  /** Caracteres visibles inicialmente. */
+  initialLimit: 90,
+  /** Caracteres adicionales por cada tap. */
+  step: 90,
+  /** Máximo absoluto de caracteres visibles. */
+  maxLimit: 500,
+} as const;
+
 /** Botón de upvote del comentario (posición relativa a su tarjeta). */
 export const COMMENT_UPVOTE_LAYOUT = {
   /** Desplazamiento X respecto al borde derecho de la tarjeta. */
