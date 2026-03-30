@@ -23,6 +23,6 @@ export const DETAIL_HEADER_ROW_OFFSET_Y = 3;
 /** Colores por rango. */
 export const RANK_BADGE_COLORS: Record<Rank, { backgroundColor: string; textColor: string }> = {
   aprendiz: { backgroundColor: 'transparent', textColor: '#b36a34' },
-  maestro:  { backgroundColor: 'transparent', textColor: '#939393' },
+  maestro:  { backgroundColor: 'transparent', textColor: '#cdcdcd' },
   filosofo: { backgroundColor: 'transparent', textColor: '#d9af50' },
 };
