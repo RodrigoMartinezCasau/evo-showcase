@@ -35,3 +35,11 @@ export const PANELS_GAP = 12;
 
 /** Espacio reservado debajo del panel de comentarios (px). Reducir para expandir los paneles hacia abajo. */
 export const PANELS_BOTTOM_RESERVE = 0;
+
+/** Límites internos del contenido de comentarios dentro del panel negro. */
+export const COMMENTS_CONTENT_INSETS = {
+  top: 0,
+  bottom: 0,
+  left: 0,
+  right: 0,
+} as const;

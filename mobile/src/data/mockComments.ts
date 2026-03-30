@@ -14,5 +14,5 @@ export const mockComments: Comment[] = [
   { id: 'co3', author: users[2], body: 'Interesante perspectiva.', upCount: 8, createdAt: new Date().toISOString() },
   { id: 'co4', author: users[3], body: 'Esto me hizo pensar mucho.', upCount: 3, createdAt: new Date().toISOString() },
   { id: 'co5', author: users[4], body: 'Gran reflexión, la comparto.', upCount: 7, createdAt: new Date().toISOString() },
-  { id: 'co6', author: users[0], body: 'Vuelvo a leerlo y encuentro más sentido.', upCount: 2, createdAt: new Date().toISOString() },
+  { id: 'co6', author: users[0], body: 'Vuelvo a leerlo y encuentro más sentido cada vez que lo hago. Este tipo de reflexiones son las que marcan la diferencia en cómo vemos el mundo y nuestro lugar en él. Ojalá hubiera más contenido así.', upCount: 2, createdAt: new Date().toISOString() },
 ]

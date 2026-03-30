@@ -6,11 +6,13 @@ import { getClanColor } from '@evoconn/constants/clanColors';
 import { ReflectionBackground } from './ReflectionBackground';
 import { REFLECTION_DETAIL_RANK_BADGE_LAYOUT as RB, RANK_BADGE_COLORS, DETAIL_HEADER_ROW_OFFSET_Y } from '@evoconn/constants/reflectionDetailRankBadgeLayout';
 import { DetailActionColumn } from './DetailActionColumn';
+import { CommentCard } from './CommentCard';
 import {
   REFLECTION_PANEL_LAYOUT as RP,
   COMMENTS_PANEL_LAYOUT as CP,
   PANELS_GAP,
   PANELS_BOTTOM_RESERVE,
+  COMMENTS_CONTENT_INSETS,
 } from '@evoconn/constants/reflectionPanelsLayout';
 import { DETAIL_ACTION_COLUMN_LAYOUT as COL } from '@evoconn/constants/detailActionColumnLayout';
 import { mockComments } from '@evoconn/data/mockComments';
@@ -48,6 +50,11 @@ export function ReflectionDetailItem({
   }, []);
   const handleSave = useCallback(() => {
     setSaved((s) => !s);
+  }, []);
+
+  const [commentVotes, setCommentVotes] = useState<Record<string, boolean>>({});
+  const toggleCommentVote = useCallback((commentId: string) => {
+    setCommentVotes((prev) => ({ ...prev, [commentId]: !prev[commentId] }));
   }, []);
 
   const headerHeight = 52;
@@ -146,12 +153,25 @@ export function ReflectionDetailItem({
               showsVerticalScrollIndicator={false}
               nestedScrollEnabled
               keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{
+                paddingTop: COMMENTS_CONTENT_INSETS.top,
+                paddingBottom: COMMENTS_CONTENT_INSETS.bottom,
+                paddingLeft: COMMENTS_CONTENT_INSETS.left,
+                paddingRight: COMMENTS_CONTENT_INSETS.right,
+              }}
             >
               {mockComments.map((c) => (
-                <View key={c.id} style={styles.commentRow}>
-                  <Text style={styles.commentAuthor}>@{c.author.username}</Text>
-                  <Text style={styles.commentBody}>{c.body}</Text>
-                </View>
+                <CommentCard
+                  key={c.id}
+                  username={c.author.username}
+                  text={c.body}
+                  clanId={c.author.clanId}
+                  upvotes={
+                    c.upCount + (commentVotes[c.id] ? 1 : 0)
+                  }
+                  isUpvoted={!!commentVotes[c.id]}
+                  onUpvote={() => toggleCommentVote(c.id)}
+                />
               ))}
             </ScrollView>
           </View>
@@ -240,19 +260,5 @@ const styles = StyleSheet.create({
 
   commentsPanel: {
     overflow: 'hidden',
-  },
-  commentRow: {
-    marginBottom: 10,
-  },
-  commentAuthor: {
-    color: evoconnColors.text,
-    fontWeight: '700',
-    fontSize: 13,
-    marginBottom: 2,
-  },
-  commentBody: {
-    color: '#CCCCCC',
-    fontSize: 14,
-    lineHeight: 20,
   },
 });
