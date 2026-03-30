@@ -14,6 +14,8 @@ import {
   PANELS_GAP,
   PANELS_BOTTOM_RESERVE,
   COMMENTS_CONTENT_INSETS,
+  REFLECTION_TEXT_RIGHT_INSET,
+  DETAIL_TITLE_LAYOUT as TL,
 } from '@evoconn/constants/reflectionPanelsLayout';
 import { DETAIL_ACTION_COLUMN_LAYOUT as COL } from '@evoconn/constants/detailActionColumnLayout';
 import { mockComments } from '@evoconn/data/mockComments';
@@ -168,8 +170,27 @@ export function ReflectionDetailItem({
               showsVerticalScrollIndicator={false}
               nestedScrollEnabled
               keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingRight: REFLECTION_TEXT_RIGHT_INSET }}
             >
-              {post.title ? <Text style={styles.title}>{post.title}</Text> : null}
+              {post.title ? (
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.title,
+                    {
+                      transform: [
+                        { translateX: TL.offsetX },
+                        { translateY: TL.offsetY },
+                        { scale: TL.scale },
+                      ],
+                    },
+                  ]}
+                >
+                  {post.title.length > TL.maxCharacters
+                    ? post.title.slice(0, TL.maxCharacters) + '…'
+                    : post.title}
+                </Text>
+              ) : null}
               <Text style={styles.bodyText}>{post.body}</Text>
             </ScrollView>
           </Pressable>

@@ -36,6 +36,18 @@ export const PANELS_GAP = 12;
 /** Espacio reservado debajo del panel de comentarios (px). Reducir para expandir los paneles hacia abajo. */
 export const PANELS_BOTTOM_RESERVE = 0;
 
+/** Reducción del ancho útil del texto de la reflexión desde la derecha (px). */
+export const REFLECTION_TEXT_RIGHT_INSET = 45;
+
+/** Control del título de la reflexión/frase. */
+export const DETAIL_TITLE_LAYOUT = {
+  offsetX: 33,
+  offsetY: 0,
+  scale: 1.2,
+  /** Caracteres máximos visibles. Si el título es más largo, se trunca con "…". */
+  maxCharacters: 25,
+} as const;
+
 /** Límites internos del contenido de comentarios dentro del panel negro. */
 export const COMMENTS_CONTENT_INSETS = {
   top: 0,
