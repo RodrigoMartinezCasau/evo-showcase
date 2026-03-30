@@ -8,7 +8,7 @@ export const DETAIL_ACTION_COLUMN_LAYOUT = {
   /** Desplazamiento X de toda la columna respecto al borde derecho del display. */
   offsetX: 0,
   /** Desplazamiento Y de toda la columna. */
-  offsetY: -135,
+  offsetY: -120,
   /** Espacio vertical entre botones (px). */
   gap: 16,
   /** Tamaño base de cada icono (px). Los editores de scale lo multiplican. */
@@ -26,19 +26,19 @@ export const DETAIL_CLAN_BUTTON_LAYOUT = {
 export const DETAIL_UPVOTE_BUTTON_LAYOUT = {
   offsetX: 18.5,
   offsetY: 0,
-  scale: 1.7,
+  scale: 1.8,
 } as const;
 
 /** Botón DOWNVOTE. */
 export const DETAIL_DOWNVOTE_BUTTON_LAYOUT = {
   offsetX: 18.5,
   offsetY: 0,
-  scale: 1.7,
+  scale: 1.8,
 } as const;
 
 /** Botón SAVE (guardar / bookmark). */
 export const DETAIL_SAVE_BUTTON_LAYOUT = {
   offsetX: 18,
   offsetY: 0,
-  scale: 1.5,
+  scale: 1.6,
 } as const;

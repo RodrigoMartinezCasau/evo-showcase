@@ -10,7 +10,7 @@ export const REFLECTION_PANEL_LAYOUT = {
   /** 1 = ancho completo del contenedor; <1 más estrecho, >1 más ancho. */
   widthScale: 0.95,
   /** Proporción de la altura disponible (0–1). El resto lo toma el panel de comentarios. */
-  heightRatio: 0.75,
+  heightRatio: 0.65,
   borderRadius: 15,
   paddingHorizontal: 14,
   paddingVertical: 16,

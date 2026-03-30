@@ -1,10 +1,10 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
-import type { CommunityPost } from '@evoconn/types';
+import type { CommunityPost, Rank } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getClanColor } from '@evoconn/constants/clanColors';
-import { ClanBanner, RankBadge } from '@evoconn/components';
 import { ReflectionBackground } from './ReflectionBackground';
+import { REFLECTION_DETAIL_RANK_BADGE_LAYOUT as RB, RANK_BADGE_COLORS, DETAIL_HEADER_ROW_OFFSET_Y } from '@evoconn/constants/reflectionDetailRankBadgeLayout';
 import { DetailActionColumn } from './DetailActionColumn';
 import {
   REFLECTION_PANEL_LAYOUT as RP,
@@ -14,6 +14,12 @@ import {
 } from '@evoconn/constants/reflectionPanelsLayout';
 import { DETAIL_ACTION_COLUMN_LAYOUT as COL } from '@evoconn/constants/detailActionColumnLayout';
 import { mockComments } from '@evoconn/data/mockComments';
+
+const RANK_LABELS: Record<Rank, string> = {
+  aprendiz: 'Aprendiz',
+  maestro: 'Maestro',
+  filosofo: 'Filósofo',
+};
 
 type ReflectionDetailItemProps = {
   post: CommunityPost;
@@ -57,17 +63,33 @@ export function ReflectionDetailItem({
       <ReflectionBackground clan={post.author.clanId}>
         <View style={styles.content}>
           {/* ── Header ── */}
-          <View style={styles.headerRow}>
+          <View style={[styles.headerRow, { transform: [{ translateY: DETAIL_HEADER_ROW_OFFSET_Y }] }]}>
             <TouchableOpacity onPress={() => onAuthorPress(post.author.id)}>
               <Text style={styles.username}>{post.author.username}</Text>
             </TouchableOpacity>
-            <View style={styles.badges}>
-              {post.author.clanId ? (
-                <TouchableOpacity onPress={() => onClanPress(post.author.clanId!)}>
-                  <ClanBanner clanId={post.author.clanId} shortLabel={post.author.clanId.toUpperCase()} small />
-                </TouchableOpacity>
-              ) : null}
-              <RankBadge rank={post.author.rank} small />
+            <View
+              style={{
+                backgroundColor: RANK_BADGE_COLORS[post.author.rank].backgroundColor,
+                paddingHorizontal: RB.paddingHorizontal,
+                paddingVertical: RB.paddingVertical,
+                borderRadius: RB.borderRadius,
+                transform: [
+                  { translateX: RB.offsetX },
+                  { translateY: RB.offsetY },
+                ],
+              }}
+            >
+              <Text
+                style={{
+                  color: RANK_BADGE_COLORS[post.author.rank].textColor,
+                  fontSize: RB.fontSize,
+                  fontWeight: RB.fontWeight,
+                  letterSpacing: RB.letterSpacing,
+                  textTransform: 'uppercase',
+                }}
+              >
+                {RANK_LABELS[post.author.rank]}
+              </Text>
             </View>
           </View>
 
@@ -190,12 +212,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     letterSpacing: 0.4,
   },
-  badges: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-
   actionCol: {
     position: 'absolute',
     right: 0,
