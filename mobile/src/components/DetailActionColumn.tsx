@@ -101,168 +101,165 @@ export const DetailActionColumn = forwardRef<DetailActionColumnHandle, DetailAct
   const approvalPct = total > 0 ? Math.round((upCount / total) * 100) : 100;
 
   return (
-    <View
-      style={[
-        styles.column,
-        { gap: COL.gap },
-      ]}
-    >
-      {/* Clan */}
-      <TouchableOpacity onPress={onClanPress} activeOpacity={0.7}>
-        <View
+    <View style={styles.root}>
+      {/* ── Buttons (flex column) ── */}
+      <View style={[styles.column, { gap: COL.gap }]}>
+        {/* Clan */}
+        <TouchableOpacity onPress={onClanPress} activeOpacity={0.7}>
+          <View
+            style={{
+              width: sz * CLAN_L.scale,
+              height: sz * CLAN_L.scale,
+              transform: [
+                { translateX: CLAN_L.offsetX },
+                { translateY: CLAN_L.offsetY },
+              ],
+            }}
+          >
+            <InsigniaIcon width={sz * CLAN_L.scale} height={sz * CLAN_L.scale} />
+          </View>
+        </TouchableOpacity>
+
+        {/* Upvote */}
+        <TouchableOpacity onPress={handleUp} activeOpacity={0.7}>
+          <Animated.View
+            style={{
+              width: sz * UP_L.scale,
+              height: sz * UP_L.scale,
+              transform: [
+                { translateX: UP_L.offsetX },
+                { translateY: UP_L.offsetY },
+                { scale: upBounce.scale },
+              ],
+            }}
+          >
+            {voted === 'up' ? (
+              <UpvoteActive key="up-active" width={sz * UP_L.scale} height={sz * UP_L.scale} />
+            ) : (
+              <UpvoteInactive key="up-inactive" width={sz * UP_L.scale} height={sz * UP_L.scale} />
+            )}
+          </Animated.View>
+        </TouchableOpacity>
+
+        {/* Downvote */}
+        <TouchableOpacity onPress={handleDown} activeOpacity={0.7}>
+          <Animated.View
+            style={{
+              width: sz * DOWN_L.scale,
+              height: sz * DOWN_L.scale,
+              transform: [
+                { translateX: DOWN_L.offsetX },
+                { translateY: DOWN_L.offsetY },
+                { scale: downBounce.scale },
+              ],
+            }}
+          >
+            {voted === 'down' ? (
+              <DownvoteActive key="down-active" width={sz * DOWN_L.scale} height={sz * DOWN_L.scale} />
+            ) : (
+              <DownvoteInactive key="down-inactive" width={sz * DOWN_L.scale} height={sz * DOWN_L.scale} />
+            )}
+          </Animated.View>
+        </TouchableOpacity>
+
+        {/* Save */}
+        <TouchableOpacity onPress={handleSave} activeOpacity={0.7}>
+          <Animated.View
+            style={{
+              width: sz * SAVE_L.scale,
+              height: sz * SAVE_L.scale,
+              transform: [
+                { translateX: SAVE_L.offsetX },
+                { translateY: SAVE_L.offsetY },
+                { scale: saveBounce.scale },
+              ],
+            }}
+          >
+            {saved ? (
+              <SaveActive key="save-active" width={sz * SAVE_L.scale} height={sz * SAVE_L.scale} />
+            ) : (
+              <SaveInactive key="save-inactive" width={sz * SAVE_L.scale} height={sz * SAVE_L.scale} />
+            )}
+          </Animated.View>
+        </TouchableOpacity>
+
+        {/* More (three dots) */}
+        <TouchableOpacity
+          onPress={onMorePress}
+          activeOpacity={0.7}
+          hitSlop={8}
           style={{
-            width: sz * CLAN_L.scale,
-            height: sz * CLAN_L.scale,
             transform: [
-              { translateX: CLAN_L.offsetX },
-              { translateY: CLAN_L.offsetY },
+              { translateX: MORE_L.offsetX },
+              { translateY: MORE_L.offsetY },
             ],
           }}
         >
-          <InsigniaIcon width={sz * CLAN_L.scale} height={sz * CLAN_L.scale} />
-        </View>
-      </TouchableOpacity>
+          <Text style={[styles.moreDots, { fontSize: 22 * MORE_L.scale }]}>
+            ···
+          </Text>
+        </TouchableOpacity>
+      </View>
 
-      {/* Upvote count */}
+      {/* ── Stats (absolute, 100% independent) ── */}
       <Text
+        pointerEvents="none"
         style={{
+          position: 'absolute',
+          left: UP_C.offsetX,
+          top: UP_C.offsetY,
           color: voted === 'up' ? UP_C.colorActive : UP_C.colorInactive,
           fontSize: UP_C.fontSize,
           fontWeight: UP_C.fontWeight,
-          textAlign: 'center',
-          minWidth: STAT_MIN_WIDTH,
-          transform: [
-            { translateX: UP_C.offsetX },
-            { translateY: UP_C.offsetY },
-          ],
+          transform: [{ scale: UP_C.scale }],
         }}
       >
         {formatCount(upCount)}
       </Text>
 
-      {/* Upvote */}
-      <TouchableOpacity onPress={handleUp} activeOpacity={0.7}>
-        <Animated.View
-          style={{
-            width: sz * UP_L.scale,
-            height: sz * UP_L.scale,
-            transform: [
-              { translateX: UP_L.offsetX },
-              { translateY: UP_L.offsetY },
-              { scale: upBounce.scale },
-            ],
-          }}
-        >
-          {voted === 'up' ? (
-            <UpvoteActive key="up-active" width={sz * UP_L.scale} height={sz * UP_L.scale} />
-          ) : (
-            <UpvoteInactive key="up-inactive" width={sz * UP_L.scale} height={sz * UP_L.scale} />
-          )}
-        </Animated.View>
-      </TouchableOpacity>
-
-      {/* Approval percentage */}
       <Text
+        pointerEvents="none"
         style={{
+          position: 'absolute',
+          left: APPR.offsetX,
+          top: APPR.offsetY,
           color: getApprovalColor(approvalPct),
           fontSize: APPR.fontSize,
           fontWeight: APPR.fontWeight,
-          textAlign: 'center',
-          minWidth: STAT_MIN_WIDTH,
-          transform: [
-            { translateX: APPR.offsetX },
-            { translateY: APPR.offsetY },
-          ],
+          transform: [{ scale: APPR.scale }],
         }}
       >
         {approvalPct}%
       </Text>
 
-      {/* Downvote */}
-      <TouchableOpacity onPress={handleDown} activeOpacity={0.7}>
-        <Animated.View
-          style={{
-            width: sz * DOWN_L.scale,
-            height: sz * DOWN_L.scale,
-            transform: [
-              { translateX: DOWN_L.offsetX },
-              { translateY: DOWN_L.offsetY },
-              { scale: downBounce.scale },
-            ],
-          }}
-        >
-          {voted === 'down' ? (
-            <DownvoteActive key="down-active" width={sz * DOWN_L.scale} height={sz * DOWN_L.scale} />
-          ) : (
-            <DownvoteInactive key="down-inactive" width={sz * DOWN_L.scale} height={sz * DOWN_L.scale} />
-          )}
-        </Animated.View>
-      </TouchableOpacity>
-
-      {/* Downvote count */}
       <Text
+        pointerEvents="none"
         style={{
+          position: 'absolute',
+          left: DOWN_C.offsetX,
+          top: DOWN_C.offsetY,
           color: voted === 'down' ? DOWN_C.colorActive : DOWN_C.colorInactive,
           fontSize: DOWN_C.fontSize,
           fontWeight: DOWN_C.fontWeight,
-          textAlign: 'center',
-          minWidth: STAT_MIN_WIDTH,
-          transform: [
-            { translateX: DOWN_C.offsetX },
-            { translateY: DOWN_C.offsetY },
-          ],
+          transform: [{ scale: DOWN_C.scale }],
         }}
       >
         {formatCount(downCount)}
       </Text>
-
-      {/* Save */}
-      <TouchableOpacity onPress={handleSave} activeOpacity={0.7}>
-        <Animated.View
-          style={{
-            width: sz * SAVE_L.scale,
-            height: sz * SAVE_L.scale,
-            transform: [
-              { translateX: SAVE_L.offsetX },
-              { translateY: SAVE_L.offsetY },
-              { scale: saveBounce.scale },
-            ],
-          }}
-        >
-          {saved ? (
-            <SaveActive key="save-active" width={sz * SAVE_L.scale} height={sz * SAVE_L.scale} />
-          ) : (
-            <SaveInactive key="save-inactive" width={sz * SAVE_L.scale} height={sz * SAVE_L.scale} />
-          )}
-        </Animated.View>
-      </TouchableOpacity>
-
-      {/* More (three dots) */}
-      <TouchableOpacity
-        onPress={onMorePress}
-        activeOpacity={0.7}
-        hitSlop={8}
-        style={{
-          transform: [
-            { translateX: MORE_L.offsetX },
-            { translateY: MORE_L.offsetY },
-          ],
-        }}
-      >
-        <Text style={[styles.moreDots, { fontSize: 22 * MORE_L.scale }]}>
-          ···
-        </Text>
-      </TouchableOpacity>
     </View>
   );
 });
 
-const STAT_MIN_WIDTH = 40;
+const COL_FIXED_WIDTH = COL.iconSize * CLAN_L.scale;
 
 const styles = StyleSheet.create({
+  root: {
+    width: COL_FIXED_WIDTH,
+  },
   column: {
     alignItems: 'center',
     justifyContent: 'flex-start',
+    width: COL_FIXED_WIDTH,
   },
   moreDots: {
     color: '#FFFFFF',

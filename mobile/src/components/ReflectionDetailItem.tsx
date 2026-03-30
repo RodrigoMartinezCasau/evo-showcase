@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Pressable, StyleSheet, Alert, Share } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Pressable, StyleSheet, Alert, Share, useWindowDimensions } from 'react-native';
 import type { CommunityPost } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getClanColor } from '@evoconn/constants/clanColors';
@@ -121,6 +121,8 @@ export function ReflectionDetailItem({
     ]);
   }, [post, handleBlockUser]);
 
+  const { width: screenW } = useWindowDimensions();
+
   const headerHeight = 52;
   const panelsAvailable =
     itemHeight - headerHeight - PANELS_BOTTOM_RESERVE - PANELS_GAP - 16;
@@ -223,37 +225,35 @@ export function ReflectionDetailItem({
             </ScrollView>
           </View>
 
-          {/* ── Action column (absolute, independent layer) ── */}
-          <View
-            pointerEvents="box-none"
-            style={[
-              styles.actionCol,
-              {
-                transform: [
-                  { translateX: COL.offsetX },
-                  { translateY: COL.offsetY },
-                ],
-              },
-            ]}
-          >
-            <DetailActionColumn
-              ref={actionColRef}
-              clanId={post.author.clanId}
-              upCount={post.voteStats.up}
-              downCount={post.voteStats.down}
-              saved={saved}
-              voted={voted}
-              onUpvote={handleUpvote}
-              onDownvote={handleDownvote}
-              onSave={handleSave}
-              onClanPress={() => {
-                if (post.author.clanId) onClanPress(post.author.clanId);
-              }}
-              onMorePress={handleMorePress}
-            />
-          </View>
         </View>
       </ReflectionBackground>
+
+      {/* ── Action column (pixel-pinned, independent of any layout) ── */}
+      <View
+        pointerEvents="box-none"
+        style={{
+          position: 'absolute',
+          left: screenW - 70 + COL.offsetX,
+          top: itemHeight / 2 + COL.offsetY,
+          zIndex: 10,
+        }}
+      >
+        <DetailActionColumn
+          ref={actionColRef}
+          clanId={post.author.clanId}
+          upCount={post.voteStats.up}
+          downCount={post.voteStats.down}
+          saved={saved}
+          voted={voted}
+          onUpvote={handleUpvote}
+          onDownvote={handleDownvote}
+          onSave={handleSave}
+          onClanPress={() => {
+            if (post.author.clanId) onClanPress(post.author.clanId);
+          }}
+          onMorePress={handleMorePress}
+        />
+      </View>
     </View>
   );
 }
@@ -281,16 +281,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     letterSpacing: 0.4,
   },
-  actionCol: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-  },
-
   reflectionPanel: {
     borderLeftWidth: 4,
     overflow: 'hidden',

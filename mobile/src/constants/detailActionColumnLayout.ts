@@ -6,11 +6,11 @@
 /** Configuración global de la columna. */
 export const DETAIL_ACTION_COLUMN_LAYOUT = {
   /** Desplazamiento X de toda la columna respecto al borde derecho del display. */
-  offsetX: 0,
+  offsetX: -49,
   /** Desplazamiento Y de toda la columna. */
-  offsetY: -125,
+  offsetY: -345,
   /** Espacio vertical entre botones (px). */
-  gap: 7.5,
+  gap: 26,
   /** Tamaño base de cada icono (px). Los editores de scale lo multiplican. */
   iconSize: 36,
 } as const;
@@ -46,7 +46,7 @@ export const DETAIL_SAVE_BUTTON_LAYOUT = {
 /** Botón MÁS (tres puntitos). */
 export const DETAIL_MORE_BUTTON_LAYOUT = {
   offsetX: 18,
-  offsetY: -10,
+  offsetY: -25,
   scale: 2,
 } as const;
 
@@ -54,30 +54,39 @@ export const DETAIL_MORE_BUTTON_LAYOUT = {
  *  Stats visuales (números de votos + porcentaje)
  * ────────────────────────────────────────────── */
 
-/** Número de upvotes (encima de la flecha). */
+/**
+ * Stats visuales — posicionamiento ABSOLUTO e independiente.
+ * offsetX/offsetY: posición relativa al top-left de la columna (px).
+ * scale: escala visual del texto (no afecta a otros elementos).
+ */
+
+/** Número de upvotes. */
 export const DETAIL_UPVOTE_COUNT_LAYOUT = {
-  offsetX: 18,
-  offsetY: 0,
+  offsetX: 60,
+  offsetY: 125,
+  scale: 1.1,
   fontSize: 13,
   fontWeight: '700' as const,
   colorActive: '#A3FF3B',
   colorInactive: '#FFFFFF',
 } as const;
 
-/** Número de downvotes (debajo de la flecha). */
+/** Número de downvotes. */
 export const DETAIL_DOWNVOTE_COUNT_LAYOUT = {
-  offsetX: 18,
-  offsetY: 0,
+  offsetX: 64,
+  offsetY: 300,
+  scale: 1.1,
   fontSize: 13,
   fontWeight: '700' as const,
   colorActive: '#ff4a31',
   colorInactive: '#FFFFFF',
 } as const;
 
-/** Porcentaje de aprobación (entre ambas flechas). */
+/** Porcentaje de aprobación. */
 export const DETAIL_APPROVAL_PERCENT_LAYOUT = {
-  offsetX: 18,
-  offsetY: 0,
+  offsetX: 64,
+  offsetY: 213,
+  scale: 1.1,
   fontSize: 12,
   fontWeight: '800' as const,
   colorAbove95: '#A3FF3B',
