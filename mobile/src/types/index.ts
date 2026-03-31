@@ -37,6 +37,8 @@ export type CommunityPost = {
   author: User
   title?: string
   body: string
+  /** Original author of the quote (for phrases). Not the posting user. */
+  quoteAuthor?: string
   voteStats: VoteStats
   createdAt: string
 }

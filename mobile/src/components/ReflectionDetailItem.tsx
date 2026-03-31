@@ -18,6 +18,10 @@ import {
   DETAIL_TITLE_LAYOUT as TL,
 } from '@evoconn/constants/reflectionPanelsLayout';
 import { DETAIL_ACTION_COLUMN_LAYOUT as COL } from '@evoconn/constants/detailActionColumnLayout';
+import {
+  DETAIL_QUOTE_LAYOUT as QL,
+  DETAIL_QUOTE_AUTHOR_LAYOUT as QAL,
+} from '@evoconn/constants/detailQuoteLayout';
 import { mockComments } from '@evoconn/data/mockComments';
 import { FollowButton } from './FollowButton';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
@@ -210,12 +214,14 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     : Math.max(80, panelsAvailable * (1 - RP.heightRatio));
   const reflectionH = Math.max(80, panelsAvailable - commentsH);
 
+  const isPhrase = post.type === 'phrase';
+
   const BODY_LINE_HEIGHT = 24;
   const titleOccupied = post.title ? 32 : 0;
   const readMoreSpace = 22;
   const bodyAvailableH = reflectionH - RP.paddingVertical * 2 - titleOccupied - readMoreSpace;
   const maxBodyLines = Math.max(2, Math.floor(bodyAvailableH / BODY_LINE_HEIGHT));
-  const isLongText = post.body.length > maxBodyLines * 32;
+  const isLongText = !isPhrase && post.body.length > maxBodyLines * 32;
 
   const visibleComments = useMemo(
     () => mockComments.filter((c) => !blockedUsers.has(c.author.id)),
@@ -278,42 +284,83 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
               },
             ]}
           >
-            <ScrollView
-              scrollEnabled={readingMode && isLongText}
-              showsVerticalScrollIndicator={readingMode}
-              nestedScrollEnabled
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ paddingRight: REFLECTION_TEXT_RIGHT_INSET }}
-            >
-              {post.title ? (
+            {isPhrase ? (
+              <View
+                style={[
+                  styles.quoteCenter,
+                  {
+                    paddingLeft: QL.maxWidthReductionLeft,
+                    paddingRight: QL.maxWidthReductionRight,
+                    transform: [
+                      { translateX: QL.offsetX },
+                      { translateY: QL.offsetY },
+                    ],
+                  },
+                ]}
+              >
                 <Text
-                  numberOfLines={1}
                   style={[
-                    styles.title,
-                    {
-                      transform: [
-                        { translateX: TL.offsetX },
-                        { translateY: TL.offsetY },
-                        { scale: TL.scale },
-                      ],
-                    },
+                    styles.quoteText,
+                    { fontSize: QL.fontSize, lineHeight: QL.lineHeight },
                   ]}
                 >
-                  {post.title.length > TL.maxCharacters
-                    ? post.title.slice(0, TL.maxCharacters) + '…'
-                    : post.title}
+                  {`\u201C${post.body}\u201D`}
                 </Text>
-              ) : null}
-              <Text
-                style={styles.bodyText}
-                numberOfLines={!readingMode && isLongText ? maxBodyLines : undefined}
+                {post.quoteAuthor ? (
+                  <Text
+                    style={[
+                      styles.quoteAuthor,
+                      {
+                        fontSize: QAL.fontSize,
+                        transform: [
+                          { translateX: QAL.offsetX },
+                          { translateY: QAL.offsetY },
+                        ],
+                      },
+                    ]}
+                  >
+                    {post.quoteAuthor}
+                  </Text>
+                ) : null}
+              </View>
+            ) : (
+              <ScrollView
+                scrollEnabled={readingMode && isLongText}
+                showsVerticalScrollIndicator={readingMode}
+                nestedScrollEnabled
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={{ paddingRight: REFLECTION_TEXT_RIGHT_INSET }}
               >
-                {post.body}
-              </Text>
-              {!readingMode && isLongText ? (
-                <Text style={styles.readMoreLabel}>ver más...</Text>
-              ) : null}
-            </ScrollView>
+                {post.title ? (
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.title,
+                      {
+                        transform: [
+                          { translateX: TL.offsetX },
+                          { translateY: TL.offsetY },
+                          { scale: TL.scale },
+                        ],
+                      },
+                    ]}
+                  >
+                    {post.title.length > TL.maxCharacters
+                      ? post.title.slice(0, TL.maxCharacters) + '…'
+                      : post.title}
+                  </Text>
+                ) : null}
+                <Text
+                  style={styles.bodyText}
+                  numberOfLines={!readingMode && isLongText ? maxBodyLines : undefined}
+                >
+                  {post.body}
+                </Text>
+                {!readingMode && isLongText ? (
+                  <Text style={styles.readMoreLabel}>ver más...</Text>
+                ) : null}
+              </ScrollView>
+            )}
           </View>
 
           <View style={{ height: PANELS_GAP }} />
@@ -442,6 +489,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontStyle: 'italic',
     marginTop: 4,
+  },
+
+  quoteCenter: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quoteText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontStyle: 'italic',
+    textAlign: 'center',
+  },
+  quoteAuthor: {
+    color: '#CCCCCC',
+    fontWeight: '400',
+    textAlign: 'center',
+    marginTop: 8,
   },
 
   commentsPanel: {
