@@ -557,7 +557,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   feedStatCount: {
-    color: evoconnColors.muted,
+    color: evoconnColors.text,
     fontSize: 12,
     fontWeight: '600',
   },

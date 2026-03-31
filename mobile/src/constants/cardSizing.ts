@@ -25,5 +25,5 @@ export const CARD_CHAR_THRESHOLD_SMALL = 92;
  * MEDIUM: truncate with "..." after this many lines.
  */
 export const CARD_MAX_LINES_SMALL: undefined = undefined;
-export const CARD_MAX_LINES_MEDIUM = 10;
+export const CARD_MAX_LINES_MEDIUM = 8;
 export const CARD_MAX_LINES_QUOTE = 4;

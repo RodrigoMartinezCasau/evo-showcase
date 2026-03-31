@@ -41,9 +41,9 @@ export const REFLECTION_TEXT_RIGHT_INSET = 45;
 
 /** Control del título de la reflexión/frase. */
 export const DETAIL_TITLE_LAYOUT = {
-  offsetX: 33,
+  offsetX: 27,
   offsetY: 0,
-  scale: 1.2,
+  scale: 1.16,
   /** Caracteres máximos visibles. Si el título es más largo, se trunca con "…". */
   maxCharacters: 25,
 } as const;

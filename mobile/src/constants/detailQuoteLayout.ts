@@ -13,6 +13,6 @@ export const DETAIL_QUOTE_LAYOUT = {
 
 export const DETAIL_QUOTE_AUTHOR_LAYOUT = {
   offsetX: 0,
-  offsetY: 12,
+  offsetY: 8,
   fontSize: 24,
 } as const;
