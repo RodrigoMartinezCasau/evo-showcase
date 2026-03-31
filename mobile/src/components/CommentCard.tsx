@@ -7,11 +7,13 @@ import {
   COMMENT_UPVOTE_LAYOUT as UP,
   COMMENT_EXPANSION_CONFIG as EXP,
 } from '@evoconn/constants/commentCardLayout';
+import { useFollowState } from '@evoconn/hooks/useFollowState';
 
 import UpvoteInactive from '../assets/detailActions/31.svg';
 import UpvoteActive from '../assets/detailActions/32.svg';
 
 type CommentCardProps = {
+  authorId: string;
   username: string;
   text: string;
   clanId: string | null | undefined;
@@ -23,6 +25,7 @@ type CommentCardProps = {
 };
 
 export const CommentCard = React.memo(function CommentCard({
+  authorId,
   username,
   text,
   clanId,
@@ -52,8 +55,17 @@ export const CommentCard = React.memo(function CommentCard({
     onUpvote?.();
   }, [bounceScale, onUpvote]);
 
+  const { isFollowing: checkFollowing, toggleFollow } = useFollowState();
+
   const handleLongPress = useCallback(() => {
+    const following = checkFollowing(authorId);
     Alert.alert(`@${username}`, undefined, [
+      {
+        text: following ? 'Dejar de seguir' : 'Seguir usuario',
+        onPress: () => {
+          toggleFollow(authorId);
+        },
+      },
       {
         text: 'Denunciar comentario',
         onPress: () => {
@@ -84,7 +96,7 @@ export const CommentCard = React.memo(function CommentCard({
       },
       { text: 'Cancelar', style: 'cancel' },
     ]);
-  }, [username, onReport, onBlockUser]);
+  }, [username, authorId, onReport, onBlockUser, checkFollowing, toggleFollow]);
 
   const lastTap = useRef(0);
   const singleTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);

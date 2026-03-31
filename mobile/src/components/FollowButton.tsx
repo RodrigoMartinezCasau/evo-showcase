@@ -1,4 +1,4 @@
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useEffect } from 'react';
 import { TouchableOpacity, Animated, StyleSheet } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { getClanSecondaryColor } from '@evoconn/constants/clanColors';
@@ -48,37 +48,61 @@ export const FollowButton = React.memo(function FollowButton({
   const { isFollowing, toggleFollow } = useFollowState();
   const following = isFollowing(authorId);
 
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const opacityAnim = useRef(new Animated.Value(1)).current;
+  const scaleAnim = useRef(new Animated.Value(following ? 0 : 1)).current;
+  const opacityAnim = useRef(new Animated.Value(following ? 0 : 1)).current;
+  const prevFollowing = useRef(following);
+  const busy = useRef(false);
 
-  const handlePress = useCallback(() => {
-    if (following) return;
+  useEffect(() => {
+    if (prevFollowing.current === following) return;
+    prevFollowing.current = following;
 
-    Animated.sequence([
-      Animated.spring(scaleAnim, {
-        toValue: 1.3,
-        friction: 4,
-        tension: 300,
-        useNativeDriver: true,
-      }),
+    if (following) {
+      busy.current = true;
+      Animated.sequence([
+        Animated.spring(scaleAnim, {
+          toValue: 1.3,
+          friction: 4,
+          tension: 300,
+          useNativeDriver: true,
+        }),
+        Animated.parallel([
+          Animated.timing(scaleAnim, {
+            toValue: 0,
+            duration: 180,
+            useNativeDriver: true,
+          }),
+          Animated.timing(opacityAnim, {
+            toValue: 0,
+            duration: 180,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start(() => { busy.current = false; });
+    } else {
+      scaleAnim.setValue(0.85);
+      opacityAnim.setValue(0);
+      busy.current = true;
       Animated.parallel([
-        Animated.timing(scaleAnim, {
-          toValue: 0,
-          duration: 180,
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          friction: 6,
+          tension: 120,
           useNativeDriver: true,
         }),
         Animated.timing(opacityAnim, {
-          toValue: 0,
-          duration: 180,
+          toValue: 1,
+          duration: 240,
           useNativeDriver: true,
         }),
-      ]),
-    ]).start(() => {
-      toggleFollow(authorId);
-    });
-  }, [following, authorId, scaleAnim, opacityAnim, toggleFollow]);
+      ]).start(() => { busy.current = false; });
+    }
+  }, [following, scaleAnim, opacityAnim]);
 
-  if (following) return null;
+  const handlePress = useCallback(() => {
+    if (following || busy.current) return;
+    toggleFollow(authorId);
+  }, [following, authorId, toggleFollow]);
 
   const layout = LAYOUT_BY_CONTEXT[context];
   const sz = BASE_SIZE * layout.scale;
@@ -86,6 +110,7 @@ export const FollowButton = React.memo(function FollowButton({
 
   return (
     <Animated.View
+      pointerEvents={following ? 'none' : 'auto'}
       style={[
         styles.root,
         {

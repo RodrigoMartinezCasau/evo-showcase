@@ -20,6 +20,7 @@ import {
 import { DETAIL_ACTION_COLUMN_LAYOUT as COL } from '@evoconn/constants/detailActionColumnLayout';
 import { mockComments } from '@evoconn/data/mockComments';
 import { FollowButton } from './FollowButton';
+import { useFollowState } from '@evoconn/hooks/useFollowState';
 
 function useDoubleTap(callback: () => void, delay = 300) {
   const lastTap = useRef(0);
@@ -83,6 +84,8 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     setBlockedUsers((prev) => new Set(prev).add(userId));
   }, []);
 
+  const { isFollowing: checkFollowing, toggleFollow } = useFollowState();
+
   const handlePostDoubleTapUpvote = useCallback(() => {
     actionColRef.current?.triggerUpvoteBounce();
     handleUpvote();
@@ -90,6 +93,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   const handlePostDoubleTap = useDoubleTap(handlePostDoubleTapUpvote);
 
   const handleMorePress = useCallback(() => {
+    const following = checkFollowing(post.author.id);
     Alert.alert(post.title ?? 'Publicación', undefined, [
       {
         text: 'Compartir',
@@ -99,6 +103,12 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
               message: `${post.author.username}: "${post.body}"`,
             });
           } catch (_) { /* user cancelled */ }
+        },
+      },
+      {
+        text: following ? 'Dejar de seguir' : 'Seguir usuario',
+        onPress: () => {
+          toggleFollow(post.author.id);
         },
       },
       {
@@ -130,7 +140,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
       },
       { text: 'Cancelar', style: 'cancel' },
     ]);
-  }, [post, handleBlockUser]);
+  }, [post, handleBlockUser, checkFollowing, toggleFollow]);
 
   const { width: screenW } = useWindowDimensions();
 
@@ -266,6 +276,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                 {visibleComments.map((c) => (
                   <CommentCard
                     key={c.id}
+                    authorId={c.author.id}
                     username={c.author.username}
                     text={c.body}
                     clanId={c.author.clanId}
