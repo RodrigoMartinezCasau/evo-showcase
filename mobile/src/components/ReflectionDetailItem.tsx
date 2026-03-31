@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Pressable, StyleSheet, Alert, Share, useWindowDimensions, InteractionManager } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Share, useWindowDimensions, InteractionManager } from 'react-native';
 import type { CommunityPost } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getClanColor } from '@evoconn/constants/clanColors';
@@ -22,25 +22,13 @@ import { mockComments } from '@evoconn/data/mockComments';
 import { FollowButton } from './FollowButton';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
 
-function useDoubleTap(callback: () => void, delay = 300) {
-  const lastTap = useRef(0);
-  return useCallback(() => {
-    const now = Date.now();
-    if (now - lastTap.current < delay) {
-      callback();
-      lastTap.current = 0;
-    } else {
-      lastTap.current = now;
-    }
-  }, [callback, delay]);
-}
-
 type ReflectionDetailItemProps = {
   post: CommunityPost;
   /** Visible height for this item (full screen minus top/bottom bars). */
   itemHeight: number;
   onAuthorPress: (userId: string) => void;
   onClanPress: (clanId: string) => void;
+  onReadingModeChange?: (active: boolean) => void;
 };
 
 export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
@@ -48,6 +36,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   itemHeight,
   onAuthorPress,
   onClanPress,
+  onReadingModeChange,
 }: ReflectionDetailItemProps) {
   const clanColor = getClanColor(post.author.clanId);
   const actionColRef = useRef<DetailActionColumnHandle>(null);
@@ -55,6 +44,8 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   const [voted, setVoted] = useState<'up' | 'down' | null>(null);
   const [saved, setSaved] = useState(false);
   const [commentsReady, setCommentsReady] = useState(false);
+  const [readingMode, setReadingMode] = useState(false);
+  const readingModeRef = useRef(false);
 
   useEffect(() => {
     const task = InteractionManager.runAfterInteractions(() => {
@@ -85,12 +76,6 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   }, []);
 
   const { isFollowing: checkFollowing, toggleFollow } = useFollowState();
-
-  const handlePostDoubleTapUpvote = useCallback(() => {
-    actionColRef.current?.triggerUpvoteBounce();
-    handleUpvote();
-  }, [handleUpvote]);
-  const handlePostDoubleTap = useDoubleTap(handlePostDoubleTapUpvote);
 
   const handleMorePress = useCallback(() => {
     const following = checkFollowing(post.author.id);
@@ -142,6 +127,79 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     ]);
   }, [post, handleBlockUser, checkFollowing, toggleFollow]);
 
+  const TAP_MOVE_THRESHOLD = 10;
+  const panelLastTap = useRef(0);
+  const panelSingleTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchStartRef = useRef({ x: 0, y: 0 });
+  const didMoveRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      if (panelSingleTapTimer.current) clearTimeout(panelSingleTapTimer.current);
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    };
+  }, []);
+
+  const fireTap = useCallback(() => {
+    const now = Date.now();
+    if (now - panelLastTap.current < 300) {
+      if (panelSingleTapTimer.current) clearTimeout(panelSingleTapTimer.current);
+      panelLastTap.current = 0;
+      actionColRef.current?.triggerUpvoteBounce();
+      handleUpvote();
+    } else {
+      panelLastTap.current = now;
+      panelSingleTapTimer.current = setTimeout(() => {
+        const next = !readingModeRef.current;
+        readingModeRef.current = next;
+        setReadingMode(next);
+        onReadingModeChange?.(next);
+      }, 300);
+    }
+  }, [handleUpvote, onReadingModeChange]);
+
+  const handlePanelTouchStart = useCallback((e: any) => {
+    const { pageX, pageY } = e.nativeEvent;
+    touchStartRef.current = { x: pageX, y: pageY };
+    didMoveRef.current = false;
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTimerRef.current = null;
+      handleMorePress();
+    }, 500);
+  }, [handleMorePress]);
+
+  const handlePanelTouchMove = useCallback((e: any) => {
+    if (didMoveRef.current) return;
+    const { pageX, pageY } = e.nativeEvent;
+    const dx = Math.abs(pageX - touchStartRef.current.x);
+    const dy = Math.abs(pageY - touchStartRef.current.y);
+    if (dx > TAP_MOVE_THRESHOLD || dy > TAP_MOVE_THRESHOLD) {
+      didMoveRef.current = true;
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+    }
+  }, []);
+
+  const handlePanelTouchEnd = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    if (!didMoveRef.current) {
+      fireTap();
+    }
+  }, [fireTap]);
+
+  const handlePanelTouchCancel = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
   const { width: screenW } = useWindowDimensions();
 
   const headerHeight = 52;
@@ -151,6 +209,13 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     ? CP.height
     : Math.max(80, panelsAvailable * (1 - RP.heightRatio));
   const reflectionH = Math.max(80, panelsAvailable - commentsH);
+
+  const BODY_LINE_HEIGHT = 24;
+  const titleOccupied = post.title ? 32 : 0;
+  const readMoreSpace = 22;
+  const bodyAvailableH = reflectionH - RP.paddingVertical * 2 - titleOccupied - readMoreSpace;
+  const maxBodyLines = Math.max(2, Math.floor(bodyAvailableH / BODY_LINE_HEIGHT));
+  const isLongText = post.body.length > maxBodyLines * 32;
 
   const visibleComments = useMemo(
     () => mockComments.filter((c) => !blockedUsers.has(c.author.id)),
@@ -191,10 +256,11 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
           </View>
 
           {/* ── Reflection panel (upper black box) ── */}
-          <Pressable
-            onPress={handlePostDoubleTap}
-            onLongPress={handleMorePress}
-            delayLongPress={500}
+          <View
+            onTouchStart={handlePanelTouchStart}
+            onTouchMove={handlePanelTouchMove}
+            onTouchEnd={handlePanelTouchEnd}
+            onTouchCancel={handlePanelTouchCancel}
             style={[
               styles.reflectionPanel,
               {
@@ -213,7 +279,8 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
             ]}
           >
             <ScrollView
-              showsVerticalScrollIndicator={false}
+              scrollEnabled={readingMode && isLongText}
+              showsVerticalScrollIndicator={readingMode}
               nestedScrollEnabled
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={{ paddingRight: REFLECTION_TEXT_RIGHT_INSET }}
@@ -237,9 +304,17 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                     : post.title}
                 </Text>
               ) : null}
-              <Text style={styles.bodyText}>{post.body}</Text>
+              <Text
+                style={styles.bodyText}
+                numberOfLines={!readingMode && isLongText ? maxBodyLines : undefined}
+              >
+                {post.body}
+              </Text>
+              {!readingMode && isLongText ? (
+                <Text style={styles.readMoreLabel}>ver más...</Text>
+              ) : null}
             </ScrollView>
-          </Pressable>
+          </View>
 
           <View style={{ height: PANELS_GAP }} />
 
@@ -361,6 +436,12 @@ const styles = StyleSheet.create({
     color: evoconnColors.text,
     fontSize: 16,
     lineHeight: 24,
+  },
+  readMoreLabel: {
+    color: '#AAAAAA',
+    fontSize: 14,
+    fontStyle: 'italic',
+    marginTop: 4,
   },
 
   commentsPanel: {

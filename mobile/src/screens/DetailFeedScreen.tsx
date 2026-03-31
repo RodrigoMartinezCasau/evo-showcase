@@ -77,6 +77,11 @@ export default function DetailFeedScreen() {
 
   const data = useMemo(() => getDataForMode(mode, followingSet), [mode, followingSet]);
 
+  const [feedScrollEnabled, setFeedScrollEnabled] = React.useState(true);
+  const handleReadingModeChange = React.useCallback((active: boolean) => {
+    setFeedScrollEnabled(!active);
+  }, []);
+
   const handleAuthorPress = useCallback(
     (userId: string) => router.push({ pathname: '/profile/[id]', params: { id: userId } }),
     [router],
@@ -110,9 +115,10 @@ export default function DetailFeedScreen() {
         itemHeight={itemHeight}
         onAuthorPress={handleAuthorPress}
         onClanPress={handleClanPress}
+        onReadingModeChange={handleReadingModeChange}
       />
     ),
-    [itemHeight, handleAuthorPress, handleClanPress],
+    [itemHeight, handleAuthorPress, handleClanPress, handleReadingModeChange],
   );
 
   const handleTabChange = useCallback(
@@ -217,6 +223,7 @@ export default function DetailFeedScreen() {
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         pagingEnabled
+        scrollEnabled={feedScrollEnabled}
         snapToInterval={itemHeight}
         decelerationRate="fast"
         snapToAlignment="start"

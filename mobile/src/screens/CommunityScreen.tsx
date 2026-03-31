@@ -78,6 +78,11 @@ export default function CommunityScreen() {
   const gestureCommittingRef = useRef(false);
   const [activeTab, setActiveTab] = useState<TabId>('siguiendo');
   const [searchQuery, setSearchQuery] = useState('');
+  const [feedScrollEnabled, setFeedScrollEnabled] = useState(true);
+
+  const handleReadingModeChange = useCallback((active: boolean) => {
+    setFeedScrollEnabled(!active);
+  }, []);
 
   const [detailFeed, setDetailFeed] = useState<{
     mode: FeedMode;
@@ -205,9 +210,10 @@ export default function CommunityScreen() {
         itemHeight={feedItemHeight}
         onAuthorPress={handleAuthorPress}
         onClanPress={handleClanPress}
+        onReadingModeChange={handleReadingModeChange}
       />
     ),
-    [feedItemHeight, handleAuthorPress, handleClanPress],
+    [feedItemHeight, handleAuthorPress, handleClanPress, handleReadingModeChange],
   );
 
   const getFeedItemLayout = useCallback(
@@ -340,6 +346,7 @@ export default function CommunityScreen() {
               renderItem={renderFeedItem}
               keyExtractor={(item) => item.id}
               pagingEnabled
+              scrollEnabled={feedScrollEnabled}
               decelerationRate="fast"
               showsVerticalScrollIndicator={false}
               getItemLayout={getFeedItemLayout}
