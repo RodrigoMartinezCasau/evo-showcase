@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useEffect, useLayoutEffect } from 'react';
 import {
   View,
   FlatList,
@@ -69,6 +69,13 @@ function getDataForMode(mode: FeedMode, followingSet?: Set<string>): CommunityPo
 
 const ANIM_DURATION = 200;
 
+const TAB_INDEX: Record<TabId, number> = {
+  'siguiendo': 0,
+  'mas-votadas': 1,
+  'para-ti': 2,
+  'search': 3,
+};
+
 export default function CommunityScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -80,6 +87,10 @@ export default function CommunityScreen() {
   const [activeTab, setActiveTab] = useState<TabId>('siguiendo');
   const [searchQuery, setSearchQuery] = useState('');
   const [feedScrollEnabled, setFeedScrollEnabled] = useState(true);
+
+  const tabSlideAnim = useRef(new Animated.Value(1)).current;
+  const [transitionTab, setTransitionTab] = useState<TabId | null>(null);
+  const slideDirectionRef = useRef(1);
 
   const handleReadingModeChange = useCallback((active: boolean) => {
     setFeedScrollEnabled(!active);
@@ -138,6 +149,16 @@ export default function CommunityScreen() {
     outputRange: [screenW, 0],
   });
 
+  const dir = slideDirectionRef.current;
+  const incomingTabTranslateX = tabSlideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [dir * screenW, 0],
+  });
+  const outgoingTabTranslateX = tabSlideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -dir * screenW],
+  });
+
   const handlePostPress = useCallback(
     (post: CommunityPost) => {
       openDetailFeed(tabToFeedMode(activeTab), post.id);
@@ -158,26 +179,53 @@ export default function CommunityScreen() {
     (tab: string) => {
       const tabId = tab as TabId;
 
-      if (tabId === 'search') {
-        if (detailFeed) {
-          closeDetailFeed();
-        }
-        setActiveTab('search');
-        return;
-      }
-
       if (tabId === 'para-ti') {
         openDetailFeed('foryou');
         return;
       }
 
       if (detailFeed) {
+        setActiveTab(tabId);
         closeDetailFeed();
+        return;
       }
+
+      if (activeTab === tabId) return;
+
+      if (transitionTab !== null) {
+        tabSlideAnim.stopAnimation();
+      }
+
+      const fromIdx = TAB_INDEX[activeTab] ?? 0;
+      const toIdx = TAB_INDEX[tabId] ?? 0;
+      slideDirectionRef.current = toIdx > fromIdx ? 1 : -1;
+
+      const oldTab = activeTab;
       setActiveTab(tabId);
+      setTransitionTab(oldTab);
     },
-    [detailFeed, openDetailFeed, closeDetailFeed],
+    [activeTab, detailFeed, transitionTab, openDetailFeed, closeDetailFeed, tabSlideAnim],
   );
+
+  useLayoutEffect(() => {
+    if (transitionTab === null) return;
+
+    tabSlideAnim.setValue(0);
+    Animated.timing(tabSlideAnim, {
+      toValue: 1,
+      duration: ANIM_DURATION,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) {
+        setTransitionTab(null);
+      }
+    });
+
+    return () => {
+      tabSlideAnim.stopAnimation();
+    };
+  }, [transitionTab, tabSlideAnim]);
 
   const topBarHeight = 60 + insets.top;
   const bottomBarHeight =
@@ -190,6 +238,14 @@ export default function CommunityScreen() {
   const listData = useMemo(
     () => getDataForMode(tabToFeedMode(activeTab), followingSet),
     [activeTab, followingSet],
+  );
+
+  const transitionData = useMemo(
+    () =>
+      transitionTab && transitionTab !== 'search' && transitionTab !== 'para-ti'
+        ? getDataForMode(tabToFeedMode(transitionTab), followingSet)
+        : [],
+    [transitionTab, followingSet],
   );
 
   const renderListItem = useCallback(
@@ -310,10 +366,47 @@ export default function CommunityScreen() {
       />
 
       <View style={[styles.contentArea, { height: feedItemHeight }]}>
+        {transitionTab !== null ? (
+          <Animated.View
+            style={[
+              styles.panel,
+              styles.panelOverlay,
+              { transform: [{ translateX: outgoingTabTranslateX }] },
+            ]}
+          >
+            {transitionTab === 'search' ? (
+              <SearchScreen onUserPress={handleAuthorPress} />
+            ) : (
+              <FlatList
+                data={transitionData}
+                renderItem={renderListItem}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={[
+                  styles.list,
+                  {
+                    paddingBottom:
+                      BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
+                      insets.bottom +
+                      BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
+                      16,
+                  },
+                ]}
+                style={styles.panelInner}
+              />
+            )}
+          </Animated.View>
+        ) : null}
+
         <Animated.View
           style={[
             styles.panel,
-            { transform: [{ translateX: listTranslateX }] },
+            styles.panelOverlay,
+            {
+              transform: [
+                { translateX: listTranslateX },
+                { translateX: incomingTabTranslateX },
+              ],
+            },
           ]}
         >
           {activeTab === 'search' ? (
