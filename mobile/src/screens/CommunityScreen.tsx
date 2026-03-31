@@ -27,6 +27,7 @@ import {
   COMMUNITY_DRAWER_GESTURE_RANGE_X,
 } from '@evoconn/constants/communityDrawerGesture';
 import { ReflectionDetailItem } from '@evoconn/components/ReflectionDetailItem';
+import { SearchScreen } from '@evoconn/components/SearchScreen';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
 
 type TabId = 'siguiendo' | 'mas-votadas' | 'para-ti' | 'search';
@@ -315,22 +316,26 @@ export default function CommunityScreen() {
             { transform: [{ translateX: listTranslateX }] },
           ]}
         >
-          <FlatList
-            data={listData}
-            renderItem={renderListItem}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={[
-              styles.list,
-              {
-                paddingBottom:
-                  BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
-                  insets.bottom +
-                  BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
-                  16,
-              },
-            ]}
-            style={styles.panelInner}
-          />
+          {activeTab === 'search' ? (
+            <SearchScreen onUserPress={handleAuthorPress} />
+          ) : (
+            <FlatList
+              data={listData}
+              renderItem={renderListItem}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={[
+                styles.list,
+                {
+                  paddingBottom:
+                    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
+                    insets.bottom +
+                    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
+                    16,
+                },
+              ]}
+              style={styles.panelInner}
+            />
+          )}
         </Animated.View>
 
         {detailMounted ? (
