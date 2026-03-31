@@ -1,10 +1,10 @@
 import type { CommunityPost, User } from '../types'
 
 const authors: User[] = [
-  { id: '1', username: '@DIEGOLLUBERES', clanId: 'racionalista', rank: 'maestro' },
-  { id: '2', username: '@ALEJANDROSERRANO', clanId: 'humanista', rank: 'filosofo' },
-  { id: '3', username: '@RODRIGOMARTINEZ', clanId: 'estoico', rank: 'filosofo' },
-  { id: '4', username: '@HERNANCHACON', clanId: 'cientista', rank: 'aprendiz' },
+  { id: '1', username: '@DIEGOLLUBERES', clanId: 'nihilista', rank: 'maestro', followersCount: 1240, followingCount: 87 },
+  { id: '2', username: '@ALEJANDROSERRANO', clanId: 'estoico', rank: 'filosofo', followersCount: 3580, followingCount: 214 },
+  { id: '3', username: '@RODRIGOMARTINEZ', clanId: 'existencialista', rank: 'filosofo', followersCount: 8920, followingCount: 156 },
+  { id: '4', username: '@HERNANCHACON', clanId: 'realista', rank: 'aprendiz', followersCount: 420, followingCount: 63 },
 ]
 
 export const mockFeedPosts: CommunityPost[] = [
@@ -22,7 +22,7 @@ export const mockFeedPosts: CommunityPost[] = [
     type: 'reflection',
     author: authors[1],
     title: 'EL EXITO ES UNA MIERDA',
-    body: 'ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1', 
+    body: 'ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdjqsk1ehufhduo3qdiugkhoihlikyguigyyiughikughjhgyhjgyhujgyuhjgyhvfcdrtgdrtfgccdxrfdedrfddrfdxdrfgd', 
     voteStats: { up: 867, down: 12, save: 23 },
     createdAt: new Date().toISOString(),
   },

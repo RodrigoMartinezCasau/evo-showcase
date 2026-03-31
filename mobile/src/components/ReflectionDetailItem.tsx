@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Pressable, StyleSheet, Alert, Share, useWindowDimensions } from 'react-native';
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Pressable, StyleSheet, Alert, Share, useWindowDimensions, InteractionManager } from 'react-native';
 import type { CommunityPost } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getClanColor } from '@evoconn/constants/clanColors';
@@ -19,6 +19,7 @@ import {
 } from '@evoconn/constants/reflectionPanelsLayout';
 import { DETAIL_ACTION_COLUMN_LAYOUT as COL } from '@evoconn/constants/detailActionColumnLayout';
 import { mockComments } from '@evoconn/data/mockComments';
+import { FollowButton } from './FollowButton';
 
 function useDoubleTap(callback: () => void, delay = 300) {
   const lastTap = useRef(0);
@@ -41,7 +42,7 @@ type ReflectionDetailItemProps = {
   onClanPress: (clanId: string) => void;
 };
 
-export function ReflectionDetailItem({
+export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   post,
   itemHeight,
   onAuthorPress,
@@ -52,6 +53,14 @@ export function ReflectionDetailItem({
 
   const [voted, setVoted] = useState<'up' | 'down' | null>(null);
   const [saved, setSaved] = useState(false);
+  const [commentsReady, setCommentsReady] = useState(false);
+
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      setCommentsReady(true);
+    });
+    return () => task.cancel();
+  }, []);
 
   const handleUpvote = useCallback(() => {
     setVoted((v) => (v === 'up' ? null : 'up'));
@@ -133,15 +142,42 @@ export function ReflectionDetailItem({
     : Math.max(80, panelsAvailable * (1 - RP.heightRatio));
   const reflectionH = Math.max(80, panelsAvailable - commentsH);
 
+  const visibleComments = useMemo(
+    () => mockComments.filter((c) => !blockedUsers.has(c.author.id)),
+    [blockedUsers],
+  );
+
+  const actionColStyle = useMemo(() => ({
+    position: 'absolute' as const,
+    left: screenW - 70 + COL.offsetX,
+    top: itemHeight / 2 + COL.offsetY,
+    zIndex: 10,
+  }), [screenW, itemHeight]);
+
+  const handleClanPressAction = useCallback(() => {
+    if (post.author.clanId) onClanPress(post.author.clanId);
+  }, [post.author.clanId, onClanPress]);
+
+  const handleAuthorPressAction = useCallback(() => {
+    onAuthorPress(post.author.id);
+  }, [post.author.id, onAuthorPress]);
+
   return (
     <View style={[styles.container, { height: itemHeight }]}>
       <ReflectionBackground clan={post.author.clanId}>
         <View style={styles.content}>
           {/* ── Header ── */}
           <View style={[styles.headerRow, { transform: [{ translateY: DETAIL_HEADER_ROW_OFFSET_Y }] }]}>
-            <TouchableOpacity onPress={() => onAuthorPress(post.author.id)}>
-              <Text style={styles.username}>{post.author.username}</Text>
-            </TouchableOpacity>
+            <View style={styles.usernameFollowRow}>
+              <TouchableOpacity onPress={handleAuthorPressAction}>
+                <Text style={styles.username}>{post.author.username}</Text>
+              </TouchableOpacity>
+              <FollowButton
+                authorId={post.author.id}
+                authorClanId={post.author.clanId}
+                context="detail"
+              />
+            </View>
           </View>
 
           {/* ── Reflection panel (upper black box) ── */}
@@ -215,35 +251,35 @@ export function ReflectionDetailItem({
               },
             ]}
           >
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              nestedScrollEnabled
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{
-                paddingTop: COMMENTS_CONTENT_INSETS.top,
-                paddingBottom: COMMENTS_CONTENT_INSETS.bottom,
-                paddingLeft: COMMENTS_CONTENT_INSETS.left,
-                paddingRight: COMMENTS_CONTENT_INSETS.right,
-              }}
-            >
-              {mockComments
-                .filter((c) => !blockedUsers.has(c.author.id))
-                .map((c) => (
-                <CommentCard
-                  key={c.id}
-                  username={c.author.username}
-                  text={c.body}
-                  clanId={c.author.clanId}
-                  upvotes={
-                    c.upCount + (commentVotes[c.id] ? 1 : 0)
-                  }
-                  isUpvoted={!!commentVotes[c.id]}
-                  onUpvote={() => toggleCommentVote(c.id)}
-                  onReport={() => console.log(`Reported comment ${c.id}`)}
-                  onBlockUser={() => handleBlockUser(c.author.id)}
-                />
-              ))}
-            </ScrollView>
+            {commentsReady ? (
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={{
+                  paddingTop: COMMENTS_CONTENT_INSETS.top,
+                  paddingBottom: COMMENTS_CONTENT_INSETS.bottom,
+                  paddingLeft: COMMENTS_CONTENT_INSETS.left,
+                  paddingRight: COMMENTS_CONTENT_INSETS.right,
+                }}
+              >
+                {visibleComments.map((c) => (
+                  <CommentCard
+                    key={c.id}
+                    username={c.author.username}
+                    text={c.body}
+                    clanId={c.author.clanId}
+                    upvotes={
+                      c.upCount + (commentVotes[c.id] ? 1 : 0)
+                    }
+                    isUpvoted={!!commentVotes[c.id]}
+                    onUpvote={() => toggleCommentVote(c.id)}
+                    onReport={() => console.log(`Reported comment ${c.id}`)}
+                    onBlockUser={() => handleBlockUser(c.author.id)}
+                  />
+                ))}
+              </ScrollView>
+            ) : null}
           </View>
 
         </View>
@@ -252,12 +288,7 @@ export function ReflectionDetailItem({
       {/* ── Action column (pixel-pinned, independent of any layout) ── */}
       <View
         pointerEvents="box-none"
-        style={{
-          position: 'absolute',
-          left: screenW - 70 + COL.offsetX,
-          top: itemHeight / 2 + COL.offsetY,
-          zIndex: 10,
-        }}
+        style={actionColStyle}
       >
         <DetailActionColumn
           ref={actionColRef}
@@ -269,15 +300,13 @@ export function ReflectionDetailItem({
           onUpvote={handleUpvote}
           onDownvote={handleDownvote}
           onSave={handleSave}
-          onClanPress={() => {
-            if (post.author.clanId) onClanPress(post.author.clanId);
-          }}
+          onClanPress={handleClanPressAction}
           onMorePress={handleMorePress}
         />
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {
@@ -295,6 +324,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 10,
     flexWrap: 'wrap',
+  },
+  usernameFollowRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
   },
   username: {
     color: evoconnColors.text,

@@ -22,6 +22,7 @@ import {
   COMMUNITY_DRAWER_EDGE_ZONE_WIDTH,
   COMMUNITY_DRAWER_GESTURE_RANGE_X,
 } from '@evoconn/constants/communityDrawerGesture';
+import { useFollowState } from '@evoconn/hooks/useFollowState';
 
 type FeedMode = 'following' | 'top' | 'foryou';
 
@@ -34,9 +35,12 @@ function shuffled<T>(arr: T[]): T[] {
   return copy;
 }
 
-function getDataForMode(mode: FeedMode): CommunityPost[] {
+function getDataForMode(mode: FeedMode, followingSet?: Set<string>): CommunityPost[] {
   switch (mode) {
     case 'following':
+      if (followingSet && followingSet.size > 0) {
+        return mockFeedPosts.filter((p) => followingSet.has(p.author.id));
+      }
       return mockFeedPosts;
     case 'top':
       return [...mockFeedPosts].sort((a, b) => b.voteStats.up - a.voteStats.up);
@@ -65,12 +69,22 @@ export default function DetailFeedScreen() {
   const mode = (params.mode ?? 'foryou') as FeedMode;
   const initialIndex = Math.max(0, parseInt(params.initialIndex ?? '0', 10) || 0);
 
+  const { followingSet } = useFollowState();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const drawerOpenProgress = useRef(new Animated.Value(0)).current;
   const gestureCommittingRef = useRef(false);
   const activeTab = modeToTab(mode) as 'siguiendo' | 'mas-votadas' | 'para-ti' | 'search';
 
-  const data = useMemo(() => getDataForMode(mode), [mode]);
+  const data = useMemo(() => getDataForMode(mode, followingSet), [mode, followingSet]);
+
+  const handleAuthorPress = useCallback(
+    (userId: string) => router.push({ pathname: '/profile/[id]', params: { id: userId } }),
+    [router],
+  );
+  const handleClanPress = useCallback(
+    (clanId: string) => router.push({ pathname: '/clan/[id]', params: { id: clanId } }),
+    [router],
+  );
 
   const topBarHeight = 60 + insets.top;
   const bottomBarHeight =
@@ -94,15 +108,11 @@ export default function DetailFeedScreen() {
       <ReflectionDetailItem
         post={item}
         itemHeight={itemHeight}
-        onAuthorPress={(userId) =>
-          router.push({ pathname: '/profile/[id]', params: { id: userId } })
-        }
-        onClanPress={(clanId) =>
-          router.push({ pathname: '/clan/[id]', params: { id: clanId } })
-        }
+        onAuthorPress={handleAuthorPress}
+        onClanPress={handleClanPress}
       />
     ),
-    [itemHeight, router],
+    [itemHeight, handleAuthorPress, handleClanPress],
   );
 
   const handleTabChange = useCallback(
@@ -213,6 +223,10 @@ export default function DetailFeedScreen() {
         showsVerticalScrollIndicator={false}
         getItemLayout={getItemLayout}
         initialScrollIndex={initialIndex}
+        initialNumToRender={1}
+        maxToRenderPerBatch={1}
+        windowSize={3}
+        removeClippedSubviews
         style={styles.list}
       />
 

@@ -1,0 +1,19 @@
+/** Layout editors for the follow button — independent per screen context. */
+
+export const COMMUNITY_FOLLOW_BUTTON_LAYOUT = {
+  offsetX: 3,
+  offsetY: -0.5,
+  scale: 0.4,
+} as const;
+
+export const DETAIL_FOLLOW_BUTTON_LAYOUT = {
+  offsetX: 6,
+  offsetY: 0,
+  scale: 0.45,
+} as const;
+
+export const FORYOU_FOLLOW_BUTTON_LAYOUT = {
+  offsetX: 6,
+  offsetY: 0,
+  scale: 0.65,
+} as const;

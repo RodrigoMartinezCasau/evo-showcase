@@ -68,7 +68,7 @@ export type DetailActionColumnHandle = {
   triggerUpvoteBounce: () => void;
 };
 
-export const DetailActionColumn = forwardRef<DetailActionColumnHandle, DetailActionColumnProps>(
+export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle, DetailActionColumnProps>(
   function DetailActionColumn(
     {
       clanId,
@@ -263,7 +263,7 @@ export const DetailActionColumn = forwardRef<DetailActionColumnHandle, DetailAct
       </View>
     </View>
   );
-});
+}));
 
 const COL_FIXED_WIDTH = COL.iconSize * CLAN_L.scale;
 const STAT_BOX_W = 80;

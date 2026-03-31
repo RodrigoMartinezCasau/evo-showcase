@@ -34,6 +34,29 @@ export const CLAN_TO_BG_ASSET: Partial<Record<ClanId, number>> = {
   // nihilista: no asset provided; use near-black solid
 };
 
+/**
+ * Secondary / softer clan tint used for follow-button borders and similar accents.
+ * Default (no clan / Evoconn) uses the Evoconn purple.
+ */
+export const CLAN_SECONDARY_COLOR: Record<ClanId, string> = {
+  nihilista: '#6E6A63',
+  racionalista: '#7DB7FF',
+  estoico: '#D9C27A',
+  humanista: '#B97A2B',
+  existencialista: '#C96A4A',
+  trascendentalista: '#D8CF72',
+  cientista: '#DFF7F7',
+  realista: '#E37B6F',
+};
+
+export const CLAN_SECONDARY_DEFAULT = '#7A3CFF';
+
+export function getClanSecondaryColor(clanId: string | null | undefined): string {
+  if (!clanId || String(clanId).trim() === '') return CLAN_SECONDARY_DEFAULT;
+  const key = clanId.trim().toLowerCase();
+  return (CLAN_SECONDARY_COLOR as Record<string, string>)[key] ?? CLAN_SECONDARY_DEFAULT;
+}
+
 export function getClanColor(clanId: string | null | undefined): string {
   if (!clanId) return CLAN_TO_COLOR.nihilista;
   return (CLAN_TO_COLOR as Record<string, string>)[clanId] ?? CLAN_TO_COLOR.nihilista;

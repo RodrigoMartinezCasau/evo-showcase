@@ -7,6 +7,8 @@ export type User = {
   clanId: string | null
   rank: Rank
   avatarUri?: string
+  followersCount?: number
+  followingCount?: number
 }
 
 export type Clan = {

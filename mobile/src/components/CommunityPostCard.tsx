@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ImageBackground, Image, useWindowDimensions } from 'react-native';
+import { FollowButton } from './FollowButton';
 import type { CommunityPost } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getClanBgAsset, getClanColor } from '@evoconn/constants/clanColors';
@@ -293,13 +294,21 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
         >
           <View
             pointerEvents="box-none"
-            style={{
-              transform: [{ translateX: L.USERNAME_OFFSET_X }, { translateY: L.USERNAME_OFFSET_Y }],
-            }}
+            style={[
+              styles.usernameFollowRow,
+              {
+                transform: [{ translateX: L.USERNAME_OFFSET_X }, { translateY: L.USERNAME_OFFSET_Y }],
+              },
+            ]}
           >
             <TouchableOpacity onPress={onAuthorPress}>
               <Text style={styles.usernameHeader}>{post.author.username}</Text>
             </TouchableOpacity>
+            <FollowButton
+              authorId={post.author.id}
+              authorClanId={post.author.clanId}
+              context="community"
+            />
           </View>
           {isCanvaCard && authorClanId ? (
             <View
@@ -498,6 +507,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  usernameFollowRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
   },
   usernameHeader: {
     color: evoconnColors.text,

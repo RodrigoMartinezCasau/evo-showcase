@@ -12,7 +12,7 @@ type ReflectionBackgroundProps = {
  * Wrapper that renders the clan-specific SVG background behind its children.
  * Use as:  <ReflectionBackground clan={clanId}>{content}</ReflectionBackground>
  */
-export function ReflectionBackground({ clan, children }: ReflectionBackgroundProps) {
+export const ReflectionBackground = React.memo(function ReflectionBackground({ clan, children }: ReflectionBackgroundProps) {
   const BgIcon = useMemo(() => getReflectionBackgroundByHouse(clan), [clan]);
 
   return (
@@ -39,7 +39,7 @@ export function ReflectionBackground({ clan, children }: ReflectionBackgroundPro
       {children}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   root: {

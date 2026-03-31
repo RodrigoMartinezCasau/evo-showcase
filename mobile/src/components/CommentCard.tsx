@@ -22,7 +22,7 @@ type CommentCardProps = {
   onBlockUser?: () => void;
 };
 
-export function CommentCard({
+export const CommentCard = React.memo(function CommentCard({
   username,
   text,
   clanId,
@@ -167,7 +167,7 @@ export function CommentCard({
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   wrapper: {

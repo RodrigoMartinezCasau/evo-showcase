@@ -27,6 +27,7 @@ import {
   COMMUNITY_DRAWER_GESTURE_RANGE_X,
 } from '@evoconn/constants/communityDrawerGesture';
 import { ReflectionDetailItem } from '@evoconn/components/ReflectionDetailItem';
+import { useFollowState } from '@evoconn/hooks/useFollowState';
 
 type TabId = 'siguiendo' | 'mas-votadas' | 'para-ti' | 'search';
 type FeedMode = 'following' | 'top' | 'foryou';
@@ -51,9 +52,12 @@ function shuffled<T>(arr: T[]): T[] {
   return copy;
 }
 
-function getDataForMode(mode: FeedMode): CommunityPost[] {
+function getDataForMode(mode: FeedMode, followingSet?: Set<string>): CommunityPost[] {
   switch (mode) {
     case 'following':
+      if (followingSet && followingSet.size > 0) {
+        return mockFeedPosts.filter((p) => followingSet.has(p.author.id));
+      }
       return mockFeedPosts;
     case 'top':
       return [...mockFeedPosts].sort((a, b) => b.voteStats.up - a.voteStats.up);
@@ -62,12 +66,13 @@ function getDataForMode(mode: FeedMode): CommunityPost[] {
   }
 }
 
-const ANIM_DURATION = 280;
+const ANIM_DURATION = 200;
 
 export default function CommunityScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width: screenW, height: screenH } = useWindowDimensions();
+  const { followingSet } = useFollowState();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const drawerOpenProgress = useRef(new Animated.Value(0)).current;
   const gestureCommittingRef = useRef(false);
@@ -81,31 +86,26 @@ export default function CommunityScreen() {
   } | null>(null);
 
   const slideAnim = useRef(new Animated.Value(0)).current;
-  const [detailMounted, setDetailMounted] = useState(false);
+  const detailMounted = detailFeed !== null;
 
   const openDetailFeed = useCallback(
     (mode: FeedMode, postId?: string) => {
-      const data = getDataForMode(mode);
+      const data = getDataForMode(mode, followingSet);
       let initialIndex = 0;
       if (postId) {
         const idx = data.findIndex((p) => p.id === postId);
         initialIndex = idx >= 0 ? idx : 0;
-        if (__DEV__ && idx < 0) {
-          console.warn('[DetailFeed] postId not found in feed data, falling back to 0', { postId, mode });
-        }
-      }
-      if (__DEV__) {
-        console.log('[DetailFeed] opening', { mode, postId, initialIndex, firstItemId: data[initialIndex]?.id });
       }
       setDetailFeed({ mode, data, initialIndex });
-      setDetailMounted(true);
       slideAnim.setValue(0);
-      Animated.timing(slideAnim, {
-        toValue: 1,
-        duration: ANIM_DURATION,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }).start();
+      requestAnimationFrame(() => {
+        Animated.timing(slideAnim, {
+          toValue: 1,
+          duration: ANIM_DURATION,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }).start();
+      });
     },
     [slideAnim],
   );
@@ -118,7 +118,6 @@ export default function CommunityScreen() {
       useNativeDriver: true,
     }).start(({ finished }) => {
       if (finished) {
-        setDetailMounted(false);
         setDetailFeed(null);
       }
     });
@@ -163,7 +162,6 @@ export default function CommunityScreen() {
 
       if (tabId === 'para-ti') {
         openDetailFeed('foryou');
-        setActiveTab(tabId);
         return;
       }
 
@@ -184,8 +182,8 @@ export default function CommunityScreen() {
   const feedItemHeight = screenH - topBarHeight - bottomBarHeight;
 
   const listData = useMemo(
-    () => getDataForMode(tabToFeedMode(activeTab)),
-    [activeTab],
+    () => getDataForMode(tabToFeedMode(activeTab), followingSet),
+    [activeTab, followingSet],
   );
 
   const renderListItem = useCallback(
@@ -346,6 +344,10 @@ export default function CommunityScreen() {
               showsVerticalScrollIndicator={false}
               getItemLayout={getFeedItemLayout}
               initialScrollIndex={detailFeed?.initialIndex ?? 0}
+              initialNumToRender={1}
+              maxToRenderPerBatch={1}
+              windowSize={3}
+              removeClippedSubviews
               style={styles.panelInner}
             />
           </Animated.View>
