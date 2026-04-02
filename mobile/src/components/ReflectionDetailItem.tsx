@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Share, useWindowDimensions, InteractionManager } from 'react-native';
-import type { CommunityPost } from '@evoconn/types';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Share, Keyboard, Platform, Animated, useWindowDimensions, InteractionManager } from 'react-native';
+import type { CommunityPost, Comment } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getClanColor } from '@evoconn/constants/clanColors';
 import { ReflectionBackground } from './ReflectionBackground';
@@ -8,6 +8,7 @@ import { DETAIL_HEADER_ROW_OFFSET_Y } from '@evoconn/constants/reflectionDetailR
 import { DetailActionColumn } from './DetailActionColumn';
 import type { DetailActionColumnHandle } from './DetailActionColumn';
 import { CommentCard } from './CommentCard';
+import { NewCommentBox } from './NewCommentBox';
 import {
   REFLECTION_PANEL_LAYOUT as RP,
   COMMENTS_PANEL_LAYOUT as CP,
@@ -23,6 +24,7 @@ import {
   DETAIL_QUOTE_AUTHOR_LAYOUT as QAL,
 } from '@evoconn/constants/detailQuoteLayout';
 import { mockComments } from '@evoconn/data/mockComments';
+import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { FollowButton } from './FollowButton';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
 
@@ -73,10 +75,25 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     setCommentVotes((prev) => ({ ...prev, [commentId]: !prev[commentId] }));
   }, []);
 
+  const [localComments, setLocalComments] = useState<Comment[]>(mockComments);
+  const commentIdCounter = useRef(mockComments.length);
+
   const [blockedUsers, setBlockedUsers] = useState<Set<string>>(new Set());
 
   const handleBlockUser = useCallback((userId: string) => {
     setBlockedUsers((prev) => new Set(prev).add(userId));
+  }, []);
+
+  const handleAddComment = useCallback((text: string) => {
+    commentIdCounter.current += 1;
+    const newComment: Comment = {
+      id: `user-co-${commentIdCounter.current}`,
+      author: mockCurrentUser,
+      body: text,
+      upCount: 0,
+      createdAt: new Date().toISOString(),
+    };
+    setLocalComments((prev) => [...prev, newComment]);
   }, []);
 
   const { isFollowing: checkFollowing, toggleFollow } = useFollowState();
@@ -224,8 +241,8 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   const isLongText = !isPhrase && post.body.length > maxBodyLines * 32;
 
   const visibleComments = useMemo(
-    () => mockComments.filter((c) => !blockedUsers.has(c.author.id)),
-    [blockedUsers],
+    () => localComments.filter((c) => !blockedUsers.has(c.author.id)),
+    [localComments, blockedUsers],
   );
 
   const actionColStyle = useMemo(() => ({
@@ -243,8 +260,51 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     onAuthorPress(post.author.id);
   }, [post.author.id, onAuthorPress]);
 
+  const dismissKeyboard = useCallback(() => {
+    Keyboard.dismiss();
+  }, []);
+
+  const kbOffset = useRef(new Animated.Value(0)).current;
+  const newCommentMeasureRef = useRef<View>(null);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const onShow = (e: { endCoordinates: { screenY: number; height: number }; duration?: number }) => {
+      const kbTopY = e.endCoordinates.screenY;
+      newCommentMeasureRef.current?.measure((_x, _y, _w, h, _px, pageY) => {
+        if (h <= 0) return;
+        const boxBottom = pageY + h;
+        const overlap = boxBottom - kbTopY;
+        if (overlap > 0) {
+          Animated.timing(kbOffset, {
+            toValue: -(overlap + 10),
+            duration: Platform.OS === 'ios' ? (e.duration ?? 250) : 220,
+            useNativeDriver: true,
+          }).start();
+        }
+      });
+    };
+
+    const onHide = (e: { duration?: number }) => {
+      Animated.timing(kbOffset, {
+        toValue: 0,
+        duration: Platform.OS === 'ios' ? (e.duration ?? 250) : 220,
+        useNativeDriver: true,
+      }).start();
+    };
+
+    const showSub = Keyboard.addListener(showEvent, onShow as any);
+    const hideSub = Keyboard.addListener(hideEvent, onHide as any);
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [kbOffset]);
+
   return (
-    <View style={[styles.container, { height: itemHeight }]}>
+    <View style={[styles.container, { height: itemHeight }]} onStartShouldSetResponder={() => true} onResponderRelease={dismissKeyboard}>
       <ReflectionBackground clan={post.author.clanId}>
         <View style={styles.content}>
           {/* ── Header ── */}
@@ -384,34 +444,50 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
             ]}
           >
             {commentsReady ? (
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                nestedScrollEnabled
-                keyboardShouldPersistTaps="handled"
-                contentContainerStyle={{
-                  paddingTop: COMMENTS_CONTENT_INSETS.top,
-                  paddingBottom: COMMENTS_CONTENT_INSETS.bottom,
-                  paddingLeft: COMMENTS_CONTENT_INSETS.left,
-                  paddingRight: COMMENTS_CONTENT_INSETS.right,
-                }}
-              >
-                {visibleComments.map((c) => (
-                  <CommentCard
-                    key={c.id}
-                    authorId={c.author.id}
-                    username={c.author.username}
-                    text={c.body}
-                    clanId={c.author.clanId}
-                    upvotes={
-                      c.upCount + (commentVotes[c.id] ? 1 : 0)
-                    }
-                    isUpvoted={!!commentVotes[c.id]}
-                    onUpvote={() => toggleCommentVote(c.id)}
-                    onReport={() => console.log(`Reported comment ${c.id}`)}
-                    onBlockUser={() => handleBlockUser(c.author.id)}
-                  />
-                ))}
-              </ScrollView>
+              <>
+                <View style={[styles.commentsClip, { borderRadius: CP.borderRadius }]}>
+                  <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    nestedScrollEnabled
+                    keyboardShouldPersistTaps="handled"
+                    keyboardDismissMode="on-drag"
+                    style={styles.commentsScroll}
+                    contentContainerStyle={{
+                      paddingTop: COMMENTS_CONTENT_INSETS.top,
+                      paddingBottom: COMMENTS_CONTENT_INSETS.bottom,
+                      paddingLeft: COMMENTS_CONTENT_INSETS.left,
+                      paddingRight: COMMENTS_CONTENT_INSETS.right,
+                    }}
+                  >
+                    {visibleComments.map((c) => (
+                      <CommentCard
+                        key={c.id}
+                        authorId={c.author.id}
+                        username={c.author.username}
+                        text={c.body}
+                        clanId={c.author.clanId}
+                        upvotes={
+                          c.upCount + (commentVotes[c.id] ? 1 : 0)
+                        }
+                        isUpvoted={!!commentVotes[c.id]}
+                        onUpvote={() => toggleCommentVote(c.id)}
+                        onReport={() => console.log(`Reported comment ${c.id}`)}
+                        onBlockUser={() => handleBlockUser(c.author.id)}
+                      />
+                    ))}
+                  </ScrollView>
+                </View>
+                <View ref={newCommentMeasureRef} collapsable={false}>
+                  <Animated.View
+                    style={[
+                      styles.newCommentRow,
+                      { transform: [{ translateY: kbOffset }], zIndex: 30 },
+                    ]}
+                  >
+                    <NewCommentBox onSend={handleAddComment} />
+                  </Animated.View>
+                </View>
+              </>
             ) : null}
           </View>
 
@@ -510,6 +586,15 @@ const styles = StyleSheet.create({
   },
 
   commentsPanel: {
+  },
+  commentsClip: {
+    flex: 1,
     overflow: 'hidden',
+  },
+  commentsScroll: {
+    flex: 1,
+  },
+  newCommentRow: {
+    paddingTop: 6,
   },
 });
