@@ -3,6 +3,7 @@ import {
   View,
   TextInput,
   TouchableOpacity,
+  Pressable,
   Text,
   StyleSheet,
   Keyboard,
@@ -40,8 +41,7 @@ export const NewCommentBox = React.memo(function NewCommentBox({
   const btnColor = hasText ? BTN.activeColor : BTN.inactiveColor;
 
   return (
-    <TouchableOpacity
-      activeOpacity={1}
+    <Pressable
       onPress={handleBoxPress}
       style={[
         styles.container,
@@ -73,6 +73,7 @@ export const NewCommentBox = React.memo(function NewCommentBox({
         onPress={handleSend}
         disabled={!hasText}
         activeOpacity={0.7}
+        hitSlop={{ top: 14, bottom: 14, left: 10, right: 10 }}
         style={[
           styles.sendBtn,
           {
@@ -92,7 +93,7 @@ export const NewCommentBox = React.memo(function NewCommentBox({
           Enviar
         </Text>
       </TouchableOpacity>
-    </TouchableOpacity>
+    </Pressable>
   );
 });
 

@@ -281,7 +281,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
           Animated.timing(kbOffset, {
             toValue: -(overlap + 10),
             duration: Platform.OS === 'ios' ? (e.duration ?? 250) : 220,
-            useNativeDriver: true,
+            useNativeDriver: false,
           }).start();
         }
       });
@@ -291,7 +291,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
       Animated.timing(kbOffset, {
         toValue: 0,
         duration: Platform.OS === 'ios' ? (e.duration ?? 250) : 220,
-        useNativeDriver: true,
+        useNativeDriver: false,
       }).start();
     };
 
@@ -481,7 +481,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                   <Animated.View
                     style={[
                       styles.newCommentRow,
-                      { transform: [{ translateY: kbOffset }], zIndex: 30 },
+                      { top: kbOffset, zIndex: 30 },
                     ]}
                   >
                     <NewCommentBox onSend={handleAddComment} />
