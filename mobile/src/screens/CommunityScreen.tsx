@@ -18,7 +18,7 @@ import {
   SidebarDrawer,
 } from '@evoconn/components';
 import { mockFeedPosts } from '@evoconn/data/mockCommunity';
-import { mockConversations } from '@evoconn/data/mockConversations';
+import { useThoughts } from '@evoconn/hooks/useThoughts';
 import type { CommunityPost } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
@@ -81,6 +81,7 @@ export default function CommunityScreen() {
   const insets = useSafeAreaInsets();
   const { width: screenW, height: screenH } = useWindowDimensions();
   const { followingSet } = useFollowState();
+  const { thoughts } = useThoughts();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const drawerOpenProgress = useRef(new Animated.Value(0)).current;
   const gestureCommittingRef = useRef(false);
@@ -498,8 +499,11 @@ export default function CommunityScreen() {
       <SidebarDrawer
         visible={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        conversations={mockConversations}
-        onConversationPress={() => {}}
+        conversations={thoughts}
+        onConversationPress={(id) => {
+          setSidebarOpen(false);
+          router.push({ pathname: '/reflection', params: { thoughtId: id } });
+        }}
         searchQuery={searchQuery}
         openProgress={drawerOpenProgress}
       />

@@ -16,7 +16,7 @@ import { mockFeedPosts } from '@evoconn/data/mockCommunity';
 import type { CommunityPost } from '@evoconn/types';
 import { ReflectionDetailItem } from '@evoconn/components/ReflectionDetailItem';
 import { AppTopBar, SidebarDrawer, BottomCommunityTabs } from '@evoconn/components';
-import { mockConversations } from '@evoconn/data/mockConversations';
+import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
 import {
   COMMUNITY_DRAWER_EDGE_ZONE_WIDTH,
@@ -70,6 +70,7 @@ export default function DetailFeedScreen() {
   const initialIndex = Math.max(0, parseInt(params.initialIndex ?? '0', 10) || 0);
 
   const { followingSet } = useFollowState();
+  const { thoughts } = useThoughts();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const drawerOpenProgress = useRef(new Animated.Value(0)).current;
   const gestureCommittingRef = useRef(false);
@@ -276,8 +277,11 @@ export default function DetailFeedScreen() {
       <SidebarDrawer
         visible={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        conversations={mockConversations}
-        onConversationPress={() => {}}
+        conversations={thoughts}
+        onConversationPress={(id) => {
+          setSidebarOpen(false);
+          router.push({ pathname: '/reflection', params: { thoughtId: id } });
+        }}
         openProgress={drawerOpenProgress}
       />
     </View>

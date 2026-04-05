@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { AppTopBar, PublishCard, ChatInputBar, SidebarDrawer } from '@evoconn/components';
-import { mockConversations } from '@evoconn/data/mockConversations';
+import { useThoughts } from '@evoconn/hooks/useThoughts';
+import { useRouter } from 'expo-router';
 import { evoconnColors } from '@evoconn/theme/colors';
 
 export default function PhraseCreationScreen() {
+  const router = useRouter();
+  const { thoughts } = useThoughts();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [phrases, setPhrases] = useState<string[]>([]);
 
@@ -33,8 +36,11 @@ export default function PhraseCreationScreen() {
       <SidebarDrawer
         visible={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        conversations={mockConversations}
-        onConversationPress={() => setSidebarOpen(false)}
+        conversations={thoughts}
+        onConversationPress={(id) => {
+          setSidebarOpen(false);
+          router.push({ pathname: '/reflection', params: { thoughtId: id } });
+        }}
       />
     </View>
   );
