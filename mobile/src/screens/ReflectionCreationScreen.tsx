@@ -32,6 +32,8 @@ import {
 } from '@evoconn/constants/chatUserMessageLayout';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
+import { getChatSendButtonByHouse } from '@evoconn/utils/getChatSendButtonByHouse';
+import { CHAT_SEND_BUTTON_LAYOUT } from '@evoconn/constants/chatInputBarLayout';
 
 const TYPEWRITER_CHUNK = 3;
 const TYPEWRITER_MS = 15;
@@ -46,6 +48,13 @@ export default function ReflectionCreationScreen() {
   const { thoughts, createThought, updateThought, loadThread } = useThoughts();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const clanColor = getChatUserAccentColor(activeClan);
+
+  const SendIcon = useMemo(() => getChatSendButtonByHouse(activeClan), [activeClan]);
+  const sendButtonSize = CHAT_SEND_BUTTON_LAYOUT.size;
+  const sendIconNode = useMemo(
+    () => <SendIcon width={sendButtonSize} height={sendButtonSize} />,
+    [SendIcon, sendButtonSize],
+  );
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [messages, setMessages] = useState<ChatBubble[]>([]);
@@ -238,6 +247,7 @@ export default function ReflectionCreationScreen() {
               : 'Continúa la conversación…'
         }
         onSend={handleSend}
+        sendIcon={sendIconNode}
       />
 
       <SidebarDrawer

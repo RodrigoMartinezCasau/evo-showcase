@@ -1,13 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { AppTopBar, PublishCard, ChatInputBar, SidebarDrawer } from '@evoconn/components';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useRouter } from 'expo-router';
 import { evoconnColors } from '@evoconn/theme/colors';
+import { useActiveClan } from '@evoconn/debug/DebugClanContext';
+import { mockCurrentUser } from '@evoconn/data/mockUser';
+import { getChatSendButtonByHouse } from '@evoconn/utils/getChatSendButtonByHouse';
+import { CHAT_SEND_BUTTON_LAYOUT } from '@evoconn/constants/chatInputBarLayout';
 
 export default function PhraseCreationScreen() {
   const router = useRouter();
   const { thoughts } = useThoughts();
+  const activeClan = useActiveClan(mockCurrentUser.clanId);
+  const SendIcon = useMemo(() => getChatSendButtonByHouse(activeClan), [activeClan]);
+  const sendBtnSize = CHAT_SEND_BUTTON_LAYOUT.size;
+  const sendIconNode = useMemo(
+    () => <SendIcon width={sendBtnSize} height={sendBtnSize} />,
+    [SendIcon, sendBtnSize],
+  );
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [phrases, setPhrases] = useState<string[]>([]);
 
@@ -32,7 +43,7 @@ export default function PhraseCreationScreen() {
         ))}
         {phrases.length > 0 && <PublishCard onPublish={handlePublish} />}
       </ScrollView>
-      <ChatInputBar placeholder="Escribe tu frase..." onSend={handleSend} />
+      <ChatInputBar placeholder="Escribe tu frase..." onSend={handleSend} sendIcon={sendIconNode} />
       <SidebarDrawer
         visible={sidebarOpen}
         onClose={() => setSidebarOpen(false)}

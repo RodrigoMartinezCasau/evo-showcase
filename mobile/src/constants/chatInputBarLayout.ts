@@ -32,14 +32,14 @@ export const CHAT_INPUT_LAYOUT = {
   paddingVertical: 10,
 } as const;
 
-/** The send button. */
+/** The send button (clan SVG replaces the old star icon). */
 export const CHAT_SEND_BUTTON_LAYOUT = {
   offsetX: -10,
   offsetY: -20,
   scale: 1,
-  size: 44,
+  /** Diameter of the tap target / SVG container. */
+  size: 40,
   borderRadius: 22,
-  backgroundColor: '#c7ff02',
-  iconColor: '#0b0b0f',
-  iconSize: 20,
+  /** 'transparent' because the clan SVG includes its own circular background. */
+  backgroundColor: 'transparent',
 } as const;

@@ -10,6 +10,7 @@ import {
 type ChatInputBarProps = {
   placeholder?: string;
   onSend: (text: string) => void;
+  /** Clan-specific SVG rendered inside the send button. Falls back to a star if omitted. */
   sendIcon?: React.ReactNode;
 };
 
@@ -85,7 +86,7 @@ export function ChatInputBar({ placeholder = 'Escribe aquí...', onSend, sendIco
             },
           ]}
         >
-          {sendIcon ?? <Text style={[styles.star, { color: BTN.iconColor, fontSize: BTN.iconSize }]}>★</Text>}
+          {sendIcon ?? <Text style={{ color: '#0b0b0f', fontSize: 20 }}>★</Text>}
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -105,6 +106,6 @@ const styles = StyleSheet.create({
   sendBtn: {
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
-  star: {},
 });
