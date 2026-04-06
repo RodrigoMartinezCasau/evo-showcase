@@ -34,6 +34,7 @@ import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { getChatSendButtonByHouse } from '@evoconn/utils/getChatSendButtonByHouse';
 import { CHAT_SEND_BUTTON_LAYOUT } from '@evoconn/constants/chatInputBarLayout';
+import { DebateResponseDisplay } from '@evoconn/components/debate';
 
 const TYPEWRITER_CHUNK = 3;
 const TYPEWRITER_MS = 15;
@@ -227,7 +228,7 @@ export default function ReflectionCreationScreen() {
           ) : null}
 
           {messages.map((msg, i) => (
-            <MessageBubble key={`${msg.id ?? i}-${msg.role}`} message={msg} clanColor={clanColor} />
+            <MessageBubble key={`${msg.id ?? i}-${msg.role}`} message={msg} clanColor={clanColor} clanId={activeClan} />
           ))}
 
           {error ? (
@@ -263,13 +264,15 @@ export default function ReflectionCreationScreen() {
   );
 }
 
-/** Renders a single user or assistant message bubble. */
+/** Renders a single user or assistant message. */
 const MessageBubble = React.memo(function MessageBubble({
   message,
   clanColor,
+  clanId,
 }: {
   message: ChatBubble;
   clanColor: string;
+  clanId: string | null | undefined;
 }) {
   const isUser = message.role === 'user';
   const displayText = message.revealed ?? message.content;
@@ -293,102 +296,28 @@ const MessageBubble = React.memo(function MessageBubble({
     );
   }
 
-  return (
-    <View style={[styles.bubble, styles.aiBubble]}>
-      <Text style={styles.aiText}>{displayText}</Text>
-      {assistantMsg.streaming ? (
-        <Text style={styles.typingIndicator}>▌</Text>
-      ) : null}
-      {!assistantMsg.streaming && assistantMsg.nextQuestion ? (
-        <View style={styles.nextQuestionBox}>
-          <Text style={styles.nextQuestionLabel}>Pregunta para reflexionar:</Text>
-          <Text style={styles.nextQuestionText}>{assistantMsg.nextQuestion}</Text>
-        </View>
-      ) : null}
-      {!assistantMsg.streaming && assistantMsg.debateResponse ? (
-        <DebateResponseSummary response={assistantMsg.debateResponse} />
-      ) : null}
-    </View>
-  );
-});
-
-/** Compact summary of the structured debate response. */
-const DebateResponseSummary = React.memo(function DebateResponseSummary({
-  response,
-}: {
-  response: DebateResponse;
-}) {
-  const dl = response.debate_layer;
-  const stance = dl.stance_section;
-  const counter = dl.counter_section;
-  const question = dl.question_section;
+  const isStreaming = !!assistantMsg.streaming;
+  const hasStructured = !isStreaming && !!assistantMsg.debateResponse;
 
   return (
-    <View style={styles.debateSection}>
-      {stance ? (
-        <View style={styles.debateBlock}>
-          <Text style={styles.debateBlockTitle}>{stance.section_title}</Text>
-          {stance.points.map((p) => (
-            <View key={p.index} style={styles.debatePoint}>
-              <Text style={styles.debatePointTitle}>★ {p.title}</Text>
-              {p.bullets.map((b, bi) => (
-                <Text key={bi} style={styles.debateBullet}>• {b.text}</Text>
-              ))}
-            </View>
-          ))}
-          {stance.quick_summary ? (
-            <Text style={styles.debateSummary}>{stance.quick_summary}</Text>
-          ) : null}
-        </View>
-      ) : dl.steelman_of_user ? (
-        <View style={styles.debateBlock}>
-          <Text style={styles.debateBlockTitle}>Tu postura</Text>
-          <Text style={styles.debateBullet}>{dl.steelman_of_user}</Text>
+    <View style={styles.assistantBlock}>
+      {/* Typewriter text while streaming, brief intro once done */}
+      {isStreaming ? (
+        <View style={[styles.bubble, styles.aiBubble]}>
+          <Text style={styles.aiText}>{displayText}</Text>
+          <Text style={styles.typingIndicator}>▌</Text>
         </View>
       ) : null}
 
-      {counter ? (
-        <View style={styles.debateBlock}>
-          <Text style={styles.debateBlockTitle}>{counter.section_title}</Text>
-          {counter.points.map((p) => (
-            <View key={p.index} style={styles.debatePoint}>
-              <Text style={styles.debatePointTitle}>★ {p.title}</Text>
-              {p.bullets.map((b, bi) => (
-                <Text key={bi} style={styles.debateBullet}>• {b.text}</Text>
-              ))}
-            </View>
-          ))}
-          {counter.quick_summary ? (
-            <Text style={styles.debateSummary}>{counter.quick_summary}</Text>
-          ) : null}
-        </View>
-      ) : dl.contrarian_position ? (
-        <View style={styles.debateBlock}>
-          <Text style={styles.debateBlockTitle}>Contrapunto</Text>
-          <Text style={styles.debateBullet}>{dl.contrarian_position}</Text>
-        </View>
-      ) : null}
-
-      {question ? (
-        <View style={styles.debateBlock}>
-          <Text style={styles.debateBlockTitle}>{question.section_title}</Text>
-          <Text style={styles.debateQuestionText}>{question.socratic_question}</Text>
-        </View>
-      ) : dl.socratic_questions?.length ? (
-        <View style={styles.debateBlock}>
-          <Text style={styles.debateBlockTitle}>Preguntas socráticas</Text>
-          {dl.socratic_questions.map((q, qi) => (
-            <Text key={qi} style={styles.debateBullet}>• {q}</Text>
-          ))}
-        </View>
-      ) : null}
-
-      {response.closing?.open_ended_takeaways?.length ? (
-        <View style={styles.debateBlock}>
-          <Text style={styles.debateBlockTitle}>Para reflexionar</Text>
-          {response.closing.open_ended_takeaways.map((t, ti) => (
-            <Text key={ti} style={styles.debateBullet}>• {t}</Text>
-          ))}
+      {/* Structured card layout once streaming completes */}
+      {hasStructured ? (
+        <DebateResponseDisplay
+          response={assistantMsg.debateResponse!}
+          clanId={clanId}
+        />
+      ) : !isStreaming ? (
+        <View style={[styles.bubble, styles.aiBubble]}>
+          <Text style={styles.aiText}>{displayText}</Text>
         </View>
       ) : null}
     </View>
@@ -433,6 +362,10 @@ const styles = StyleSheet.create({
     backgroundColor: evoconnColors.card,
     borderBottomLeftRadius: 4,
   },
+  assistantBlock: {
+    marginBottom: 16,
+    width: '100%',
+  },
   userText: { color: evoconnColors.text, fontSize: 15, lineHeight: 22 },
   aiText: { color: evoconnColors.text, fontSize: 15, lineHeight: 22 },
   thinkingText: {
@@ -446,69 +379,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     marginTop: 2,
-  },
-
-  nextQuestionBox: {
-    marginTop: 14,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: evoconnColors.border,
-  },
-  nextQuestionLabel: {
-    color: evoconnColors.neonGreen,
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 4,
-  },
-  nextQuestionText: {
-    color: evoconnColors.text,
-    fontSize: 14,
-    fontStyle: 'italic',
-    lineHeight: 20,
-  },
-
-  debateSection: { marginTop: 14 },
-  debateBlock: {
-    marginTop: 12,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: evoconnColors.border,
-  },
-  debateBlockTitle: {
-    color: evoconnColors.neonGreen,
-    fontSize: 13,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginBottom: 8,
-  },
-  debatePoint: { marginBottom: 8 },
-  debatePointTitle: {
-    color: evoconnColors.text,
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  debateBullet: {
-    color: '#D1D5DB',
-    fontSize: 14,
-    lineHeight: 20,
-    paddingLeft: 8,
-    marginBottom: 2,
-  },
-  debateSummary: {
-    color: evoconnColors.muted,
-    fontSize: 13,
-    fontStyle: 'italic',
-    marginTop: 6,
-  },
-  debateQuestionText: {
-    color: evoconnColors.text,
-    fontSize: 14,
-    fontStyle: 'italic',
-    lineHeight: 20,
   },
 
   errorBox: {
