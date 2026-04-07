@@ -13,48 +13,50 @@ export type ArgumentPointData = {
 };
 
 type Props = {
-  /** Card header label (e.g. "TU POSTURA"). */
   title: string;
-  /** Left border + header star color. */
-  accentColor: string;
-  points: ArgumentPointData[];
+  borderColor: string;
+  borderWidth: number;
+  backgroundColor: string;
+  /** Prose body text (new format). When present, rendered instead of points. */
+  body?: string;
+  /** Legacy numbered points format. */
+  points?: ArgumentPointData[];
   summary?: string;
 };
 
 export const ArgumentCard = React.memo(function ArgumentCard({
   title,
-  accentColor,
+  borderColor,
+  borderWidth,
+  backgroundColor,
+  body,
   points,
   summary,
 }: Props) {
+  const hasBody = !!body && body.length > 0;
+
   return (
-    <View
-      style={[
-        styles.card,
-        { borderColor: accentColor },
-      ]}
-    >
-      {/* ── Header ── */}
+    <View style={[styles.card, { borderColor, borderWidth, backgroundColor }]}>
       <View style={styles.header}>
-        <Text style={[styles.star, { color: accentColor }]}>★</Text>
-        <Text style={[styles.headerLabel, { color: accentColor }]}>
-          {title}
-        </Text>
+        <Text style={styles.star}>★</Text>
+        <Text style={styles.headerLabel}>{title}</Text>
       </View>
 
-      {/* ── Numbered points ── */}
-      {points.map((pt, idx) => (
-        <View key={idx} style={idx > 0 ? styles.pointGap : undefined}>
-          <Text style={styles.pointTitle}>
-            {idx + 1}. {pt.title}
-          </Text>
-          {pt.bullets.map((b, bi) => (
-            <Text key={bi} style={styles.bullet}>•  {b}</Text>
-          ))}
-        </View>
-      ))}
+      {hasBody ? (
+        <Text style={styles.bodyText}>{body}</Text>
+      ) : points?.length ? (
+        points.map((pt, idx) => (
+          <View key={idx} style={idx > 0 ? styles.pointGap : undefined}>
+            <Text style={styles.pointTitle}>
+              {idx + 1}. {pt.title}
+            </Text>
+            {pt.bullets.map((b, bi) => (
+              <Text key={bi} style={styles.bullet}>•  {b}</Text>
+            ))}
+          </View>
+        ))
+      ) : null}
 
-      {/* ── Summary ── */}
       {summary ? (
         <>
           <View style={styles.divider} />
@@ -68,9 +70,7 @@ export const ArgumentCard = React.memo(function ArgumentCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: CARD.backgroundColor,
     borderRadius: CARD.borderRadius,
-    borderWidth: CARD.borderWidth,
     paddingHorizontal: CARD.paddingHorizontal,
     paddingVertical: CARD.paddingVertical,
   },
@@ -82,12 +82,19 @@ const styles = StyleSheet.create({
   star: {
     fontSize: HDR.starSize,
     marginRight: 8,
+    color: HDR.starColor,
   },
   headerLabel: {
     fontSize: HDR.labelSize,
     fontWeight: '800',
     letterSpacing: HDR.letterSpacing,
     textTransform: 'uppercase',
+    color: HDR.titleColor,
+  },
+  bodyText: {
+    color: '#D8D8D8',
+    fontSize: 14,
+    lineHeight: 22,
   },
   pointGap: {
     marginTop: PT.pointGap,

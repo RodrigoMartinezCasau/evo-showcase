@@ -10,7 +10,9 @@ type Props = {
   quote: string;
   author?: string;
   work?: string;
-  /** Called when user taps "AÑADIR COMO WIDGET". */
+  borderColor: string;
+  borderWidth: number;
+  backgroundColor: string;
   onAddWidget?: () => void;
 };
 
@@ -18,19 +20,20 @@ export const DebateQuoteCard = React.memo(function DebateQuoteCard({
   quote,
   author,
   work,
+  borderColor,
+  borderWidth,
+  backgroundColor,
   onAddWidget,
 }: Props) {
   const attribution = [author, work].filter(Boolean).join(' — ');
 
   return (
-    <View style={[styles.card, { borderColor: QT.borderColor }]}>
-      {/* ── Header ── */}
+    <View style={[styles.card, { borderColor, borderWidth, backgroundColor }]}>
       <View style={styles.header}>
         <Text style={styles.star}>★</Text>
         <Text style={styles.headerLabel}>CITA TEXTUAL</Text>
       </View>
 
-      {/* ── Quote with red left accent ── */}
       <View style={styles.quoteRow}>
         <View style={styles.accentBar} />
         <View style={styles.quoteContent}>
@@ -41,7 +44,6 @@ export const DebateQuoteCard = React.memo(function DebateQuoteCard({
         </View>
       </View>
 
-      {/* ── Unlocked badge + Widget button ── */}
       <View style={styles.footer}>
         <Text style={styles.badge}>¡NUEVA FRASE DESBLOQUEADA!</Text>
         <TouchableOpacity
@@ -58,9 +60,7 @@ export const DebateQuoteCard = React.memo(function DebateQuoteCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: CARD.backgroundColor,
     borderRadius: CARD.borderRadius,
-    borderWidth: CARD.borderWidth,
     paddingHorizontal: CARD.paddingHorizontal,
     paddingVertical: CARD.paddingVertical,
   },
@@ -72,14 +72,14 @@ const styles = StyleSheet.create({
   star: {
     fontSize: HDR.starSize,
     marginRight: 8,
-    color: QT.accentColor,
+    color: HDR.starColor,
   },
   headerLabel: {
     fontSize: HDR.labelSize,
     fontWeight: '800',
     letterSpacing: HDR.letterSpacing,
     textTransform: 'uppercase',
-    color: QT.accentColor,
+    color: HDR.titleColor,
   },
   quoteRow: {
     flexDirection: 'row',

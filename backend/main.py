@@ -865,13 +865,16 @@ def debate_chat_persisted(debate_id: str, payload: DebateChatPayload):
         quotes_json=json.dumps(response.author_layer.model_dump(mode="json")),
     )
 
-    # Build response with possibly repaired debate_layer
+    # Build response with possibly repaired debate_layer (preserve structured sections)
     repaired_layer = DebateLayer(
         steelman_of_user=steelman,
         contrarian_position=contrarian,
         counterarguments=response.debate_layer.counterarguments,
         socratic_questions=[next_question],
         where_contrarian_might_fail=response.debate_layer.where_contrarian_might_fail,
+        stance_section=response.debate_layer.stance_section,
+        counter_section=response.debate_layer.counter_section,
+        question_section=response.debate_layer.question_section,
     )
     response_for_frontend = DebateResponse(
         facts_layer=response.facts_layer,

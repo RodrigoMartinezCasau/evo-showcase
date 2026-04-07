@@ -59,6 +59,8 @@ export type StructuredSection = {
   section_title: string;
   points: ArgumentPoint[];
   quick_summary: string;
+  /** Prose-format body (new format). When present, takes priority over points[]. */
+  body?: string;
 };
 
 export type QuestionSection = {

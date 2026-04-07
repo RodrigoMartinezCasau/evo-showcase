@@ -6,10 +6,18 @@ import {
 } from '@evoconn/constants/debateResponseLayout';
 
 type Props = {
+  borderColor: string;
+  borderWidth: number;
+  backgroundColor: string;
   onTitleChange?: (title: string) => void;
 };
 
-export const PublishBlock = React.memo(function PublishBlock({ onTitleChange }: Props) {
+export const PublishBlock = React.memo(function PublishBlock({
+  borderColor,
+  borderWidth,
+  backgroundColor,
+  onTitleChange,
+}: Props) {
   const [title, setTitle] = useState('');
 
   const handleChange = (t: string) => {
@@ -18,7 +26,7 @@ export const PublishBlock = React.memo(function PublishBlock({ onTitleChange }: 
   };
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { borderColor, borderWidth, backgroundColor }]}>
       <Text style={styles.title}>¡PUBLICAR!</Text>
       <TextInput
         style={styles.input}
@@ -34,7 +42,6 @@ export const PublishBlock = React.memo(function PublishBlock({ onTitleChange }: 
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: PUB.backgroundColor,
     borderRadius: PUB.borderRadius,
     paddingHorizontal: CARD.paddingHorizontal,
     paddingVertical: CARD.paddingVertical,

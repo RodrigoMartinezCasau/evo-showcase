@@ -8,22 +8,22 @@ import {
 
 type Props = {
   question: string;
-  accentColor?: string;
+  borderColor: string;
+  borderWidth: number;
+  backgroundColor: string;
 };
 
 export const QuestionCard = React.memo(function QuestionCard({
   question,
-  accentColor,
+  borderColor,
+  borderWidth,
+  backgroundColor,
 }: Props) {
-  const borderColor = accentColor ?? Q.borderColor;
-
   return (
-    <View style={[styles.card, { borderColor }]}>
+    <View style={[styles.card, { borderColor, borderWidth, backgroundColor }]}>
       <View style={styles.header}>
-        <Text style={[styles.star, { color: borderColor }]}>★</Text>
-        <Text style={[styles.headerLabel, { color: borderColor }]}>
-          PREGUNTA REFLEXIVA
-        </Text>
+        <Text style={styles.star}>★</Text>
+        <Text style={styles.headerLabel}>PREGUNTA REFLEXIVA</Text>
       </View>
       <Text style={styles.questionText}>{question}</Text>
     </View>
@@ -32,9 +32,7 @@ export const QuestionCard = React.memo(function QuestionCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: CARD.backgroundColor,
     borderRadius: CARD.borderRadius,
-    borderWidth: CARD.borderWidth,
     paddingHorizontal: CARD.paddingHorizontal,
     paddingVertical: CARD.paddingVertical,
   },
@@ -46,12 +44,14 @@ const styles = StyleSheet.create({
   star: {
     fontSize: HDR.starSize,
     marginRight: 8,
+    color: HDR.starColor,
   },
   headerLabel: {
     fontSize: HDR.labelSize,
     fontWeight: '800',
     letterSpacing: HDR.letterSpacing,
     textTransform: 'uppercase',
+    color: HDR.titleColor,
   },
   questionText: {
     color: Q.textColor,

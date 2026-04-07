@@ -1,8 +1,12 @@
 import React, { useMemo } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View } from 'react-native';
 import type { DebateResponse } from '@evoconn/types/debate';
-import { getClanColor, getClanSecondaryColor } from '@evoconn/constants/clanColors';
-import { DEBATE_CARD_LAYOUT } from '@evoconn/constants/debateResponseLayout';
+import {
+  AI_RESPONSE_BLOCK_GAPS as GAPS,
+  AI_RESPONSE_BORDER_WIDTH as BW,
+  getBlockBorderColor,
+  getBlockBackgroundColor,
+} from '@evoconn/constants/debateResponseLayout';
 import { ArgumentCard, type ArgumentPointData } from './ArgumentCard';
 import { QuestionCard } from './QuestionCard';
 import { DebateQuoteCard } from './DebateQuoteCard';
@@ -13,56 +17,49 @@ type Props = {
   clanId: string | null | undefined;
 };
 
-/**
- * Adapts a StructuredSection (from backend) into the flat
- * array of { title, bullets } that ArgumentCard expects.
- */
-function sectionToPoints(
-  section: DebateResponse['debate_layer']['stance_section'],
-): ArgumentPointData[] {
-  if (!section?.points?.length) return [];
-  return section.points.map((p) => ({
-    title: p.title,
-    bullets: p.bullets.map((b) => b.text),
-  }));
-}
+type SectionData = {
+  body?: string;
+  points: ArgumentPointData[];
+  summary?: string;
+};
 
-/**
- * Fallback: convert a plain-text steelman/contrarian string
- * into a single point with one bullet.
- */
-function textToPoints(text: string | undefined): ArgumentPointData[] {
-  if (!text) return [];
-  return [{ title: 'Argumento', bullets: [text] }];
+function extractSection(
+  section: DebateResponse['debate_layer']['stance_section'],
+  fallbackText?: string,
+): SectionData {
+  if (section?.body && section.body.length >= 50) {
+    return { body: section.body, points: [], summary: section.quick_summary };
+  }
+  if (section?.points?.length) {
+    return {
+      points: section.points.map((p) => ({
+        title: p.title,
+        bullets: p.bullets.map((b) => b.text),
+      })),
+      summary: section.quick_summary,
+    };
+  }
+  if (fallbackText) {
+    return { body: fallbackText, points: [] };
+  }
+  return { points: [] };
 }
 
 export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
   response,
   clanId,
 }: Props) {
-  const primaryColor = getClanColor(clanId);
-  const secondaryColor = getClanSecondaryColor(clanId);
-
   const dl = response.debate_layer;
 
-  const stancePoints = useMemo(
-    () =>
-      dl.stance_section
-        ? sectionToPoints(dl.stance_section)
-        : textToPoints(dl.steelman_of_user),
+  const stance = useMemo(
+    () => extractSection(dl.stance_section, dl.steelman_of_user),
     [dl.stance_section, dl.steelman_of_user],
   );
 
-  const counterPoints = useMemo(
-    () =>
-      dl.counter_section
-        ? sectionToPoints(dl.counter_section)
-        : textToPoints(dl.contrarian_position),
+  const counter = useMemo(
+    () => extractSection(dl.counter_section, dl.contrarian_position),
     [dl.counter_section, dl.contrarian_position],
   );
-
-  const stanceSummary = dl.stance_section?.quick_summary;
-  const counterSummary = dl.counter_section?.quick_summary;
 
   const questionText =
     dl.question_section?.socratic_question ??
@@ -71,50 +68,75 @@ export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
 
   const firstQuote = response.author_layer?.quotes?.[0] ?? null;
 
+  const hasStance = !!stance.body || stance.points.length > 0;
+  const hasCounter = !!counter.body || counter.points.length > 0;
+  const hasQuestion = !!questionText;
+  const hasQuote = !!firstQuote;
+
   return (
-    <View style={styles.wrapper}>
+    <View>
       {/* ── 1. TU POSTURA ── */}
-      {stancePoints.length > 0 ? (
+      {hasStance ? (
         <ArgumentCard
           title="TU POSTURA"
-          accentColor={primaryColor}
-          points={stancePoints}
-          summary={stanceSummary}
+          borderColor={getBlockBorderColor('posture', clanId)}
+          borderWidth={BW.posture}
+          backgroundColor={getBlockBackgroundColor('posture', clanId)}
+          body={stance.body}
+          points={stance.points}
+          summary={stance.summary}
         />
       ) : null}
 
       {/* ── 2. CONTRAPOSTURA ── */}
-      {counterPoints.length > 0 ? (
-        <ArgumentCard
-          title="CONTRAPOSTURA"
-          accentColor={secondaryColor}
-          points={counterPoints}
-          summary={counterSummary}
-        />
+      {hasCounter ? (
+        <View style={{ marginTop: GAPS.postureToCounterpoint }}>
+          <ArgumentCard
+            title="CONTRAPOSTURA"
+            borderColor={getBlockBorderColor('counterpoint', clanId)}
+            borderWidth={BW.counterpoint}
+            backgroundColor={getBlockBackgroundColor('counterpoint', clanId)}
+            body={counter.body}
+            points={counter.points}
+            summary={counter.summary}
+          />
+        </View>
       ) : null}
 
       {/* ── 3. PREGUNTA REFLEXIVA ── */}
-      {questionText ? (
-        <QuestionCard question={questionText} accentColor={primaryColor} />
+      {hasQuestion ? (
+        <View style={{ marginTop: GAPS.counterpointToQuestion }}>
+          <QuestionCard
+            question={questionText}
+            borderColor={getBlockBorderColor('question', clanId)}
+            borderWidth={BW.question}
+            backgroundColor={getBlockBackgroundColor('question', clanId)}
+          />
+        </View>
       ) : null}
 
       {/* ── 4. CITA TEXTUAL ── */}
-      {firstQuote ? (
-        <DebateQuoteCard
-          quote={firstQuote.quote}
-          author={firstQuote.author}
-          work={firstQuote.work}
-        />
+      {hasQuote ? (
+        <View style={{ marginTop: GAPS.questionToQuote }}>
+          <DebateQuoteCard
+            quote={firstQuote.quote}
+            author={firstQuote.author}
+            work={firstQuote.work}
+            borderColor={getBlockBorderColor('quote', clanId)}
+            borderWidth={BW.quote}
+            backgroundColor={getBlockBackgroundColor('quote', clanId)}
+          />
+        </View>
       ) : null}
 
       {/* ── 5. PUBLICAR ── */}
-      <PublishBlock />
+      <View style={{ marginTop: GAPS.quoteToPublish }}>
+        <PublishBlock
+          borderColor={getBlockBorderColor('publish', clanId)}
+          borderWidth={BW.publish}
+          backgroundColor={getBlockBackgroundColor('publish', clanId)}
+        />
+      </View>
     </View>
   );
-});
-
-const styles = StyleSheet.create({
-  wrapper: {
-    gap: DEBATE_CARD_LAYOUT.cardGap,
-  },
 });
