@@ -233,11 +233,11 @@ def translate_debate_layer_star_format_to_es(
 
 STRICT RULES:
 - DO NOT summarize or shorten. Preserve FULL length and depth.
-- If stance/counter contain "body" (prose), translate the entire body preserving paragraphs, flow, and style. Do NOT convert prose into bullet points.
-- If stance/counter contain "points" (legacy format), preserve same structure: same number of points, same number of bullets per point.
+- stance and counter contain "points" (array of { index, title, bullets }). Preserve same structure: same number of points, same number of bullets per point. Translate each title and each bullet text fully.
+- If stance/counter contain "body" (legacy prose), translate the entire body preserving paragraphs and style.
 - quick_summary: 1-2 sentences. socratic_question: 1 sentence.
 - Return ONLY valid JSON with keys: stance, counter, question, counterarguments, where_contrarian_might_fail.
-- stance and counter: preserve whichever keys are present (body or points), plus section_title and quick_summary.
+- stance and counter: preserve whichever keys are present (points or body), plus section_title and quick_summary.
 - question: { "section_title": "...", "socratic_question": "..." }."""
 
     user = f"""Translate to Spanish. Preserve structure and length.

@@ -304,7 +304,7 @@ def _has_conclusive_language(text: str) -> bool:
 
 
 MAX_TITLE_WORDS = 30
-MIN_BULLETS_PER_POINT = 2
+MIN_BULLETS_PER_POINT = 1
 MAX_BULLETS_PER_POINT = 5
 MIN_BULLET_LEN = 30
 
@@ -316,9 +316,7 @@ def _word_count(s: str) -> int:
 def _derived_flat_from_stance_section(section: StructuredSection) -> str:
     """Derive flat paragraph from structured stance/counter section for fallback display."""
     parts = []
-    if (section.body or "").strip():
-        parts.append(section.body.strip())
-    else:
+    if section.points:
         for p in section.points:
             if (p.title or "").strip():
                 parts.append((p.title or "").strip())
@@ -326,6 +324,8 @@ def _derived_flat_from_stance_section(section: StructuredSection) -> str:
                 t = (getattr(b, "text", b) if isinstance(b, BulletPoint) else str(b)).strip()
                 if t:
                     parts.append("• " + t)
+    elif (section.body or "").strip():
+        parts.append(section.body.strip())
     if (section.quick_summary or "").strip():
         parts.append("RESUMEN RÁPIDO → " + (section.quick_summary or "").strip())
     return "\n".join(parts)
@@ -345,18 +345,35 @@ def _build_structured_debate_prompts(
 
 RULES:
 - Do NOT invent new arguments. Do NOT remove arguments. Only reorganize and articulate.
-- stance.body: write a COHERENT, WELL-CRAFTED ESSAY that reconstructs the user's position in its strongest form. Cover every important aspect of their idea, but do so in flowing, connected prose — NOT bullet points, NOT numbered lists. Use paragraphs, transitions, and logical progression. The text should read like an eloquent defense written by a skilled writer, not like notes or an outline. Aim for 150–400 words.
-- counter.body: same style — a coherent, well-written essay presenting the contrarian position. Serious, structured, covering all friction points and weaknesses, but expressed as flowing text with paragraphs. Aim for 150–400 words.
+- stance.points and counter.points: organize the content into NUMBERED THEMATIC POINTS. Each point is a distinct idea or angle within the argument.
+  * First, mentally draft the full argument.
+  * Then, split it into 3–6 thematic points (use as many as the content demands — no padding, no filler).
+  * Each point has a short, specific TITLE (3–8 words) that names the concrete idea — NOT generic labels like "Key Consideration" or "Important Factor".
+  * Each point has 1–3 BULLETS. Each bullet is ONE concise sentence that adds a unique idea. No repetition, no paraphrasing the title, no filler.
+  * Bullets must be intellectually dense: each one should teach, reveal, or reframe something.
 - stance.quick_summary and counter.quick_summary: 1–2 sentences summarizing each section.
 - question.socratic_question: 1 sentence that invites reflection (Socratic question).
 - Maintain language: output in English.
 - Include counterarguments and where_contrarian_might_fail as arrays (same as before).
-- STYLE: clear, elegant, reflective, precise. Not overly academic, not robotic. It should feel like a thoughtful reformulation, not AI-generated notes.
+- QUALITY: Do NOT produce empty or generic points. Every point must correspond to a real idea from the reflection. Every bullet must contribute something new.
 
 SCHEMA (StructuredDebateOutput):
 {
-  "stance": { "section_title": "TU POSTURA (EN SU MEJOR VERSIÓN)", "body": "coherent essay text...", "quick_summary": "..." },
-  "counter": { "section_title": "CONTRAPOSTURA", "body": "coherent essay text...", "quick_summary": "..." },
+  "stance": {
+    "section_title": "TU POSTURA (EN SU MEJOR VERSIÓN)",
+    "points": [
+      { "index": 1, "title": "Specific Idea Name", "bullets": [{ "text": "One concise sentence with a unique idea." }, { "text": "Another distinct insight." }] },
+      { "index": 2, "title": "Another Angle", "bullets": [{ "text": "..." }] }
+    ],
+    "quick_summary": "1–2 sentence summary"
+  },
+  "counter": {
+    "section_title": "CONTRAPOSTURA",
+    "points": [
+      { "index": 1, "title": "...", "bullets": [{ "text": "..." }] }
+    ],
+    "quick_summary": "..."
+  },
   "question": { "section_title": "PREGUNTA PARA TI", "socratic_question": "..." },
   "counterarguments": ["...", ...],
   "where_contrarian_might_fail": ["...", ...]
@@ -436,15 +453,8 @@ def _validate_structured_debate(debate_dict: dict) -> tuple[StructuredSection, S
         def build_section(section: dict, default_title: str) -> StructuredSection | None:
             st = (section.get("section_title") or "").strip() or default_title
             qs = (section.get("quick_summary") or "").strip()
-            body = (section.get("body") or "").strip()
             if not qs:
                 return None
-            if body and len(body) >= 50:
-                return StructuredSection(
-                    section_title=st,
-                    body=body,
-                    quick_summary=qs,
-                )
             pts = section.get("points")
             if isinstance(pts, list) and len(pts) >= 1:
                 arg_points = to_argument_points(pts)
@@ -454,6 +464,13 @@ def _validate_structured_debate(debate_dict: dict) -> tuple[StructuredSection, S
                         points=arg_points,
                         quick_summary=qs,
                     )
+            body = (section.get("body") or "").strip()
+            if body and len(body) >= 50:
+                return StructuredSection(
+                    section_title=st,
+                    body=body,
+                    quick_summary=qs,
+                )
             return None
 
         stance_sec = build_section(stance, "TU POSTURA (EN SU MEJOR VERSIÓN)")

@@ -187,23 +187,72 @@ export function getBlockBackgroundColor(
 }
 
 /* ──────────────────────────────────────────────
- * PART 4 — Header title color (forced white)
+ * PART 4 — Fine-grained position/size editors
+ *
+ * AI_RESPONSE_LAYOUT — single config for all
+ * editable element positions and sizes.
+ * ────────────────────────────────────────────── */
+
+type StarEditor = {
+  offsetX: number;
+  offsetY: number;
+  scale: number;
+  /** Base size in dp (effective = size × scale). */
+  size: number;
+  marginRight: number;
+};
+
+type TextEditor = {
+  offsetX: number;
+  offsetY: number;
+  fontSize: number;
+  /** 0 = use default / auto. */
+  lineHeight: number;
+};
+
+export const AI_RESPONSE_LAYOUT = {
+  /* ── A) Stars ── */
+  stars: {
+    posture:      { offsetX: -10, offsetY: -10, scale: 3, size: 18, marginRight: 8 } as StarEditor,
+    counterpoint: { offsetX: -10, offsetY: -10, scale: 3, size: 18, marginRight: 8 } as StarEditor,
+    question:     { offsetX: -10, offsetY: -10, scale: 3, size: 16, marginRight: 8 } as StarEditor,
+    quote:        { offsetX: -10, offsetY: -10, scale: 3, size: 16, marginRight: 8 } as StarEditor,
+  },
+
+  /* ── B) Display titles (block headers) ── */
+  displayTitles: {
+    posture:      { offsetX: -10, offsetY: -10, fontSize: 20, lineHeight: 0 } as TextEditor,
+    counterpoint: { offsetX: -10, offsetY: -10, fontSize: 20, lineHeight: 0 } as TextEditor,
+    question:     { offsetX: -10, offsetY: -10, fontSize: 20, lineHeight: 0 } as TextEditor,
+    quote:        { offsetX: -10, offsetY: -10, fontSize: 20, lineHeight: 0 } as TextEditor,
+    publish:      { offsetX: -10, offsetY: -10, fontSize: 20, lineHeight: 0 } as TextEditor,
+  },
+
+  /* ── C) Point titles (numbered headings inside cards) ── */
+  pointTitles: { offsetX: 0, offsetY: 0, fontSize: 14, lineHeight: 0 } as TextEditor,
+
+  /* ── D) Point bullets / gray text ── */
+  pointBullets: { offsetX: 0, offsetY: 0, fontSize: 14, lineHeight: 20 } as TextEditor,
+
+  /* ── E) Summary section ── */
+  summary: {
+    label: { offsetX: 0, offsetY: 0, fontSize: 11, lineHeight: 0 } as TextEditor,
+    body:  { offsetX: 0, offsetY: 0, fontSize: 13, lineHeight: 19 } as TextEditor,
+  },
+} as const;
+
+export type { StarEditor, TextEditor };
+
+/* ──────────────────────────────────────────────
+ * Shared structural metrics & colors
+ * (kept separate — NOT position/size editors)
  * ────────────────────────────────────────────── */
 
 export const DEBATE_HEADER_LAYOUT = {
-  starSize: 16,
-  labelSize: 13,
   letterSpacing: 1.2,
   marginBottom: 14,
-  /** All block titles are forced to this color. */
   titleColor: '#FFFFFF',
-  /** Star icon color (same as title — white). */
-  starColor: '#FFFFFF',
 } as const;
-
-/* ──────────────────────────────────────────────
- * Shared card metrics
- * ────────────────────────────────────────────── */
 
 export const DEBATE_CARD_LAYOUT = {
   borderRadius: 16,
@@ -212,11 +261,8 @@ export const DEBATE_CARD_LAYOUT = {
 } as const;
 
 export const DEBATE_POINT_LAYOUT = {
-  titleSize: 14,
   titleColor: '#FFFFFF',
-  bulletSize: 14,
   bulletColor: '#A0A0A0',
-  bulletLineHeight: 20,
   pointGap: 14,
   bulletIndent: 16,
 } as const;
@@ -224,11 +270,8 @@ export const DEBATE_POINT_LAYOUT = {
 export const DEBATE_SUMMARY_LAYOUT = {
   dividerColor: '#3A3A3A',
   dividerMarginVertical: 14,
-  labelSize: 11,
   labelColor: '#808080',
-  textSize: 13,
   textColor: '#C0C0C0',
-  textLineHeight: 19,
 } as const;
 
 export const DEBATE_QUESTION_LAYOUT = {
@@ -255,9 +298,6 @@ export const DEBATE_QUOTE_LAYOUT = {
 
 export const DEBATE_PUBLISH_LAYOUT = {
   borderRadius: 16,
-  titleSize: 18,
-  /** Title forced to white. */
-  titleColor: '#FFFFFF',
   inputPlaceholderColor: '#606060',
   inputBackgroundColor: '#2A2A30',
   inputBorderRadius: 10,

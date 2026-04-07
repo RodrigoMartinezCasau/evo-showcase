@@ -1,6 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import type { FC } from 'react';
+import type { SvgProps } from 'react-native-svg';
+import type { StarEditor, TextEditor } from '@evoconn/constants/debateResponseLayout';
 import {
+  AI_RESPONSE_LAYOUT as L,
   DEBATE_CARD_LAYOUT as CARD,
   DEBATE_HEADER_LAYOUT as HDR,
   DEBATE_POINT_LAYOUT as PT,
@@ -17,12 +21,18 @@ type Props = {
   borderColor: string;
   borderWidth: number;
   backgroundColor: string;
-  /** Prose body text (new format). When present, rendered instead of points. */
   body?: string;
-  /** Legacy numbered points format. */
   points?: ArgumentPointData[];
   summary?: string;
+  starIcon?: FC<SvgProps>;
+  starLayout: StarEditor;
+  displayTitleLayout: TextEditor;
 };
+
+const PTs = L.pointTitles;
+const PBs = L.pointBullets;
+const SL = L.summary.label;
+const SB = L.summary.body;
 
 export const ArgumentCard = React.memo(function ArgumentCard({
   title,
@@ -32,36 +42,139 @@ export const ArgumentCard = React.memo(function ArgumentCard({
   body,
   points,
   summary,
+  starIcon: StarIcon,
+  starLayout,
+  displayTitleLayout: dt,
 }: Props) {
-  const hasBody = !!body && body.length > 0;
+  const hasPoints = !!points && points.length > 0;
+  const starSz = starLayout.size * starLayout.scale;
 
   return (
     <View style={[styles.card, { borderColor, borderWidth, backgroundColor }]}>
       <View style={styles.header}>
-        <Text style={styles.star}>★</Text>
-        <Text style={styles.headerLabel}>{title}</Text>
+        {StarIcon ? (
+          <View
+            style={{
+              width: starSz,
+              height: starSz,
+              marginRight: starLayout.marginRight,
+              transform: [
+                { translateX: starLayout.offsetX },
+                { translateY: starLayout.offsetY },
+              ],
+            }}
+          >
+            <StarIcon width={starSz} height={starSz} />
+          </View>
+        ) : (
+          <Text
+            style={[
+              styles.starFallback,
+              {
+                fontSize: starSz,
+                marginRight: starLayout.marginRight,
+                transform: [
+                  { translateX: starLayout.offsetX },
+                  { translateY: starLayout.offsetY },
+                ],
+              },
+            ]}
+          >
+            ★
+          </Text>
+        )}
+        <Text
+          style={[
+            styles.headerLabel,
+            {
+              fontSize: dt.fontSize,
+              ...(dt.lineHeight > 0 ? { lineHeight: dt.lineHeight } : {}),
+              transform: [
+                { translateX: dt.offsetX },
+                { translateY: dt.offsetY },
+              ],
+            },
+          ]}
+        >
+          {title}
+        </Text>
       </View>
 
-      {hasBody ? (
-        <Text style={styles.bodyText}>{body}</Text>
-      ) : points?.length ? (
+      {hasPoints ? (
         points.map((pt, idx) => (
           <View key={idx} style={idx > 0 ? styles.pointGap : undefined}>
-            <Text style={styles.pointTitle}>
+            <Text
+              style={[
+                styles.pointTitle,
+                {
+                  fontSize: PTs.fontSize,
+                  ...(PTs.lineHeight > 0 ? { lineHeight: PTs.lineHeight } : {}),
+                  transform: [
+                    { translateX: PTs.offsetX },
+                    { translateY: PTs.offsetY },
+                  ],
+                },
+              ]}
+            >
               {idx + 1}. {pt.title}
             </Text>
             {pt.bullets.map((b, bi) => (
-              <Text key={bi} style={styles.bullet}>•  {b}</Text>
+              <Text
+                key={bi}
+                style={[
+                  styles.bullet,
+                  {
+                    fontSize: PBs.fontSize,
+                    lineHeight: PBs.lineHeight > 0 ? PBs.lineHeight : undefined,
+                    transform: [
+                      { translateX: PBs.offsetX },
+                      { translateY: PBs.offsetY },
+                    ],
+                  },
+                ]}
+              >
+                •  {b}
+              </Text>
             ))}
           </View>
         ))
+      ) : body && body.length > 0 ? (
+        <Text style={styles.bodyText}>{body}</Text>
       ) : null}
 
       {summary ? (
         <>
           <View style={styles.divider} />
-          <Text style={styles.summaryLabel}>RESUMEN RÁPIDO</Text>
-          <Text style={styles.summaryText}>{summary}</Text>
+          <Text
+            style={[
+              styles.summaryLabel,
+              {
+                fontSize: SL.fontSize,
+                ...(SL.lineHeight > 0 ? { lineHeight: SL.lineHeight } : {}),
+                transform: [
+                  { translateX: SL.offsetX },
+                  { translateY: SL.offsetY },
+                ],
+              },
+            ]}
+          >
+            RESUMEN RÁPIDO
+          </Text>
+          <Text
+            style={[
+              styles.summaryText,
+              {
+                fontSize: SB.fontSize,
+                lineHeight: SB.lineHeight > 0 ? SB.lineHeight : undefined,
+                transform: [
+                  { translateX: SB.offsetX },
+                  { translateY: SB.offsetY },
+                ],
+              },
+            ]}
+          >
+            {summary}
+          </Text>
         </>
       ) : null}
     </View>
@@ -79,13 +192,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: HDR.marginBottom,
   },
-  star: {
-    fontSize: HDR.starSize,
-    marginRight: 8,
-    color: HDR.starColor,
+  starFallback: {
+    color: '#FFFFFF',
   },
   headerLabel: {
-    fontSize: HDR.labelSize,
     fontWeight: '800',
     letterSpacing: HDR.letterSpacing,
     textTransform: 'uppercase',
@@ -101,14 +211,11 @@ const styles = StyleSheet.create({
   },
   pointTitle: {
     color: PT.titleColor,
-    fontSize: PT.titleSize,
     fontWeight: '700',
     marginBottom: 4,
   },
   bullet: {
     color: PT.bulletColor,
-    fontSize: PT.bulletSize,
-    lineHeight: PT.bulletLineHeight,
     paddingLeft: PT.bulletIndent,
     marginBottom: 2,
   },
@@ -119,7 +226,6 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     color: SUM.labelColor,
-    fontSize: SUM.labelSize,
     fontWeight: '700',
     letterSpacing: 1,
     textTransform: 'uppercase',
@@ -127,7 +233,5 @@ const styles = StyleSheet.create({
   },
   summaryText: {
     color: SUM.textColor,
-    fontSize: SUM.textSize,
-    lineHeight: SUM.textLineHeight,
   },
 });

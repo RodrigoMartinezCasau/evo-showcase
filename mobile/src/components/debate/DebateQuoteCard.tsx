@@ -1,10 +1,15 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import {
+  AI_RESPONSE_LAYOUT as L,
   DEBATE_CARD_LAYOUT as CARD,
   DEBATE_HEADER_LAYOUT as HDR,
   DEBATE_QUOTE_LAYOUT as QT,
 } from '@evoconn/constants/debateResponseLayout';
+import WhiteStar from '../../assets/debate/whiteStar.svg';
+
+const STAR = L.stars.quote;
+const DT = L.displayTitles.quote;
 
 type Props = {
   quote: string;
@@ -26,12 +31,39 @@ export const DebateQuoteCard = React.memo(function DebateQuoteCard({
   onAddWidget,
 }: Props) {
   const attribution = [author, work].filter(Boolean).join(' — ');
+  const starSz = STAR.size * STAR.scale;
 
   return (
     <View style={[styles.card, { borderColor, borderWidth, backgroundColor }]}>
       <View style={styles.header}>
-        <Text style={styles.star}>★</Text>
-        <Text style={styles.headerLabel}>CITA TEXTUAL</Text>
+        <View
+          style={{
+            width: starSz,
+            height: starSz,
+            marginRight: STAR.marginRight,
+            transform: [
+              { translateX: STAR.offsetX },
+              { translateY: STAR.offsetY },
+            ],
+          }}
+        >
+          <WhiteStar width={starSz} height={starSz} />
+        </View>
+        <Text
+          style={[
+            styles.headerLabel,
+            {
+              fontSize: DT.fontSize,
+              ...(DT.lineHeight > 0 ? { lineHeight: DT.lineHeight } : {}),
+              transform: [
+                { translateX: DT.offsetX },
+                { translateY: DT.offsetY },
+              ],
+            },
+          ]}
+        >
+          CITA TEXTUAL
+        </Text>
       </View>
 
       <View style={styles.quoteRow}>
@@ -69,13 +101,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: HDR.marginBottom,
   },
-  star: {
-    fontSize: HDR.starSize,
-    marginRight: 8,
-    color: HDR.starColor,
-  },
   headerLabel: {
-    fontSize: HDR.labelSize,
     fontWeight: '800',
     letterSpacing: HDR.letterSpacing,
     textTransform: 'uppercase',
