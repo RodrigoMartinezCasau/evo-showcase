@@ -139,6 +139,7 @@ export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
             borderColor={getBlockBorderColor('quote', clanId)}
             borderWidth={BW.quote}
             backgroundColor={getBlockBackgroundColor('quote', clanId)}
+            innerBorderColor={getBlockBorderColor('quote', clanId)}
           />
         </View>
       ) : null}

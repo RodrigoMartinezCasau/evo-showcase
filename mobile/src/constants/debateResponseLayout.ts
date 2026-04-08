@@ -215,16 +215,16 @@ export const AI_RESPONSE_LAYOUT = {
   stars: {
     posture:      { offsetX: -10, offsetY: -10, scale: 3, size: 18, marginRight: 8 } as StarEditor,
     counterpoint: { offsetX: -10, offsetY: -10, scale: 3, size: 18, marginRight: 8 } as StarEditor,
-    question:     { offsetX: -10, offsetY: -10, scale: 3, size: 16, marginRight: 8 } as StarEditor,
-    quote:        { offsetX: -10, offsetY: -10, scale: 3, size: 16, marginRight: 8 } as StarEditor,
+    question:     { offsetX: -7, offsetY: -3, scale: 2, size: 16, marginRight: 8 } as StarEditor,
+    quote:        { offsetX: -7, offsetY: -3, scale: 2, size: 16, marginRight: 8 } as StarEditor,
   },
 
   /* ── B) Display titles (block headers) ── */
   displayTitles: {
     posture:      { offsetX: -10, offsetY: -10, fontSize: 20, lineHeight: 0 } as TextEditor,
     counterpoint: { offsetX: -10, offsetY: -10, fontSize: 20, lineHeight: 0 } as TextEditor,
-    question:     { offsetX: -10, offsetY: -10, fontSize: 20, lineHeight: 0 } as TextEditor,
-    quote:        { offsetX: -10, offsetY: -10, fontSize: 20, lineHeight: 0 } as TextEditor,
+    question:     { offsetX: -10, offsetY: -2, fontSize: 20, lineHeight: 0 } as TextEditor,
+    quote:        { offsetX: -10, offsetY: -2, fontSize: 20, lineHeight: 0 } as TextEditor,
     publish:      { offsetX: -10, offsetY: -10, fontSize: 20, lineHeight: 0 } as TextEditor,
   },
 
@@ -274,34 +274,71 @@ export const DEBATE_SUMMARY_LAYOUT = {
   textColor: '#C0C0C0',
 } as const;
 
-export const DEBATE_QUESTION_LAYOUT = {
-  textSize: 15,
-  textColor: '#E0E0E0',
-  textLineHeight: 22,
-} as const;
+/* ──────────────────────────────────────────────
+ * PART 6 — Unified special-block layout
+ *
+ * Controls heights, outer padding, inner cards,
+ * and every internal text for Pregunta, Cita,
+ * and Publicar blocks.
+ * ────────────────────────────────────────────── */
 
-export const DEBATE_QUOTE_LAYOUT = {
-  textSize: 15,
-  textColor: '#FFFFFF',
-  textLineHeight: 22,
-  accentWidth: 4,
-  accentColor: '#C93A3A',
-  badgeFontSize: 11,
-  badgeColor: '#C7FF02',
-  buttonFontSize: 12,
-  buttonColor: '#C7FF02',
-  buttonBorderColor: '#C7FF02',
-  buttonBorderRadius: 8,
-  buttonPaddingH: 12,
-  buttonPaddingV: 6,
-} as const;
+export const AI_SPECIAL_BLOCK_LAYOUT = {
+  /* ── A) Outer card heights ── */
+  heights: {
+    question: 110,
+    quote: 110,
+    publish: 110,
+  },
 
-export const DEBATE_PUBLISH_LAYOUT = {
-  borderRadius: 16,
-  inputPlaceholderColor: '#606060',
-  inputBackgroundColor: '#2A2A30',
-  inputBorderRadius: 10,
-  inputFontSize: 14,
-  inputPaddingH: 14,
-  inputPaddingV: 10,
+  /* ── A2) Outer card padding (compact for 110) ── */
+  outerPaddingH: 12,
+  outerPaddingV: 8,
+  headerMarginBottom: 6,
+
+  /* ── B) Inner cards (left-accent-only) ── */
+  questionCard: {
+    offsetX: 0,
+    offsetY: 0,
+    widthScale: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#171717',
+    accentColor: '#FFFFFF',
+    accentWidth: 4,
+  },
+  quoteCard: {
+    offsetX: 0,
+    offsetY: 0,
+    widthScale: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#171717',
+    accentColorFallback: '#C93A3A',
+    accentWidth: 4,
+  },
+
+  /* ── C) Text editors — Pregunta Reflexiva ── */
+  questionText: { offsetX: 0, offsetY: 0, fontSize: 13, lineHeight: 18, color: '#E0E0E0' },
+
+  /* ── D) Text editors — Cita Textual ── */
+  quoteText:        { offsetX: 0, offsetY: 0, fontSize: 13, lineHeight: 18, color: '#FFFFFF' },
+  quoteAuthor:      { offsetX: 0, offsetY: 0, fontSize: 11, lineHeight: 0,  color: '#808080' },
+  unlockedLabel:    { offsetX: 0, offsetY: 0, fontSize: 9,  lineHeight: 0,  color: '#C7FF02' },
+  widgetButtonText: { offsetX: 0, offsetY: 0, fontSize: 10, lineHeight: 0,  color: '#C7FF02' },
+  widgetButtonBorder: '#C7FF02',
+  widgetButtonBorderRadius: 6,
+  widgetButtonPaddingH: 8,
+  widgetButtonPaddingV: 3,
+
+  /* ── E) Text editors — ¡PUBLICAR! ── */
+  publishTitle: { offsetX: 0, offsetY: 0, fontSize: 18, lineHeight: 0, color: '#FFFFFF' },
+  publishInput: { offsetX: 0, offsetY: 0, fontSize: 13, lineHeight: 0, color: '#FFFFFF' },
+  publishInputPlaceholderColor: '#606060',
+  publishInputBackground: '#2A2A30',
+  publishInputBorderRadius: 10,
+  publishInputPaddingH: 12,
+  publishInputPaddingV: 8,
+  publishTitleMarginBottom: 8,
 } as const;

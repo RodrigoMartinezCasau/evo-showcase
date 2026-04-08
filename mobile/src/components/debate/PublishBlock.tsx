@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
 import {
-  AI_RESPONSE_LAYOUT as L,
+  AI_SPECIAL_BLOCK_LAYOUT as SB,
   DEBATE_CARD_LAYOUT as CARD,
-  DEBATE_PUBLISH_LAYOUT as PUB,
-  DEBATE_HEADER_LAYOUT as HDR,
 } from '@evoconn/constants/debateResponseLayout';
 
-const DT = L.displayTitles.publish;
+const PT = SB.publishTitle;
+const PI = SB.publishInput;
 
 type Props = {
   borderColor: string;
@@ -30,16 +29,30 @@ export const PublishBlock = React.memo(function PublishBlock({
   };
 
   return (
-    <View style={[styles.card, { borderColor, borderWidth, backgroundColor }]}>
+    <View
+      style={[
+        styles.card,
+        {
+          borderColor,
+          borderWidth,
+          backgroundColor,
+          height: SB.heights.publish,
+          paddingHorizontal: SB.outerPaddingH,
+          paddingVertical: SB.outerPaddingV,
+        },
+      ]}
+    >
       <Text
         style={[
           styles.title,
           {
-            fontSize: DT.fontSize,
-            ...(DT.lineHeight > 0 ? { lineHeight: DT.lineHeight } : {}),
+            fontSize: PT.fontSize,
+            color: PT.color,
+            ...(PT.lineHeight > 0 ? { lineHeight: PT.lineHeight } : {}),
+            marginBottom: SB.publishTitleMarginBottom,
             transform: [
-              { translateX: DT.offsetX },
-              { translateY: DT.offsetY },
+              { translateX: PT.offsetX },
+              { translateY: PT.offsetY },
             ],
           },
         ]}
@@ -47,11 +60,26 @@ export const PublishBlock = React.memo(function PublishBlock({
         ¡PUBLICAR!
       </Text>
       <TextInput
-        style={styles.input}
+        style={[
+          styles.input,
+          {
+            fontSize: PI.fontSize,
+            color: PI.color,
+            ...(PI.lineHeight > 0 ? { lineHeight: PI.lineHeight } : {}),
+            backgroundColor: SB.publishInputBackground,
+            borderRadius: SB.publishInputBorderRadius,
+            paddingHorizontal: SB.publishInputPaddingH,
+            paddingVertical: SB.publishInputPaddingV,
+            transform: [
+              { translateX: PI.offsetX },
+              { translateY: PI.offsetY },
+            ],
+          },
+        ]}
         value={title}
         onChangeText={handleChange}
         placeholder="AÑADE UN TITULO INTERESANTE..."
-        placeholderTextColor={PUB.inputPlaceholderColor}
+        placeholderTextColor={SB.publishInputPlaceholderColor}
         maxLength={120}
       />
     </View>
@@ -60,25 +88,17 @@ export const PublishBlock = React.memo(function PublishBlock({
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: PUB.borderRadius,
-    paddingHorizontal: CARD.paddingHorizontal,
-    paddingVertical: CARD.paddingVertical,
+    borderRadius: CARD.borderRadius,
+    justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
   },
   title: {
-    color: HDR.titleColor,
     fontWeight: '800',
     letterSpacing: 1.5,
     textTransform: 'uppercase',
-    marginBottom: 14,
   },
   input: {
     width: '100%',
-    backgroundColor: PUB.inputBackgroundColor,
-    borderRadius: PUB.inputBorderRadius,
-    color: '#FFFFFF',
-    fontSize: PUB.inputFontSize,
-    paddingHorizontal: PUB.inputPaddingH,
-    paddingVertical: PUB.inputPaddingV,
   },
 });

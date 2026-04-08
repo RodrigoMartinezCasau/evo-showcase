@@ -2,14 +2,16 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import {
   AI_RESPONSE_LAYOUT as L,
+  AI_SPECIAL_BLOCK_LAYOUT as SB,
   DEBATE_CARD_LAYOUT as CARD,
   DEBATE_HEADER_LAYOUT as HDR,
-  DEBATE_QUESTION_LAYOUT as Q,
 } from '@evoconn/constants/debateResponseLayout';
 import WhiteStar from '../../assets/debate/whiteStar.svg';
 
 const STAR = L.stars.question;
 const DT = L.displayTitles.question;
+const IC = SB.questionCard;
+const QT = SB.questionText;
 
 type Props = {
   question: string;
@@ -27,8 +29,20 @@ export const QuestionCard = React.memo(function QuestionCard({
   const starSz = STAR.size * STAR.scale;
 
   return (
-    <View style={[styles.card, { borderColor, borderWidth, backgroundColor }]}>
-      <View style={styles.header}>
+    <View
+      style={[
+        styles.outerCard,
+        {
+          borderColor,
+          borderWidth,
+          backgroundColor,
+          height: SB.heights.question,
+          paddingHorizontal: SB.outerPaddingH,
+          paddingVertical: SB.outerPaddingV,
+        },
+      ]}
+    >
+      <View style={[styles.header, { marginBottom: SB.headerMarginBottom }]}>
         <View
           style={{
             width: starSz,
@@ -58,21 +72,55 @@ export const QuestionCard = React.memo(function QuestionCard({
           PREGUNTA REFLEXIVA
         </Text>
       </View>
-      <Text style={styles.questionText}>{question}</Text>
+
+      <View
+        style={[
+          styles.innerCard,
+          {
+            borderRadius: IC.borderRadius,
+            paddingHorizontal: IC.paddingHorizontal,
+            paddingVertical: IC.paddingVertical,
+            backgroundColor: IC.backgroundColor,
+            borderLeftWidth: IC.accentWidth,
+            borderLeftColor: IC.accentColor,
+            transform: [
+              { translateX: IC.offsetX },
+              { translateY: IC.offsetY },
+            ],
+          },
+          IC.widthScale < 1
+            ? { alignSelf: 'center' as const, width: `${IC.widthScale * 100}%` as unknown as number }
+            : undefined,
+        ]}
+      >
+        <Text
+          style={{
+            fontSize: QT.fontSize,
+            color: QT.color,
+            ...(QT.lineHeight > 0 ? { lineHeight: QT.lineHeight } : {}),
+            fontStyle: 'italic',
+            transform: [
+              { translateX: QT.offsetX },
+              { translateY: QT.offsetY },
+            ],
+          }}
+          numberOfLines={3}
+        >
+          {question}
+        </Text>
+      </View>
     </View>
   );
 });
 
 const styles = StyleSheet.create({
-  card: {
+  outerCard: {
     borderRadius: CARD.borderRadius,
-    paddingHorizontal: CARD.paddingHorizontal,
-    paddingVertical: CARD.paddingVertical,
+    overflow: 'hidden',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: HDR.marginBottom,
   },
   headerLabel: {
     fontWeight: '800',
@@ -80,10 +128,9 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     color: HDR.titleColor,
   },
-  questionText: {
-    color: Q.textColor,
-    fontSize: Q.textSize,
-    lineHeight: Q.textLineHeight,
-    fontStyle: 'italic',
+  innerCard: {
+    flex: 1,
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
 });
