@@ -844,27 +844,6 @@ def debate_chat_persisted(debate_id: str, payload: DebateChatPayload):
     parts.append(q_label)
     assistant_text = " ".join(parts)
 
-    # Append assistant message with minimal meta + store details for lazy expand
-    from debate_db import upsert_message_details
-    m = append_message(
-        debate_id,
-        "assistant",
-        assistant_text,
-        meta={
-            "steelman": steelman,
-            "contrarian": contrarian,
-            "next_question": next_question,
-            "topic": topic,
-            "lang": lang,
-            "facts_summary": (response.facts_layer.summary or "").strip(),
-        },
-    )
-    upsert_message_details(
-        m.id,
-        facts_json=json.dumps(response.facts_layer.model_dump(mode="json")),
-        quotes_json=json.dumps(response.author_layer.model_dump(mode="json")),
-    )
-
     # Build response with possibly repaired debate_layer (preserve structured sections)
     repaired_layer = DebateLayer(
         steelman_of_user=steelman,
@@ -881,6 +860,28 @@ def debate_chat_persisted(debate_id: str, payload: DebateChatPayload):
         author_layer=response.author_layer,
         debate_layer=repaired_layer,
         closing=response.closing,
+    )
+
+    # Append assistant message with full debate_response for reload persistence
+    from debate_db import upsert_message_details
+    m = append_message(
+        debate_id,
+        "assistant",
+        assistant_text,
+        meta={
+            "steelman": steelman,
+            "contrarian": contrarian,
+            "next_question": next_question,
+            "topic": topic,
+            "lang": lang,
+            "facts_summary": (response.facts_layer.summary or "").strip(),
+            "debate_response": response_for_frontend.model_dump(mode="json"),
+        },
+    )
+    upsert_message_details(
+        m.id,
+        facts_json=json.dumps(response.facts_layer.model_dump(mode="json")),
+        quotes_json=json.dumps(response.author_layer.model_dump(mode="json")),
     )
 
     # Update memory (merge with existing)
