@@ -127,6 +127,8 @@ export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
     publishTitleRef.current = t;
   }, []);
 
+  const canPublish = !!onPublish && !!userReflectionText;
+
   const handlePublish = useCallback(async () => {
     if (!onPublish || !userReflectionText) return;
     await onPublish(publishTitleRef.current, userReflectionText);
@@ -208,8 +210,8 @@ export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
           starIcon={PublishStar}
           titleOutlineColor={getPublishTitleOutlineColor(clanId)}
           actionBarColor={getPublishTitleOutlineColor(clanId)}
-          onTitleChange={handleTitleChange}
-          onPublish={handlePublish}
+          onTitleChange={canPublish ? handleTitleChange : undefined}
+          onPublish={canPublish ? handlePublish : undefined}
         />
       </View>
     </View>
