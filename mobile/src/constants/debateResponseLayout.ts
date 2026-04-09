@@ -104,14 +104,14 @@ export const CLAN_DISPLAY_COLORS: Record<keyof ClanColorMap, ClanDisplayEntry> =
     borderPrimary: '#defcef',
     questionBackground: '#0f0f12',
     quoteBackground: '#0f0f12',
-    titleOutlineColor: '#defcef',
+    titleOutlineColor: '#008ad8',
   },
   estoico: {
-    publishBackground: '#818a41',
+    publishBackground: '#444826',
     borderPrimary: '#868883',
     questionBackground: '#0f0f12',
     quoteBackground: '#0f0f12',
-    titleOutlineColor: '#868883',
+    titleOutlineColor: '#2a2a30',
   },
   humanista: {
     publishBackground: '#efb318',
@@ -129,10 +129,10 @@ export const CLAN_DISPLAY_COLORS: Record<keyof ClanColorMap, ClanDisplayEntry> =
   },
   trascendentalista: {
     publishBackground: '#cb6ce6',
-    borderPrimary: '#f9660c',
+    borderPrimary: '#3f2247',
     questionBackground: '#0f0f12',
     quoteBackground: '#0f0f12',
-    titleOutlineColor: '#f9660c',
+    titleOutlineColor: '#3f2247',
   },
   cientista: {
     publishBackground: '#54d5cf',
