@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, TextInput, StyleSheet, LayoutChangeEvent } from 'react-native';
 import type { FC } from 'react';
 import type { SvgProps } from 'react-native-svg';
@@ -7,20 +7,40 @@ import {
   AI_SPECIAL_BLOCK_LAYOUT as SB,
   DEBATE_CARD_LAYOUT as CARD,
 } from '@evoconn/constants/debateResponseLayout';
+import { PublishActionBar } from './PublishActionBar';
 
 const PT = SB.publishTitle;
 const PI = SB.publishInput;
 const STAR = L.stars.publish;
 const STAR_SZ = STAR.size * STAR.scale;
+const OW = PT.outlineWidth;
+
+const OUTLINE_OFFSETS: [number, number][] = [
+  [-OW, -OW], [-OW, 0], [-OW, OW],
+  [0, -OW],              [0, OW],
+  [OW, -OW],  [OW, 0],  [OW, OW],
+];
+
+const titleBaseStyle = {
+  fontWeight: '800' as const,
+  letterSpacing: 1.5,
+  textTransform: 'uppercase' as const,
+  fontSize: PT.fontSize,
+  ...(PT.lineHeight > 0 ? { lineHeight: PT.lineHeight } : {}),
+  transform: [{ scale: PT.scale }],
+};
 
 type Props = {
   borderColor: string;
   borderWidth: number;
   backgroundColor: string;
   starIcon?: FC<SvgProps>;
+  titleOutlineColor?: string;
+  actionBarColor?: string;
   unifiedHeight?: number;
   onMeasure?: (h: number) => void;
   onTitleChange?: (title: string) => void;
+  onPublish?: () => Promise<void> | void;
 };
 
 export const PublishBlock = React.memo(function PublishBlock({
@@ -28,9 +48,12 @@ export const PublishBlock = React.memo(function PublishBlock({
   borderWidth,
   backgroundColor,
   starIcon: StarIcon,
+  titleOutlineColor,
+  actionBarColor,
   unifiedHeight,
   onMeasure,
   onTitleChange,
+  onPublish,
 }: Props) {
   const [title, setTitle] = useState('');
 
@@ -42,6 +65,22 @@ export const PublishBlock = React.memo(function PublishBlock({
   const handleLayout = onMeasure
     ? (e: LayoutChangeEvent) => onMeasure(e.nativeEvent.layout.height)
     : undefined;
+
+  const outlineElements = useMemo(() => {
+    if (!titleOutlineColor || OW <= 0) return null;
+    return OUTLINE_OFFSETS.map(([dx, dy], i) => (
+      <Text
+        key={i}
+        style={[
+          titleBaseStyle,
+          styles.outlineCopy,
+          { color: titleOutlineColor, left: dx, top: dy },
+        ]}
+      >
+        ¡PUBLICAR!
+      </Text>
+    ));
+  }, [titleOutlineColor]);
 
   return (
     <View
@@ -63,21 +102,14 @@ export const PublishBlock = React.memo(function PublishBlock({
           <StarIcon width={STAR_SZ} height={STAR_SZ} />
         </View>
       ) : null}
-      <Text
-        style={[
-          styles.title,
-          {
-            fontSize: PT.fontSize,
-            color: PT.color,
-            ...(PT.lineHeight > 0 ? { lineHeight: PT.lineHeight } : {}),
-            marginBottom: SB.publishTitleMarginBottom,
-            marginLeft: PT.offsetX,
-            marginTop: PT.offsetY,
-          },
-        ]}
-      >
-        ¡PUBLICAR!
-      </Text>
+
+      <View style={[styles.titleContainer, { marginBottom: SB.publishTitleMarginBottom, marginLeft: PT.offsetX, marginTop: PT.offsetY }]}>
+        {outlineElements}
+        <Text style={[titleBaseStyle, { color: PT.color }]}>
+          ¡PUBLICAR!
+        </Text>
+      </View>
+
       <TextInput
         style={[
           styles.input,
@@ -99,6 +131,11 @@ export const PublishBlock = React.memo(function PublishBlock({
         placeholderTextColor={SB.publishInputPlaceholderColor}
         maxLength={120}
       />
+
+      <PublishActionBar
+        barColor={actionBarColor ?? borderColor}
+        onPublish={onPublish}
+      />
     </View>
   );
 });
@@ -116,10 +153,12 @@ const styles = StyleSheet.create({
     width: STAR_SZ,
     height: STAR_SZ,
   },
-  title: {
-    fontWeight: '800',
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
+  titleContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  outlineCopy: {
+    position: 'absolute',
   },
   input: {
     width: '100%',

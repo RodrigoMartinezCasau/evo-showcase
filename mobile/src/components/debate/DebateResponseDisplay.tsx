@@ -8,6 +8,7 @@ import {
   AI_SPECIAL_BLOCK_LAYOUT as SB,
   getBlockBorderColor,
   getBlockBackgroundColor,
+  getPublishTitleOutlineColor,
 } from '@evoconn/constants/debateResponseLayout';
 import {
   getPostureStarByClan,
@@ -84,48 +85,37 @@ export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
   const hasQuestion = !!questionText;
   const hasQuote = !!firstQuote;
 
-  /* ── Unified height for the 3 bottom blocks ── */
-  const heights = useRef({ question: 0, quote: 0, publish: 0 });
-  const [unifiedHeight, setUnifiedHeight] = useState<number | undefined>(undefined);
-  const measured = useRef(0);
+  /* ── Group 1: Pregunta + Cita share height ── */
+  const qaHeights = useRef({ question: 0, quote: 0 });
+  const [qaSharedHeight, setQaSharedHeight] = useState<number | undefined>(undefined);
+  const qaMeasured = useRef(0);
 
-  const recalc = useCallback(() => {
-    const h = heights.current;
-    const max = Math.max(h.question, h.quote, h.publish, SB.baseMinHeight);
-    setUnifiedHeight((prev) => (prev === max ? prev : max));
+  const recalcQA = useCallback(() => {
+    const h = qaHeights.current;
+    const max = Math.max(h.question, h.quote, SB.baseMinHeight);
+    setQaSharedHeight((prev) => (prev === max ? prev : max));
   }, []);
 
   const onQuestionMeasure = useCallback(
     (h: number) => {
-      if (heights.current.question !== h) {
-        heights.current.question = h;
-        measured.current |= 1;
-        if (measured.current === 7) recalc();
+      if (qaHeights.current.question !== h) {
+        qaHeights.current.question = h;
+        qaMeasured.current |= 1;
+        if (qaMeasured.current === 3) recalcQA();
       }
     },
-    [recalc],
+    [recalcQA],
   );
 
   const onQuoteMeasure = useCallback(
     (h: number) => {
-      if (heights.current.quote !== h) {
-        heights.current.quote = h;
-        measured.current |= 2;
-        if (measured.current === 7) recalc();
+      if (qaHeights.current.quote !== h) {
+        qaHeights.current.quote = h;
+        qaMeasured.current |= 2;
+        if (qaMeasured.current === 3) recalcQA();
       }
     },
-    [recalc],
-  );
-
-  const onPublishMeasure = useCallback(
-    (h: number) => {
-      if (heights.current.publish !== h) {
-        heights.current.publish = h;
-        measured.current |= 4;
-        if (measured.current === 7) recalc();
-      }
-    },
-    [recalc],
+    [recalcQA],
   );
 
   return (
@@ -172,7 +162,7 @@ export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
             borderColor={getBlockBorderColor('question', clanId)}
             borderWidth={BW.question}
             backgroundColor={getBlockBackgroundColor('question', clanId)}
-            unifiedHeight={unifiedHeight}
+            unifiedHeight={qaSharedHeight}
             onMeasure={onQuestionMeasure}
           />
         </View>
@@ -189,7 +179,7 @@ export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
             borderWidth={BW.quote}
             backgroundColor={getBlockBackgroundColor('quote', clanId)}
             innerBorderColor={getBlockBorderColor('quote', clanId)}
-            unifiedHeight={unifiedHeight}
+            unifiedHeight={qaSharedHeight}
             onMeasure={onQuoteMeasure}
           />
         </View>
@@ -202,8 +192,8 @@ export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
           borderWidth={BW.publish}
           backgroundColor={getBlockBackgroundColor('publish', clanId)}
           starIcon={PublishStar}
-          unifiedHeight={unifiedHeight}
-          onMeasure={onPublishMeasure}
+          titleOutlineColor={getPublishTitleOutlineColor(clanId)}
+          actionBarColor={getPublishTitleOutlineColor(clanId)}
         />
       </View>
     </View>

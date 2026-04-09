@@ -64,43 +64,96 @@ export const AI_RESPONSE_BORDER_COLORS: Record<string, ClanColorMap> = {
     cientista: '#DFF7F7',
     realista: '#E37B6F',
   },
-  question: {
-    noClan: '#4f59fe',
-    nihilista: '#37343b',
-    racionalista: '#defcef',
-    estoico: '#868883',
-    humanista: '#2d996a',
-    existencialista: '#591c2d',
-    trascendentalista: '#f9660c',
-    cientista: '#298280',
-    realista: '#696969',
+};
+
+/* ──────────────────────────────────────────────
+ * PART 2b — Unified per-clan colors for
+ *   Pregunta, Cita, Publicar
+ *
+ *   publishBackground → fondo del bloque ¡PUBLICAR!
+ *   borderPrimary     → borde de Pregunta, Cita y Publicar
+ *   questionBackground → fondo bloque Pregunta
+ *   quoteBackground    → fondo bloque Cita
+ * ────────────────────────────────────────────── */
+
+type ClanDisplayEntry = {
+  publishBackground: string;
+  borderPrimary: string;
+  questionBackground: string;
+  quoteBackground: string;
+  titleOutlineColor: string;
+};
+
+export const CLAN_DISPLAY_COLORS: Record<keyof ClanColorMap, ClanDisplayEntry> = {
+  noClan: {
+    publishBackground: '#c7ff02',
+    borderPrimary: '#4f59fe',
+    questionBackground: '#0f0f12',
+    quoteBackground: '#0f0f12',
+    titleOutlineColor: '#4f59fe',
   },
-  quote: {
-    noClan: '#4f59fe',
-    nihilista: '#37343b',
-    racionalista: '#defcef',
-    estoico: '#868883',
-    humanista: '#2d996a',
-    existencialista: '#591c2d',
-    trascendentalista: '#f9660c',
-    cientista: '#298280',
-    realista: '#696969',
+  nihilista: {
+    publishBackground: '#bdb29c',
+    borderPrimary: '#37343b',
+    questionBackground: '#0f0f12',
+    quoteBackground: '#0f0f12',
+    titleOutlineColor: '#37343b',
   },
-  publish: {
-    noClan: '#4f59fe',
-    nihilista: '#37343b',
-    racionalista: '#defcef',
-    estoico: '#868883',
-    humanista: '#2d996a',
-    existencialista: '#591c2d',
-    trascendentalista: '#f9660c',
-    cientista: '#298280',
-    realista: '#696969',
+  racionalista: {
+    publishBackground: '#395df2',
+    borderPrimary: '#defcef',
+    questionBackground: '#0f0f12',
+    quoteBackground: '#0f0f12',
+    titleOutlineColor: '#defcef',
+  },
+  estoico: {
+    publishBackground: '#818a41',
+    borderPrimary: '#868883',
+    questionBackground: '#0f0f12',
+    quoteBackground: '#0f0f12',
+    titleOutlineColor: '#868883',
+  },
+  humanista: {
+    publishBackground: '#efb318',
+    borderPrimary: '#2d996a',
+    questionBackground: '#0f0f12',
+    quoteBackground: '#0f0f12',
+    titleOutlineColor: '#2d996a',
+  },
+  existencialista: {
+    publishBackground: '#c93a39',
+    borderPrimary: '#591c2d',
+    questionBackground: '#0f0f12',
+    quoteBackground: '#0f0f12',
+    titleOutlineColor: '#591c2d',
+  },
+  trascendentalista: {
+    publishBackground: '#cb6ce6',
+    borderPrimary: '#f9660c',
+    questionBackground: '#0f0f12',
+    quoteBackground: '#0f0f12',
+    titleOutlineColor: '#f9660c',
+  },
+  cientista: {
+    publishBackground: '#54d5cf',
+    borderPrimary: '#298280',
+    questionBackground: '#0f0f12',
+    quoteBackground: '#0f0f12',
+    titleOutlineColor: '#298280',
+  },
+  realista: {
+    publishBackground: '#a2a3a8',
+    borderPrimary: '#696969',
+    questionBackground: '#0f0f12',
+    quoteBackground: '#0f0f12',
+    titleOutlineColor: '#696969',
   },
 };
 
 /* ──────────────────────────────────────────────
- * PART 3 — Per-clan BACKGROUND colors (per block)
+ * PART 3 — Per-clan BACKGROUND colors
+ *   (posture / counterpoint only — the rest
+ *    is resolved from CLAN_DISPLAY_COLORS)
  * ────────────────────────────────────────────── */
 
 export const AI_RESPONSE_BACKGROUND_COLORS: Record<string, ClanColorMap> = {
@@ -126,39 +179,6 @@ export const AI_RESPONSE_BACKGROUND_COLORS: Record<string, ClanColorMap> = {
     cientista: '#262626',
     realista: '#262626',
   },
-  question: {
-    noClan: '#0f0f12',
-    nihilista: '#0f0f12',
-    racionalista: '#0f0f12',
-    estoico: '#0f0f12',
-    humanista: '#0f0f12',
-    existencialista: '#0f0f12',
-    trascendentalista: '#0f0f12',
-    cientista: '#0f0f12',
-    realista: '#0f0f12',
-  },
-  quote: {
-    noClan: '#0f0f12',
-    nihilista: '#0f0f12',
-    racionalista: '#0f0f12',
-    estoico: '#0f0f12',
-    humanista: '#0f0f12',
-    existencialista: '#0f0f12',
-    trascendentalista: '#0f0f12',
-    cientista: '#0f0f12',
-    realista: '#0f0f12',
-  },
-  publish: {
-    noClan: '#c7ff02',
-    nihilista: '#bdb29c',
-    racionalista: '#395df2',
-    estoico: '#818a41',
-    humanista: '#efb318',
-    existencialista: '#c93a39',
-    trascendentalista: '#cb6ce6',
-    cientista: '#54d5cf',
-    realista: '#a2a3a8',
-  },
 };
 
 /* ──────────────────────────────────────────────
@@ -172,18 +192,32 @@ function clanKey(clanId: string | null | undefined): keyof ClanColorMap {
   return 'noClan';
 }
 
+export function getPublishTitleOutlineColor(
+  clanId: string | null | undefined,
+): string {
+  return CLAN_DISPLAY_COLORS[clanKey(clanId)]?.titleOutlineColor ?? '#4f59fe';
+}
+
 export function getBlockBorderColor(
   block: string,
   clanId: string | null | undefined,
 ): string {
-  return AI_RESPONSE_BORDER_COLORS[block]?.[clanKey(clanId)] ?? '#3A3A3A';
+  const k = clanKey(clanId);
+  if (block === 'question' || block === 'quote' || block === 'publish') {
+    return CLAN_DISPLAY_COLORS[k]?.borderPrimary ?? '#3A3A3A';
+  }
+  return AI_RESPONSE_BORDER_COLORS[block]?.[k] ?? '#3A3A3A';
 }
 
 export function getBlockBackgroundColor(
   block: string,
   clanId: string | null | undefined,
 ): string {
-  return AI_RESPONSE_BACKGROUND_COLORS[block]?.[clanKey(clanId)] ?? '#262626';
+  const k = clanKey(clanId);
+  if (block === 'publish') return CLAN_DISPLAY_COLORS[k]?.publishBackground ?? '#262626';
+  if (block === 'question') return CLAN_DISPLAY_COLORS[k]?.questionBackground ?? '#0f0f12';
+  if (block === 'quote') return CLAN_DISPLAY_COLORS[k]?.quoteBackground ?? '#0f0f12';
+  return AI_RESPONSE_BACKGROUND_COLORS[block]?.[k] ?? '#262626';
 }
 
 /* ──────────────────────────────────────────────
@@ -217,7 +251,7 @@ export const AI_RESPONSE_LAYOUT = {
     counterpoint: { offsetX: -10, offsetY: -10, scale: 3, size: 18, marginRight: 8 } as StarEditor,
     question:     { offsetX: -7, offsetY: -3, scale: 2, size: 16, marginRight: 8 } as StarEditor,
     quote:        { offsetX: -7, offsetY: -3, scale: 2, size: 16, marginRight: 8 } as StarEditor,
-    publish:      { offsetX: -7, offsetY: -3, scale: 2.5, size: 16, marginRight: 8 } as StarEditor,
+    publish:      { offsetX: -7, offsetY: -10, scale: 2.5, size: 16, marginRight: 8 } as StarEditor,
   },
 
   /* ── B) Display titles (block headers) ── */
@@ -226,7 +260,7 @@ export const AI_RESPONSE_LAYOUT = {
     counterpoint: { offsetX: -10, offsetY: -15, fontSize: 22, lineHeight: 0 } as TextEditor,
     question:     { offsetX: -10, offsetY: -2, fontSize: 20, lineHeight: 0 } as TextEditor,
     quote:        { offsetX: -10, offsetY: -2, fontSize: 20, lineHeight: 0 } as TextEditor,
-    publish:      { offsetX: -10, offsetY: -10, fontSize: 20, lineHeight: 0 } as TextEditor,
+    publish:      { offsetX: -220, offsetY: -0, fontSize: 20, lineHeight: 0 } as TextEditor,
   },
 
   /* ── C) Body container (moves all points + bullets as a group) ── */
@@ -336,7 +370,7 @@ export const AI_SPECIAL_BLOCK_LAYOUT = {
   widgetButtonPaddingV: 3,
 
   /* ── E) Text editors — ¡PUBLICAR! ── */
-  publishTitle: { offsetX: 0, offsetY: 0, fontSize: 18, lineHeight: 0, color: '#FFFFFF' },
+  publishTitle: { offsetX: -150, offsetY: -5, fontSize: 24, lineHeight: 0, color: '#FFFFFF', scale: 1.5, outlineWidth: 1.5 },
   publishInput: { offsetX: 0, offsetY: 0, fontSize: 13, lineHeight: 0, color: '#FFFFFF' },
   publishInputPlaceholderColor: '#606060',
   publishInputBackground: '#2A2A30',
@@ -344,4 +378,32 @@ export const AI_SPECIAL_BLOCK_LAYOUT = {
   publishInputPaddingH: 12,
   publishInputPaddingV: 8,
   publishTitleMarginBottom: 8,
+
+  /* ── F) Publish action bar ── */
+  publishActionBar: {
+    offsetX: 0,
+    offsetY: 8,
+    widthScale: 1,
+    height: 46,
+    borderRadius: 14,
+  },
+  publishActionBarText: {
+    offsetX: 0,
+    offsetY: 0,
+    fontSize: 15,
+    lineHeight: 0,
+    letterSpacing: 1.2,
+  },
+  publishActionBarIcon: {
+    offsetX: 0,
+    offsetY: 0,
+    scale: 1,
+    size: 20,
+  },
+
+  /* ── G) Publish block internal spacing ── */
+  publishSpacing: {
+    titleToInput: 12,
+    inputToButton: 12,
+  },
 } as const;
