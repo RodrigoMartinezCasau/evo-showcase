@@ -17,8 +17,8 @@ import {
   BottomCommunityTabs,
   SidebarDrawer,
 } from '@evoconn/components';
-import { mockFeedPosts } from '@evoconn/data/mockCommunity';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
+import { useFeedStore } from '@evoconn/hooks/useFeedStore';
 import type { CommunityPost } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
@@ -53,17 +53,17 @@ function shuffled<T>(arr: T[]): T[] {
   return copy;
 }
 
-function getDataForMode(mode: FeedMode, followingSet?: Set<string>): CommunityPost[] {
+function getDataForMode(mode: FeedMode, allPosts: CommunityPost[], followingSet?: Set<string>): CommunityPost[] {
   switch (mode) {
     case 'following':
       if (followingSet && followingSet.size > 0) {
-        return mockFeedPosts.filter((p) => followingSet.has(p.author.id));
+        return allPosts.filter((p) => followingSet.has(p.author.id));
       }
-      return mockFeedPosts;
+      return allPosts;
     case 'top':
-      return [...mockFeedPosts].sort((a, b) => b.voteStats.up - a.voteStats.up);
+      return [...allPosts].sort((a, b) => b.voteStats.up - a.voteStats.up);
     case 'foryou':
-      return shuffled(mockFeedPosts);
+      return shuffled(allPosts);
   }
 }
 
@@ -82,6 +82,7 @@ export default function CommunityScreen() {
   const { width: screenW, height: screenH } = useWindowDimensions();
   const { followingSet } = useFollowState();
   const { thoughts } = useThoughts();
+  const { posts: allPosts } = useFeedStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const drawerOpenProgress = useRef(new Animated.Value(0)).current;
   const gestureCommittingRef = useRef(false);
@@ -108,7 +109,7 @@ export default function CommunityScreen() {
 
   const openDetailFeed = useCallback(
     (mode: FeedMode, postId?: string) => {
-      const data = getDataForMode(mode, followingSet);
+      const data = getDataForMode(mode, allPosts, followingSet);
       let initialIndex = 0;
       if (postId) {
         const idx = data.findIndex((p) => p.id === postId);
@@ -237,16 +238,16 @@ export default function CommunityScreen() {
   const feedItemHeight = screenH - topBarHeight - bottomBarHeight;
 
   const listData = useMemo(
-    () => getDataForMode(tabToFeedMode(activeTab), followingSet),
-    [activeTab, followingSet],
+    () => getDataForMode(tabToFeedMode(activeTab), allPosts, followingSet),
+    [activeTab, allPosts, followingSet],
   );
 
   const transitionData = useMemo(
     () =>
       transitionTab && transitionTab !== 'search' && transitionTab !== 'para-ti'
-        ? getDataForMode(tabToFeedMode(transitionTab), followingSet)
+        ? getDataForMode(tabToFeedMode(transitionTab), allPosts, followingSet)
         : [],
-    [transitionTab, followingSet],
+    [transitionTab, allPosts, followingSet],
   );
 
   const renderListItem = useCallback(

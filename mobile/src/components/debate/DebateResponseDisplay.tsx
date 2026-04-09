@@ -23,6 +23,8 @@ import { PublishBlock } from './PublishBlock';
 type Props = {
   response: DebateResponse;
   clanId: string | null | undefined;
+  userReflectionText?: string;
+  onPublish?: (title: string, body: string) => Promise<void> | void;
 };
 
 type SectionData = {
@@ -56,6 +58,8 @@ function extractSection(
 export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
   response,
   clanId,
+  userReflectionText,
+  onPublish,
 }: Props) {
   const dl = response.debate_layer;
 
@@ -117,6 +121,16 @@ export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
     },
     [recalcQA],
   );
+
+  const publishTitleRef = useRef('');
+  const handleTitleChange = useCallback((t: string) => {
+    publishTitleRef.current = t;
+  }, []);
+
+  const handlePublish = useCallback(async () => {
+    if (!onPublish || !userReflectionText) return;
+    await onPublish(publishTitleRef.current, userReflectionText);
+  }, [onPublish, userReflectionText]);
 
   return (
     <View>
@@ -194,6 +208,8 @@ export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
           starIcon={PublishStar}
           titleOutlineColor={getPublishTitleOutlineColor(clanId)}
           actionBarColor={getPublishTitleOutlineColor(clanId)}
+          onTitleChange={handleTitleChange}
+          onPublish={handlePublish}
         />
       </View>
     </View>

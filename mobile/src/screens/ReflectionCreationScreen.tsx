@@ -35,6 +35,7 @@ import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { getChatSendButtonByHouse } from '@evoconn/utils/getChatSendButtonByHouse';
 import { CHAT_SEND_BUTTON_LAYOUT } from '@evoconn/constants/chatInputBarLayout';
 import { DebateResponseDisplay } from '@evoconn/components/debate';
+import { useFeedStore, createReflectionPost } from '@evoconn/hooks/useFeedStore';
 
 const TYPEWRITER_CHUNK = 3;
 const TYPEWRITER_MS = 15;
@@ -56,6 +57,8 @@ export default function ReflectionCreationScreen() {
     () => <SendIcon width={sendButtonSize} height={sendButtonSize} />,
     [SendIcon, sendButtonSize],
   );
+
+  const { publishPost, hasPublished } = useFeedStore();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [messages, setMessages] = useState<ChatBubble[]>([]);
@@ -227,9 +230,24 @@ export default function ReflectionCreationScreen() {
             </View>
           ) : null}
 
-          {messages.map((msg, i) => (
-            <MessageBubble key={`${msg.id ?? i}-${msg.role}`} message={msg} clanColor={clanColor} clanId={activeClan} />
-          ))}
+          {messages.map((msg, i) => {
+            const userText =
+              msg.role === 'assistant' && i > 0 && messages[i - 1].role === 'user'
+                ? messages[i - 1].content
+                : undefined;
+            return (
+              <MessageBubble
+                key={`${msg.id ?? i}-${msg.role}`}
+                message={msg}
+                clanColor={clanColor}
+                clanId={activeClan}
+                userReflectionText={userText}
+                onPublish={publishPost}
+                hasPublished={hasPublished}
+                currentUser={mockCurrentUser}
+              />
+            );
+          })}
 
           {error ? (
             <View style={styles.errorBox}>
@@ -269,10 +287,18 @@ const MessageBubble = React.memo(function MessageBubble({
   message,
   clanColor,
   clanId,
+  userReflectionText,
+  onPublish,
+  hasPublished,
+  currentUser,
 }: {
   message: ChatBubble;
   clanColor: string;
   clanId: string | null | undefined;
+  userReflectionText?: string;
+  onPublish?: (post: import('../types').CommunityPost) => void;
+  hasPublished?: (id: string) => boolean;
+  currentUser?: import('../types').User;
 }) {
   const isUser = message.role === 'user';
   const displayText = message.revealed ?? message.content;
@@ -314,6 +340,18 @@ const MessageBubble = React.memo(function MessageBubble({
         <DebateResponseDisplay
           response={assistantMsg.debateResponse!}
           clanId={clanId}
+          userReflectionText={userReflectionText}
+          onPublish={
+            onPublish && currentUser && userReflectionText
+              ? async (title: string, body: string) => {
+                  const sourceId = `${assistantMsg.id ?? 'msg'}_pub`;
+                  if (hasPublished?.(sourceId)) return;
+                  const post = createReflectionPost(currentUser, title, body);
+                  (post as any).id = sourceId;
+                  onPublish(post);
+                }
+              : undefined
+          }
         />
       ) : !isStreaming ? (
         <View style={[styles.bubble, styles.aiBubble]}>

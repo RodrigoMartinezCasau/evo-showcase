@@ -65,21 +65,7 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
   const mediumClanBgAsset = isMediumCard ? getMediumClanBackgroundAsset(post.author.clanId) : undefined;
   const quoteClanBgAsset = isQuoteCard ? getQuoteClanBackgroundAsset(post.author.clanId) : undefined;
 
-  if (isSmallCard && !smallClanBgAsset) {
-    throw new Error(
-      `Missing SMALL clan background asset for clan "${String(post.author.clanId)}" on post "${post.id}".`
-    );
-  }
-  if (isMediumCard && !mediumClanBgAsset) {
-    throw new Error(
-      `Missing MEDIUM clan background asset for clan "${String(post.author.clanId)}" on post "${post.id}".`
-    );
-  }
-  if (isQuoteCard && !quoteClanBgAsset) {
-    throw new Error(
-      `Missing QUOTE clan background asset for clan "${String(post.author.clanId)}" on post "${post.id}".`
-    );
-  }
+  const hasClanBg = isSmallCard ? !!smallClanBgAsset : isMediumCard ? !!mediumClanBgAsset : isQuoteCard ? !!quoteClanBgAsset : false;
 
   const canvaBgAsset = isSmallCard ? smallClanBgAsset : isMediumCard ? mediumClanBgAsset : isQuoteCard ? quoteClanBgAsset : undefined;
   const resolvedOuterAsset = isCanvaCard ? canvaBgAsset : outerAsset;
@@ -96,11 +82,7 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
         ? getQuoteClanBannerAsset(post.author.clanId)
         : undefined;
 
-  if (isCanvaCard && !canvaBannerAsset) {
-    throw new Error(
-      `Missing ${cardTier.toUpperCase()} clan banner asset for clan "${String(post.author.clanId)}" on post "${post.id}".`
-    );
-  }
+  
 
   const QA = CARD_ASSET_LAYOUT.QUOTE;
   const canvaAssetScale = isSmallCard

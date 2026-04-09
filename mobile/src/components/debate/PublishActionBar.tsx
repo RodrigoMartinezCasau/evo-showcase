@@ -17,11 +17,13 @@ type PublishState = 'idle' | 'publishing' | 'published';
 
 type Props = {
   barColor: string;
+  disabled?: boolean;
   onPublish?: () => Promise<void> | void;
 };
 
 export const PublishActionBar = React.memo(function PublishActionBar({
   barColor,
+  disabled,
   onPublish,
 }: Props) {
   const [state, setState] = useState<PublishState>('idle');
@@ -39,7 +41,7 @@ export const PublishActionBar = React.memo(function PublishActionBar({
   useEffect(() => cleanup, [cleanup]);
 
   const handlePress = useCallback(async () => {
-    if (state !== 'idle') return;
+    if (state !== 'idle' || disabled) return;
 
     setState('publishing');
     setPercent(0);
@@ -71,7 +73,7 @@ export const PublishActionBar = React.memo(function PublishActionBar({
     }
 
     setState('published');
-  }, [state, onPublish, progressAnim, cleanup]);
+  }, [state, disabled, onPublish, progressAnim, cleanup]);
 
   const iconSize = ICO.size * ICO.scale;
 
@@ -167,9 +169,9 @@ export const PublishActionBar = React.memo(function PublishActionBar({
 
   return (
     <TouchableOpacity
-      activeOpacity={state === 'idle' ? 0.75 : 1}
+      activeOpacity={state === 'idle' && !disabled ? 0.75 : 1}
       onPress={handlePress}
-      disabled={state !== 'idle'}
+      disabled={state !== 'idle' || disabled}
       style={[
         styles.bar,
         {

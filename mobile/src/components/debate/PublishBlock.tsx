@@ -134,6 +134,7 @@ export const PublishBlock = React.memo(function PublishBlock({
 
       <PublishActionBar
         barColor={actionBarColor ?? borderColor}
+        disabled={!onPublish || title.trim().length === 0}
         onPublish={onPublish}
       />
     </View>

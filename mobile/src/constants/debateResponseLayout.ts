@@ -370,7 +370,7 @@ export const AI_SPECIAL_BLOCK_LAYOUT = {
   widgetButtonPaddingV: 3,
 
   /* ── E) Text editors — ¡PUBLICAR! ── */
-  publishTitle: { offsetX: -150, offsetY: -5, fontSize: 24, lineHeight: 0, color: '#FFFFFF', scale: 1.5, outlineWidth: 1.5 },
+  publishTitle: { offsetX: -120, offsetY: -5, fontSize: 24, lineHeight: 0, color: '#FFFFFF', scale: 1.2, outlineWidth: 1.5 },
   publishInput: { offsetX: 0, offsetY: 0, fontSize: 13, lineHeight: 0, color: '#FFFFFF' },
   publishInputPlaceholderColor: '#606060',
   publishInputBackground: '#2A2A30',

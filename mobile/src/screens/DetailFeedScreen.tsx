@@ -12,11 +12,11 @@ import { runOnJS } from 'react-native-reanimated';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
-import { mockFeedPosts } from '@evoconn/data/mockCommunity';
 import type { CommunityPost } from '@evoconn/types';
 import { ReflectionDetailItem } from '@evoconn/components/ReflectionDetailItem';
 import { AppTopBar, SidebarDrawer, BottomCommunityTabs } from '@evoconn/components';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
+import { useFeedStore } from '@evoconn/hooks/useFeedStore';
 import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
 import {
   COMMUNITY_DRAWER_EDGE_ZONE_WIDTH,
@@ -35,17 +35,17 @@ function shuffled<T>(arr: T[]): T[] {
   return copy;
 }
 
-function getDataForMode(mode: FeedMode, followingSet?: Set<string>): CommunityPost[] {
+function getDataForMode(mode: FeedMode, allPosts: CommunityPost[], followingSet?: Set<string>): CommunityPost[] {
   switch (mode) {
     case 'following':
       if (followingSet && followingSet.size > 0) {
-        return mockFeedPosts.filter((p) => followingSet.has(p.author.id));
+        return allPosts.filter((p) => followingSet.has(p.author.id));
       }
-      return mockFeedPosts;
+      return allPosts;
     case 'top':
-      return [...mockFeedPosts].sort((a, b) => b.voteStats.up - a.voteStats.up);
+      return [...allPosts].sort((a, b) => b.voteStats.up - a.voteStats.up);
     case 'foryou':
-      return shuffled(mockFeedPosts);
+      return shuffled(allPosts);
   }
 }
 
@@ -71,12 +71,13 @@ export default function DetailFeedScreen() {
 
   const { followingSet } = useFollowState();
   const { thoughts } = useThoughts();
+  const { posts: allPosts } = useFeedStore();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const drawerOpenProgress = useRef(new Animated.Value(0)).current;
   const gestureCommittingRef = useRef(false);
   const activeTab = modeToTab(mode) as 'siguiendo' | 'mas-votadas' | 'para-ti' | 'search';
 
-  const data = useMemo(() => getDataForMode(mode, followingSet), [mode, followingSet]);
+  const data = useMemo(() => getDataForMode(mode, allPosts, followingSet), [mode, allPosts, followingSet]);
 
   const [feedScrollEnabled, setFeedScrollEnabled] = React.useState(true);
   const handleReadingModeChange = React.useCallback((active: boolean) => {
