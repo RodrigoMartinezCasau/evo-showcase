@@ -24,6 +24,17 @@ import CS7 from '../assets/debate/counterpointStar/7.svg';
 import CS8 from '../assets/debate/counterpointStar/8.svg';
 import CS9 from '../assets/debate/counterpointStar/9.svg';
 
+// ── Publish / tertiary stars ("estrellas terciarias") ──
+import TS38 from '../assets/debate/publishStar/38.svg';
+import TS39 from '../assets/debate/publishStar/39.svg';
+import TS40 from '../assets/debate/publishStar/40.svg';
+import TS41 from '../assets/debate/publishStar/41.svg';
+import TS42 from '../assets/debate/publishStar/42.svg';
+import TS43 from '../assets/debate/publishStar/43.svg';
+import TS44 from '../assets/debate/publishStar/44.svg';
+import TS45 from '../assets/debate/publishStar/45.svg';
+import TS46 from '../assets/debate/publishStar/46.svg';
+
 /**
  * 1 = noClan, 2 = estoico, 3 = nihilista, 4 = cientista,
  * 5 = trascendentalista, 6 = existencialista, 7 = humanista,
@@ -51,8 +62,20 @@ const COUNTERPOINT_STAR_BY_CLAN: Record<ClanId, FC<SvgProps>> = {
   racionalista: CS9,
 };
 
+const PUBLISH_STAR_BY_CLAN: Record<ClanId, FC<SvgProps>> = {
+  estoico: TS39,
+  nihilista: TS40,
+  cientista: TS41,
+  trascendentalista: TS42,
+  existencialista: TS43,
+  humanista: TS44,
+  realista: TS45,
+  racionalista: TS46,
+};
+
 const POSTURE_STAR_DEFAULT: FC<SvgProps> = PS1;
 const COUNTERPOINT_STAR_DEFAULT: FC<SvgProps> = CS1;
+const PUBLISH_STAR_DEFAULT: FC<SvgProps> = TS38;
 
 function resolve(
   map: Record<string, FC<SvgProps> | undefined>,
@@ -69,4 +92,8 @@ export function getPostureStarByClan(clan?: string | null): FC<SvgProps> {
 
 export function getCounterpointStarByClan(clan?: string | null): FC<SvgProps> {
   return resolve(COUNTERPOINT_STAR_BY_CLAN, COUNTERPOINT_STAR_DEFAULT, clan);
+}
+
+export function getPublishStarByClan(clan?: string | null): FC<SvgProps> {
+  return resolve(PUBLISH_STAR_BY_CLAN, PUBLISH_STAR_DEFAULT, clan);
 }

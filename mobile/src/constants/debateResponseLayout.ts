@@ -217,27 +217,34 @@ export const AI_RESPONSE_LAYOUT = {
     counterpoint: { offsetX: -10, offsetY: -10, scale: 3, size: 18, marginRight: 8 } as StarEditor,
     question:     { offsetX: -7, offsetY: -3, scale: 2, size: 16, marginRight: 8 } as StarEditor,
     quote:        { offsetX: -7, offsetY: -3, scale: 2, size: 16, marginRight: 8 } as StarEditor,
+    publish:      { offsetX: -7, offsetY: -3, scale: 2.5, size: 16, marginRight: 8 } as StarEditor,
   },
 
   /* ── B) Display titles (block headers) ── */
   displayTitles: {
-    posture:      { offsetX: -10, offsetY: -10, fontSize: 20, lineHeight: 0 } as TextEditor,
-    counterpoint: { offsetX: -10, offsetY: -10, fontSize: 20, lineHeight: 0 } as TextEditor,
+    posture:      { offsetX: -10, offsetY: -15, fontSize: 22, lineHeight: 0 } as TextEditor,
+    counterpoint: { offsetX: -10, offsetY: -15, fontSize: 22, lineHeight: 0 } as TextEditor,
     question:     { offsetX: -10, offsetY: -2, fontSize: 20, lineHeight: 0 } as TextEditor,
     quote:        { offsetX: -10, offsetY: -2, fontSize: 20, lineHeight: 0 } as TextEditor,
     publish:      { offsetX: -10, offsetY: -10, fontSize: 20, lineHeight: 0 } as TextEditor,
   },
 
-  /* ── C) Point titles (numbered headings inside cards) ── */
-  pointTitles: { offsetX: 0, offsetY: 0, fontSize: 14, lineHeight: 0 } as TextEditor,
+  /* ── C) Body container (moves all points + bullets as a group) ── */
+  bodyContainer: { offsetX: 0, offsetY: -15 },
 
-  /* ── D) Point bullets / gray text ── */
-  pointBullets: { offsetX: 0, offsetY: 0, fontSize: 14, lineHeight: 20 } as TextEditor,
+  /* ── D) Point titles (numbered headings inside cards) ── */
+  pointTitles: { offsetX: 0, offsetY: 0, fontSize: 16, lineHeight: 22 } as TextEditor,
 
-  /* ── E) Summary section ── */
+  /* ── E) Point bullets / gray text ── */
+  pointBullets: { offsetX: 0, offsetY: 0, fontSize: 14, lineHeight: 23 } as TextEditor,
+
+  /* ── F) Summary container (moves label + body as a group) ── */
+  summaryContainer: { offsetX: 0, offsetY: 0 },
+
+  /* ── G) Summary section ── */
   summary: {
-    label: { offsetX: 0, offsetY: 0, fontSize: 11, lineHeight: 0 } as TextEditor,
-    body:  { offsetX: 0, offsetY: 0, fontSize: 13, lineHeight: 19 } as TextEditor,
+    label: { offsetX: 0, offsetY: 0, fontSize: 11, lineHeight: 16 } as TextEditor,
+    body:  { offsetX: 0, offsetY: 0, fontSize: 13, lineHeight: 22 } as TextEditor,
   },
 } as const;
 
@@ -283,17 +290,13 @@ export const DEBATE_SUMMARY_LAYOUT = {
  * ────────────────────────────────────────────── */
 
 export const AI_SPECIAL_BLOCK_LAYOUT = {
-  /* ── A) Outer card heights ── */
-  heights: {
-    question: 110,
-    quote: 110,
-    publish: 110,
-  },
+  /* ── A) Min-height base (dynamic: actual height = max of all 3) ── */
+  baseMinHeight: 120,
 
-  /* ── A2) Outer card padding (compact for 110) ── */
-  outerPaddingH: 12,
-  outerPaddingV: 8,
-  headerMarginBottom: 6,
+  /* ── A2) Outer card padding ── */
+  outerPaddingH: 14,
+  outerPaddingV: 14,
+  headerMarginBottom: 10,
 
   /* ── B) Inner cards (left-accent-only) ── */
   questionCard: {

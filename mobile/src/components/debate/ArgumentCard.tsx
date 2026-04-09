@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import type { FC } from 'react';
 import type { SvgProps } from 'react-native-svg';
@@ -29,8 +29,10 @@ type Props = {
   displayTitleLayout: TextEditor;
 };
 
+const BC = L.bodyContainer;
 const PTs = L.pointTitles;
 const PBs = L.pointBullets;
+const SC = L.summaryContainer;
 const SL = L.summary.label;
 const SB = L.summary.body;
 
@@ -48,22 +50,48 @@ export const ArgumentCard = React.memo(function ArgumentCard({
 }: Props) {
   const hasPoints = !!points && points.length > 0;
   const starSz = starLayout.size * starLayout.scale;
+  const headerH = starSz;
+
+  const starBoxStyle = useMemo(
+    () => ({
+      position: 'absolute' as const,
+      left: starLayout.offsetX,
+      top: starLayout.offsetY,
+      width: starSz,
+      height: starSz,
+    }),
+    [starSz, starLayout.offsetX, starLayout.offsetY],
+  );
+
+  const titleBoxStyle = useMemo(
+    () => ({
+      position: 'absolute' as const,
+      left: starSz + starLayout.marginRight + dt.offsetX,
+      top: 0,
+      bottom: 0,
+      justifyContent: 'center' as const,
+    }),
+    [starSz, starLayout.marginRight, dt.offsetX],
+  );
+
+  const titleTextStyle = useMemo(
+    () => ({
+      fontWeight: '800' as const,
+      letterSpacing: HDR.letterSpacing,
+      textTransform: 'uppercase' as const,
+      color: HDR.titleColor,
+      fontSize: dt.fontSize,
+      ...(dt.lineHeight > 0 ? { lineHeight: dt.lineHeight } : {}),
+      marginTop: dt.offsetY,
+    }),
+    [dt.fontSize, dt.lineHeight, dt.offsetY],
+  );
 
   return (
     <View style={[styles.card, { borderColor, borderWidth, backgroundColor }]}>
-      <View style={styles.header}>
+      <View style={[styles.header, { height: headerH }]}>
         {StarIcon ? (
-          <View
-            style={{
-              width: starSz,
-              height: starSz,
-              marginRight: starLayout.marginRight,
-              transform: [
-                { translateX: starLayout.offsetX },
-                { translateY: starLayout.offsetY },
-              ],
-            }}
-          >
+          <View style={starBoxStyle}>
             <StarIcon width={starSz} height={starSz} />
           </View>
         ) : (
@@ -71,79 +99,65 @@ export const ArgumentCard = React.memo(function ArgumentCard({
             style={[
               styles.starFallback,
               {
+                position: 'absolute',
+                left: starLayout.offsetX,
+                top: starLayout.offsetY,
                 fontSize: starSz,
-                marginRight: starLayout.marginRight,
-                transform: [
-                  { translateX: starLayout.offsetX },
-                  { translateY: starLayout.offsetY },
-                ],
               },
             ]}
           >
             ★
           </Text>
         )}
-        <Text
-          style={[
-            styles.headerLabel,
-            {
-              fontSize: dt.fontSize,
-              ...(dt.lineHeight > 0 ? { lineHeight: dt.lineHeight } : {}),
-              transform: [
-                { translateX: dt.offsetX },
-                { translateY: dt.offsetY },
-              ],
-            },
-          ]}
-        >
-          {title}
-        </Text>
+        <View style={titleBoxStyle}>
+          <Text style={titleTextStyle}>{title}</Text>
+        </View>
       </View>
 
-      {hasPoints ? (
-        points.map((pt, idx) => (
-          <View key={idx} style={idx > 0 ? styles.pointGap : undefined}>
-            <Text
-              style={[
-                styles.pointTitle,
-                {
-                  fontSize: PTs.fontSize,
-                  ...(PTs.lineHeight > 0 ? { lineHeight: PTs.lineHeight } : {}),
-                  transform: [
-                    { translateX: PTs.offsetX },
-                    { translateY: PTs.offsetY },
-                  ],
-                },
-              ]}
-            >
-              {idx + 1}. {pt.title}
-            </Text>
-            {pt.bullets.map((b, bi) => (
+      {/* Body container — movable as a group */}
+      <View style={{ marginLeft: BC.offsetX, marginTop: BC.offsetY }}>
+        {hasPoints ? (
+          points.map((pt, idx) => (
+            <View key={idx} style={idx > 0 ? styles.pointGap : undefined}>
               <Text
-                key={bi}
                 style={[
-                  styles.bullet,
+                  styles.pointTitle,
                   {
-                    fontSize: PBs.fontSize,
-                    lineHeight: PBs.lineHeight > 0 ? PBs.lineHeight : undefined,
-                    transform: [
-                      { translateX: PBs.offsetX },
-                      { translateY: PBs.offsetY },
-                    ],
+                    fontSize: PTs.fontSize,
+                    ...(PTs.lineHeight > 0 ? { lineHeight: PTs.lineHeight } : {}),
+                    marginLeft: PTs.offsetX,
+                    marginTop: PTs.offsetY,
                   },
                 ]}
               >
-                •  {b}
+                {idx + 1}. {pt.title}
               </Text>
-            ))}
-          </View>
-        ))
-      ) : body && body.length > 0 ? (
-        <Text style={styles.bodyText}>{body}</Text>
-      ) : null}
+              {pt.bullets.map((b, bi) => (
+                <Text
+                  key={bi}
+                  style={[
+                    styles.bullet,
+                    {
+                      fontSize: PBs.fontSize,
+                      lineHeight: PBs.lineHeight > 0 ? PBs.lineHeight : undefined,
+                      marginLeft: PBs.offsetX + PT.bulletIndent,
+                      marginTop: PBs.offsetY,
+                    },
+                  ]}
+                >
+                  •  {b}
+                </Text>
+              ))}
+            </View>
+          ))
+        ) : body && body.length > 0 ? (
+          <Text style={styles.bodyText}>{body}</Text>
+        ) : null}
+      </View>
 
+      {/* Summary container — movable as a group */}
       {summary ? (
-        <>
+        <View style={{ marginLeft: SC.offsetX, marginTop: SC.offsetY }}>
           <View style={styles.divider} />
           <Text
             style={[
@@ -151,10 +165,8 @@ export const ArgumentCard = React.memo(function ArgumentCard({
               {
                 fontSize: SL.fontSize,
                 ...(SL.lineHeight > 0 ? { lineHeight: SL.lineHeight } : {}),
-                transform: [
-                  { translateX: SL.offsetX },
-                  { translateY: SL.offsetY },
-                ],
+                marginLeft: SL.offsetX,
+                marginTop: SL.offsetY,
               },
             ]}
           >
@@ -166,16 +178,14 @@ export const ArgumentCard = React.memo(function ArgumentCard({
               {
                 fontSize: SB.fontSize,
                 lineHeight: SB.lineHeight > 0 ? SB.lineHeight : undefined,
-                transform: [
-                  { translateX: SB.offsetX },
-                  { translateY: SB.offsetY },
-                ],
+                marginLeft: SB.offsetX,
+                marginTop: SB.offsetY,
               },
             ]}
           >
             {summary}
           </Text>
-        </>
+        </View>
       ) : null}
     </View>
   );
@@ -188,18 +198,10 @@ const styles = StyleSheet.create({
     paddingVertical: CARD.paddingVertical,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
     marginBottom: HDR.marginBottom,
   },
   starFallback: {
     color: '#FFFFFF',
-  },
-  headerLabel: {
-    fontWeight: '800',
-    letterSpacing: HDR.letterSpacing,
-    textTransform: 'uppercase',
-    color: HDR.titleColor,
   },
   bodyText: {
     color: '#D8D8D8',
@@ -216,7 +218,6 @@ const styles = StyleSheet.create({
   },
   bullet: {
     color: PT.bulletColor,
-    paddingLeft: PT.bulletIndent,
     marginBottom: 2,
   },
   divider: {

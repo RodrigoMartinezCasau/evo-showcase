@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, LayoutChangeEvent } from 'react-native';
 import {
   AI_RESPONSE_LAYOUT as L,
   AI_SPECIAL_BLOCK_LAYOUT as SB,
@@ -13,8 +13,52 @@ const DT = L.displayTitles.quote;
 const IC = SB.quoteCard;
 const QTxt = SB.quoteText;
 const QAut = SB.quoteAuthor;
-const UL = SB.unlockedLabel;
-const WB = SB.widgetButtonText;
+
+const STAR_SZ = STAR.size * STAR.scale;
+const HEADER_H = STAR_SZ;
+
+const starBoxStyle = {
+  position: 'absolute' as const,
+  left: STAR.offsetX,
+  top: STAR.offsetY,
+  width: STAR_SZ,
+  height: STAR_SZ,
+};
+
+const titleBoxStyle = {
+  position: 'absolute' as const,
+  left: STAR_SZ + STAR.marginRight + DT.offsetX,
+  top: 0,
+  bottom: 0,
+  justifyContent: 'center' as const,
+};
+
+const titleTextStyle = {
+  fontWeight: '800' as const,
+  letterSpacing: HDR.letterSpacing,
+  textTransform: 'uppercase' as const,
+  color: HDR.titleColor,
+  fontSize: DT.fontSize,
+  ...(DT.lineHeight > 0 ? { lineHeight: DT.lineHeight } : {}),
+  marginTop: DT.offsetY,
+};
+
+const quoteTextBaseStyle = {
+  fontSize: QTxt.fontSize,
+  color: QTxt.color,
+  ...(QTxt.lineHeight > 0 ? { lineHeight: QTxt.lineHeight } : {}),
+  fontStyle: 'italic' as const,
+  marginLeft: QTxt.offsetX,
+  marginTop: QTxt.offsetY,
+};
+
+const authorBaseStyle = {
+  fontSize: QAut.fontSize,
+  color: QAut.color,
+  ...(QAut.lineHeight > 0 ? { lineHeight: QAut.lineHeight } : {}),
+  marginTop: 4 + QAut.offsetY,
+  marginLeft: QAut.offsetX,
+};
 
 type Props = {
   quote: string;
@@ -24,7 +68,8 @@ type Props = {
   borderWidth: number;
   backgroundColor: string;
   innerBorderColor?: string;
-  onAddWidget?: () => void;
+  unifiedHeight?: number;
+  onMeasure?: (h: number) => void;
 };
 
 export const DebateQuoteCard = React.memo(function DebateQuoteCard({
@@ -35,55 +80,38 @@ export const DebateQuoteCard = React.memo(function DebateQuoteCard({
   borderWidth,
   backgroundColor,
   innerBorderColor,
-  onAddWidget,
+  unifiedHeight,
+  onMeasure,
 }: Props) {
   const attribution = [author, work].filter(Boolean).join(' — ');
-  const starSz = STAR.size * STAR.scale;
   const accentColor = innerBorderColor || IC.accentColorFallback;
+
+  const handleLayout = onMeasure
+    ? (e: LayoutChangeEvent) => onMeasure(e.nativeEvent.layout.height)
+    : undefined;
 
   return (
     <View
+      onLayout={handleLayout}
       style={[
         styles.outerCard,
         {
           borderColor,
           borderWidth,
           backgroundColor,
-          height: SB.heights.quote,
+          minHeight: unifiedHeight ?? SB.baseMinHeight,
           paddingHorizontal: SB.outerPaddingH,
           paddingVertical: SB.outerPaddingV,
         },
       ]}
     >
-      <View style={[styles.header, { marginBottom: SB.headerMarginBottom }]}>
-        <View
-          style={{
-            width: starSz,
-            height: starSz,
-            marginRight: STAR.marginRight,
-            transform: [
-              { translateX: STAR.offsetX },
-              { translateY: STAR.offsetY },
-            ],
-          }}
-        >
-          <WhiteStar width={starSz} height={starSz} />
+      <View style={styles.header}>
+        <View style={starBoxStyle}>
+          <WhiteStar width={STAR_SZ} height={STAR_SZ} />
         </View>
-        <Text
-          style={[
-            styles.headerLabel,
-            {
-              fontSize: DT.fontSize,
-              ...(DT.lineHeight > 0 ? { lineHeight: DT.lineHeight } : {}),
-              transform: [
-                { translateX: DT.offsetX },
-                { translateY: DT.offsetY },
-              ],
-            },
-          ]}
-        >
-          CITA TEXTUAL
-        </Text>
+        <View style={titleBoxStyle}>
+          <Text style={titleTextStyle}>CITA TEXTUAL</Text>
+        </View>
       </View>
 
       <View
@@ -96,98 +124,19 @@ export const DebateQuoteCard = React.memo(function DebateQuoteCard({
             backgroundColor: IC.backgroundColor,
             borderLeftWidth: IC.accentWidth,
             borderLeftColor: accentColor,
-            transform: [
-              { translateX: IC.offsetX },
-              { translateY: IC.offsetY },
-            ],
+            marginLeft: IC.offsetX,
+            marginTop: IC.offsetY,
           },
           IC.widthScale < 1
             ? { alignSelf: 'center' as const, width: `${IC.widthScale * 100}%` as unknown as number }
             : undefined,
         ]}
       >
-        <Text
-          style={{
-            fontSize: QTxt.fontSize,
-            color: QTxt.color,
-            ...(QTxt.lineHeight > 0 ? { lineHeight: QTxt.lineHeight } : {}),
-            fontStyle: 'italic',
-            transform: [
-              { translateX: QTxt.offsetX },
-              { translateY: QTxt.offsetY },
-            ],
-          }}
-          numberOfLines={1}
-        >
-          "{quote}"
-        </Text>
+        <Text style={quoteTextBaseStyle}>"{quote}"</Text>
 
         {attribution ? (
-          <Text
-            style={{
-              fontSize: QAut.fontSize,
-              color: QAut.color,
-              ...(QAut.lineHeight > 0 ? { lineHeight: QAut.lineHeight } : {}),
-              marginTop: 2,
-              transform: [
-                { translateX: QAut.offsetX },
-                { translateY: QAut.offsetY },
-              ],
-            }}
-            numberOfLines={1}
-          >
-            — {attribution}
-          </Text>
+          <Text style={authorBaseStyle}>— {attribution}</Text>
         ) : null}
-
-        <View style={styles.footer}>
-          <Text
-            style={[
-              styles.badge,
-              {
-                fontSize: UL.fontSize,
-                color: UL.color,
-                ...(UL.lineHeight > 0 ? { lineHeight: UL.lineHeight } : {}),
-                transform: [
-                  { translateX: UL.offsetX },
-                  { translateY: UL.offsetY },
-                ],
-              },
-            ]}
-          >
-            ¡NUEVA FRASE DESBLOQUEADA!
-          </Text>
-          <TouchableOpacity
-            style={[
-              styles.widgetBtn,
-              {
-                borderColor: SB.widgetButtonBorder,
-                borderRadius: SB.widgetButtonBorderRadius,
-                paddingHorizontal: SB.widgetButtonPaddingH,
-                paddingVertical: SB.widgetButtonPaddingV,
-              },
-            ]}
-            onPress={onAddWidget}
-            activeOpacity={0.7}
-          >
-            <Text
-              style={[
-                styles.widgetBtnText,
-                {
-                  fontSize: WB.fontSize,
-                  color: WB.color,
-                  ...(WB.lineHeight > 0 ? { lineHeight: WB.lineHeight } : {}),
-                  transform: [
-                    { translateX: WB.offsetX },
-                    { translateY: WB.offsetY },
-                  ],
-                },
-              ]}
-            >
-              AÑADIR COMO WIDGET
-            </Text>
-          </TouchableOpacity>
-        </View>
       </View>
     </View>
   );
@@ -196,39 +145,12 @@ export const DebateQuoteCard = React.memo(function DebateQuoteCard({
 const styles = StyleSheet.create({
   outerCard: {
     borderRadius: CARD.borderRadius,
-    overflow: 'hidden',
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerLabel: {
-    fontWeight: '800',
-    letterSpacing: HDR.letterSpacing,
-    textTransform: 'uppercase',
-    color: HDR.titleColor,
+    height: HEADER_H,
+    marginBottom: SB.headerMarginBottom,
   },
   innerCard: {
-    flex: 1,
-    justifyContent: 'space-between',
-    overflow: 'hidden',
-  },
-  footer: {
-    marginTop: 4,
-    alignItems: 'center',
-  },
-  badge: {
-    fontWeight: '800',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginBottom: 3,
-  },
-  widgetBtn: {
-    borderWidth: 1,
-  },
-  widgetBtnText: {
-    fontWeight: '700',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
+    justifyContent: 'center',
   },
 });

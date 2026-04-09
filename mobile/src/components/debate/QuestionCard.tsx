@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, LayoutChangeEvent } from 'react-native';
 import {
   AI_RESPONSE_LAYOUT as L,
   AI_SPECIAL_BLOCK_LAYOUT as SB,
@@ -13,11 +13,51 @@ const DT = L.displayTitles.question;
 const IC = SB.questionCard;
 const QT = SB.questionText;
 
+const STAR_SZ = STAR.size * STAR.scale;
+const HEADER_H = STAR_SZ;
+
+const starBoxStyle = {
+  position: 'absolute' as const,
+  left: STAR.offsetX,
+  top: STAR.offsetY,
+  width: STAR_SZ,
+  height: STAR_SZ,
+};
+
+const titleBoxStyle = {
+  position: 'absolute' as const,
+  left: STAR_SZ + STAR.marginRight + DT.offsetX,
+  top: 0,
+  bottom: 0,
+  justifyContent: 'center' as const,
+};
+
+const titleTextStyle = {
+  fontWeight: '800' as const,
+  letterSpacing: HDR.letterSpacing,
+  textTransform: 'uppercase' as const,
+  color: HDR.titleColor,
+  fontSize: DT.fontSize,
+  ...(DT.lineHeight > 0 ? { lineHeight: DT.lineHeight } : {}),
+  marginTop: DT.offsetY,
+};
+
+const questionTextStyle = {
+  fontSize: QT.fontSize,
+  color: QT.color,
+  ...(QT.lineHeight > 0 ? { lineHeight: QT.lineHeight } : {}),
+  fontStyle: 'italic' as const,
+  marginLeft: QT.offsetX,
+  marginTop: QT.offsetY,
+};
+
 type Props = {
   question: string;
   borderColor: string;
   borderWidth: number;
   backgroundColor: string;
+  unifiedHeight?: number;
+  onMeasure?: (h: number) => void;
 };
 
 export const QuestionCard = React.memo(function QuestionCard({
@@ -25,52 +65,35 @@ export const QuestionCard = React.memo(function QuestionCard({
   borderColor,
   borderWidth,
   backgroundColor,
+  unifiedHeight,
+  onMeasure,
 }: Props) {
-  const starSz = STAR.size * STAR.scale;
+  const handleLayout = onMeasure
+    ? (e: LayoutChangeEvent) => onMeasure(e.nativeEvent.layout.height)
+    : undefined;
 
   return (
     <View
+      onLayout={handleLayout}
       style={[
         styles.outerCard,
         {
           borderColor,
           borderWidth,
           backgroundColor,
-          height: SB.heights.question,
+          minHeight: unifiedHeight ?? SB.baseMinHeight,
           paddingHorizontal: SB.outerPaddingH,
           paddingVertical: SB.outerPaddingV,
         },
       ]}
     >
-      <View style={[styles.header, { marginBottom: SB.headerMarginBottom }]}>
-        <View
-          style={{
-            width: starSz,
-            height: starSz,
-            marginRight: STAR.marginRight,
-            transform: [
-              { translateX: STAR.offsetX },
-              { translateY: STAR.offsetY },
-            ],
-          }}
-        >
-          <WhiteStar width={starSz} height={starSz} />
+      <View style={styles.header}>
+        <View style={starBoxStyle}>
+          <WhiteStar width={STAR_SZ} height={STAR_SZ} />
         </View>
-        <Text
-          style={[
-            styles.headerLabel,
-            {
-              fontSize: DT.fontSize,
-              ...(DT.lineHeight > 0 ? { lineHeight: DT.lineHeight } : {}),
-              transform: [
-                { translateX: DT.offsetX },
-                { translateY: DT.offsetY },
-              ],
-            },
-          ]}
-        >
-          PREGUNTA REFLEXIVA
-        </Text>
+        <View style={titleBoxStyle}>
+          <Text style={titleTextStyle}>PREGUNTA REFLEXIVA</Text>
+        </View>
       </View>
 
       <View
@@ -83,31 +106,15 @@ export const QuestionCard = React.memo(function QuestionCard({
             backgroundColor: IC.backgroundColor,
             borderLeftWidth: IC.accentWidth,
             borderLeftColor: IC.accentColor,
-            transform: [
-              { translateX: IC.offsetX },
-              { translateY: IC.offsetY },
-            ],
+            marginLeft: IC.offsetX,
+            marginTop: IC.offsetY,
           },
           IC.widthScale < 1
             ? { alignSelf: 'center' as const, width: `${IC.widthScale * 100}%` as unknown as number }
             : undefined,
         ]}
       >
-        <Text
-          style={{
-            fontSize: QT.fontSize,
-            color: QT.color,
-            ...(QT.lineHeight > 0 ? { lineHeight: QT.lineHeight } : {}),
-            fontStyle: 'italic',
-            transform: [
-              { translateX: QT.offsetX },
-              { translateY: QT.offsetY },
-            ],
-          }}
-          numberOfLines={3}
-        >
-          {question}
-        </Text>
+        <Text style={questionTextStyle}>{question}</Text>
       </View>
     </View>
   );
@@ -116,21 +123,12 @@ export const QuestionCard = React.memo(function QuestionCard({
 const styles = StyleSheet.create({
   outerCard: {
     borderRadius: CARD.borderRadius,
-    overflow: 'hidden',
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerLabel: {
-    fontWeight: '800',
-    letterSpacing: HDR.letterSpacing,
-    textTransform: 'uppercase',
-    color: HDR.titleColor,
+    height: HEADER_H,
+    marginBottom: SB.headerMarginBottom,
   },
   innerCard: {
-    flex: 1,
     justifyContent: 'center',
-    overflow: 'hidden',
   },
 });

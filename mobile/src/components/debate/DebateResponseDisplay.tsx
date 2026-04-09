@@ -1,16 +1,18 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useCallback, useRef } from 'react';
 import { View } from 'react-native';
 import type { DebateResponse } from '@evoconn/types/debate';
 import {
   AI_RESPONSE_LAYOUT as L,
   AI_RESPONSE_BLOCK_GAPS as GAPS,
   AI_RESPONSE_BORDER_WIDTH as BW,
+  AI_SPECIAL_BLOCK_LAYOUT as SB,
   getBlockBorderColor,
   getBlockBackgroundColor,
 } from '@evoconn/constants/debateResponseLayout';
 import {
   getPostureStarByClan,
   getCounterpointStarByClan,
+  getPublishStarByClan,
 } from '@evoconn/utils/getDebateStarByClan';
 import { ArgumentCard, type ArgumentPointData } from './ArgumentCard';
 import { QuestionCard } from './QuestionCard';
@@ -68,6 +70,7 @@ export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
 
   const PostureStar = useMemo(() => getPostureStarByClan(clanId), [clanId]);
   const CounterpointStar = useMemo(() => getCounterpointStarByClan(clanId), [clanId]);
+  const PublishStar = useMemo(() => getPublishStarByClan(clanId), [clanId]);
 
   const questionText =
     dl.question_section?.socratic_question ??
@@ -80,6 +83,50 @@ export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
   const hasCounter = !!counter.body || counter.points.length > 0;
   const hasQuestion = !!questionText;
   const hasQuote = !!firstQuote;
+
+  /* ── Unified height for the 3 bottom blocks ── */
+  const heights = useRef({ question: 0, quote: 0, publish: 0 });
+  const [unifiedHeight, setUnifiedHeight] = useState<number | undefined>(undefined);
+  const measured = useRef(0);
+
+  const recalc = useCallback(() => {
+    const h = heights.current;
+    const max = Math.max(h.question, h.quote, h.publish, SB.baseMinHeight);
+    setUnifiedHeight((prev) => (prev === max ? prev : max));
+  }, []);
+
+  const onQuestionMeasure = useCallback(
+    (h: number) => {
+      if (heights.current.question !== h) {
+        heights.current.question = h;
+        measured.current |= 1;
+        if (measured.current === 7) recalc();
+      }
+    },
+    [recalc],
+  );
+
+  const onQuoteMeasure = useCallback(
+    (h: number) => {
+      if (heights.current.quote !== h) {
+        heights.current.quote = h;
+        measured.current |= 2;
+        if (measured.current === 7) recalc();
+      }
+    },
+    [recalc],
+  );
+
+  const onPublishMeasure = useCallback(
+    (h: number) => {
+      if (heights.current.publish !== h) {
+        heights.current.publish = h;
+        measured.current |= 4;
+        if (measured.current === 7) recalc();
+      }
+    },
+    [recalc],
+  );
 
   return (
     <View>
@@ -125,6 +172,8 @@ export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
             borderColor={getBlockBorderColor('question', clanId)}
             borderWidth={BW.question}
             backgroundColor={getBlockBackgroundColor('question', clanId)}
+            unifiedHeight={unifiedHeight}
+            onMeasure={onQuestionMeasure}
           />
         </View>
       ) : null}
@@ -140,6 +189,8 @@ export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
             borderWidth={BW.quote}
             backgroundColor={getBlockBackgroundColor('quote', clanId)}
             innerBorderColor={getBlockBorderColor('quote', clanId)}
+            unifiedHeight={unifiedHeight}
+            onMeasure={onQuoteMeasure}
           />
         </View>
       ) : null}
@@ -150,6 +201,9 @@ export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
           borderColor={getBlockBorderColor('publish', clanId)}
           borderWidth={BW.publish}
           backgroundColor={getBlockBackgroundColor('publish', clanId)}
+          starIcon={PublishStar}
+          unifiedHeight={unifiedHeight}
+          onMeasure={onPublishMeasure}
         />
       </View>
     </View>
