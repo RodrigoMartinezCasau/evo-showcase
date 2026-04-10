@@ -14,6 +14,7 @@ const PI = SB.publishInput;
 const STAR = L.stars.publish;
 const STAR_SZ = STAR.size * STAR.scale;
 const OW = PT.outlineWidth;
+const PUBLISH_TITLE_MAX_LEN = 21;
 
 const OUTLINE_OFFSETS: [number, number][] = [
   [-OW, -OW], [-OW, 0], [-OW, OW],
@@ -58,8 +59,9 @@ export const PublishBlock = React.memo(function PublishBlock({
   const [title, setTitle] = useState('');
 
   const handleChange = (t: string) => {
-    setTitle(t);
-    onTitleChange?.(t);
+    const next = t.slice(0, PUBLISH_TITLE_MAX_LEN);
+    setTitle(next);
+    onTitleChange?.(next);
   };
 
   const handleLayout = onMeasure
@@ -129,7 +131,7 @@ export const PublishBlock = React.memo(function PublishBlock({
         onChangeText={handleChange}
         placeholder="AÑADE UN TITULO INTERESANTE..."
         placeholderTextColor={SB.publishInputPlaceholderColor}
-        maxLength={120}
+        maxLength={PUBLISH_TITLE_MAX_LEN}
       />
 
       <PublishActionBar
