@@ -126,7 +126,7 @@ export default function CommunityScreen() {
         }).start();
       });
     },
-    [slideAnim],
+    [slideAnim, allPosts, followingSet],
   );
 
   const closeDetailFeed = useCallback(() => {

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getClanCardColor } from '@evoconn/theme/theme';
@@ -21,36 +21,41 @@ export default function PostDetailScreen() {
 
   const [voted, setVoted] = useState<'up' | 'down' | null>(null);
   const [saved, setSaved] = useState(false);
+  const votedRef = useRef<'up' | 'down' | null>(null);
+  const savedRef = useRef(false);
 
   useEffect(() => {
     setVoted(null);
     setSaved(false);
+    votedRef.current = null;
+    savedRef.current = false;
   }, [post?.id]);
 
   const handleUp = useCallback(() => {
     if (!post) return;
-    setVoted((prev) => {
-      const next = prev === 'up' ? null : 'up';
-      updatePostVote(post.id, prev, next);
-      return next;
-    });
+    const prev = votedRef.current;
+    const next = prev === 'up' ? null : 'up';
+    votedRef.current = next;
+    updatePostVote(post.id, prev, next);
+    setVoted(next);
   }, [post, updatePostVote]);
 
   const handleDown = useCallback(() => {
     if (!post) return;
-    setVoted((prev) => {
-      const next = prev === 'down' ? null : 'down';
-      updatePostVote(post.id, prev, next);
-      return next;
-    });
+    const prev = votedRef.current;
+    const next = prev === 'down' ? null : 'down';
+    votedRef.current = next;
+    updatePostVote(post.id, prev, next);
+    setVoted(next);
   }, [post, updatePostVote]);
 
   const handleSave = useCallback(() => {
     if (!post) return;
-    setSaved((prev) => {
-      updatePostSaveToggle(post.id, prev, !prev);
-      return !prev;
-    });
+    const was = savedRef.current;
+    const now = !was;
+    savedRef.current = now;
+    updatePostSaveToggle(post.id, was, now);
+    setSaved(now);
   }, [post, updatePostSaveToggle]);
 
   if (!post) {

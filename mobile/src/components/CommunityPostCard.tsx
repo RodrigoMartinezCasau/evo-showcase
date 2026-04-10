@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ImageBackground, Image, useWindowDimensions } from 'react-native';
 import { FollowButton } from './FollowButton';
 import type { CommunityPost } from '@evoconn/types';
@@ -35,51 +35,62 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
   const [listVote, setListVote] = useState<'up' | 'down' | null>(null);
   const [listSaved, setListSaved] = useState(false);
 
+  const smallVoteRef = useRef<'up' | null>(null);
+  const smallSavedRef = useRef(false);
+  const listVoteRef = useRef<'up' | 'down' | null>(null);
+  const listSavedRef = useRef(false);
+
   useEffect(() => {
     setSmallVote(null);
     setSmallSaved(false);
     setListVote(null);
     setListSaved(false);
+    smallVoteRef.current = null;
+    smallSavedRef.current = false;
+    listVoteRef.current = null;
+    listSavedRef.current = false;
   }, [post.id]);
 
   const handleSmallUp = useCallback(() => {
-    setSmallVote((prev) => {
-      const next = prev === 'up' ? null : 'up';
-      const from: 'up' | 'down' | null = prev === 'up' ? 'up' : null;
-      const to: 'up' | 'down' | null = next === 'up' ? 'up' : null;
-      updatePostVote(post.id, from, to);
-      return next;
-    });
+    const prev = smallVoteRef.current;
+    const next = prev === 'up' ? null : 'up';
+    const from: 'up' | 'down' | null = prev === 'up' ? 'up' : null;
+    const to: 'up' | 'down' | null = next === 'up' ? 'up' : null;
+    smallVoteRef.current = next;
+    updatePostVote(post.id, from, to);
+    setSmallVote(next);
   }, [post.id, updatePostVote]);
 
   const handleSmallSave = useCallback(() => {
-    setSmallSaved((prev) => {
-      updatePostSaveToggle(post.id, prev, !prev);
-      return !prev;
-    });
+    const was = smallSavedRef.current;
+    const now = !was;
+    smallSavedRef.current = now;
+    updatePostSaveToggle(post.id, was, now);
+    setSmallSaved(now);
   }, [post.id, updatePostSaveToggle]);
 
   const handleListUp = useCallback(() => {
-    setListVote((prev) => {
-      const next = prev === 'up' ? null : 'up';
-      updatePostVote(post.id, prev, next);
-      return next;
-    });
+    const prev = listVoteRef.current;
+    const next = prev === 'up' ? null : 'up';
+    listVoteRef.current = next;
+    updatePostVote(post.id, prev, next);
+    setListVote(next);
   }, [post.id, updatePostVote]);
 
   const handleListDown = useCallback(() => {
-    setListVote((prev) => {
-      const next = prev === 'down' ? null : 'down';
-      updatePostVote(post.id, prev, next);
-      return next;
-    });
+    const prev = listVoteRef.current;
+    const next = prev === 'down' ? null : 'down';
+    listVoteRef.current = next;
+    updatePostVote(post.id, prev, next);
+    setListVote(next);
   }, [post.id, updatePostVote]);
 
   const handleListSave = useCallback(() => {
-    setListSaved((prev) => {
-      updatePostSaveToggle(post.id, prev, !prev);
-      return !prev;
-    });
+    const was = listSavedRef.current;
+    const now = !was;
+    listSavedRef.current = now;
+    updatePostSaveToggle(post.id, was, now);
+    setListSaved(now);
   }, [post.id, updatePostSaveToggle]);
 
   const smallUpvoted = smallVote === 'up';

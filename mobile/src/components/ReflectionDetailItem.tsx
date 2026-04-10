@@ -47,10 +47,14 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
 }: ReflectionDetailItemProps) {
   const clanColor = getClanColor(post.author.clanId);
   const actionColRef = useRef<DetailActionColumnHandle>(null);
-  const { updatePostVote, updatePostSaveToggle } = useFeedStore();
+  const { updatePostVote, updatePostSaveToggle, getPostById } = useFeedStore();
+  /** Fuente de verdad para votos: el feed overlay guarda un snapshot en `post`; el store se actualiza al votar. */
+  const livePost = getPostById(post.id) ?? post;
 
   const [voted, setVoted] = useState<'up' | 'down' | null>(null);
   const [saved, setSaved] = useState(false);
+  const votedRef = useRef<'up' | 'down' | null>(null);
+  const savedRef = useRef(false);
   const [commentsReady, setCommentsReady] = useState(false);
   const [readingMode, setReadingMode] = useState(false);
   const readingModeRef = useRef(false);
@@ -65,29 +69,32 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   useEffect(() => {
     setVoted(null);
     setSaved(false);
+    votedRef.current = null;
+    savedRef.current = false;
   }, [post.id]);
 
   const handleUpvote = useCallback(() => {
-    setVoted((prev) => {
-      const next = prev === 'up' ? null : 'up';
-      updatePostVote(post.id, prev, next);
-      return next;
-    });
+    const prev = votedRef.current;
+    const next = prev === 'up' ? null : 'up';
+    votedRef.current = next;
+    updatePostVote(post.id, prev, next);
+    setVoted(next);
   }, [post.id, updatePostVote]);
 
   const handleDownvote = useCallback(() => {
-    setVoted((prev) => {
-      const next = prev === 'down' ? null : 'down';
-      updatePostVote(post.id, prev, next);
-      return next;
-    });
+    const prev = votedRef.current;
+    const next = prev === 'down' ? null : 'down';
+    votedRef.current = next;
+    updatePostVote(post.id, prev, next);
+    setVoted(next);
   }, [post.id, updatePostVote]);
 
   const handleSave = useCallback(() => {
-    setSaved((prev) => {
-      updatePostSaveToggle(post.id, prev, !prev);
-      return !prev;
-    });
+    const was = savedRef.current;
+    const now = !was;
+    savedRef.current = now;
+    updatePostSaveToggle(post.id, was, now);
+    setSaved(now);
   }, [post.id, updatePostSaveToggle]);
 
   const [commentVotes, setCommentVotes] = useState<Record<string, boolean>>({});
@@ -522,8 +529,8 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
         <DetailActionColumn
           ref={actionColRef}
           clanId={post.author.clanId}
-          upCount={post.voteStats.up}
-          downCount={post.voteStats.down}
+          upCount={livePost.voteStats.up}
+          downCount={livePost.voteStats.down}
           saved={saved}
           voted={voted}
           onUpvote={handleUpvote}
