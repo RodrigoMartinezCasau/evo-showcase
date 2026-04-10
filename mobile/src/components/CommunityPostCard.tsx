@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ImageBackground, Image, useWindowDimensions } from 'react-native';
 import { FollowButton } from './FollowButton';
 import type { CommunityPost } from '@evoconn/types';
@@ -17,6 +17,7 @@ import { getQuoteClanBackgroundAsset } from '@evoconn/assets/cards/quoteClanBack
 import { getQuoteClanBannerAsset } from '@evoconn/assets/cards/quoteClanBanners';
 import { CARD_ASSET_LAYOUT } from '@evoconn/constants/cardAssetLayout';
 import { smallStatsIcons } from '@evoconn/assets/icons/smallStats';
+import { useFeedStore } from '@evoconn/hooks/useFeedStore';
 
 const S = CARD_LAYOUT_SHARED;
 
@@ -28,8 +29,60 @@ type CommunityPostCardProps = {
 };
 
 export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }: CommunityPostCardProps) {
-  const [smallUpvoted, setSmallUpvoted] = useState(false);
+  const { updatePostVote, updatePostSaveToggle } = useFeedStore();
+  const [smallVote, setSmallVote] = useState<'up' | null>(null);
   const [smallSaved, setSmallSaved] = useState(false);
+  const [listVote, setListVote] = useState<'up' | 'down' | null>(null);
+  const [listSaved, setListSaved] = useState(false);
+
+  useEffect(() => {
+    setSmallVote(null);
+    setSmallSaved(false);
+    setListVote(null);
+    setListSaved(false);
+  }, [post.id]);
+
+  const handleSmallUp = useCallback(() => {
+    setSmallVote((prev) => {
+      const next = prev === 'up' ? null : 'up';
+      const from: 'up' | 'down' | null = prev === 'up' ? 'up' : null;
+      const to: 'up' | 'down' | null = next === 'up' ? 'up' : null;
+      updatePostVote(post.id, from, to);
+      return next;
+    });
+  }, [post.id, updatePostVote]);
+
+  const handleSmallSave = useCallback(() => {
+    setSmallSaved((prev) => {
+      updatePostSaveToggle(post.id, prev, !prev);
+      return !prev;
+    });
+  }, [post.id, updatePostSaveToggle]);
+
+  const handleListUp = useCallback(() => {
+    setListVote((prev) => {
+      const next = prev === 'up' ? null : 'up';
+      updatePostVote(post.id, prev, next);
+      return next;
+    });
+  }, [post.id, updatePostVote]);
+
+  const handleListDown = useCallback(() => {
+    setListVote((prev) => {
+      const next = prev === 'down' ? null : 'down';
+      updatePostVote(post.id, prev, next);
+      return next;
+    });
+  }, [post.id, updatePostVote]);
+
+  const handleListSave = useCallback(() => {
+    setListSaved((prev) => {
+      updatePostSaveToggle(post.id, prev, !prev);
+      return !prev;
+    });
+  }, [post.id, updatePostSaveToggle]);
+
+  const smallUpvoted = smallVote === 'up';
   const [measuredBlackBoxContentHeight, setMeasuredBlackBoxContentHeight] = useState<number | null>(null);
   const [measuredColoredHeaderHeight, setMeasuredColoredHeaderHeight] = useState<number | null>(null);
   const isReflection = post.type === 'reflection';
@@ -113,7 +166,7 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
     <>
       <View style={styles.feedStatItem}>
         <TouchableOpacity
-          onPress={() => setSmallUpvoted((prev) => !prev)}
+          onPress={handleSmallUp}
           style={styles.feedStatPress}
           hitSlop={8}
         >
@@ -129,7 +182,7 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
       </View>
       <View style={styles.feedStatItem}>
         <TouchableOpacity
-          onPress={() => setSmallSaved((prev) => !prev)}
+          onPress={handleSmallSave}
           style={styles.feedStatPress}
           hitSlop={8}
         >
@@ -414,7 +467,13 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
                   },
                 ]}
               >
-                <VoteWidget stats={post.voteStats} compact />
+                <VoteWidget
+                  stats={post.voteStats}
+                  compact
+                  onUp={handleListUp}
+                  onDown={handleListDown}
+                  onSave={handleListSave}
+                />
               </View>
             ) : null}
           </View>

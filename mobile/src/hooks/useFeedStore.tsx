@@ -5,14 +5,29 @@ import React, {
   useCallback,
   useMemo,
 } from 'react';
-import type { CommunityPost, User } from '../types';
+import type { CommunityPost, User, VoteStats } from '../types';
 import { mockFeedPosts as SEED } from '../data/mockCommunity';
+
+function applyVoteTransition(
+  stats: VoteStats,
+  from: 'up' | 'down' | null,
+  to: 'up' | 'down' | null,
+): VoteStats {
+  let { up, down, save } = stats;
+  if (from === 'up') up = Math.max(0, up - 1);
+  if (from === 'down') down = Math.max(0, down - 1);
+  if (to === 'up') up += 1;
+  if (to === 'down') down += 1;
+  return { up, down, save };
+}
 
 type FeedContextValue = {
   posts: CommunityPost[];
   publishPost: (post: CommunityPost) => void;
   hasPublished: (sourceId: string) => boolean;
   getPostById: (id: string) => CommunityPost | undefined;
+  updatePostVote: (postId: string, from: 'up' | 'down' | null, to: 'up' | 'down' | null) => void;
+  updatePostSaveToggle: (postId: string, wasSaved: boolean, nowSaved: boolean) => void;
 };
 
 const FeedContext = createContext<FeedContextValue | null>(null);
@@ -38,9 +53,40 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
     [posts],
   );
 
+  const updatePostVote = useCallback(
+    (postId: string, from: 'up' | 'down' | null, to: 'up' | 'down' | null) => {
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId
+            ? { ...p, voteStats: applyVoteTransition(p.voteStats, from, to) }
+            : p,
+        ),
+      );
+    },
+    [],
+  );
+
+  const updatePostSaveToggle = useCallback((postId: string, wasSaved: boolean, nowSaved: boolean) => {
+    if (wasSaved === nowSaved) return;
+    setPosts((prev) =>
+      prev.map((p) => {
+        if (p.id !== postId) return p;
+        const save = p.voteStats.save + (nowSaved ? 1 : -1);
+        return { ...p, voteStats: { ...p.voteStats, save: Math.max(0, save) } };
+      }),
+    );
+  }, []);
+
   const value = useMemo(
-    () => ({ posts, publishPost, hasPublished, getPostById: getById }),
-    [posts, publishPost, hasPublished, getById],
+    () => ({
+      posts,
+      publishPost,
+      hasPublished,
+      getPostById: getById,
+      updatePostVote,
+      updatePostSaveToggle,
+    }),
+    [posts, publishPost, hasPublished, getById, updatePostVote, updatePostSaveToggle],
   );
 
   return (

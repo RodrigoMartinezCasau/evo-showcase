@@ -9,5 +9,8 @@ export const defaultTheme = {
 export type AppTheme = ThemeColors & { clanCardColors: typeof clanCardColors }
 
 export function getClanCardColor(clanId: string | null | undefined): string {
-  return clanCardColors[clanId] ?? evoconnColors.accent
+  if (clanId == null || String(clanId).trim() === '') {
+    return evoconnColors.neonGreen;
+  }
+  return clanCardColors[clanId] ?? evoconnColors.neonGreen;
 }

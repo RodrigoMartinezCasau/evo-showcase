@@ -27,6 +27,7 @@ import { mockComments } from '@evoconn/data/mockComments';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { FollowButton } from './FollowButton';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
+import { useFeedStore } from '@evoconn/hooks/useFeedStore';
 
 type ReflectionDetailItemProps = {
   post: CommunityPost;
@@ -46,6 +47,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
 }: ReflectionDetailItemProps) {
   const clanColor = getClanColor(post.author.clanId);
   const actionColRef = useRef<DetailActionColumnHandle>(null);
+  const { updatePostVote, updatePostSaveToggle } = useFeedStore();
 
   const [voted, setVoted] = useState<'up' | 'down' | null>(null);
   const [saved, setSaved] = useState(false);
@@ -60,15 +62,33 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     return () => task.cancel();
   }, []);
 
+  useEffect(() => {
+    setVoted(null);
+    setSaved(false);
+  }, [post.id]);
+
   const handleUpvote = useCallback(() => {
-    setVoted((v) => (v === 'up' ? null : 'up'));
-  }, []);
+    setVoted((prev) => {
+      const next = prev === 'up' ? null : 'up';
+      updatePostVote(post.id, prev, next);
+      return next;
+    });
+  }, [post.id, updatePostVote]);
+
   const handleDownvote = useCallback(() => {
-    setVoted((v) => (v === 'down' ? null : 'down'));
-  }, []);
+    setVoted((prev) => {
+      const next = prev === 'down' ? null : 'down';
+      updatePostVote(post.id, prev, next);
+      return next;
+    });
+  }, [post.id, updatePostVote]);
+
   const handleSave = useCallback(() => {
-    setSaved((s) => !s);
-  }, []);
+    setSaved((prev) => {
+      updatePostSaveToggle(post.id, prev, !prev);
+      return !prev;
+    });
+  }, [post.id, updatePostSaveToggle]);
 
   const [commentVotes, setCommentVotes] = useState<Record<string, boolean>>({});
   const toggleCommentVote = useCallback((commentId: string) => {

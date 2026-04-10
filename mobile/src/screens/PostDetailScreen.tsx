@@ -1,9 +1,8 @@
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getClanCardColor } from '@evoconn/theme/theme';
 import { evoconnColors } from '@evoconn/theme/colors';
-import { getPostById } from '@evoconn/data/mockCommunity';
 import { mockComments } from '@evoconn/data/mockComments';
 import {
   FeedbackWidget,
@@ -12,11 +11,47 @@ import {
   CommentItem,
   RankBadge,
 } from '@evoconn/components';
+import { useFeedStore } from '@evoconn/hooks/useFeedStore';
 
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { getPostById, updatePostVote, updatePostSaveToggle } = useFeedStore();
   const post = id ? getPostById(id) : undefined;
+
+  const [voted, setVoted] = useState<'up' | 'down' | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setVoted(null);
+    setSaved(false);
+  }, [post?.id]);
+
+  const handleUp = useCallback(() => {
+    if (!post) return;
+    setVoted((prev) => {
+      const next = prev === 'up' ? null : 'up';
+      updatePostVote(post.id, prev, next);
+      return next;
+    });
+  }, [post, updatePostVote]);
+
+  const handleDown = useCallback(() => {
+    if (!post) return;
+    setVoted((prev) => {
+      const next = prev === 'down' ? null : 'down';
+      updatePostVote(post.id, prev, next);
+      return next;
+    });
+  }, [post, updatePostVote]);
+
+  const handleSave = useCallback(() => {
+    if (!post) return;
+    setSaved((prev) => {
+      updatePostSaveToggle(post.id, prev, !prev);
+      return !prev;
+    });
+  }, [post, updatePostSaveToggle]);
 
   if (!post) {
     return (
@@ -30,6 +65,7 @@ export default function PostDetailScreen() {
   }
 
   const clanColor = getClanCardColor(post.author.clanId);
+  const clanLabel = post.author.clanId ? String(post.author.clanId).toUpperCase() : 'EVOCONN';
 
   return (
     <View style={styles.container}>
@@ -47,8 +83,15 @@ export default function PostDetailScreen() {
             <Text style={styles.username}>{post.author.username}</Text>
           </TouchableOpacity>
           <View style={styles.badges}>
-            <TouchableOpacity onPress={() => router.push({ pathname: '/clan/[id]', params: { id: post.author.clanId } })}>
-              <ClanBanner clanId={post.author.clanId} shortLabel={post.author.clanId.toUpperCase()} />
+            <TouchableOpacity
+              onPress={() => {
+                if (post.author.clanId) {
+                  router.push({ pathname: '/clan/[id]', params: { id: post.author.clanId } });
+                }
+              }}
+              disabled={!post.author.clanId}
+            >
+              <ClanBanner clanId={post.author.clanId} shortLabel={clanLabel} />
             </TouchableOpacity>
             <RankBadge rank={post.author.rank} />
           </View>
@@ -60,7 +103,7 @@ export default function PostDetailScreen() {
           <Text style={styles.body}>{post.body}</Text>
         </View>
         <View style={styles.voteRow}>
-          <VoteWidget stats={post.voteStats} />
+          <VoteWidget stats={post.voteStats} onUp={handleUp} onDown={handleDown} onSave={handleSave} />
         </View>
         <View style={styles.comments}>
           <Text style={styles.commentsTitle}>Comentarios</Text>
@@ -73,7 +116,7 @@ export default function PostDetailScreen() {
           ))}
         </View>
         <View style={[styles.clanBadge, { backgroundColor: clanColor }]}>
-          <Text style={styles.clanBadgeText}>{post.author.clanId.toUpperCase()}</Text>
+          <Text style={styles.clanBadgeText}>{clanLabel}</Text>
         </View>
       </ScrollView>
     </View>
@@ -98,16 +141,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 12,
   },
-  title: { color: evoconnColors.text, fontWeight: '700', fontSize: 18, marginBottom: 8 },
+  title: { color: evoconnColors.text, fontWeight: '800', fontSize: 18, marginBottom: 8 },
   body: { color: evoconnColors.text, fontSize: 15, lineHeight: 22 },
-  voteRow: { marginBottom: 24 },
-  comments: { marginBottom: 24 },
-  commentsTitle: { color: evoconnColors.muted, fontSize: 14, marginBottom: 12 },
-  clanBadge: {
-    alignSelf: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  clanBadgeText: { color: evoconnColors.background, fontWeight: '700', fontSize: 12 },
+  voteRow: { marginBottom: 16 },
+  comments: { marginTop: 8 },
+  commentsTitle: { color: evoconnColors.text, fontWeight: '700', marginBottom: 12 },
+  clanBadge: { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, marginTop: 8 },
+  clanBadgeText: { color: '#000', fontWeight: '800', fontSize: 12 },
 });

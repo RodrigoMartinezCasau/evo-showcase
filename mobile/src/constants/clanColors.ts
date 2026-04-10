@@ -51,15 +51,19 @@ export const CLAN_SECONDARY_COLOR: Record<ClanId, string> = {
 
 export const CLAN_SECONDARY_DEFAULT = '#7A3CFF';
 
+/** Sin clan / Evocon — verde lima (#c7ff02). */
+export const NO_CLAN_ACCENT_COLOR = evoconnColors.neonGreen;
+
 export function getClanSecondaryColor(clanId: string | null | undefined): string {
-  if (!clanId || String(clanId).trim() === '') return CLAN_SECONDARY_DEFAULT;
+  if (!clanId || String(clanId).trim() === '') return NO_CLAN_ACCENT_COLOR;
   const key = clanId.trim().toLowerCase();
-  return (CLAN_SECONDARY_COLOR as Record<string, string>)[key] ?? CLAN_SECONDARY_DEFAULT;
+  return (CLAN_SECONDARY_COLOR as Record<string, string>)[key] ?? NO_CLAN_ACCENT_COLOR;
 }
 
 export function getClanColor(clanId: string | null | undefined): string {
-  if (!clanId) return CLAN_TO_COLOR.nihilista;
-  return (CLAN_TO_COLOR as Record<string, string>)[clanId] ?? CLAN_TO_COLOR.nihilista;
+  if (clanId == null || String(clanId).trim() === '') return NO_CLAN_ACCENT_COLOR;
+  const key = String(clanId).trim().toLowerCase();
+  return (CLAN_TO_COLOR as Record<string, string>)[key] ?? NO_CLAN_ACCENT_COLOR;
 }
 
 /** Color de la línea de clan en el footer del sidebar: Evocon (`neonGreen`) si aún no hay clan asignado. */
