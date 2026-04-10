@@ -12,9 +12,16 @@ type ChatInputBarProps = {
   onSend: (text: string) => void;
   /** Clan-specific SVG rendered inside the send button. Falls back to a star if omitted. */
   sendIcon?: React.ReactNode;
+  /** Rendered above the input row, inside the same keyboard-avoiding wrapper (e.g. empty-state copy). */
+  contentAboveBar?: React.ReactNode;
 };
 
-export function ChatInputBar({ placeholder = 'Escribe aquí...', onSend, sendIcon }: ChatInputBarProps) {
+export function ChatInputBar({
+  placeholder = 'Escribe aquí...',
+  onSend,
+  sendIcon,
+  contentAboveBar,
+}: ChatInputBarProps) {
   const [text, setText] = useState('');
 
   const handleSend = () => {
@@ -26,7 +33,11 @@ export function ChatInputBar({ placeholder = 'Escribe aquí...', onSend, sendIco
   };
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={styles.keyboardWrap}
+    >
+      {contentAboveBar}
       <View
         style={[
           styles.bar,
@@ -94,6 +105,9 @@ export function ChatInputBar({ placeholder = 'Escribe aquí...', onSend, sendIco
 }
 
 const styles = StyleSheet.create({
+  keyboardWrap: {
+    width: '100%',
+  },
   bar: {
     flexDirection: 'row',
     alignItems: 'flex-end',

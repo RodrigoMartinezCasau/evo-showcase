@@ -33,7 +33,13 @@ import {
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { getChatSendButtonByHouse } from '@evoconn/utils/getChatSendButtonByHouse';
-import { CHAT_SEND_BUTTON_LAYOUT } from '@evoconn/constants/chatInputBarLayout';
+import {
+  CHAT_SEND_BUTTON_LAYOUT,
+  CHAT_BOTTOM_AREA_LAYOUT as CHAT_BOTTOM_AREA,
+} from '@evoconn/constants/chatInputBarLayout';
+import { REFLECTION_EMPTY_WELCOME_LAYOUT as EMPTY_WELCOME } from '@evoconn/constants/reflectionEmptyWelcomeLayout';
+import { EMPTY_WELCOME_TRIPLE_STARS_LAYOUT as EMPTY_WELCOME_TRIPLE_STARS } from '@evoconn/constants/reflectionEmptyWelcomeTripleStarsLayout';
+import { getReflectionTripleStarsByHouse } from '@evoconn/utils/getReflectionTripleStarsByHouse';
 import { DebateResponseDisplay } from '@evoconn/components/debate';
 import { useFeedStore, createReflectionPost } from '@evoconn/hooks/useFeedStore';
 
@@ -216,6 +222,65 @@ export default function ReflectionCreationScreen() {
     [thoughts],
   );
 
+  const showEmptyReflectionWelcome = !loadingThread && messages.length === 0;
+
+  const emptyReflectionWelcome = useMemo(() => {
+    if (!showEmptyReflectionWelcome) return null;
+    const TripleStarsIcon = getReflectionTripleStarsByHouse(activeClan);
+    return (
+      <View
+        style={[
+          styles.reflectionWelcomeAboveInput,
+          {
+            paddingHorizontal: EMPTY_WELCOME.paddingHorizontal,
+            paddingTop: EMPTY_WELCOME.paddingTop,
+            paddingBottom: EMPTY_WELCOME.paddingBottom,
+            transform: [
+              { translateX: EMPTY_WELCOME.offsetX },
+              { translateY: EMPTY_WELCOME.offsetY },
+              { scale: EMPTY_WELCOME.scale },
+            ],
+          },
+        ]}
+        pointerEvents="none"
+      >
+        <View style={styles.reflectionWelcomeTitleWrap}>
+          <Text style={styles.reflectionWelcomeTitle}>¡Dime tu reflexión YA!</Text>
+          <View
+            style={[
+              styles.reflectionWelcomeTripleStars,
+              {
+                top: EMPTY_WELCOME_TRIPLE_STARS.offsetY,
+                right: 0,
+                transform: [
+                  { translateX: EMPTY_WELCOME_TRIPLE_STARS.offsetX },
+                  { scale: EMPTY_WELCOME_TRIPLE_STARS.scale },
+                ],
+              },
+            ]}
+            pointerEvents="none"
+          >
+            <TripleStarsIcon
+              width={EMPTY_WELCOME_TRIPLE_STARS.width}
+              height={EMPTY_WELCOME_TRIPLE_STARS.height}
+            />
+          </View>
+        </View>
+        <Text
+          style={[
+            styles.reflectionWelcomeSub,
+            {
+              marginTop: EMPTY_WELCOME.subtitleMarginTop,
+              maxWidth: EMPTY_WELCOME.subtitleMaxWidth,
+            },
+          ]}
+        >
+          Escribe abajo para empezar un debate con hechos, citas y preguntas abiertas.
+        </Text>
+      </View>
+    );
+  }, [showEmptyReflectionWelcome, activeClan]);
+
   return (
     <View style={styles.container}>
       <AppTopBar onMenuPress={() => setSidebarOpen(true)} showClanIcon={true} />
@@ -234,16 +299,6 @@ export default function ReflectionCreationScreen() {
           keyboardDismissMode="on-drag"
           onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
         >
-          {messages.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.welcomeTitle}>Nueva reflexión</Text>
-              <Text style={styles.welcomeSub}>
-                Escribe lo que piensas. La IA analizará tu reflexión y te dará una respuesta
-                estructurada con hechos, contra-argumentos y preguntas socráticas.
-              </Text>
-            </View>
-          ) : null}
-
           {messages.map((msg, i) => {
             const userText =
               msg.role === 'assistant' && i > 0 && messages[i - 1].role === 'user'
@@ -282,6 +337,7 @@ export default function ReflectionCreationScreen() {
         }
         onSend={handleSend}
         sendIcon={sendIconNode}
+        contentAboveBar={emptyReflectionWelcome}
       />
 
       <SidebarDrawer
@@ -370,18 +426,31 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 24 },
 
-  emptyState: { marginTop: 40, alignItems: 'center', paddingHorizontal: 20 },
-  welcomeTitle: {
-    color: evoconnColors.text,
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 12,
+  reflectionWelcomeAboveInput: {
+    alignItems: 'center',
+    backgroundColor: CHAT_BOTTOM_AREA.backgroundColor,
   },
-  welcomeSub: {
-    color: evoconnColors.muted,
-    fontSize: 15,
+  reflectionWelcomeTitleWrap: {
+    width: '100%',
+    position: 'relative',
+    alignItems: 'center',
+  },
+  reflectionWelcomeTripleStars: {
+    position: 'absolute',
+  },
+  reflectionWelcomeTitle: {
+    color: '#FFFFFF',
+    fontSize: 26,
+    fontWeight: '800',
     textAlign: 'center',
-    lineHeight: 22,
+    letterSpacing: 0.2,
+  },
+  reflectionWelcomeSub: {
+    color: evoconnColors.muted,
+    fontSize: 14,
+    fontWeight: '400',
+    textAlign: 'center',
+    lineHeight: 20,
   },
 
   bubble: {
