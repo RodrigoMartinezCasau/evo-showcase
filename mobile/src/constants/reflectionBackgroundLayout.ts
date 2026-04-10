@@ -8,7 +8,7 @@ export const REFLECTION_BACKGROUND_LAYOUT = {
   /** Desplazamiento horizontal del SVG (px). */
   offsetX: 0,
   /** Desplazamiento vertical del SVG (px). */
-  offsetY: -120,
+  offsetY: -0,
   /** Redondeo de los bordes del fondo SVG (0 = recto, 20–30 = suave, 50+ = muy redondeado). */
   borderRadius: 40,
 } as const;

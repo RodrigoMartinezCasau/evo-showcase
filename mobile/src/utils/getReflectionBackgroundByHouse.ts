@@ -10,6 +10,7 @@ import Svg36 from '../assets/reflectionBackground/36.svg';
 import Svg37 from '../assets/reflectionBackground/37.svg';
 import Svg38 from '../assets/reflectionBackground/38.svg';
 import Svg39 from '../assets/reflectionBackground/39.svg';
+import SvgNoClan from '../assets/reflectionBackground/noClan.svg';
 
 const BG_BY_CLAN: Record<ClanId, FC<SvgProps>> = {
   racionalista: Svg32,
@@ -23,9 +24,9 @@ const BG_BY_CLAN: Record<ClanId, FC<SvgProps>> = {
 };
 
 /**
- * Default background when no clan is set (nihilista / neutral beige).
+ * Para ti / reflexión — fondo cuando el usuario no tiene clan (Evocon).
  */
-export const REFLECTION_BG_DEFAULT: FC<SvgProps> = Svg38;
+export const REFLECTION_BG_DEFAULT: FC<SvgProps> = SvgNoClan;
 
 export function getReflectionBackgroundByHouse(
   house?: string | null,
@@ -33,7 +34,6 @@ export function getReflectionBackgroundByHouse(
   if (house == null || String(house).trim() === '') return REFLECTION_BG_DEFAULT;
   const key = house.trim().toLowerCase() as ClanId;
   return (
-    (BG_BY_CLAN as Record<string, FC<SvgProps> | undefined>)[key] ??
-    REFLECTION_BG_DEFAULT
+    (BG_BY_CLAN as Record<string, FC<SvgProps> | undefined>)[key] ?? Svg38
   );
 }
