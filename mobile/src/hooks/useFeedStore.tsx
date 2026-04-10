@@ -5,7 +5,7 @@ import React, {
   useCallback,
   useMemo,
 } from 'react';
-import type { CommunityPost, User, VoteStats } from '../types';
+import type { CommunityPost, PhrasePost, User, VoteStats } from '../types';
 import { mockFeedPosts as SEED } from '../data/mockCommunity';
 
 function applyVoteTransition(
@@ -113,6 +113,25 @@ export function createReflectionPost(
     author,
     title,
     body,
+    voteStats: { up: 0, down: 0, save: 0 },
+    createdAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Frase en comunidad: `body` = texto interior normalizado (sin comillas); la UI añade las comillas al renderizar.
+ */
+export function createPhrasePost(
+  author: User,
+  phraseInnerNormalized: string,
+  quoteAuthor: string,
+): PhrasePost {
+  return {
+    id: `pub_phrase_${++_nextId}_${Date.now()}`,
+    type: 'phrase',
+    author,
+    body: phraseInnerNormalized,
+    quoteAuthor: quoteAuthor.trim(),
     voteStats: { up: 0, down: 0, save: 0 },
     createdAt: new Date().toISOString(),
   };

@@ -42,6 +42,13 @@ type Props = {
   onMeasure?: (h: number) => void;
   onTitleChange?: (title: string) => void;
   onPublish?: () => Promise<void> | void;
+  /** Por defecto título de reflexión; en frases = autor citado. */
+  inputPlaceholder?: string;
+  inputMaxLength?: number;
+  /** Frase ya publicada: input solo lectura y barra en ✓ PUBLICADO. */
+  published?: boolean;
+  /** Valor inicial del autor cuando `published` (reapertura de hilo). */
+  initialAuthorValue?: string;
 };
 
 export const PublishBlock = React.memo(function PublishBlock({
@@ -55,11 +62,18 @@ export const PublishBlock = React.memo(function PublishBlock({
   onMeasure,
   onTitleChange,
   onPublish,
+  inputPlaceholder = 'AÑADE UN TITULO INTERESANTE...',
+  inputMaxLength = PUBLISH_TITLE_MAX_LEN,
+  published = false,
+  initialAuthorValue = '',
 }: Props) {
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState(() =>
+    published && initialAuthorValue ? initialAuthorValue : '',
+  );
 
   const handleChange = (t: string) => {
-    const next = t.slice(0, PUBLISH_TITLE_MAX_LEN);
+    if (published) return;
+    const next = t.slice(0, inputMaxLength);
     setTitle(next);
     onTitleChange?.(next);
   };
@@ -129,15 +143,17 @@ export const PublishBlock = React.memo(function PublishBlock({
         ]}
         value={title}
         onChangeText={handleChange}
-        placeholder="AÑADE UN TITULO INTERESANTE..."
+        placeholder={inputPlaceholder}
         placeholderTextColor={SB.publishInputPlaceholderColor}
-        maxLength={PUBLISH_TITLE_MAX_LEN}
+        maxLength={inputMaxLength}
+        editable={!published}
       />
 
       <PublishActionBar
         barColor={actionBarColor ?? borderColor}
-        disabled={!onPublish || title.trim().length === 0}
-        onPublish={onPublish}
+        disabled={published || !onPublish || title.trim().length === 0}
+        onPublish={published ? undefined : onPublish}
+        externallyPublished={published}
       />
     </View>
   );

@@ -112,6 +112,12 @@ export type DebateMessage =
       nextQuestion?: string;
       topic?: string;
       lang?: string;
+      /** Nueva frase (sin IA): bloque publicar; `pending` → editable, `published` → solo lectura + barra ✓. */
+      phrasePublishUI?: {
+        status: 'pending' | 'published';
+        /** Autor citado guardado al publicar (solo status published). */
+        author?: string;
+      };
     };
 
 export type DebateThread = {

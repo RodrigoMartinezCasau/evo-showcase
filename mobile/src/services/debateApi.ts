@@ -14,14 +14,26 @@ import type {
 
 /**
  * Backend base URL.
+ * - Optional override (physical device, otra red): `EXPO_PUBLIC_API_URL` en `mobile/mobile/.env`
+ *   Ej: EXPO_PUBLIC_API_URL=http://192.168.1.42:8000 — reinicia Expo tras cambiarlo.
  * - iOS simulator: 127.0.0.1 works (shares host network).
  * - Android emulator: 10.0.2.2 maps to host loopback.
- * - Physical device: replace with your machine's LAN IP (e.g. 192.168.1.42).
  */
-const DEFAULT_API_URL = Platform.select({
-  android: 'http://10.0.2.2:8000',
-  default: 'http://127.0.0.1:8000',
-});
+function stripTrailingSlash(url: string): string {
+  return url.replace(/\/$/, '');
+}
+
+const fromEnv =
+  typeof process !== 'undefined' && process.env.EXPO_PUBLIC_API_URL
+    ? String(process.env.EXPO_PUBLIC_API_URL).trim()
+    : '';
+
+const DEFAULT_API_URL = fromEnv
+  ? stripTrailingSlash(fromEnv)
+  : Platform.select({
+      android: 'http://10.0.2.2:8000',
+      default: 'http://127.0.0.1:8000',
+    });
 
 let _apiUrl: string = DEFAULT_API_URL;
 

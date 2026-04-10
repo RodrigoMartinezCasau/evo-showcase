@@ -250,10 +250,24 @@ export default function CommunityScreen() {
     [transitionTab, allPosts, followingSet],
   );
 
-  const renderListItem = useCallback(
+  const renderMainListItem = useCallback(
     ({ item }: { item: CommunityPost }): React.ReactElement => (
       <CommunityPostCard
         post={item}
+        showPhraseAuthor={activeTab === 'para-ti'}
+        onPress={() => handlePostPress(item)}
+        onAuthorPress={() => handleAuthorPress(item.author.id)}
+        onClanPress={() => handleClanPress(item.author.clanId)}
+      />
+    ),
+    [activeTab, handlePostPress, handleAuthorPress, handleClanPress],
+  );
+
+  const renderTransitionListItem = useCallback(
+    ({ item }: { item: CommunityPost }): React.ReactElement => (
+      <CommunityPostCard
+        post={item}
+        showPhraseAuthor={false}
         onPress={() => handlePostPress(item)}
         onAuthorPress={() => handleAuthorPress(item.author.id)}
         onClanPress={() => handleClanPress(item.author.clanId)}
@@ -381,7 +395,7 @@ export default function CommunityScreen() {
             ) : (
               <FlatList
                 data={transitionData}
-                renderItem={renderListItem}
+                renderItem={renderTransitionListItem}
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={[
                   styles.list,
@@ -416,7 +430,7 @@ export default function CommunityScreen() {
           ) : (
             <FlatList
               data={listData}
-              renderItem={renderListItem}
+              renderItem={renderMainListItem}
               keyExtractor={(item) => item.id}
               contentContainerStyle={[
                 styles.list,

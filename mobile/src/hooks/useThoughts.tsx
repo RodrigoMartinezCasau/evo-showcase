@@ -11,6 +11,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -29,6 +30,8 @@ type ThoughtsContextValue = {
   thoughts: ThoughtEntry[];
   /** Create a new thought (debate) on the backend. Returns the new ID. */
   createThought: (firstMessage: string) => Promise<string>;
+  /** Nueva frase (solo local, sin IA): crea conversación tipo `phrase`. */
+  createPhraseThought: (phraseText: string) => Promise<string>;
   /** Record that a thought was updated (e.g. new message). */
   updateThought: (id: string, patch: Partial<ThoughtEntry>) => void;
   /** Delete a thought. */
@@ -47,6 +50,10 @@ export function ThoughtsProvider({ children }: { children: React.ReactNode }) {
   const [thoughts, setThoughts] = useState<ThoughtEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const didFetch = useRef(false);
+  const thoughtsRef = useRef<ThoughtEntry[]>(thoughts);
+  useLayoutEffect(() => {
+    thoughtsRef.current = thoughts;
+  }, [thoughts]);
 
   const fetchFromBackend = useCallback(async () => {
     try {
@@ -59,7 +66,10 @@ export function ThoughtsProvider({ children }: { children: React.ReactNode }) {
         isFavorite: d.is_favorite,
         folderId: d.folder_id,
       }));
-      setThoughts(entries);
+      setThoughts((prev) => {
+        const phraseOnly = prev.filter((t) => t.type === 'phrase');
+        return [...phraseOnly, ...entries];
+      });
     } catch {
       // Backend unreachable — keep whatever we have locally.
     } finally {
@@ -85,6 +95,26 @@ export function ThoughtsProvider({ children }: { children: React.ReactNode }) {
     return id;
   }, []);
 
+  const createPhraseThought = useCallback(async (phraseText: string): Promise<string> => {
+    const trimmed = phraseText.trim();
+    const id = `phrase_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    const userMsg: DebateMessage = { role: 'user', content: trimmed };
+    const publishSlot: DebateMessage = {
+      role: 'assistant',
+      content: '',
+      phrasePublishUI: { status: 'pending' },
+    };
+    const entry: ThoughtEntry = {
+      id,
+      type: 'phrase',
+      title: getShortTitle(trimmed),
+      updatedAt: new Date().toISOString(),
+      messages: [userMsg, publishSlot],
+    };
+    setThoughts((prev) => [entry, ...prev]);
+    return id;
+  }, []);
+
   const updateThought = useCallback((id: string, patch: Partial<ThoughtEntry>) => {
     setThoughts((prev) =>
       prev.map((t) => (t.id === id ? { ...t, ...patch, updatedAt: new Date().toISOString() } : t)),
@@ -92,11 +122,27 @@ export function ThoughtsProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const removeThought = useCallback((id: string) => {
-    api.deleteDebate(id).catch(() => {});
-    setThoughts((prev) => prev.filter((t) => t.id !== id));
+    setThoughts((prev) => {
+      const target = prev.find((t) => t.id === id);
+      if (target?.type !== 'phrase') {
+        api.deleteDebate(id).catch(() => {});
+      }
+      return prev.filter((t) => t.id !== id);
+    });
   }, []);
 
   const loadThread = useCallback(async (id: string): Promise<DebateThread | null> => {
+    const localThought = thoughtsRef.current.find((t) => t.id === id);
+    if (localThought?.type === 'phrase') {
+      const thread: DebateThread = {
+        id: localThought.id,
+        title: localThought.title,
+        messages: localThought.messages ?? [],
+        createdAt: Date.parse(localThought.updatedAt) || Date.now(),
+      };
+      return thread;
+    }
+
     const thread = await api.getDebate(id);
     if (thread) {
       setThoughts((prev) =>
@@ -112,13 +158,23 @@ export function ThoughtsProvider({ children }: { children: React.ReactNode }) {
     () => ({
       thoughts,
       createThought,
+      createPhraseThought,
       updateThought,
       removeThought,
       loadThread,
       loading,
       refresh: fetchFromBackend,
     }),
-    [thoughts, createThought, updateThought, removeThought, loadThread, loading, fetchFromBackend],
+    [
+      thoughts,
+      createThought,
+      createPhraseThought,
+      updateThought,
+      removeThought,
+      loadThread,
+      loading,
+      fetchFromBackend,
+    ],
   );
 
   return <ThoughtsContext.Provider value={value}>{children}</ThoughtsContext.Provider>;

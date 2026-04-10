@@ -1,5 +1,5 @@
 /**
- * Bloque de bienvenida vacío en Nueva reflexión (encima del input).
+ * Bloque de bienvenida vacío encima del input (Nueva reflexión y Nueva frase comparten estos valores).
  * Editor: mover y escalar el conjunto (título + subtítulo) sin tocar la barra ni el chat.
  */
 export const REFLECTION_EMPTY_WELCOME_LAYOUT = {

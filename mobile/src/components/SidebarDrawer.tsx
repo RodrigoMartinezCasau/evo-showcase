@@ -247,7 +247,10 @@ export function SidebarDrawer({
             width: newPhrasePlusLayout.width,
             height: newPhrasePlusLayout.height,
           }}
-          onPress={() => { onClose(); router.push('/phrase'); }}
+          onPress={() => {
+            onClose();
+            router.replace({ pathname: '/phrase' });
+          }}
         />
         <View style={styles.searchBarLayer}>
           <SidebarSearchBar ref={searchInputRef} value={drawerSearch} onChangeText={setDrawerSearch} />

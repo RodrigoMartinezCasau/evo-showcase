@@ -18,6 +18,7 @@ import { getQuoteClanBannerAsset } from '@evoconn/assets/cards/quoteClanBanners'
 import { CARD_ASSET_LAYOUT } from '@evoconn/constants/cardAssetLayout';
 import { smallStatsIcons } from '@evoconn/assets/icons/smallStats';
 import { useFeedStore } from '@evoconn/hooks/useFeedStore';
+import { formatPhraseBodyForDisplay } from '@evoconn/utils/phrasePublish';
 
 const S = CARD_LAYOUT_SHARED;
 
@@ -26,9 +27,20 @@ type CommunityPostCardProps = {
   onPress: () => void;
   onAuthorPress: () => void;
   onClanPress: () => void;
+  /**
+   * Solo en PARA TI (lista compacta). Siguiendo / Más votadas: false.
+   * Vistas ampliadas usan `ReflectionDetailItem`, no esta tarjeta.
+   */
+  showPhraseAuthor?: boolean;
 };
 
-export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }: CommunityPostCardProps) {
+export function CommunityPostCard({
+  post,
+  onPress,
+  onAuthorPress,
+  onClanPress,
+  showPhraseAuthor = false,
+}: CommunityPostCardProps) {
   const { updatePostVote, updatePostSaveToggle } = useFeedStore();
   const [smallVote, setSmallVote] = useState<'up' | null>(null);
   const [smallSaved, setSmallSaved] = useState(false);
@@ -448,8 +460,13 @@ export function CommunityPostCard({ post, onPress, onAuthorPress, onClanPress }:
                 style={[styles.bodyInner, isQuoteCard && { fontWeight: '700' as const, fontStyle: 'italic' as const }]}
                 numberOfLines={collapsedBodyMaxLines}
               >
-                {post.body}
+                {isQuoteCard ? formatPhraseBodyForDisplay(post.body) : post.body}
               </Text>
+              {isQuoteCard && showPhraseAuthor && post.quoteAuthor ? (
+                <Text style={styles.phraseQuoteAuthorInFeed} numberOfLines={2}>
+                  {post.quoteAuthor}
+                </Text>
+              ) : null}
             </View>
 
             {isCanvaCard && L.STATS_ABSOLUTE_BOTTOM < 0 ? (
@@ -620,5 +637,13 @@ const styles = StyleSheet.create({
   title: { color: evoconnColors.text, fontWeight: '800', fontSize: 18, marginBottom: 8 },
   body: { color: evoconnColors.muted, fontSize: 14, lineHeight: 20, marginBottom: 10 },
   bodyInner: { color: evoconnColors.text, fontSize: 14, lineHeight: 20, marginBottom: 12 },
+  phraseQuoteAuthorInFeed: {
+    color: evoconnColors.muted,
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: -4,
+    marginBottom: 4,
+  },
   footer: { marginTop: 4 },
 });

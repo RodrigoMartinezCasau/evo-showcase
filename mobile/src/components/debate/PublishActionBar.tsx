@@ -19,14 +19,19 @@ type Props = {
   barColor: string;
   disabled?: boolean;
   onPublish?: () => Promise<void> | void;
+  /** Frases/reapertura: el padre marca publicado sin desmontar el bloque. */
+  externallyPublished?: boolean;
 };
 
 export const PublishActionBar = React.memo(function PublishActionBar({
   barColor,
   disabled,
   onPublish,
+  externallyPublished,
 }: Props) {
-  const [state, setState] = useState<PublishState>('idle');
+  const [state, setState] = useState<PublishState>(() =>
+    externallyPublished ? 'published' : 'idle',
+  );
   const [percent, setPercent] = useState(0);
   const progressAnim = useRef(new Animated.Value(0)).current;
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -39,6 +44,10 @@ export const PublishActionBar = React.memo(function PublishActionBar({
   }, []);
 
   useEffect(() => cleanup, [cleanup]);
+
+  useEffect(() => {
+    if (externallyPublished) setState('published');
+  }, [externallyPublished]);
 
   const handlePress = useCallback(async () => {
     if (state !== 'idle' || disabled) return;
