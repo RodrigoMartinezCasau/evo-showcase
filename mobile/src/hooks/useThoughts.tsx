@@ -24,6 +24,8 @@ import * as api from '@evoconn/services/debateApi';
 export type ThoughtEntry = ConversationItem & {
   /** Cached messages so we can show them instantly when reopening. */
   messages?: DebateMessage[];
+  /** Notas privadas del usuario (solo flujo Nueva frase). */
+  phraseNotes?: string;
 };
 
 type ThoughtsContextValue = {

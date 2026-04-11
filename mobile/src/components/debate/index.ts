@@ -4,3 +4,5 @@ export { DebateQuoteCard } from './DebateQuoteCard';
 export { PublishBlock } from './PublishBlock';
 export { PublishActionBar } from './PublishActionBar';
 export { DebateResponseDisplay } from './DebateResponseDisplay';
+export { PhraseNotesCard } from './PhraseNotesCard';
+export { PhraseFolderManagerCard } from './PhraseFolderManagerCard';

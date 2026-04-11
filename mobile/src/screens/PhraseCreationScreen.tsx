@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Keyboard } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Keyboard, Alert } from 'react-native';
 import { AppTopBar, ChatInputBar, SidebarDrawer } from '@evoconn/components';
-import { PublishBlock } from '@evoconn/components/debate';
+import { PublishBlock, PhraseNotesCard, PhraseFolderManagerCard } from '@evoconn/components/debate';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
+import { useConversationFolders } from '@evoconn/hooks/ConversationFoldersContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
@@ -30,6 +31,7 @@ import { getPublishStarByClan } from '@evoconn/utils/getDebateStarByClan';
 import type { DebateMessage } from '@evoconn/types/debate';
 import { useFeedStore, createPhrasePost } from '@evoconn/hooks/useFeedStore';
 import { normalizePhraseInnerForPublish } from '@evoconn/utils/phrasePublish';
+import type { SidebarFolder } from '@evoconn/types';
 
 const PUBLISH_AUTHOR_PLACEHOLDER = 'AÑADE EL AUTOR...';
 const PUBLISH_AUTHOR_MAX_LEN = 40;
@@ -64,6 +66,7 @@ export default function PhraseCreationScreen() {
     loadThread,
     updateThought,
   } = useThoughts();
+  const { folders } = useConversationFolders();
   const { publishPost } = useFeedStore();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const clanColor = getChatUserAccentColor(activeClan);
@@ -84,6 +87,9 @@ export default function PhraseCreationScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const publishAuthorRef = useRef('');
   const publishedRef = useRef<Set<string>>(new Set());
+  const notesDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [phraseNotesLocal, setPhraseNotesLocal] = useState('');
 
   const scrollToEnd = useCallback(() => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
@@ -111,6 +117,33 @@ export default function PhraseCreationScreen() {
       cancelled = true;
     };
   }, [phraseId, loadThread]);
+
+  const phraseThought = useMemo(
+    () => (phraseId ? thoughts.find((t) => t.id === phraseId) : undefined),
+    [thoughts, phraseId],
+  );
+
+  useEffect(() => {
+    setPhraseNotesLocal(phraseThought?.phraseNotes ?? '');
+  }, [phraseId, phraseThought?.phraseNotes]);
+
+  useEffect(() => {
+    return () => {
+      if (notesDebounceRef.current) clearTimeout(notesDebounceRef.current);
+    };
+  }, []);
+
+  const onPhraseNotesChange = useCallback(
+    (text: string) => {
+      setPhraseNotesLocal(text);
+      if (!phraseId) return;
+      if (notesDebounceRef.current) clearTimeout(notesDebounceRef.current);
+      notesDebounceRef.current = setTimeout(() => {
+        updateThought(phraseId, { phraseNotes: text });
+      }, 400);
+    },
+    [phraseId, updateThought],
+  );
 
   const publishPending = useMemo(
     () => messages.some((m) => getPhrasePublishUI(m)?.status === 'pending'),
@@ -157,6 +190,15 @@ export default function PhraseCreationScreen() {
       Keyboard.dismiss();
     },
     [publishPost, updateThought],
+  );
+
+  const handleAssignPhraseToFolder = useCallback(
+    (folder: SidebarFolder) => {
+      if (!phraseId) return;
+      updateThought(phraseId, { folderId: folder.id });
+      Alert.alert('Carpeta', `La frase se ha guardado en «${folder.name}».`);
+    },
+    [phraseId, updateThought],
   );
 
   const handleSend = useCallback(
@@ -293,31 +335,51 @@ export default function PhraseCreationScreen() {
                 messages[i - 1]?.role === 'user' ? messages[i - 1].content : '';
               const published = pubUi.status === 'published';
               return (
-                <View key={`pub-${effectiveThreadId}`} style={{ marginTop: GAPS.quoteToPublish }}>
-                  <PublishBlock
-                    borderColor={getBlockBorderColor('publish', activeClan)}
-                    borderWidth={BW.publish}
-                    backgroundColor={getBlockBackgroundColor('publish', activeClan)}
-                    starIcon={PublishStar}
-                    titleOutlineColor={getPublishTitleOutlineColor(activeClan)}
-                    actionBarColor={getPublishTitleOutlineColor(activeClan)}
-                    inputPlaceholder={PUBLISH_AUTHOR_PLACEHOLDER}
-                    inputMaxLength={PUBLISH_AUTHOR_MAX_LEN}
-                    published={published}
-                    initialAuthorValue={published ? pubUi.author ?? '' : ''}
-                    onTitleChange={
-                      published
-                        ? undefined
-                        : (a) => {
-                            publishAuthorRef.current = a;
-                          }
-                    }
-                    onPublish={
-                      published
-                        ? undefined
-                        : () => handlePhrasePublish(effectiveThreadId, userPhrase)
-                    }
+                <View key={`pub-stack-${effectiveThreadId}`} style={{ marginTop: GAPS.quoteToPublish }}>
+                  <PhraseNotesCard
+                    borderColor={getBlockBorderColor('question', activeClan)}
+                    borderWidth={BW.question}
+                    backgroundColor={getBlockBackgroundColor('question', activeClan)}
+                    value={phraseNotesLocal}
+                    onChangeText={onPhraseNotesChange}
                   />
+                  <View style={{ marginTop: GAPS.questionToQuote }}>
+                    <PhraseFolderManagerCard
+                      borderColor={getBlockBorderColor('quote', activeClan)}
+                      borderWidth={BW.quote}
+                      backgroundColor={getBlockBackgroundColor('quote', activeClan)}
+                      innerBorderColor={getBlockBorderColor('quote', activeClan)}
+                      folders={folders}
+                      selectedFolderId={phraseThought?.folderId ?? null}
+                      onSelectFolder={handleAssignPhraseToFolder}
+                    />
+                  </View>
+                  <View style={{ marginTop: GAPS.questionToQuote }}>
+                    <PublishBlock
+                      borderColor={getBlockBorderColor('publish', activeClan)}
+                      borderWidth={BW.publish}
+                      backgroundColor={getBlockBackgroundColor('publish', activeClan)}
+                      starIcon={PublishStar}
+                      titleOutlineColor={getPublishTitleOutlineColor(activeClan)}
+                      actionBarColor={getPublishTitleOutlineColor(activeClan)}
+                      inputPlaceholder={PUBLISH_AUTHOR_PLACEHOLDER}
+                      inputMaxLength={PUBLISH_AUTHOR_MAX_LEN}
+                      published={published}
+                      initialAuthorValue={published ? pubUi.author ?? '' : ''}
+                      onTitleChange={
+                        published
+                          ? undefined
+                          : (a) => {
+                              publishAuthorRef.current = a;
+                            }
+                      }
+                      onPublish={
+                        published
+                          ? undefined
+                          : () => handlePhrasePublish(effectiveThreadId, userPhrase)
+                      }
+                    />
+                  </View>
                 </View>
               );
             }

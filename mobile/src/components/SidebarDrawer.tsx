@@ -43,7 +43,7 @@ import { FrasesButton } from './FrasesButton';
 import { RachaButton } from './RachaButton';
 import type { ConversationItem as ConvItem } from '@evoconn/types';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
-import { mockSidebarFolders } from '@evoconn/data/mockSidebarFolders';
+import { useConversationFolders } from '@evoconn/hooks/ConversationFoldersContext';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { SIDEBAR_DRAWER_OFFSCREEN_TRANSLATE_X } from '@evoconn/constants/communityDrawerGesture';
 
@@ -76,7 +76,7 @@ export function SidebarDrawer({
   const searchInputRef = useRef<TextInput>(null);
   const [drawerSearch, setDrawerSearch] = useState('');
   const [convState, setConvState] = useState(conversations);
-  const [folderState, setFolderState] = useState(() => mockSidebarFolders.map((f) => ({ ...f })));
+  const { folders: folderState, setFolders: setFolderState } = useConversationFolders();
 
   useEffect(() => {
     setConvState(conversations);
