@@ -14,6 +14,10 @@ import {
 import { SIDEBAR_CONVERSATIONS_LAYOUT as L } from '@evoconn/constants/sidebarConversationsLayout';
 import { getConversationsFrameByHouse } from '@evoconn/utils/getSidebarConversationsFrameByHouse';
 import { getSidebarFolderColors } from '@evoconn/constants/sidebarFolderColors';
+import {
+  getSidebarClanTabColorRow,
+  sidebarTabIconTint,
+} from '@evoconn/constants/sidebarClanTabColors';
 import type { ConversationItem, SidebarFolder } from '@evoconn/types';
 import { SidebarFolderItem } from './SidebarFolderItem';
 import { SidebarFolderViewHeader } from './SidebarFolderViewHeader';
@@ -54,6 +58,7 @@ export function SidebarConversationsPanel({
 
   const frameSource = useMemo(() => getConversationsFrameByHouse(clanId), [clanId]);
   const folderColors = useMemo(() => getSidebarFolderColors(clanId), [clanId]);
+  const clanTabColors = useMemo(() => getSidebarClanTabColorRow(clanId), [clanId]);
   const browsedFolderName = useMemo(
     () => (foldersBrowseId ? folders.find((f) => f.id === foldersBrowseId)?.name ?? '' : ''),
     [foldersBrowseId, folders],
@@ -308,7 +313,10 @@ export function SidebarConversationsPanel({
                       style={{
                         width: L.FAVORITES_ICON_BASE_SIZE,
                         height: L.FAVORITES_ICON_BASE_SIZE,
-                        tintColor: activeTab === 'favorites' ? folderColors.secondary : undefined,
+                        tintColor:
+                          activeTab === 'favorites'
+                            ? sidebarTabIconTint(clanTabColors.favorites.icon)
+                            : undefined,
                       }}
                       resizeMode="contain"
                     />
@@ -321,7 +329,7 @@ export function SidebarConversationsPanel({
                         marginLeft: L.FAVORITES_ICON_TEXT_GAP_X,
                         fontSize: L.SIDEBAR_FAVORITES_FONT_SIZE,
                         letterSpacing: L.SIDEBAR_FAVORITES_LETTER_SPACING,
-                        color: activeTab === 'favorites' ? folderColors.secondary : '#FFFFFF',
+                        color: activeTab === 'favorites' ? clanTabColors.favorites.label : '#FFFFFF',
                       },
                     ]}
                   >
@@ -355,7 +363,10 @@ export function SidebarConversationsPanel({
                       style={{
                         width: L.FOLDERS_ICON_BASE_SIZE,
                         height: L.FOLDERS_ICON_BASE_SIZE,
-                        tintColor: activeTab === 'folders' ? folderColors.primary : undefined,
+                        tintColor:
+                          activeTab === 'folders'
+                            ? sidebarTabIconTint(clanTabColors.folders.icon)
+                            : undefined,
                       }}
                       resizeMode="contain"
                     />
@@ -368,7 +379,7 @@ export function SidebarConversationsPanel({
                         marginLeft: L.FOLDERS_ICON_TEXT_GAP_X,
                         fontSize: L.SIDEBAR_FOLDERS_FONT_SIZE,
                         letterSpacing: L.SIDEBAR_FOLDERS_LETTER_SPACING,
-                        color: activeTab === 'folders' ? folderColors.primary : '#FFFFFF',
+                        color: activeTab === 'folders' ? clanTabColors.folders.label : '#FFFFFF',
                       },
                     ]}
                   >
@@ -401,6 +412,10 @@ export function SidebarConversationsPanel({
                       style={{
                         width: L.THOUGHTS_ICON_BASE_SIZE,
                         height: L.THOUGHTS_ICON_BASE_SIZE,
+                        tintColor:
+                          activeTab === 'thoughts'
+                            ? sidebarTabIconTint(clanTabColors.thoughts.icon)
+                            : undefined,
                       }}
                       resizeMode="contain"
                     />
@@ -413,7 +428,7 @@ export function SidebarConversationsPanel({
                         marginLeft: L.THOUGHTS_ICON_TEXT_GAP_X,
                         fontSize: L.SIDEBAR_THOUGHTS_FONT_SIZE,
                         letterSpacing: L.SIDEBAR_THOUGHTS_LETTER_SPACING,
-                        color: activeTab === 'thoughts' ? folderColors.tertiary : '#FFFFFF',
+                        color: activeTab === 'thoughts' ? clanTabColors.thoughts.label : '#FFFFFF',
                       },
                     ]}
                   >
