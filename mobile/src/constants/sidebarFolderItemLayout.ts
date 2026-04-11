@@ -23,9 +23,9 @@ export const SIDEBAR_FOLDER_ITEM_LAYOUT = {
   titleLineHeight: 0,
 
   /** Icono de edición (lápiz) a la derecha del título. */
-  pencilSize: 14,
+  pencilSize: 23,
   pencilGapLeft: 6,
-  pencilOffsetX: -35,
+  pencilOffsetX: -29,
   pencilOffsetY: 0,
   pencilColor: '#D1D5DB',
 } as const;

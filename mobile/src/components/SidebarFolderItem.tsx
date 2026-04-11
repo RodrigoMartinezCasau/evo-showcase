@@ -1,8 +1,6 @@
 import React from 'react';
-import { View, TouchableOpacity, Text, Image, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { SIDEBAR_FOLDER_ITEM_LAYOUT as IL } from '@evoconn/constants/sidebarFolderItemLayout';
-
-const PENCIL_ASSET = require('../assets/icons/topbar/pencil.png');
 
 type Props = {
   name: string;
@@ -74,11 +72,9 @@ export const SidebarFolderItem = React.memo(function SidebarFolderItem({
             },
           ]}
         >
-          <Image
-            source={PENCIL_ASSET}
-            style={[styles.pencilImg, { tintColor: IL.pencilColor }]}
-            resizeMode="contain"
-          />
+          <Text style={[styles.pencilGlyph, { fontSize: IL.pencilSize * 0.68, color: IL.pencilColor }]}>
+            ✎
+          </Text>
         </TouchableOpacity>
       )}
     </View>
@@ -106,8 +102,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     zIndex: 1,
   },
-  pencilImg: {
-    width: '100%',
-    height: '100%',
+  pencilGlyph: {
+    textAlign: 'center',
   },
 });

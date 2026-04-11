@@ -14,7 +14,7 @@ import PS8 from '../assets/debate/postureStar/8.svg';
 import PS9 from '../assets/debate/postureStar/9.svg';
 
 // ── Counterpoint stars ("estrellas secundarias") ──
-import CS1 from '../assets/debate/counterpointStar/1.svg';
+import CS1 from '../assets/debate/counterpointStar/estrella_contra.svg';
 import CS2 from '../assets/debate/counterpointStar/2.svg';
 import CS3 from '../assets/debate/counterpointStar/3.svg';
 import CS4 from '../assets/debate/counterpointStar/4.svg';
