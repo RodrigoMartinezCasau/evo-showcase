@@ -11,10 +11,13 @@ export const PHRASE_FOLDER_ITEM_LAYOUT = {
   padding: 12,
   /** Separación vertical entre tarjetas de carpeta. */
   gap: 10,
+  /** Icono carpeta blanca (`iconoCarpetas.svg`): posición y escala. */
   icon: {
-    offsetX: 0,
+    offsetX: -4,
     offsetY: 0,
-    fontSize: 18,
+    /** Tamaño base (px) antes de aplicar `scale`. */
+    size: 22,
+    scale: 0.6,
   },
   title: {
     offsetX: 0,

@@ -20,6 +20,11 @@ import type { ConversationItem } from '@evoconn/types';
 import type { DebateMessage, DebateThread } from '@evoconn/types/debate';
 import { getShortTitle } from '@evoconn/types/debate';
 import * as api from '@evoconn/services/debateApi';
+import {
+  loadPhraseThoughtsFromStorage,
+  savePhraseThoughtsToStorage,
+  type PersistedPhraseThought,
+} from '@evoconn/services/phraseThreadsStorage';
 
 export type ThoughtEntry = ConversationItem & {
   /** Cached messages so we can show them instantly when reopening. */
@@ -58,6 +63,12 @@ export function ThoughtsProvider({ children }: { children: React.ReactNode }) {
   }, [thoughts]);
 
   const fetchFromBackend = useCallback(async () => {
+    let storedPhrases: PersistedPhraseThought[] = [];
+    try {
+      storedPhrases = await loadPhraseThoughtsFromStorage();
+    } catch {
+      storedPhrases = [];
+    }
     try {
       const list = await api.fetchDebates();
       const entries: ThoughtEntry[] = list.map((d) => ({
@@ -69,11 +80,29 @@ export function ThoughtsProvider({ children }: { children: React.ReactNode }) {
         folderId: d.folder_id,
       }));
       setThoughts((prev) => {
-        const phraseOnly = prev.filter((t) => t.type === 'phrase');
-        return [...phraseOnly, ...entries];
+        const inFlight = prev.filter((t) => t.type === 'phrase');
+        const byId = new Map<string, ThoughtEntry>();
+        for (const p of storedPhrases) {
+          byId.set(p.id, p as ThoughtEntry);
+        }
+        for (const p of inFlight) {
+          byId.set(p.id, p);
+        }
+        const phrases = [...byId.values()];
+        return [...phrases, ...entries];
       });
     } catch {
-      // Backend unreachable — keep whatever we have locally.
+      setThoughts((prev) => {
+        const inFlight = prev.filter((t) => t.type === 'phrase');
+        const byId = new Map<string, ThoughtEntry>();
+        for (const p of storedPhrases) {
+          byId.set(p.id, p as ThoughtEntry);
+        }
+        for (const p of inFlight) {
+          byId.set(p.id, p);
+        }
+        return [...byId.values()];
+      });
     } finally {
       setLoading(false);
     }
@@ -84,6 +113,12 @@ export function ThoughtsProvider({ children }: { children: React.ReactNode }) {
     didFetch.current = true;
     fetchFromBackend();
   }, [fetchFromBackend]);
+
+  useEffect(() => {
+    if (loading) return;
+    const phrases = thoughts.filter((t): t is PersistedPhraseThought => t.type === 'phrase');
+    savePhraseThoughtsToStorage(phrases).catch(() => {});
+  }, [thoughts, loading]);
 
   const createThought = useCallback(async (firstMessage: string): Promise<string> => {
     const { id, title } = await api.createDebate(firstMessage);

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import {
   AI_SPECIAL_BLOCK_LAYOUT as SB,
@@ -10,6 +10,12 @@ import { PHRASE_FOLDER_ITEM_LAYOUT as ITEM } from '@evoconn/constants/phraseFold
 import { evoconnColors } from '@evoconn/theme/colors';
 import type { SidebarFolder } from '@evoconn/types';
 import WhiteStar from '../../assets/debate/whiteStar.svg';
+import IconoCarpetas from '../../assets/folders/iconoCarpetas.svg';
+import { getFollowPlusButtonByHouse } from '@evoconn/utils/getFollowPlusButtonByHouse';
+import { useActiveClan } from '@evoconn/debug/DebugClanContext';
+import { mockCurrentUser } from '@evoconn/data/mockUser';
+import { useConversationFolders } from '@evoconn/hooks/ConversationFoldersContext';
+import { PhraseFolderCreateModal } from './PhraseFolderCreateModal';
 
 const STAR_SZ = L.star.size * L.star.scale;
 const HEADER_H = STAR_SZ;
@@ -45,6 +51,7 @@ function FolderItemBox({
   folderBorderColor: string;
   onPress: () => void;
 }) {
+  const iconDim = ITEM.icon.size * ITEM.icon.scale;
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -67,6 +74,8 @@ function FolderItemBox({
           style={[
             styles.iconWrap,
             {
+              width: iconDim,
+              minHeight: iconDim,
               transform: [
                 { translateX: ITEM.icon.offsetX },
                 { translateY: ITEM.icon.offsetY },
@@ -74,7 +83,7 @@ function FolderItemBox({
             },
           ]}
         >
-          <Text style={[styles.folderIcon, { fontSize: ITEM.icon.fontSize }]}>📁</Text>
+          <IconoCarpetas width={iconDim} height={iconDim} />
         </View>
         <View style={styles.titleWrap}>
           <Text
@@ -125,8 +134,22 @@ export const PhraseFolderManagerCard = React.memo(function PhraseFolderManagerCa
   selectedFolderId,
   onSelectFolder,
 }: Props) {
+  const activeClan = useActiveClan(mockCurrentUser.clanId);
+  const { addFolder } = useConversationFolders();
+  const [createOpen, setCreateOpen] = useState(false);
+
+  const PlusIcon = useMemo(() => getFollowPlusButtonByHouse(activeClan), [activeClan]);
+  const plusSz = L.plusButton.size * L.plusButton.scale;
+
   const innerMarginLeft = IC.offsetX + L.contentOffsetX + L.content.offsetX;
   const innerMarginTop = IC.offsetY + L.contentOffsetY + L.content.offsetY;
+
+  const onCreateFolder = useCallback(
+    (name: string) => {
+      addFolder(name);
+    },
+    [addFolder],
+  );
 
   return (
     <View
@@ -147,24 +170,51 @@ export const PhraseFolderManagerCard = React.memo(function PhraseFolderManagerCa
         </View>
         <View
           style={[
-            styles.titleBox,
-            { left: STAR_SZ + L.star.marginRight + L.title.offsetX },
+            styles.headerTitleRow,
+            {
+              left: STAR_SZ + L.star.marginRight,
+              paddingRight: 4,
+            },
           ]}
         >
           <Text
             style={[
               styles.blockTitleText,
+              styles.headerTitleFlex,
               {
                 fontSize: L.title.fontSize,
                 ...(L.title.lineHeight > 0 ? { lineHeight: L.title.lineHeight } : {}),
                 marginTop: L.title.offsetY,
+                marginLeft: L.title.offsetX,
               },
             ]}
+            numberOfLines={1}
           >
             Añadir a carpeta...
           </Text>
+          <TouchableOpacity
+            onPress={() => setCreateOpen(true)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Crear carpeta"
+            activeOpacity={0.75}
+            style={{
+              transform: [
+                { translateX: L.plusButton.offsetX },
+                { translateY: L.plusButton.offsetY },
+              ],
+            }}
+          >
+            <PlusIcon width={plusSz} height={plusSz} />
+          </TouchableOpacity>
         </View>
       </View>
+
+      <PhraseFolderCreateModal
+        visible={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreate={onCreateFolder}
+      />
 
       <View
         style={[
@@ -221,18 +271,25 @@ const styles = StyleSheet.create({
   header: {
     height: HEADER_H,
     marginBottom: SB.headerMarginBottom,
+    position: 'relative',
   },
-  titleBox: {
+  headerTitleRow: {
     position: 'absolute',
     top: 0,
-    bottom: 0,
     right: 0,
-    justifyContent: 'center',
+    bottom: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerTitleFlex: {
+    flex: 1,
+    marginRight: 10,
   },
   blockTitleText: {
     fontWeight: '800',
     letterSpacing: HDR.letterSpacing,
-    textTransform: 'none',
+    textTransform: 'uppercase',
     color: HDR.titleColor,
   },
   innerCard: {},
@@ -258,11 +315,9 @@ const styles = StyleSheet.create({
     minHeight: 24,
   },
   iconWrap: {
-    width: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  folderIcon: {},
   titleWrap: {
     flex: 1,
     justifyContent: 'center',

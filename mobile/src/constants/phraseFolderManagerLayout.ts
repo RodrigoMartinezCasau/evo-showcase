@@ -1,9 +1,12 @@
+import { PHRASE_FOLDER_PLUS_BUTTON_LAYOUT } from './phraseFolderPlusButtonLayout';
+
 /**
- * Bloque «Añadir a carpeta…» (Nueva frase) — misma línea visual que Cita textual.
+ * Bloque «Añadir a carpeta…» (Nueva frase).
+ *
+ * `height` = altura fija del área de lista (scroll interno); el bloque exterior crece con cabecera + este valor.
  */
 export const PHRASE_FOLDER_MANAGER_LAYOUT = {
-  /** Altura fija del área interna (solo la lista; scroll interno). */
-  height: 220,
+  height: 130,
   contentOffsetX: 0,
   contentOffsetY: 0,
   star: {
@@ -19,6 +22,8 @@ export const PHRASE_FOLDER_MANAGER_LAYOUT = {
     fontSize: 18,
     lineHeight: 22,
   },
+  /** Misma referencia que `PHRASE_FOLDER_PLUS_BUTTON_LAYOUT` (un solo sitio para editar escala/offset). */
+  plusButton: PHRASE_FOLDER_PLUS_BUTTON_LAYOUT,
   content: {
     offsetX: 0,
     offsetY: 0,
