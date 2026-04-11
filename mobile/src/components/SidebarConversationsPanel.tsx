@@ -337,7 +337,7 @@ export function SidebarConversationsPanel({
             }}
           >
             {!q ? (
-              <View style={{ paddingBottom: L.SIDEBAR_CONVERSATIONS_SECTIONS_TO_LIST_GAP_Y, zIndex: 1 }}>
+              <View style={{ paddingBottom: L.SIDEBAR_CONVERSATIONS_SECTIONS_TO_LIST_GAP_Y, zIndex: 10, position: 'relative' }}>
                 {/* ── FAVORITOS ── */}
                 <TouchableOpacity
                   activeOpacity={0.7}
@@ -439,17 +439,18 @@ export function SidebarConversationsPanel({
                 </TouchableOpacity>
 
                 {/* ── PENSAMIENTOS ── */}
-                <TouchableOpacity
-                  activeOpacity={0.7}
+                <Pressable
+                  hitSlop={6}
                   onPress={() => onTab('thoughts')}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
+                  style={({ pressed }) => ({
+                    flexDirection: 'row' as const,
+                    alignItems: 'center' as const,
                     marginLeft: L.SIDEBAR_THOUGHTS_OFFSET_X,
                     marginTop: L.SIDEBAR_THOUGHTS_OFFSET_Y,
-                    paddingVertical: 6,
+                    opacity: pressed ? 0.7 : 1,
+                    zIndex: 2,
                     transform: [{ scale: L.SIDEBAR_THOUGHTS_SCALE }],
-                  }}
+                  })}
                 >
                   <View
                     style={{
@@ -485,7 +486,7 @@ export function SidebarConversationsPanel({
                   >
                     PENSAMIENTOS
                   </Text>
-                </TouchableOpacity>
+                </Pressable>
               </View>
             ) : (
               <View
@@ -500,7 +501,7 @@ export function SidebarConversationsPanel({
             )}
 
             <ScrollView
-              style={styles.scroll}
+              style={[styles.scroll, { zIndex: 0 }]}
               contentContainerStyle={{
                 paddingTop: 0,
                 paddingBottom: 8,

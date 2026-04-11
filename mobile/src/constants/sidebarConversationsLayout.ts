@@ -25,7 +25,7 @@ export const SIDEBAR_CONVERSATIONS_LAYOUT = {
   SIDEBAR_CONVERSATIONS_VIEWPORT_OFFSET_Y: 16,
 
   /** Espacio vertical entre las tres pestañas de sección (FAVORITOS / CARPETAS / PENSAMIENTOS). */
-  SIDEBAR_CONVERSATIONS_SECTION_GAP_Y: 22,
+  SIDEBAR_CONVERSATIONS_SECTION_GAP_Y: 20,
 
   /**
    * Hueco entre el bloque de cabeceras (tras “PENSAMIENTOS”) y el inicio de la lista de conversaciones.
