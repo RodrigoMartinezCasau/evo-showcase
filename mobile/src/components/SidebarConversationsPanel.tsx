@@ -13,7 +13,11 @@ import {
 } from 'react-native';
 import { SIDEBAR_CONVERSATIONS_LAYOUT as L } from '@evoconn/constants/sidebarConversationsLayout';
 import { getConversationsFrameByHouse } from '@evoconn/utils/getSidebarConversationsFrameByHouse';
+import { getSidebarFolderColors } from '@evoconn/constants/sidebarFolderColors';
 import type { ConversationItem, SidebarFolder } from '@evoconn/types';
+import { SidebarFolderItem } from './SidebarFolderItem';
+import { SidebarFolderViewHeader } from './SidebarFolderViewHeader';
+import { SIDEBAR_FOLDER_ITEM_LAYOUT as FIL } from '@evoconn/constants/sidebarFolderItemLayout';
 
 const SECTION_ICON_FAVORITES = require('../assets/sidebar/conversationsSections/section_favorites_star.png');
 const SECTION_ICON_FOLDERS = require('../assets/sidebar/conversationsSections/section_folders_folder.png');
@@ -49,6 +53,11 @@ export function SidebarConversationsPanel({
   const [newFolderConvId, setNewFolderConvId] = useState<string | null>(null);
 
   const frameSource = useMemo(() => getConversationsFrameByHouse(clanId), [clanId]);
+  const folderColors = useMemo(() => getSidebarFolderColors(clanId), [clanId]);
+  const browsedFolderName = useMemo(
+    () => (foldersBrowseId ? folders.find((f) => f.id === foldersBrowseId)?.name ?? '' : ''),
+    [foldersBrowseId, folders],
+  );
 
   const imgW = L.SIDEBAR_CONVERSATIONS_IMAGE_WIDTH;
   const imgH = L.SIDEBAR_CONVERSATIONS_IMAGE_HEIGHT;
@@ -272,14 +281,19 @@ export function SidebarConversationsPanel({
             }}
           >
             {!q ? (
-              <View style={{ marginBottom: L.SIDEBAR_CONVERSATIONS_SECTIONS_TO_LIST_GAP_Y }}>
-                <View
+              <View style={{ paddingBottom: L.SIDEBAR_CONVERSATIONS_SECTIONS_TO_LIST_GAP_Y, zIndex: 1 }}>
+                {/* ── FAVORITOS ── */}
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  hitSlop={6}
+                  onPress={() => onTab('favorites')}
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
                     marginLeft: L.SIDEBAR_FAVORITES_OFFSET_X,
                     marginTop: L.SIDEBAR_FAVORITES_OFFSET_Y,
                     marginBottom: L.SIDEBAR_CONVERSATIONS_SECTION_GAP_Y,
+                    transform: [{ scale: L.SIDEBAR_FAVORITES_SCALE }],
                   }}
                 >
                   <View
@@ -294,39 +308,39 @@ export function SidebarConversationsPanel({
                       style={{
                         width: L.FAVORITES_ICON_BASE_SIZE,
                         height: L.FAVORITES_ICON_BASE_SIZE,
+                        tintColor: activeTab === 'favorites' ? folderColors.secondary : undefined,
                       }}
                       resizeMode="contain"
                     />
                   </View>
-                  <TouchableOpacity
-                    style={{
-                      marginLeft: L.FAVORITES_ICON_TEXT_GAP_X,
-                      transform: [{ scale: L.SIDEBAR_FAVORITES_SCALE }],
-                    }}
-                    onPress={() => onTab('favorites')}
-                    hitSlop={6}
+                  <Text
+                    style={[
+                      styles.sectionLabel,
+                      sectionHeaderText,
+                      {
+                        marginLeft: L.FAVORITES_ICON_TEXT_GAP_X,
+                        fontSize: L.SIDEBAR_FAVORITES_FONT_SIZE,
+                        letterSpacing: L.SIDEBAR_FAVORITES_LETTER_SPACING,
+                        color: activeTab === 'favorites' ? folderColors.secondary : '#FFFFFF',
+                      },
+                    ]}
                   >
-                    <Text
-                      style={[
-                        styles.sectionLabel,
-                        sectionHeaderText,
-                        {
-                          fontSize: L.SIDEBAR_FAVORITES_FONT_SIZE,
-                          letterSpacing: L.SIDEBAR_FAVORITES_LETTER_SPACING,
-                        },
-                      ]}
-                    >
-                      FAVORITOS
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-                <View
+                    FAVORITOS
+                  </Text>
+                </TouchableOpacity>
+
+                {/* ── CARPETAS ── */}
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  hitSlop={6}
+                  onPress={() => onTab('folders')}
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
                     marginLeft: L.SIDEBAR_FOLDERS_OFFSET_X,
                     marginTop: L.SIDEBAR_FOLDERS_OFFSET_Y,
                     marginBottom: L.SIDEBAR_CONVERSATIONS_SECTION_GAP_Y,
+                    transform: [{ scale: L.SIDEBAR_FOLDERS_SCALE }],
                   }}
                 >
                   <View
@@ -341,38 +355,38 @@ export function SidebarConversationsPanel({
                       style={{
                         width: L.FOLDERS_ICON_BASE_SIZE,
                         height: L.FOLDERS_ICON_BASE_SIZE,
+                        tintColor: activeTab === 'folders' ? folderColors.primary : undefined,
                       }}
                       resizeMode="contain"
                     />
                   </View>
-                  <TouchableOpacity
-                    style={{
-                      marginLeft: L.FOLDERS_ICON_TEXT_GAP_X,
-                      transform: [{ scale: L.SIDEBAR_FOLDERS_SCALE }],
-                    }}
-                    onPress={() => onTab('folders')}
-                    hitSlop={6}
+                  <Text
+                    style={[
+                      styles.sectionLabel,
+                      sectionHeaderText,
+                      {
+                        marginLeft: L.FOLDERS_ICON_TEXT_GAP_X,
+                        fontSize: L.SIDEBAR_FOLDERS_FONT_SIZE,
+                        letterSpacing: L.SIDEBAR_FOLDERS_LETTER_SPACING,
+                        color: activeTab === 'folders' ? folderColors.primary : '#FFFFFF',
+                      },
+                    ]}
                   >
-                    <Text
-                      style={[
-                        styles.sectionLabel,
-                        sectionHeaderText,
-                        {
-                          fontSize: L.SIDEBAR_FOLDERS_FONT_SIZE,
-                          letterSpacing: L.SIDEBAR_FOLDERS_LETTER_SPACING,
-                        },
-                      ]}
-                    >
-                      CARPETAS
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-                <View
+                    CARPETAS
+                  </Text>
+                </TouchableOpacity>
+
+                {/* ── PENSAMIENTOS ── */}
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => onTab('thoughts')}
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
                     marginLeft: L.SIDEBAR_THOUGHTS_OFFSET_X,
                     marginTop: L.SIDEBAR_THOUGHTS_OFFSET_Y,
+                    paddingVertical: 6,
+                    transform: [{ scale: L.SIDEBAR_THOUGHTS_SCALE }],
                   }}
                 >
                   <View
@@ -391,28 +405,21 @@ export function SidebarConversationsPanel({
                       resizeMode="contain"
                     />
                   </View>
-                  <TouchableOpacity
-                    style={{
-                      marginLeft: L.THOUGHTS_ICON_TEXT_GAP_X,
-                      transform: [{ scale: L.SIDEBAR_THOUGHTS_SCALE }],
-                    }}
-                    onPress={() => onTab('thoughts')}
-                    hitSlop={6}
+                  <Text
+                    style={[
+                      styles.sectionLabel,
+                      sectionHeaderText,
+                      {
+                        marginLeft: L.THOUGHTS_ICON_TEXT_GAP_X,
+                        fontSize: L.SIDEBAR_THOUGHTS_FONT_SIZE,
+                        letterSpacing: L.SIDEBAR_THOUGHTS_LETTER_SPACING,
+                        color: activeTab === 'thoughts' ? folderColors.tertiary : '#FFFFFF',
+                      },
+                    ]}
                   >
-                    <Text
-                      style={[
-                        styles.sectionLabel,
-                        sectionHeaderText,
-                        {
-                          fontSize: L.SIDEBAR_THOUGHTS_FONT_SIZE,
-                          letterSpacing: L.SIDEBAR_THOUGHTS_LETTER_SPACING,
-                        },
-                      ]}
-                    >
-                      PENSAMIENTOS
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                    PENSAMIENTOS
+                  </Text>
+                </TouchableOpacity>
               </View>
             ) : (
               <View
@@ -439,35 +446,34 @@ export function SidebarConversationsPanel({
               keyboardShouldPersistTaps="always"
               keyboardDismissMode="on-drag"
             >
-              {activeTab === 'folders' && !q && !foldersBrowseId
-                ? folders.map((f) => (
-                    <TouchableOpacity
-                      key={f.id}
-                      style={[
-                        styles.folderRow,
-                        {
-                          marginBottom: L.SIDEBAR_CONVERSATIONS_ITEM_GAP_Y,
-                          minHeight: rowH,
-                        },
-                      ]}
-                      onPress={() => setFoldersBrowseId(f.id)}
-                    >
-                      <Text style={styles.folderIcon}>📁</Text>
-                      <Text style={[styles.rowTitle, { fontSize: L.SIDEBAR_CONVERSATIONS_ITEM_TEXT_FONT_SIZE }]}>
-                        {f.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))
-                : null}
+              {activeTab === 'folders' && !q && !foldersBrowseId ? (
+                <View
+                  style={{
+                    paddingLeft: FIL.listPaddingLeft,
+                    transform: [
+                      { translateX: FIL.listOffsetX },
+                      { translateY: FIL.listOffsetY },
+                    ],
+                  }}
+                >
+                  {folders.map((f) => (
+                    <View key={f.id} style={{ marginBottom: FIL.rowGap }}>
+                      <SidebarFolderItem
+                        name={f.name}
+                        titleColor={folderColors.primary}
+                        onPress={() => setFoldersBrowseId(f.id)}
+                      />
+                    </View>
+                  ))}
+                </View>
+              ) : null}
 
               {activeTab === 'folders' && !q && foldersBrowseId ? (
-                <TouchableOpacity
-                  style={{ marginBottom: 8 }}
-                  onPress={() => setFoldersBrowseId(null)}
-                  hitSlop={8}
-                >
-                  <Text style={styles.backLink}>← Carpetas</Text>
-                </TouchableOpacity>
+                <SidebarFolderViewHeader
+                  folderName={browsedFolderName}
+                  primaryColor={folderColors.primary}
+                  onBack={() => setFoldersBrowseId(null)}
+                />
               ) : null}
 
               {(q || activeTab !== 'folders' || foldersBrowseId) &&
@@ -610,11 +616,7 @@ const styles = StyleSheet.create({
   sectionLabel: { textTransform: 'uppercase' },
   searchHint: { color: '#9CA3AF', fontSize: 11, fontWeight: '600' },
   scroll: { flex: 1, minHeight: 0, marginTop: 0 },
-  /** Color base para carpetas; los títulos de conversación lo sobrescriben con el layout. */
   rowTitle: { fontWeight: '600', color: '#F3F4F6' },
-  folderRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  folderIcon: { fontSize: 16 },
-  backLink: { color: '#A78BFA', fontSize: 12, fontWeight: '600' },
   convRow: {
     flexDirection: 'row',
     alignSelf: 'stretch',
