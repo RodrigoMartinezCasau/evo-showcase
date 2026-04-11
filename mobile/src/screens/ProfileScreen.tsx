@@ -1,15 +1,39 @@
-import React from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import React, { useCallback, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { mockCurrentUser, mockUserStats } from '@evoconn/data/mockUser';
-import { AppTopBar, RankBadge, ClanBanner } from '@evoconn/components';
+import { getOtherUserProfileOrFallback } from '@evoconn/data/mockOtherUsers';
+import { AppTopBar, RankBadge, ClanBanner, BottomCommunityTabs } from '@evoconn/components';
 import { getClanCardColor } from '@evoconn/theme/theme';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
+import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
+import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
+import {
+  ProfileFollowButton,
+  UserFollowStats,
+  UserIdentityHeader,
+  UserInsigniaPhrase,
+  PhilosophyPercentagesPanel,
+  UserTotalsStats,
+  RecentPostsSlider,
+} from '@evoconn/components/otherProfile';
+import type { CommunityPost } from '@evoconn/types';
 
 export default function ProfileScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
+  const router = useRouter();
   const isOwn = !id || id === mockCurrentUser.id;
+
+  if (isOwn) {
+    return <OwnProfileView />;
+  }
+
+  return <OtherUserProfileView userId={id} router={router} />;
+}
+
+function OwnProfileView() {
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const user = { ...mockCurrentUser, clanId: activeClan };
   const stats = mockUserStats;
@@ -59,6 +83,91 @@ export default function ProfileScreen() {
   );
 }
 
+function OtherUserProfileView({ userId, router }: { userId: string; router: ReturnType<typeof useRouter> }) {
+  const profile = getOtherUserProfileOrFallback(userId);
+  const insets = useSafeAreaInsets();
+  const { height: screenH } = useWindowDimensions();
+  const [bottomTab] = useState<'siguiendo' | 'mas-votadas' | 'para-ti' | 'search'>('para-ti');
+
+  const topBarHeight = 60 + insets.top;
+  const bottomBarHeight =
+    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
+    insets.bottom +
+    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
+    20;
+  const contentHeight = screenH - topBarHeight - bottomBarHeight;
+
+  const handlePostPress = useCallback(
+    (post: CommunityPost) => {
+      router.push({ pathname: '/post/[id]', params: { id: post.id } });
+    },
+    [router],
+  );
+
+  const handleBottomTabChange = useCallback(
+    (tab: string) => {
+      router.replace('/(tabs)');
+    },
+    [router],
+  );
+
+  return (
+    <View style={styles.container}>
+      <AppTopBar onMenuPress={() => {}} onClanPress={() => {}} />
+
+      <View style={[styles.otherProfileWrap, { height: contentHeight }]}>
+        <ReflectionBackground clan={profile.clanId}>
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.otherContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <ProfileFollowButton userId={profile.id} clanId={profile.clanId} />
+
+            <UserFollowStats
+              followersCount={profile.followersCount}
+              followingCount={profile.followingCount}
+            />
+
+            <UserIdentityHeader
+              username={profile.username}
+              clanId={profile.clanId}
+              rank={profile.rank}
+            />
+
+            <UserInsigniaPhrase phrase={profile.insigniaPhrase} />
+
+            <PhilosophyPercentagesPanel percentages={profile.philosophyPercentages} />
+
+            <UserTotalsStats
+              totalReflections={profile.totalReflections}
+              totalQuotes={profile.totalQuotes}
+            />
+
+            <RecentPostsSlider posts={profile.recentPosts} onPostPress={handlePostPress} />
+
+            <View style={styles.bottomSpacer} />
+          </ScrollView>
+        </ReflectionBackground>
+      </View>
+
+      <View
+        style={[
+          styles.bottomTabsWrap,
+          {
+            paddingBottom: insets.bottom + BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION,
+            paddingHorizontal: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HORIZONTAL_PADDING,
+            bottom: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_BOTTOM_OFFSET,
+            borderRadius: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_BORDER_RADIUS,
+          },
+        ]}
+      >
+        <BottomCommunityTabs activeTab={bottomTab} onTabChange={handleBottomTabChange} />
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: evoconnColors.background },
   scroll: { flex: 1 },
@@ -77,4 +186,25 @@ const styles = StyleSheet.create({
   parchment: { borderWidth: 2, padding: 16, borderRadius: 12 },
   parchmentTitle: { color: evoconnColors.text, fontWeight: '700', marginBottom: 8 },
   parchmentBody: { color: evoconnColors.muted, fontSize: 14 },
+
+  otherProfileWrap: {
+    overflow: 'hidden',
+  },
+  otherContent: {
+    paddingTop: 24,
+    paddingBottom: 48,
+    gap: 20,
+  },
+  bottomSpacer: {
+    height: 20,
+  },
+  bottomTabsWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: evoconnColors.background,
+    borderTopWidth: 1,
+    borderTopColor: evoconnColors.background,
+  },
 });
