@@ -199,6 +199,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     } else {
       panelLastTap.current = now;
       panelSingleTapTimer.current = setTimeout(() => {
+        if (!isLongTextRef.current) return;
         const next = !readingModeRef.current;
         readingModeRef.current = next;
         setReadingMode(next);
@@ -265,7 +266,42 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   const readMoreSpace = 22;
   const bodyAvailableH = reflectionH - RP.paddingVertical * 2 - titleOccupied - readMoreSpace;
   const maxBodyLines = Math.max(2, Math.floor(bodyAvailableH / BODY_LINE_HEIGHT));
-  const isLongText = !isPhrase && post.body.length > maxBodyLines * 32;
+
+  const [isLongText, setIsLongText] = useState(false);
+  const isLongTextRef = useRef(false);
+
+  useEffect(() => {
+    setIsLongText(false);
+    isLongTextRef.current = false;
+    reflectionScrollLayoutH.current = 0;
+    reflectionContentH.current = 0;
+    readingModeRef.current = false;
+    setReadingMode(false);
+    onReadingModeChange?.(false);
+  }, [post.id, onReadingModeChange]);
+
+  const reflectionScrollLayoutH = useRef(0);
+  const reflectionContentH = useRef(0);
+
+  const checkOverflow = useCallback(() => {
+    if (isLongTextRef.current) return;
+    const containerH = reflectionScrollLayoutH.current;
+    const contentH = reflectionContentH.current;
+    if (containerH > 0 && contentH > containerH + 1) {
+      isLongTextRef.current = true;
+      setIsLongText(true);
+    }
+  }, []);
+
+  const handleReflectionScrollLayout = useCallback((e: any) => {
+    reflectionScrollLayoutH.current = e.nativeEvent.layout.height;
+    checkOverflow();
+  }, [checkOverflow]);
+
+  const handleReflectionContentSize = useCallback((_w: number, h: number) => {
+    reflectionContentH.current = h;
+    checkOverflow();
+  }, [checkOverflow]);
 
   const visibleComments = useMemo(
     () => localComments.filter((c) => !blockedUsers.has(c.author.id)),
@@ -331,7 +367,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   }, [kbOffset]);
 
   return (
-    <View style={[styles.container, { height: itemHeight }]} onStartShouldSetResponder={() => true} onResponderRelease={dismissKeyboard}>
+    <View style={[styles.container, { height: itemHeight }]} onStartShouldSetResponder={() => !readingMode} onResponderRelease={dismissKeyboard}>
       <ReflectionBackground clan={post.author.clanId}>
         <View style={styles.content}>
           {/* ── Header ── */}
@@ -372,10 +408,11 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
             ]}
           >
             {isPhrase ? (
-              <View
-                style={[
+              <ScrollView
+                contentContainerStyle={[
                   styles.quoteCenter,
                   {
+                    flexGrow: 1,
                     paddingLeft: QL.maxWidthReductionLeft,
                     paddingRight: QL.maxWidthReductionRight,
                     transform: [
@@ -384,6 +421,8 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                     ],
                   },
                 ]}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled
               >
                 <Text
                   style={[
@@ -409,14 +448,18 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                     {post.quoteAuthor}
                   </Text>
                 ) : null}
-              </View>
+              </ScrollView>
             ) : (
               <ScrollView
                 scrollEnabled={readingMode && isLongText}
-                showsVerticalScrollIndicator={readingMode}
+                showsVerticalScrollIndicator={readingMode && isLongText}
                 nestedScrollEnabled
+                bounces={readingMode && isLongText}
                 keyboardShouldPersistTaps="handled"
+                style={styles.reflectionScroll}
                 contentContainerStyle={{ paddingRight: REFLECTION_TEXT_RIGHT_INSET }}
+                onLayout={handleReflectionScrollLayout}
+                onContentSizeChange={handleReflectionContentSize}
               >
                 {post.title ? (
                   <Text
@@ -444,7 +487,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                   {post.body}
                 </Text>
                 {!readingMode && isLongText ? (
-                  <Text style={styles.readMoreLabel}>ver más...</Text>
+                  <Text style={styles.readMoreLabel}>Ver más...</Text>
                 ) : null}
               </ScrollView>
             )}
@@ -575,6 +618,9 @@ const styles = StyleSheet.create({
   reflectionPanel: {
     borderLeftWidth: 4,
     overflow: 'hidden',
+  },
+  reflectionScroll: {
+    flex: 1,
   },
   title: {
     color: evoconnColors.text,
