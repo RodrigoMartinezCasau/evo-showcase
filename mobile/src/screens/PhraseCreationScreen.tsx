@@ -1,11 +1,15 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Keyboard, Alert } from 'react-native';
+import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AppTopBar, ChatInputBar, SidebarDrawer } from '@evoconn/components';
 import { PublishBlock, PhraseNotesCard, PhraseFolderManagerCard } from '@evoconn/components/debate';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useConversationFolders } from '@evoconn/hooks/ConversationFoldersContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
+import { COMMUNITY_DRAWER_EDGE_ZONE_WIDTH } from '@evoconn/constants/communityDrawerGesture';
+import { useSidebarGesture } from '@evoconn/hooks/useSidebarGesture';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { getChatSendButtonByHouse } from '@evoconn/utils/getChatSendButtonByHouse';
@@ -79,7 +83,11 @@ export default function PhraseCreationScreen() {
   );
   const PublishStar = useMemo(() => getPublishStarByClan(activeClan), [activeClan]);
 
+  const insets = useSafeAreaInsets();
+  const topBarHeight = 60 + insets.top;
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { drawerOpenProgress, edgeOpenGesture } = useSidebarGesture(sidebarOpen, setSidebarOpen);
   const [messages, setMessages] = useState<DebateMessage[]>([]);
   const [loadingThread, setLoadingThread] = useState(!!phraseId);
   const [sending, setSending] = useState(false);
@@ -295,6 +303,7 @@ export default function PhraseCreationScreen() {
   const effectiveThreadId = phraseId;
 
   return (
+    <GestureHandlerRootView style={styles.gestureRoot}>
     <View style={styles.container}>
       <AppTopBar onMenuPress={() => setSidebarOpen(true)} showClanIcon={true} />
 
@@ -401,6 +410,17 @@ export default function PhraseCreationScreen() {
         contentAboveBar={emptyPhraseWelcome}
       />
 
+      {!sidebarOpen ? (
+        <GestureDetector gesture={edgeOpenGesture}>
+          <View
+            style={[
+              styles.edgeHitStrip,
+              { top: topBarHeight, width: COMMUNITY_DRAWER_EDGE_ZONE_WIDTH },
+            ]}
+          />
+        </GestureDetector>
+      ) : null}
+
       <SidebarDrawer
         visible={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
@@ -414,14 +434,18 @@ export default function PhraseCreationScreen() {
             router.replace({ pathname: '/reflection', params: { thoughtId: id } });
           }
         }}
+        openProgress={drawerOpenProgress}
       />
     </View>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
+  gestureRoot: { flex: 1 },
   container: { flex: 1, backgroundColor: evoconnColors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  edgeHitStrip: { position: 'absolute', left: 0, bottom: 0, zIndex: 250 },
   loadingText: { color: evoconnColors.muted, marginTop: 12, fontSize: 14 },
   scroll: { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 24 },

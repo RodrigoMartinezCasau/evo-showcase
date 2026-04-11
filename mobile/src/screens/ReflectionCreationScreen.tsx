@@ -20,7 +20,9 @@ import {
   ActivityIndicator,
   Keyboard,
 } from 'react-native';
+import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppTopBar, ChatInputBar, SidebarDrawer } from '@evoconn/components';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
@@ -42,6 +44,8 @@ import { EMPTY_WELCOME_TRIPLE_STARS_LAYOUT as EMPTY_WELCOME_TRIPLE_STARS } from 
 import { getReflectionTripleStarsByHouse } from '@evoconn/utils/getReflectionTripleStarsByHouse';
 import { DebateResponseDisplay } from '@evoconn/components/debate';
 import { useFeedStore, createReflectionPost } from '@evoconn/hooks/useFeedStore';
+import { COMMUNITY_DRAWER_EDGE_ZONE_WIDTH } from '@evoconn/constants/communityDrawerGesture';
+import { useSidebarGesture } from '@evoconn/hooks/useSidebarGesture';
 
 const TYPEWRITER_CHUNK = 3;
 const TYPEWRITER_MS = 15;
@@ -80,7 +84,11 @@ export default function ReflectionCreationScreen() {
     [publishPost],
   );
 
+  const insets = useSafeAreaInsets();
+  const topBarHeight = 60 + insets.top;
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { drawerOpenProgress, edgeOpenGesture } = useSidebarGesture(sidebarOpen, setSidebarOpen);
   const [messages, setMessages] = useState<ChatBubble[]>([]);
   const [debateId, setDebateId] = useState<string | null>(thoughtId ?? null);
   const [sending, setSending] = useState(false);
@@ -282,6 +290,7 @@ export default function ReflectionCreationScreen() {
   }, [showEmptyReflectionWelcome, activeClan]);
 
   return (
+    <GestureHandlerRootView style={styles.gestureRoot}>
     <View style={styles.container}>
       <AppTopBar onMenuPress={() => setSidebarOpen(true)} showClanIcon={true} />
 
@@ -340,6 +349,17 @@ export default function ReflectionCreationScreen() {
         contentAboveBar={emptyReflectionWelcome}
       />
 
+      {!sidebarOpen ? (
+        <GestureDetector gesture={edgeOpenGesture}>
+          <View
+            style={[
+              styles.edgeHitStrip,
+              { top: topBarHeight, width: COMMUNITY_DRAWER_EDGE_ZONE_WIDTH },
+            ]}
+          />
+        </GestureDetector>
+      ) : null}
+
       <SidebarDrawer
         visible={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
@@ -348,8 +368,10 @@ export default function ReflectionCreationScreen() {
           setSidebarOpen(false);
           router.replace({ pathname: '/reflection', params: { thoughtId: id } });
         }}
+        openProgress={drawerOpenProgress}
       />
     </View>
+    </GestureHandlerRootView>
   );
 }
 
@@ -420,8 +442,10 @@ const MessageBubble = React.memo(function MessageBubble({
 });
 
 const styles = StyleSheet.create({
+  gestureRoot: { flex: 1 },
   container: { flex: 1, backgroundColor: evoconnColors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  edgeHitStrip: { position: 'absolute', left: 0, bottom: 0, zIndex: 250 },
   loadingText: { color: evoconnColors.muted, marginTop: 12, fontSize: 14 },
   scroll: { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 24 },

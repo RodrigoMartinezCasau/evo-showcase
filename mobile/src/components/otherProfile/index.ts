@@ -6,3 +6,4 @@ export { PhilosophyPercentagesPanel } from './PhilosophyPercentagesPanel';
 export { UserTotalsStats } from './UserTotalsStats';
 export { RecentPostsSlider } from './RecentPostsSlider';
 export { RecentPostCard } from './RecentPostCard';
+export { ProfileRevealPanel } from './ProfileRevealPanel';

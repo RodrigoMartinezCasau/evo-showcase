@@ -29,6 +29,7 @@ import {
 import { ReflectionDetailItem } from '@evoconn/components/ReflectionDetailItem';
 import { SearchScreen } from '@evoconn/components/SearchScreen';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
+import { ProfileRevealPanel } from '@evoconn/components/otherProfile';
 
 type TabId = 'siguiendo' | 'mas-votadas' | 'para-ti' | 'search';
 type FeedMode = 'following' | 'top' | 'foryou';
@@ -68,6 +69,7 @@ function getDataForMode(mode: FeedMode, allPosts: CommunityPost[], followingSet?
 }
 
 const ANIM_DURATION = 200;
+const RIGHT_EDGE_ZONE_WIDTH = 28;
 
 const TAB_INDEX: Record<TabId, number> = {
   'siguiendo': 0,
@@ -331,7 +333,7 @@ export default function CommunityScreen() {
     }
   }, [sidebarOpen, drawerOpenProgress]);
 
-  // ── Edge-swipe gesture callbacks ──────────────────────────────────
+  // ── Edge-swipe gesture callbacks (sidebar — left edge) ────────────
   const setProgressJS = useCallback(
     (p: number) => { drawerOpenProgress.setValue(p); },
     [drawerOpenProgress],
@@ -372,6 +374,144 @@ export default function CommunityScreen() {
         }),
     [sidebarOpen, setProgressJS, commitGestureOpenJS, cancelGestureJS],
   );
+
+  // ── Profile reveal overlay (right edge — left swipe) ──────────────
+  const visibleAuthorIdRef = useRef<string | null>(null);
+  const [visibleAuthorId, setVisibleAuthorId] = useState<string | null>(null);
+  const profileRevealAnim = useRef(new Animated.Value(0)).current;
+  const [profileOverlayActive, setProfileOverlayActive] = useState(false);
+
+  useEffect(() => {
+    if (detailFeed) {
+      const id = detailFeed.data[detailFeed.initialIndex]?.author?.id ?? null;
+      visibleAuthorIdRef.current = id;
+      setVisibleAuthorId(id);
+    } else {
+      visibleAuthorIdRef.current = null;
+      setVisibleAuthorId(null);
+    }
+  }, [detailFeed]);
+
+  const detailViewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
+  const onDetailViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: Array<{ item: CommunityPost }> }) => {
+      if (viewableItems.length > 0 && viewableItems[0].item?.author?.id) {
+        const id = viewableItems[0].item.author.id;
+        visibleAuthorIdRef.current = id;
+        setVisibleAuthorId(id);
+      }
+    },
+  ).current;
+
+  const profileRevealOverlayTranslateX = profileRevealAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [screenW, 0],
+  });
+  const profileRevealDimOpacity = profileRevealAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 0.5],
+  });
+
+  // ── Profile OPEN gesture callbacks (left swipe from right edge) ───
+  const setProfileProgressJS = useCallback(
+    (p: number) => { profileRevealAnim.setValue(p); },
+    [profileRevealAnim],
+  );
+
+  const commitProfileRevealJS = useCallback(() => {
+    Animated.spring(profileRevealAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      friction: 9,
+      tension: 68,
+    }).start(({ finished }) => {
+      if (finished) {
+        setProfileOverlayActive(true);
+      }
+    });
+  }, [profileRevealAnim]);
+
+  const cancelProfileRevealJS = useCallback(() => {
+    Animated.timing(profileRevealAnim, {
+      toValue: 0,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [profileRevealAnim]);
+
+  const profileRevealGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(detailMounted && !sidebarOpen && !profileOverlayActive)
+        .activeOffsetX(-12)
+        .failOffsetY([-32, 32])
+        .onUpdate((e: { translationX: number }) => {
+          const p = Math.min(1, Math.max(0, -e.translationX / COMMUNITY_DRAWER_GESTURE_RANGE_X));
+          runOnJS(setProfileProgressJS)(p);
+        })
+        .onEnd((e: { translationX: number; velocityX: number }) => {
+          const p = Math.min(1, Math.max(0, -e.translationX / COMMUNITY_DRAWER_GESTURE_RANGE_X));
+          const shouldOpen = p > 0.32 || -e.velocityX > 520;
+          if (shouldOpen) {
+            runOnJS(commitProfileRevealJS)();
+          } else {
+            runOnJS(cancelProfileRevealJS)();
+          }
+        }),
+    [detailMounted, sidebarOpen, profileOverlayActive, setProfileProgressJS, commitProfileRevealJS, cancelProfileRevealJS],
+  );
+
+  // ── Profile CLOSE gesture callbacks (right swipe from left edge) ──
+  const commitProfileCloseJS = useCallback(() => {
+    Animated.timing(profileRevealAnim, {
+      toValue: 0,
+      duration: 260,
+      easing: Easing.inOut(Easing.cubic),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) {
+        setProfileOverlayActive(false);
+      }
+    });
+  }, [profileRevealAnim]);
+
+  const cancelProfileCloseJS = useCallback(() => {
+    Animated.spring(profileRevealAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      friction: 9,
+      tension: 68,
+    }).start();
+  }, [profileRevealAnim]);
+
+  const profileCloseGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(profileOverlayActive)
+        .activeOffsetX(12)
+        .failOffsetY([-32, 32])
+        .onUpdate((e: { translationX: number }) => {
+          const p = Math.max(0, Math.min(1, 1 - e.translationX / COMMUNITY_DRAWER_GESTURE_RANGE_X));
+          runOnJS(setProfileProgressJS)(p);
+        })
+        .onEnd((e: { translationX: number; velocityX: number }) => {
+          const progress = Math.max(0, Math.min(1, 1 - e.translationX / COMMUNITY_DRAWER_GESTURE_RANGE_X));
+          const shouldClose = progress < 0.68 || e.velocityX > 520;
+          if (shouldClose) {
+            runOnJS(commitProfileCloseJS)();
+          } else {
+            runOnJS(cancelProfileCloseJS)();
+          }
+        }),
+    [profileOverlayActive, setProfileProgressJS, commitProfileCloseJS, cancelProfileCloseJS],
+  );
+
+  const edgeBottomOffset =
+    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
+    insets.bottom +
+    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
+    8;
 
   return (
     <GestureHandlerRootView style={styles.gestureRoot}>
@@ -460,7 +600,7 @@ export default function CommunityScreen() {
               renderItem={renderFeedItem}
               keyExtractor={(item) => item.id}
               pagingEnabled
-              scrollEnabled={feedScrollEnabled}
+              scrollEnabled={feedScrollEnabled && !profileOverlayActive}
               decelerationRate="fast"
               showsVerticalScrollIndicator={false}
               getItemLayout={getFeedItemLayout}
@@ -470,6 +610,36 @@ export default function CommunityScreen() {
               windowSize={3}
               removeClippedSubviews
               style={styles.panelInner}
+              viewabilityConfig={detailViewabilityConfig}
+              onViewableItemsChanged={onDetailViewableItemsChanged}
+            />
+          </Animated.View>
+        ) : null}
+
+        {/* Dim overlay between detail feed and profile panel */}
+        {detailMounted ? (
+          <Animated.View
+            pointerEvents={profileOverlayActive ? 'auto' : 'none'}
+            style={[
+              styles.panel,
+              { backgroundColor: '#000', opacity: profileRevealDimOpacity },
+            ]}
+          />
+        ) : null}
+
+        {/* Profile overlay panel (slides in from right) */}
+        {detailMounted && visibleAuthorId ? (
+          <Animated.View
+            pointerEvents={profileOverlayActive ? 'auto' : 'none'}
+            style={[
+              styles.panel,
+              styles.panelOverlay,
+              { transform: [{ translateX: profileRevealOverlayTranslateX }] },
+            ]}
+          >
+            <ProfileRevealPanel
+              authorId={visibleAuthorId}
+              contentHeight={feedItemHeight}
             />
           </Animated.View>
         ) : null}
@@ -492,20 +662,37 @@ export default function CommunityScreen() {
         />
       </View>
 
-      {!sidebarOpen ? (
+      {/* Left-edge: sidebar gesture — only when profile overlay is NOT active */}
+      {!sidebarOpen && !profileOverlayActive ? (
         <GestureDetector gesture={edgeOpenGesture}>
           <View
             style={[
               styles.edgeHitStrip,
-              {
-                top: topBarHeight,
-                width: COMMUNITY_DRAWER_EDGE_ZONE_WIDTH,
-                bottom:
-                  BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
-                  insets.bottom +
-                  BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
-                  8,
-              },
+              { top: topBarHeight, width: COMMUNITY_DRAWER_EDGE_ZONE_WIDTH, bottom: edgeBottomOffset },
+            ]}
+          />
+        </GestureDetector>
+      ) : null}
+
+      {/* Left-edge: profile CLOSE gesture — only when profile overlay IS active */}
+      {profileOverlayActive ? (
+        <GestureDetector gesture={profileCloseGesture}>
+          <View
+            style={[
+              styles.profileCloseStrip,
+              { top: topBarHeight, width: COMMUNITY_DRAWER_EDGE_ZONE_WIDTH, bottom: edgeBottomOffset },
+            ]}
+          />
+        </GestureDetector>
+      ) : null}
+
+      {/* Right-edge: profile OPEN gesture — only when detail feed visible and profile NOT active */}
+      {detailMounted && !sidebarOpen && !profileOverlayActive ? (
+        <GestureDetector gesture={profileRevealGesture}>
+          <View
+            style={[
+              styles.rightEdgeHitStrip,
+              { top: topBarHeight, width: RIGHT_EDGE_ZONE_WIDTH, bottom: edgeBottomOffset },
             ]}
           />
         </GestureDetector>
@@ -533,6 +720,16 @@ const styles = StyleSheet.create({
   edgeHitStrip: {
     position: 'absolute',
     left: 0,
+    zIndex: 250,
+  },
+  profileCloseStrip: {
+    position: 'absolute',
+    left: 0,
+    zIndex: 300,
+  },
+  rightEdgeHitStrip: {
+    position: 'absolute',
+    right: 0,
     zIndex: 250,
   },
   contentArea: { overflow: 'hidden' },

@@ -105,9 +105,7 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
   );
 
   const handleBottomTabChange = useCallback(
-    (tab: string) => {
-      router.replace('/(tabs)');
-    },
+    () => { router.replace('/(tabs)'); },
     [router],
   );
 
@@ -123,29 +121,22 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
             showsVerticalScrollIndicator={false}
           >
             <ProfileFollowButton userId={profile.id} clanId={profile.clanId} />
-
             <UserFollowStats
               followersCount={profile.followersCount}
               followingCount={profile.followingCount}
             />
-
             <UserIdentityHeader
               username={profile.username}
               clanId={profile.clanId}
               rank={profile.rank}
             />
-
             <UserInsigniaPhrase phrase={profile.insigniaPhrase} />
-
             <PhilosophyPercentagesPanel percentages={profile.philosophyPercentages} />
-
             <UserTotalsStats
               totalReflections={profile.totalReflections}
               totalQuotes={profile.totalQuotes}
             />
-
             <RecentPostsSlider posts={profile.recentPosts} onPostPress={handlePostPress} />
-
             <View style={styles.bottomSpacer} />
           </ScrollView>
         </ReflectionBackground>
@@ -186,7 +177,6 @@ const styles = StyleSheet.create({
   parchment: { borderWidth: 2, padding: 16, borderRadius: 12 },
   parchmentTitle: { color: evoconnColors.text, fontWeight: '700', marginBottom: 8 },
   parchmentBody: { color: evoconnColors.muted, fontSize: 14 },
-
   otherProfileWrap: {
     overflow: 'hidden',
   },
