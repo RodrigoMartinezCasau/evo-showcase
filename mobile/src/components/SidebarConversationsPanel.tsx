@@ -55,6 +55,8 @@ export function SidebarConversationsPanel({
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [newFolderConvId, setNewFolderConvId] = useState<string | null>(null);
+  const [renameFolderId, setRenameFolderId] = useState<string | null>(null);
+  const [renameFolderText, setRenameFolderText] = useState('');
 
   const frameSource = useMemo(() => getConversationsFrameByHouse(clanId), [clanId]);
   const folderColors = useMemo(() => getSidebarFolderColors(clanId), [clanId]);
@@ -200,6 +202,55 @@ export function SidebarConversationsPanel({
     setNewFolderName('');
     setNewFolderConvId(null);
   }, [newFolderName, newFolderConvId, folders, conversations, onFoldersChange, onConversationsChange]);
+
+  const openFolderEditMenu = useCallback(
+    (folder: { id: string; name: string }) => {
+      Alert.alert(folder.name, undefined, [
+        {
+          text: 'Renombrar carpeta',
+          onPress: () => {
+            setRenameFolderId(folder.id);
+            setRenameFolderText(folder.name);
+          },
+        },
+        {
+          text: 'Eliminar carpeta',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert('Eliminar', `¿Eliminar «${folder.name}»?`, [
+              { text: 'Cancelar', style: 'cancel' },
+              {
+                text: 'Eliminar',
+                style: 'destructive',
+                onPress: () => {
+                  onFoldersChange(folders.filter((f) => f.id !== folder.id));
+                  onConversationsChange(
+                    conversations.map((c) =>
+                      c.folderId === folder.id ? { ...c, folderId: null } : c
+                    )
+                  );
+                  if (foldersBrowseId === folder.id) setFoldersBrowseId(null);
+                },
+              },
+            ]);
+          },
+        },
+        { text: 'Cancelar', style: 'cancel' },
+      ]);
+    },
+    [folders, conversations, foldersBrowseId, onFoldersChange, onConversationsChange]
+  );
+
+  const applyFolderRename = useCallback(() => {
+    if (!renameFolderId) return;
+    const t = renameFolderText.trim().slice(0, 60);
+    if (!t) return;
+    onFoldersChange(
+      folders.map((f) => (f.id === renameFolderId ? { ...f, name: t } : f))
+    );
+    setRenameFolderId(null);
+    setRenameFolderText('');
+  }, [renameFolderId, renameFolderText, folders, onFoldersChange]);
 
   const sectionHeaderText = { color: '#FFFFFF' as const, fontWeight: '700' as const };
 
@@ -464,6 +515,8 @@ export function SidebarConversationsPanel({
               {activeTab === 'folders' && !q && !foldersBrowseId ? (
                 <View
                   style={{
+                    alignSelf: 'stretch',
+                    width: '100%',
                     paddingLeft: FIL.listPaddingLeft,
                     transform: [
                       { translateX: FIL.listOffsetX },
@@ -477,6 +530,7 @@ export function SidebarConversationsPanel({
                         name={f.name}
                         titleColor={folderColors.primary}
                         onPress={() => setFoldersBrowseId(f.id)}
+                        onPencilPress={() => openFolderEditMenu(f)}
                       />
                     </View>
                   ))}
@@ -618,6 +672,30 @@ export function SidebarConversationsPanel({
               </TouchableOpacity>
               <TouchableOpacity onPress={createFolderAndAssign}>
                 <Text style={[styles.modalBtn, styles.modalBtnPrimary]}>Crear</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal visible={renameFolderId != null} transparent animationType="fade">
+        <Pressable style={styles.modalBackdrop} onPress={() => setRenameFolderId(null)}>
+          <Pressable style={styles.modalBox} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.modalTitle}>Renombrar carpeta</Text>
+            <TextInput
+              value={renameFolderText}
+              onChangeText={setRenameFolderText}
+              style={styles.modalInput}
+              autoFocus
+              placeholder="Nombre"
+              placeholderTextColor="#6B7280"
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity onPress={() => setRenameFolderId(null)}>
+                <Text style={styles.modalBtn}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={applyFolderRename}>
+                <Text style={[styles.modalBtn, styles.modalBtnPrimary]}>Guardar</Text>
               </TouchableOpacity>
             </View>
           </Pressable>

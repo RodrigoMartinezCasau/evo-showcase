@@ -13,7 +13,7 @@ export const SIDEBAR_FOLDER_ITEM_LAYOUT = {
   rowGap: 8,
 
   /** Desplazamiento de cada fila individual. */
-  rowOffsetX: 0,
+  rowOffsetX: -5,
   rowOffsetY: 0,
 
   /** Título de la carpeta. */
@@ -21,4 +21,11 @@ export const SIDEBAR_FOLDER_ITEM_LAYOUT = {
   titleOffsetY: 0,
   titleFontSize: 11,
   titleLineHeight: 0,
+
+  /** Icono de edición (lápiz) a la derecha del título. */
+  pencilSize: 14,
+  pencilGapLeft: 6,
+  pencilOffsetX: -35,
+  pencilOffsetY: 0,
+  pencilColor: '#D1D5DB',
 } as const;
