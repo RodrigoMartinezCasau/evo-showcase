@@ -1,5 +1,5 @@
-import React, { useCallback, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import React, { useCallback, useState, useRef } from 'react';
+import { View, Text, ScrollView, StyleSheet, Animated, Easing, useWindowDimensions } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
@@ -18,7 +18,10 @@ import {
   UserTotalsStats,
   RecentPostsSlider,
 } from '@evoconn/components/otherProfile';
+import { ProfileDetailPanel } from '@evoconn/components/ProfileDetailPanel';
 import type { CommunityPost } from '@evoconn/types';
+
+const ANIM_DURATION = 200;
 
 export default function ProfileScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -85,7 +88,7 @@ function OwnProfileView() {
 function OtherUserProfileView({ userId, router }: { userId: string; router: ReturnType<typeof useRouter> }) {
   const profile = getOtherUserProfileOrFallback(userId);
   const insets = useSafeAreaInsets();
-  const { height: screenH } = useWindowDimensions();
+  const { width: screenW, height: screenH } = useWindowDimensions();
   const [bottomTab] = useState<'siguiendo' | 'mas-votadas' | 'para-ti' | 'search'>('para-ti');
 
   const topBarHeight = 60 + insets.top;
@@ -96,17 +99,76 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
     20;
   const contentHeight = screenH - topBarHeight - bottomBarHeight;
 
+  // ─── Expanded post detail panel ────────────────────────────────────
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const [detailFeed, setDetailFeed] = useState<{
+    data: CommunityPost[];
+    initialIndex: number;
+  } | null>(null);
+
+  const openDetailFeed = useCallback(
+    (posts: CommunityPost[], postId: string) => {
+      const idx = posts.findIndex((p) => p.id === postId);
+      setDetailFeed({ data: posts, initialIndex: idx >= 0 ? idx : 0 });
+      slideAnim.setValue(0);
+      requestAnimationFrame(() => {
+        Animated.timing(slideAnim, {
+          toValue: 1,
+          duration: ANIM_DURATION,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }).start();
+      });
+    },
+    [slideAnim],
+  );
+
+  const closeDetailFeed = useCallback(() => {
+    Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: ANIM_DURATION,
+      easing: Easing.inOut(Easing.cubic),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) setDetailFeed(null);
+    });
+  }, [slideAnim]);
+
   const handlePostPress = useCallback(
     (post: CommunityPost) => {
-      router.push({ pathname: '/post/[id]', params: { id: post.id } });
+      openDetailFeed(profile.recentPosts, post.id);
+    },
+    [openDetailFeed, profile.recentPosts],
+  );
+
+  const handleDetailAuthorPress = useCallback(
+    (authorId: string) => {
+      if (authorId === mockCurrentUser.id) {
+        router.push('/my-profile');
+      } else if (authorId === profile.id) {
+        // Already viewing this user's profile — close the panel
+        closeDetailFeed();
+      } else {
+        router.push({ pathname: '/profile/[id]', params: { id: authorId } });
+      }
+    },
+    [closeDetailFeed, profile.id, router],
+  );
+
+  const handleDetailClanPress = useCallback(
+    (clanId: string) => {
+      router.push({ pathname: '/clan/[id]', params: { id: clanId } });
     },
     [router],
   );
 
-  const handleBottomTabChange = useCallback(
-    () => { router.replace('/(tabs)'); },
-    [router],
-  );
+  const handleBottomTabChange = useCallback(() => {
+    if (detailFeed) {
+      closeDetailFeed();
+      return;
+    }
+    router.replace('/(tabs)');
+  }, [detailFeed, closeDetailFeed, router]);
 
   return (
     <View style={styles.container}>
@@ -141,6 +203,20 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
             <View style={styles.bottomSpacer} />
           </ScrollView>
         </ReflectionBackground>
+
+        {/* Expanded post viewer — slides in over profile content */}
+        {detailFeed !== null && (
+          <ProfileDetailPanel
+            data={detailFeed.data}
+            initialIndex={detailFeed.initialIndex}
+            itemHeight={contentHeight}
+            slideAnim={slideAnim}
+            screenW={screenW}
+            onClose={closeDetailFeed}
+            onAuthorPress={handleDetailAuthorPress}
+            onClanPress={handleDetailClanPress}
+          />
+        )}
       </View>
 
       <View

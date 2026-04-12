@@ -1,5 +1,5 @@
-import React, { useCallback, useState } from 'react';
-import { View, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import React, { useCallback, useState, useRef } from 'react';
+import { View, ScrollView, StyleSheet, Animated, Easing, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
@@ -18,12 +18,15 @@ import {
   PersonalRecentPostsSlider,
   PersonalBottomBlocks,
 } from '@evoconn/components/personalProfile';
+import { ProfileDetailPanel } from '@evoconn/components/ProfileDetailPanel';
 import type { CommunityPost } from '@evoconn/types';
+
+const ANIM_DURATION = 200;
 
 export default function PersonalProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { height: screenH } = useWindowDimensions();
+  const { width: screenW, height: screenH } = useWindowDimensions();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const [bottomTab] = useState<'siguiendo' | 'mas-votadas' | 'para-ti' | 'search'>('para-ti');
 
@@ -38,17 +41,81 @@ export default function PersonalProfileScreen() {
     20;
   const contentHeight = screenH - topBarHeight - bottomBarHeight;
 
-  const handlePostPress = useCallback(
+  // ─── Expanded post detail panel ────────────────────────────────────
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const [detailFeed, setDetailFeed] = useState<{
+    data: CommunityPost[];
+    initialIndex: number;
+  } | null>(null);
+
+  const openDetailFeed = useCallback(
+    (posts: CommunityPost[], postId: string) => {
+      const idx = posts.findIndex((p) => p.id === postId);
+      setDetailFeed({ data: posts, initialIndex: idx >= 0 ? idx : 0 });
+      slideAnim.setValue(0);
+      requestAnimationFrame(() => {
+        Animated.timing(slideAnim, {
+          toValue: 1,
+          duration: ANIM_DURATION,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }).start();
+      });
+    },
+    [slideAnim],
+  );
+
+  const closeDetailFeed = useCallback(() => {
+    Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: ANIM_DURATION,
+      easing: Easing.inOut(Easing.cubic),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) setDetailFeed(null);
+    });
+  }, [slideAnim]);
+
+  const handleRecentPostPress = useCallback(
     (post: CommunityPost) => {
-      router.push({ pathname: '/post/[id]', params: { id: post.id } });
+      openDetailFeed(profile.recentPosts, post.id);
+    },
+    [openDetailFeed, profile.recentPosts],
+  );
+
+  const handleSavedPostPress = useCallback(
+    (post: CommunityPost) => {
+      openDetailFeed(profile.savedPosts, post.id);
+    },
+    [openDetailFeed, profile.savedPosts],
+  );
+
+  const handleDetailAuthorPress = useCallback(
+    (userId: string) => {
+      if (userId === mockCurrentUser.id) {
+        // Already on personal profile — just close the panel
+        closeDetailFeed();
+      } else {
+        router.push({ pathname: '/profile/[id]', params: { id: userId } });
+      }
+    },
+    [closeDetailFeed, router],
+  );
+
+  const handleDetailClanPress = useCallback(
+    (clanId: string) => {
+      router.push({ pathname: '/clan/[id]', params: { id: clanId } });
     },
     [router],
   );
 
-  const handleBottomTabChange = useCallback(
-    () => { router.replace('/(tabs)'); },
-    [router],
-  );
+  const handleBottomTabChange = useCallback(() => {
+    if (detailFeed) {
+      closeDetailFeed();
+      return;
+    }
+    router.replace('/(tabs)');
+  }, [detailFeed, closeDetailFeed, router]);
 
   return (
     <View style={styles.container}>
@@ -78,16 +145,30 @@ export default function PersonalProfileScreen() {
             <PersonalInsigniaPhrase phrase={profileWithClan.insigniaPhrase} />
             <PersonalRankProgression rank={profileWithClan.rank} />
             <PersonalPhilosophyPanel percentages={profileWithClan.philosophyPercentages} />
-            <PersonalRecentPostsSlider posts={profileWithClan.recentPosts} onPostPress={handlePostPress} />
+            <PersonalRecentPostsSlider posts={profileWithClan.recentPosts} onPostPress={handleRecentPostPress} />
             <PersonalBottomBlocks
               clanId={profileWithClan.clanId}
               friends={profileWithClan.friends}
               savedPosts={profileWithClan.savedPosts}
-              onSavedPostPress={handlePostPress}
+              onSavedPostPress={handleSavedPostPress}
             />
             <View style={styles.bottomSpacer} />
           </ScrollView>
         </ReflectionBackground>
+
+        {/* Expanded post viewer — slides in over profile content */}
+        {detailFeed !== null && (
+          <ProfileDetailPanel
+            data={detailFeed.data}
+            initialIndex={detailFeed.initialIndex}
+            itemHeight={contentHeight}
+            slideAnim={slideAnim}
+            screenW={screenW}
+            onClose={closeDetailFeed}
+            onAuthorPress={handleDetailAuthorPress}
+            onClanPress={handleDetailClanPress}
+          />
+        )}
       </View>
 
       <View
