@@ -5,7 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { getPersonalProfile } from '@evoconn/data/mockPersonalProfile';
-import { AppTopBar, BottomCommunityTabs } from '@evoconn/components';
+import { AppTopBar, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
+import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
 import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
@@ -29,6 +30,8 @@ export default function PersonalProfileScreen() {
   const { width: screenW, height: screenH } = useWindowDimensions();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const [bottomTab] = useState<'siguiendo' | 'mas-votadas' | 'para-ti' | 'search'>('para-ti');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { thoughts } = useThoughts();
 
   const profile = getPersonalProfile();
   const profileWithClan = { ...profile, clanId: activeClan };
@@ -119,7 +122,10 @@ export default function PersonalProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <AppTopBar onMenuPress={() => {}} onClanPress={() => {}} />
+      <AppTopBar
+        onMenuPress={() => setSidebarOpen(true)}
+        onClanPress={() => {/* already on personal profile */}}
+      />
 
       <View style={[styles.profileWrap, { height: contentHeight }]}>
         <ReflectionBackground clan={profileWithClan.clanId}>
@@ -184,6 +190,16 @@ export default function PersonalProfileScreen() {
       >
         <BottomCommunityTabs activeTab={bottomTab} onTabChange={handleBottomTabChange} />
       </View>
+
+      <SidebarDrawer
+        visible={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        conversations={thoughts}
+        onConversationPress={(id) => {
+          setSidebarOpen(false);
+          router.push({ pathname: '/reflection', params: { thoughtId: id } });
+        }}
+      />
     </View>
   );
 }

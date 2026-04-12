@@ -5,7 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { mockCurrentUser, mockUserStats } from '@evoconn/data/mockUser';
 import { getOtherUserProfileOrFallback } from '@evoconn/data/mockOtherUsers';
-import { AppTopBar, RankBadge, ClanBanner, BottomCommunityTabs } from '@evoconn/components';
+import { AppTopBar, RankBadge, ClanBanner, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
+import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { getClanCardColor } from '@evoconn/theme/theme';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
@@ -43,7 +44,7 @@ function OwnProfileView() {
 
   return (
     <View style={styles.container}>
-      <AppTopBar onMenuPress={() => {}} onClanPress={() => {}} />
+      <AppTopBar onMenuPress={() => {}} onClanPress={() => {/* already on profile */}} />
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Text style={styles.username}>{user.username}</Text>
@@ -90,6 +91,8 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
   const insets = useSafeAreaInsets();
   const { width: screenW, height: screenH } = useWindowDimensions();
   const [bottomTab] = useState<'siguiendo' | 'mas-votadas' | 'para-ti' | 'search'>('para-ti');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { thoughts } = useThoughts();
 
   const topBarHeight = 60 + insets.top;
   const bottomBarHeight =
@@ -172,7 +175,10 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
 
   return (
     <View style={styles.container}>
-      <AppTopBar onMenuPress={() => {}} onClanPress={() => {}} />
+      <AppTopBar
+        onMenuPress={() => setSidebarOpen(true)}
+        onClanPress={() => router.push('/my-profile')}
+      />
 
       <View style={[styles.otherProfileWrap, { height: contentHeight }]}>
         <ReflectionBackground clan={profile.clanId}>
@@ -232,6 +238,16 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
       >
         <BottomCommunityTabs activeTab={bottomTab} onTabChange={handleBottomTabChange} />
       </View>
+
+      <SidebarDrawer
+        visible={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        conversations={thoughts}
+        onConversationPress={(id) => {
+          setSidebarOpen(false);
+          router.push({ pathname: '/reflection', params: { thoughtId: id } });
+        }}
+      />
     </View>
   );
 }
