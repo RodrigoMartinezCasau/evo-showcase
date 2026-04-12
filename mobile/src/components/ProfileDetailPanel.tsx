@@ -1,11 +1,12 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useMemo } from 'react';
 import {
   Animated,
+  Easing,
   FlatList,
   StyleSheet,
-  TouchableOpacity,
-  Text,
 } from 'react-native';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 import type { CommunityPost } from '@evoconn/types';
 import { ReflectionDetailItem } from '@evoconn/components/ReflectionDetailItem';
 import { evoconnColors } from '@evoconn/theme/colors';
@@ -22,6 +23,10 @@ type Props = {
   onAuthorPress: (userId: string) => void;
   onClanPress: (clanId: string) => void;
 };
+
+const SPRING_CONFIG = { friction: 9, tension: 68, useNativeDriver: true } as const;
+const CLOSE_VELOCITY_THRESHOLD = 400;
+const CLOSE_PROGRESS_THRESHOLD = 0.5;
 
 export function ProfileDetailPanel({
   data,
@@ -40,6 +45,41 @@ export function ProfileDetailPanel({
     outputRange: [screenW, 0],
   });
 
+  // ─── Swipe-back gesture helpers (called from JS worklet via runOnJS) ─
+  const setSlideProgress = useCallback(
+    (p: number) => { slideAnim.setValue(p); },
+    [slideAnim],
+  );
+
+  const cancelClose = useCallback(() => {
+    Animated.spring(slideAnim, { toValue: 1, ...SPRING_CONFIG }).start();
+  }, [slideAnim]);
+
+  // ─── Swipe-right-to-close gesture ────────────────────────────────────
+  const swipeBackGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        // Activate on clear horizontal intent; fail on vertical scroll
+        .activeOffsetX(12)
+        .failOffsetY([-32, 32])
+        .onUpdate((e: { translationX: number }) => {
+          // translationX > 0 means user is swiping right → reduce progress
+          const p = Math.max(0, Math.min(1, 1 - e.translationX / screenW));
+          runOnJS(setSlideProgress)(p);
+        })
+        .onEnd((e: { translationX: number; velocityX: number }) => {
+          const p = Math.max(0, Math.min(1, 1 - e.translationX / screenW));
+          const shouldClose = p < CLOSE_PROGRESS_THRESHOLD || e.velocityX > CLOSE_VELOCITY_THRESHOLD;
+          if (shouldClose) {
+            runOnJS(onClose)();   // parent animates slideAnim → 0 then unmounts
+          } else {
+            runOnJS(cancelClose)();
+          }
+        }),
+    [screenW, setSlideProgress, onClose, cancelClose],
+  );
+
+  // ─── List helpers ────────────────────────────────────────────────────
   const getItemLayout = useCallback(
     (_: unknown, index: number) => ({
       length: itemHeight,
@@ -67,40 +107,34 @@ export function ProfileDetailPanel({
   );
 
   return (
-    <Animated.View
-      style={[
-        StyleSheet.absoluteFillObject,
-        styles.panel,
-        { transform: [{ translateX }] },
-      ]}
-    >
-      <FlatList
-        data={data}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        pagingEnabled
-        scrollEnabled={feedScrollEnabled}
-        decelerationRate="fast"
-        showsVerticalScrollIndicator={false}
-        getItemLayout={getItemLayout}
-        initialScrollIndex={initialIndex}
-        initialNumToRender={1}
-        maxToRenderPerBatch={1}
-        windowSize={3}
-        removeClippedSubviews
-        style={styles.list}
-      />
-
-      {/* Back button — returns to profile view */}
-      <TouchableOpacity
-        style={styles.backBtn}
-        onPress={onClose}
-        hitSlop={12}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.backArrow}>←</Text>
-      </TouchableOpacity>
-    </Animated.View>
+    <GestureHandlerRootView style={StyleSheet.absoluteFillObject}>
+      <GestureDetector gesture={swipeBackGesture}>
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFillObject,
+            styles.panel,
+            { transform: [{ translateX }] },
+          ]}
+        >
+          <FlatList
+            data={data}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.id}
+            pagingEnabled
+            scrollEnabled={feedScrollEnabled}
+            decelerationRate="fast"
+            showsVerticalScrollIndicator={false}
+            getItemLayout={getItemLayout}
+            initialScrollIndex={initialIndex}
+            initialNumToRender={1}
+            maxToRenderPerBatch={1}
+            windowSize={3}
+            removeClippedSubviews
+            style={styles.list}
+          />
+        </Animated.View>
+      </GestureDetector>
+    </GestureHandlerRootView>
   );
 }
 
@@ -110,22 +144,4 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   list: { flex: 1 },
-  backBtn: {
-    position: 'absolute',
-    top: 14,
-    left: 14,
-    zIndex: 20,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 20,
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backArrow: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
-    lineHeight: 22,
-  },
 });
