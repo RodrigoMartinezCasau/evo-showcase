@@ -68,42 +68,61 @@ export const SHARE_BUTTON_OFFSET_Y = -4;
 export const SHARE_BUTTON_SIZE = 28;
 
 // ── Rank progression block ──────────────────────────────────────────
-// A. Full block (outer wrapper – transform only, doesn't push siblings)
+// A. Full block (outer wrapper)
 export const RANK_BLOCK_OFFSET_X = 0;
 export const RANK_BLOCK_OFFSET_Y = 0;
+/** Margen superior del bloque — negativo para acercarlo al elemento de arriba. */
+export const RANK_BLOCK_MARGIN_TOP = -25;
+/** Margen inferior del bloque — negativo para acercarlo al elemento de abajo. */
+export const RANK_BLOCK_MARGIN_BOTTOM = 0;
 export const RANK_BLOCK_SCALE = 1;
+/** Compresses/expands the entire block on the vertical axis (1 = normal, <1 = thinner, >1 = taller).
+ *  Text inside stays the same rendered size — only the visual Y-dimension changes. */
+export const RANK_BLOCK_SCALE_Y = 1;
 
-// B. Container (black rounded rectangle)
+// B. Container (black rounded rectangle — "contorno")
 export const RANK_CONTAINER_WIDTH: number | undefined = undefined; // undefined = auto (fill margins)
 export const RANK_CONTAINER_HEIGHT: number | undefined = undefined; // undefined = auto (wrap content)
-export const RANK_CONTAINER_RADIUS = 14;
+/** Roundness of the black outer container corners. */
+export const RANK_CONTAINER_BORDER_RADIUS = 15;
 export const RANK_CONTAINER_COLOR = '#000000';
 export const RANK_CONTAINER_MARGIN_HORIZONTAL = 20;
-export const RANK_CONTAINER_PADDING_VERTICAL = 16;
-export const RANK_CONTAINER_PADDING_HORIZONTAL = 18;
+/** Espacio vertical interno del contorno negro (reducir = bloque más fino). */
+export const RANK_CONTAINER_PADDING_VERTICAL = 6;
+export const RANK_CONTAINER_PADDING_HORIZONTAL = 6;
+/** Comprime/expande SOLO el contorno negro en vertical (1 = normal, <1 = más fino). No afecta textos. */
+export const RANK_CONTAINER_SCALE_Y = 0.85;
 
-// C. Progression bar
-export const RANK_BAR_HEIGHT = 10;
+// C. Progression bar (la línea/barra interna)
+export const RANK_BAR_HEIGHT = 28;
 export const RANK_BAR_OFFSET_Y = 0;
 export const RANK_BAR_BACKGROUND_COLOR = 'rgba(255,255,255,0.12)';
 export const RANK_BAR_GRADIENT_START = '#E53935';
 export const RANK_BAR_GRADIENT_END = '#FF9800';
-export const RANK_BAR_RADIUS = 5;
+export const RANK_BAR_RADIUS = 10;
+/** Controls ONLY the visual thickness of the filled/track line inside the bar area. */
+export const RANK_BAR_THICKNESS = 28;
+/** Comprime/expande SOLO la barra interna en vertical (1 = normal, <1 = más fina). No afecta textos. */
+export const RANK_BAR_SCALE_Y = 0.8;
 
-// D. Current rank text (left)
-export const RANK_CURRENT_OFFSET_X = 0;
-export const RANK_CURRENT_OFFSET_Y = 0;
+// D. Current rank text (inside bar, left-aligned)
+export const RANK_CURRENT_INSIDE_OFFSET_X = 12;
+export const RANK_CURRENT_INSIDE_OFFSET_Y = 0;
+export const RANK_CURRENT_INSIDE_SCALE = 1;
 export const RANK_CURRENT_FONT_SIZE = 13;
-export const RANK_CURRENT_COLOR = '#000000';
 
-// E. Next rank text (right)
-export const RANK_NEXT_OFFSET_X = 0;
-export const RANK_NEXT_OFFSET_Y = 0;
+// E. Next rank text (inside bar, right-aligned)
+export const RANK_NEXT_INSIDE_OFFSET_X = -12;
+export const RANK_NEXT_INSIDE_OFFSET_Y = 0;
+export const RANK_NEXT_INSIDE_SCALE = 1;
 export const RANK_NEXT_FONT_SIZE = 13;
 export const RANK_NEXT_GRADIENT_START = '#E53935';
 export const RANK_NEXT_GRADIENT_END = '#FF9800';
 
-// F. Mock progress value (0–1)
+// F. Bar gradient → used for text outside the fill as well
+export const RANK_TEXT_BLACK_COLOR = '#000000';
+
+// G. Mock progress value (0–1)
 export const RANK_PROGRESS_VALUE = 0.6;
 
 // ── "Últimas publicaciones" label ──────────────────────────────────
