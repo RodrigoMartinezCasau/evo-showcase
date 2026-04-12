@@ -44,6 +44,14 @@ export const INSIGNIA_BOX_HEIGHT: number | undefined = undefined; // undefined =
 export const INSIGNIA_BOX_OFFSET_X = -50;
 export const INSIGNIA_BOX_OFFSET_Y = -15;
 
+// ── Panel porcentajes filosóficos ("Pensamiento filosófico") ───────
+export const PHILOSOPHY_PERCENTAGES_PANEL_OFFSET_X = 0;
+export const PHILOSOPHY_PERCENTAGES_PANEL_OFFSET_Y = -10;
+/** undefined = ancho automático (márgenes laterales como hasta ahora) */
+export const PHILOSOPHY_PERCENTAGES_PANEL_WIDTH: number | undefined = undefined;
+/** undefined = alto automático según el contenido */
+export const PHILOSOPHY_PERCENTAGES_PANEL_HEIGHT: number | undefined = undefined;
+
 // ── Username text ──────────────────────────────────────────────────
 export const USERNAME_OFFSET_X = 3;
 export const USERNAME_OFFSET_Y = -5;
@@ -60,6 +68,6 @@ export const RANK_OFFSET_Y = -1;
 export const RANK_FONT_SIZE = 20;
 
 // ── "Últimas publicaciones" label ──────────────────────────────────
-export const LATEST_POSTS_LABEL_OFFSET_X = 1;
+export const LATEST_POSTS_LABEL_OFFSET_X = 3;
 export const LATEST_POSTS_LABEL_OFFSET_Y = 0;
-export const LATEST_POSTS_LABEL_FONT_SIZE = 11;
+export const LATEST_POSTS_LABEL_FONT_SIZE = 14;

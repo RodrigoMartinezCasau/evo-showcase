@@ -1,5 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import {
+  PHILOSOPHY_PERCENTAGES_PANEL_OFFSET_X,
+  PHILOSOPHY_PERCENTAGES_PANEL_OFFSET_Y,
+  PHILOSOPHY_PERCENTAGES_PANEL_WIDTH,
+  PHILOSOPHY_PERCENTAGES_PANEL_HEIGHT,
+} from '@evoconn/constants/otherProfileLayout';
 
 type PctEntry = { clanId: string; label: string; pct: number };
 
@@ -11,7 +17,28 @@ export const PhilosophyPercentagesPanel = React.memo(function PhilosophyPercenta
   const sorted = [...percentages].sort((a, b) => b.pct - a.pct);
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[
+        styles.offsetWrap,
+        {
+          transform: [
+            { translateX: PHILOSOPHY_PERCENTAGES_PANEL_OFFSET_X },
+            { translateY: PHILOSOPHY_PERCENTAGES_PANEL_OFFSET_Y },
+          ],
+        },
+      ]}
+    >
+      <View
+        style={[
+          styles.container,
+          PHILOSOPHY_PERCENTAGES_PANEL_WIDTH !== undefined && {
+            width: PHILOSOPHY_PERCENTAGES_PANEL_WIDTH,
+            alignSelf: 'center',
+            marginHorizontal: 0,
+          },
+          PHILOSOPHY_PERCENTAGES_PANEL_HEIGHT !== undefined && { height: PHILOSOPHY_PERCENTAGES_PANEL_HEIGHT },
+        ]}
+      >
       <Text style={styles.title}>Pensamiento filosófico</Text>
       {sorted.map((entry) => (
         <View key={entry.clanId} style={styles.row}>
@@ -22,11 +49,15 @@ export const PhilosophyPercentagesPanel = React.memo(function PhilosophyPercenta
           <Text style={styles.pct}>{entry.pct}%</Text>
         </View>
       ))}
+      </View>
     </View>
   );
 });
 
 const styles = StyleSheet.create({
+  offsetWrap: {
+    alignSelf: 'stretch',
+  },
   container: {
     marginHorizontal: 20,
     backgroundColor: '#000000',
