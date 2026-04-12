@@ -52,7 +52,7 @@ export const PersonalIconSwitchBlock = React.memo(function PersonalIconSwitchBlo
         },
       ]}
     >
-      <Text style={styles.label}>Añadir Icono app</Text>
+      <Text style={styles.label}>Icono de app</Text>
       <Image
         source={starSource}
         resizeMode="contain"

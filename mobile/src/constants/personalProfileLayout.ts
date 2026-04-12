@@ -133,6 +133,11 @@ export const LATEST_POSTS_LABEL_FONT_SIZE = 14;
 /** Espacio vertical antes de "Últimas publicaciones" — menor = menos hueco con el bloque de arriba. */
 export const POSTS_SECTION_PADDING_TOP = 0;
 
+/** Espacio vertical ENTRE el panel de porcentajes filosóficos y "Últimas publicaciones".
+ *  Reducir → acerca la sección al panel. Aumentar → separa más.
+ *  No afecta a ningún otro espaciado del perfil. */
+export const PERSONAL_LATEST_POSTS_SPACING = -20;
+
 // ═══════════════════════════════════════════════════════════════════
 // ── Bottom blocks (3 squares: icon switch, friends, saved posts) ──
 // ═══════════════════════════════════════════════════════════════════
@@ -147,8 +152,13 @@ export const BOTTOM_BLOCK_SIZE = 120;
 export const BOTTOM_BLOCK_BORDER_RADIUS = 18;
 /** Margen horizontal del row de bloques. */
 export const BOTTOM_BLOCKS_MARGIN_HORIZONTAL = 20;
-/** Margen superior del row de bloques. */
+/** Margen superior del row de bloques (espaciado interno fijo). */
 export const BOTTOM_BLOCKS_MARGIN_TOP = 10;
+
+/** Espacio vertical ENTRE "Últimas publicaciones" y los 3 bloques inferiores.
+ *  Reducir → acerca los bloques a la sección. Aumentar → los separa más.
+ *  No afecta a ningún otro espaciado del perfil. */
+export const PERSONAL_BOTTOM_BLOCKS_SPACING_TOP = -5;
 
 // Block 1 — App icon / Clan star  (container-level position)
 export const ICON_SWITCH_OFFSET_X = 0;

@@ -11,6 +11,7 @@ import {
   BOTTOM_BLOCKS_SPACING,
   BOTTOM_BLOCKS_MARGIN_HORIZONTAL,
   BOTTOM_BLOCKS_MARGIN_TOP,
+  PERSONAL_BOTTOM_BLOCKS_SPACING_TOP,
 } from '@evoconn/constants/personalProfileLayout';
 
 type Props = {
@@ -33,7 +34,7 @@ export const PersonalBottomBlocks = React.memo(function PersonalBottomBlocks({
         {
           gap: BOTTOM_BLOCKS_SPACING,
           marginHorizontal: BOTTOM_BLOCKS_MARGIN_HORIZONTAL,
-          marginTop: BOTTOM_BLOCKS_MARGIN_TOP,
+          marginTop: BOTTOM_BLOCKS_MARGIN_TOP + PERSONAL_BOTTOM_BLOCKS_SPACING_TOP,
           transform: [
             { translateX: BOTTOM_BLOCKS_CONTAINER_OFFSET_X },
             { translateY: BOTTOM_BLOCKS_CONTAINER_OFFSET_Y },
