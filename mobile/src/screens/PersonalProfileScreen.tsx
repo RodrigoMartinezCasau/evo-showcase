@@ -14,7 +14,6 @@ import {
   PersonalIdentityHeader,
   PersonalInsigniaPhrase,
   PersonalPhilosophyPanel,
-  PersonalTotalsStats,
   PersonalRecentPostsSlider,
 } from '@evoconn/components/personalProfile';
 import type { CommunityPost } from '@evoconn/types';
@@ -66,6 +65,8 @@ export default function PersonalProfileScreen() {
               clanId={profileWithClan.clanId}
               followersCount={profileWithClan.followersCount}
               followingCount={profileWithClan.followingCount}
+              totalReflections={profileWithClan.totalReflections}
+              totalQuotes={profileWithClan.totalQuotes}
             />
             <PersonalIdentityHeader
               username={profileWithClan.username}
@@ -74,10 +75,6 @@ export default function PersonalProfileScreen() {
             />
             <PersonalInsigniaPhrase phrase={profileWithClan.insigniaPhrase} />
             <PersonalPhilosophyPanel percentages={profileWithClan.philosophyPercentages} />
-            <PersonalTotalsStats
-              totalReflections={profileWithClan.totalReflections}
-              totalQuotes={profileWithClan.totalQuotes}
-            />
             <PersonalRecentPostsSlider posts={profileWithClan.recentPosts} onPostPress={handlePostPress} />
             <View style={styles.bottomSpacer} />
           </ScrollView>

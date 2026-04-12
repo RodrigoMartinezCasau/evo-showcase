@@ -4,31 +4,30 @@
  * Tweak all positions, sizes, and spacing from this single file.
  */
 
-// ── Follow row (contenedor; botón y contadores son capas independientes) ─
-export const FOLLOW_ROW_PADDING_HORIZONTAL = 40;
-export const FOLLOW_ROW_MIN_HEIGHT = 56;
+// ── Top row (contenedor; contador de posts y contadores son capas independientes) ─
+export const TOP_ROW_PADDING_HORIZONTAL = 40;
+export const TOP_ROW_MIN_HEIGHT = 56;
 
-// ── Botón Seguir / Siguiendo (caja de layout fija; solo transform mueve/escala) ─
-export const FOLLOW_BUTTON_LAYOUT_WIDTH = 200;
-export const FOLLOW_BUTTON_LAYOUT_HEIGHT = 56;
-export const FOLLOW_BUTTON_OFFSET_X = 22;
-export const FOLLOW_BUTTON_OFFSET_Y = 0;
-export const FOLLOW_BUTTON_SCALE = 1;
-
-export const FOLLOW_BUTTON_PLUS_OFFSET_X = -15;
-export const FOLLOW_BUTTON_PLUS_OFFSET_Y = 0;
-export const FOLLOW_BUTTON_PLUS_SCALE = 0.8;
-
-export const FOLLOW_BUTTON_SEGUIR_TEXT_OFFSET_X = -12;
-export const FOLLOW_BUTTON_SEGUIR_TEXT_OFFSET_Y = 0;
-export const FOLLOW_BUTTON_SEGUIR_TEXT_SCALE = 1;
+// ── Contador de publicaciones (reemplaza al botón Seguir) ───────────
+export const POSTS_COUNTER_LAYOUT_WIDTH = 200;
+export const POSTS_COUNTER_LAYOUT_HEIGHT = 56;
+export const POSTS_COUNTER_OFFSET_X = 22;
+export const POSTS_COUNTER_OFFSET_Y = 0;
+export const POSTS_COUNTER_SCALE = 1;
 
 // ── Contadores seguidores / seguidos ────────────────────────────────
 export const FOLLOW_STATS_LAYOUT_WIDTH = 220;
 export const FOLLOW_STATS_LAYOUT_HEIGHT = 52;
-export const FOLLOW_STATS_OFFSET_X = -70;
+export const FOLLOW_STATS_OFFSET_X = -85;
 export const FOLLOW_STATS_OFFSET_Y = 0;
 export const FOLLOW_STATS_SCALE = 1.2;
+/** Espacio horizontal entre Seguidores, el divisor y Seguidos (menor = más junto). */
+export const FOLLOW_STATS_SEGUIDORES_SEGUIDOS_GAP = 14;
+
+// ── Botón ajustes (reemplaza al botón 3-puntos) ────────────────────
+export const SETTINGS_ICON_OFFSET_X = -20;
+export const SETTINGS_ICON_OFFSET_Y = -28;
+export const SETTINGS_ICON_SCALE = 1.5;
 
 // ── Clan shield position + scale ───────────────────────────────────
 export const SHIELD_OFFSET_X = -30;
@@ -55,22 +54,17 @@ export const USERNAME_FONT_SIZE = 22;
 
 // ── Clan name text ─────────────────────────────────────────────────
 export const CLAN_OFFSET_X = 3;
-export const CLAN_OFFSET_Y = -3;
+export const CLAN_OFFSET_Y = -6;
 export const CLAN_FONT_SIZE = 20;
 
 // ── Rank text ──────────────────────────────────────────────────────
 export const RANK_OFFSET_X = 3;
-export const RANK_OFFSET_Y = -3;
+export const RANK_OFFSET_Y = -6;
 export const RANK_FONT_SIZE = 20;
 
-// ── Botón 3-puntos (acciones avanzadas) ────────────────────────────
-export const THREE_DOTS_OFFSET_X = -5;
-export const THREE_DOTS_OFFSET_Y = 5;
-export const THREE_DOTS_SIZE = 50;
-
 // ── Botón compartir (junto al username) ────────────────────────────
-export const SHARE_BUTTON_OFFSET_X = -7;
-export const SHARE_BUTTON_OFFSET_Y = -5;
+export const SHARE_BUTTON_OFFSET_X = -6;
+export const SHARE_BUTTON_OFFSET_Y = -4;
 export const SHARE_BUTTON_SIZE = 28;
 
 // ── "Últimas publicaciones" label ──────────────────────────────────

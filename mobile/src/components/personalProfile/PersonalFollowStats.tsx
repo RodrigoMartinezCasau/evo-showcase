@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { FOLLOW_STATS_SEGUIDORES_SEGUIDOS_GAP } from '@evoconn/constants/personalProfileLayout';
 
 type Props = {
   followersCount: number;
@@ -17,7 +18,7 @@ export const PersonalFollowStats = React.memo(function PersonalFollowStats({
   followingCount,
 }: Props) {
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, { gap: FOLLOW_STATS_SEGUIDORES_SEGUIDOS_GAP }]}>
       <View style={styles.stat}>
         <Text style={styles.value}>{formatCount(followersCount)}</Text>
         <Text style={styles.label}>Seguidores</Text>
@@ -36,7 +37,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 28,
     paddingVertical: 6,
   },
   stat: {
