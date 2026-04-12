@@ -1,5 +1,6 @@
 export { OtherProfileFollowRow } from './OtherProfileFollowRow';
 export { ProfileFollowButton } from './ProfileFollowButton';
+export { ProfileMoreMenu } from './ProfileMoreMenu';
 export { UserFollowStats } from './UserFollowStats';
 export { UserIdentityHeader } from './UserIdentityHeader';
 export { UserInsigniaPhrase } from './UserInsigniaPhrase';

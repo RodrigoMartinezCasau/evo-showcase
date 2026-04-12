@@ -13,19 +13,25 @@ import {
   FOLLOW_STATS_OFFSET_X,
   FOLLOW_STATS_OFFSET_Y,
   FOLLOW_STATS_SCALE,
+  THREE_DOTS_SIZE,
 } from '@evoconn/constants/otherProfileLayout';
 import { ProfileFollowButton } from './ProfileFollowButton';
 import { UserFollowStats } from './UserFollowStats';
+import { ProfileMoreMenu } from './ProfileMoreMenu';
 
 type Props = {
   userId: string;
+  username: string;
   clanId: string | null | undefined;
   followersCount: number;
   followingCount: number;
 };
 
+const THREE_DOTS_HIT = Math.max(44, THREE_DOTS_SIZE + 16);
+
 export const OtherProfileFollowRow = React.memo(function OtherProfileFollowRow({
   userId,
+  username,
   clanId,
   followersCount,
   followingCount,
@@ -71,6 +77,9 @@ export const OtherProfileFollowRow = React.memo(function OtherProfileFollowRow({
       >
         <UserFollowStats followersCount={followersCount} followingCount={followingCount} />
       </View>
+      <View style={[styles.moreSlot, { marginTop: -THREE_DOTS_HIT / 2 }]}>
+        <ProfileMoreMenu userId={userId} username={username} />
+      </View>
     </View>
   );
 });
@@ -90,10 +99,19 @@ const styles = StyleSheet.create({
   },
   statsSlot: {
     position: 'absolute',
-    right: 0,
+    right: 32,
     top: '50%',
     zIndex: 2,
     alignItems: 'flex-end',
     justifyContent: 'center',
+  },
+  moreSlot: {
+    position: 'absolute',
+    right: 0,
+    top: '50%',
+    zIndex: 3,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'visible',
   },
 });

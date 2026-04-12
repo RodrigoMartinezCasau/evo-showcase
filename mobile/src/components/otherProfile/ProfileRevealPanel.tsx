@@ -37,6 +37,7 @@ export const ProfileRevealPanel = React.memo(function ProfileRevealPanel({ autho
         >
           <OtherProfileFollowRow
             userId={profile.id}
+            username={profile.username}
             clanId={profile.clanId}
             followersCount={profile.followersCount}
             followingCount={profile.followingCount}

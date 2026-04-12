@@ -64,8 +64,18 @@ export const CLAN_FONT_SIZE = 20;
 
 // ── Rank text ──────────────────────────────────────────────────────
 export const RANK_OFFSET_X = 3;
-export const RANK_OFFSET_Y = -1;
+export const RANK_OFFSET_Y = -3;
 export const RANK_FONT_SIZE = 20;
+
+// ── Botón 3-puntos (acciones avanzadas) ────────────────────────────
+export const THREE_DOTS_OFFSET_X = -5;
+export const THREE_DOTS_OFFSET_Y = 5;
+export const THREE_DOTS_SIZE = 50;
+
+// ── Botón compartir (junto al username) ────────────────────────────
+export const SHARE_BUTTON_OFFSET_X = -7;
+export const SHARE_BUTTON_OFFSET_Y = -5;
+export const SHARE_BUTTON_SIZE = 28;
 
 // ── "Últimas publicaciones" label ──────────────────────────────────
 export const LATEST_POSTS_LABEL_OFFSET_X = 3;

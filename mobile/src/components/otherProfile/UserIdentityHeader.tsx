@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useMemo, useCallback } from 'react';
+import { View, Text, TouchableOpacity, Share, StyleSheet } from 'react-native';
 import { getTopBarInsigniaByHouse } from '@evoconn/utils/getTopBarInsigniaByHouse';
 import type { Rank } from '@evoconn/types';
 import {
@@ -16,6 +16,9 @@ import {
   RANK_OFFSET_X,
   RANK_OFFSET_Y,
   RANK_FONT_SIZE,
+  SHARE_BUTTON_OFFSET_X,
+  SHARE_BUTTON_OFFSET_Y,
+  SHARE_BUTTON_SIZE,
 } from '@evoconn/constants/otherProfileLayout';
 
 const RANK_LABELS: Record<Rank, string> = {
@@ -37,24 +40,49 @@ export const UserIdentityHeader = React.memo(function UserIdentityHeader({
 }: Props) {
   const ShieldSvg = useMemo(() => getTopBarInsigniaByHouse(clanId), [clanId]);
   const clanLabel = clanId
-    ? clanId.charAt(0).toUpperCase() + clanId.slice(1)
+    ? `Clan ${clanId.charAt(0).toUpperCase() + clanId.slice(1)}`
     : 'Sin clan';
+
+  const handleShare = useCallback(() => {
+    Share.share({
+      message: `Mira el perfil de ${username} en Evoconn`,
+      url: `https://evoconn.app/profile/${username}`,
+    }).catch(() => {});
+  }, [username]);
 
   return (
     <View style={styles.container}>
       <View style={styles.textBlock}>
-        <Text
-          style={[
-            styles.username,
-            {
-              fontSize: USERNAME_FONT_SIZE,
-              transform: [{ translateX: USERNAME_OFFSET_X }, { translateY: USERNAME_OFFSET_Y }],
-            },
-          ]}
-          numberOfLines={1}
-        >
-          {username}
-        </Text>
+        <View style={styles.usernameRow}>
+          <Text
+            style={[
+              styles.username,
+              {
+                fontSize: USERNAME_FONT_SIZE,
+                transform: [{ translateX: USERNAME_OFFSET_X }, { translateY: USERNAME_OFFSET_Y }],
+              },
+            ]}
+            numberOfLines={1}
+          >
+            {username}
+          </Text>
+          <TouchableOpacity
+            onPress={handleShare}
+            hitSlop={10}
+            activeOpacity={0.6}
+            style={[
+              styles.shareButton,
+              {
+                transform: [
+                  { translateX: SHARE_BUTTON_OFFSET_X },
+                  { translateY: SHARE_BUTTON_OFFSET_Y },
+                ],
+              },
+            ]}
+          >
+            <ShareIcon size={SHARE_BUTTON_SIZE} />
+          </TouchableOpacity>
+        </View>
         <View style={styles.clanRankRow}>
           <Text
             style={[
@@ -98,6 +126,14 @@ export const UserIdentityHeader = React.memo(function UserIdentityHeader({
   );
 });
 
+function ShareIcon({ size }: { size: number }) {
+  return (
+    <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
+      <Text style={{ fontSize: size * 0.85, color: '#FFFFFF', opacity: 0.85 }}>↗</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     position: 'relative',
@@ -106,11 +142,21 @@ const styles = StyleSheet.create({
   textBlock: {
     paddingRight: SHIELD_BASE_SIZE + 20,
   },
+  usernameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 4,
+  },
   username: {
     color: '#FFFFFF',
     fontWeight: '800',
     letterSpacing: 0.6,
-    marginBottom: 4,
+    flexShrink: 1,
+  },
+  shareButton: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   clanRankRow: {
     flexDirection: 'row',

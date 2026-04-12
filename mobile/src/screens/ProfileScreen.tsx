@@ -121,6 +121,7 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
           >
             <OtherProfileFollowRow
               userId={profile.id}
+              username={profile.username}
               clanId={profile.clanId}
               followersCount={profile.followersCount}
               followingCount={profile.followingCount}
