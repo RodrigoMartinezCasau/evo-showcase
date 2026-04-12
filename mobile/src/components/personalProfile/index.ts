@@ -8,3 +8,4 @@ export { PersonalPhilosophyPanel } from './PersonalPhilosophyPanel';
 export { PersonalTotalsStats } from './PersonalTotalsStats';
 export { PersonalRecentPostCard } from './PersonalRecentPostCard';
 export { PersonalRecentPostsSlider } from './PersonalRecentPostsSlider';
+export { PersonalRankProgression } from './PersonalRankProgression';

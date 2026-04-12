@@ -13,6 +13,7 @@ import {
   PersonalFollowRow,
   PersonalIdentityHeader,
   PersonalInsigniaPhrase,
+  PersonalRankProgression,
   PersonalPhilosophyPanel,
   PersonalRecentPostsSlider,
 } from '@evoconn/components/personalProfile';
@@ -74,6 +75,7 @@ export default function PersonalProfileScreen() {
               rank={profileWithClan.rank}
             />
             <PersonalInsigniaPhrase phrase={profileWithClan.insigniaPhrase} />
+            <PersonalRankProgression rank={profileWithClan.rank} />
             <PersonalPhilosophyPanel percentages={profileWithClan.philosophyPercentages} />
             <PersonalRecentPostsSlider posts={profileWithClan.recentPosts} onPostPress={handlePostPress} />
             <View style={styles.bottomSpacer} />

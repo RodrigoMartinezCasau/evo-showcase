@@ -67,6 +67,45 @@ export const SHARE_BUTTON_OFFSET_X = -6;
 export const SHARE_BUTTON_OFFSET_Y = -4;
 export const SHARE_BUTTON_SIZE = 28;
 
+// ── Rank progression block ──────────────────────────────────────────
+// A. Full block (outer wrapper – transform only, doesn't push siblings)
+export const RANK_BLOCK_OFFSET_X = 0;
+export const RANK_BLOCK_OFFSET_Y = 0;
+export const RANK_BLOCK_SCALE = 1;
+
+// B. Container (black rounded rectangle)
+export const RANK_CONTAINER_WIDTH: number | undefined = undefined; // undefined = auto (fill margins)
+export const RANK_CONTAINER_HEIGHT: number | undefined = undefined; // undefined = auto (wrap content)
+export const RANK_CONTAINER_RADIUS = 14;
+export const RANK_CONTAINER_COLOR = '#000000';
+export const RANK_CONTAINER_MARGIN_HORIZONTAL = 20;
+export const RANK_CONTAINER_PADDING_VERTICAL = 16;
+export const RANK_CONTAINER_PADDING_HORIZONTAL = 18;
+
+// C. Progression bar
+export const RANK_BAR_HEIGHT = 10;
+export const RANK_BAR_OFFSET_Y = 0;
+export const RANK_BAR_BACKGROUND_COLOR = 'rgba(255,255,255,0.12)';
+export const RANK_BAR_GRADIENT_START = '#E53935';
+export const RANK_BAR_GRADIENT_END = '#FF9800';
+export const RANK_BAR_RADIUS = 5;
+
+// D. Current rank text (left)
+export const RANK_CURRENT_OFFSET_X = 0;
+export const RANK_CURRENT_OFFSET_Y = 0;
+export const RANK_CURRENT_FONT_SIZE = 13;
+export const RANK_CURRENT_COLOR = '#000000';
+
+// E. Next rank text (right)
+export const RANK_NEXT_OFFSET_X = 0;
+export const RANK_NEXT_OFFSET_Y = 0;
+export const RANK_NEXT_FONT_SIZE = 13;
+export const RANK_NEXT_GRADIENT_START = '#E53935';
+export const RANK_NEXT_GRADIENT_END = '#FF9800';
+
+// F. Mock progress value (0–1)
+export const RANK_PROGRESS_VALUE = 0.6;
+
 // ── "Últimas publicaciones" label ──────────────────────────────────
 export const LATEST_POSTS_LABEL_OFFSET_X = 3;
 export const LATEST_POSTS_LABEL_OFFSET_Y = 0;
