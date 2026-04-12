@@ -11,8 +11,7 @@ import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
 import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
 import {
-  ProfileFollowButton,
-  UserFollowStats,
+  OtherProfileFollowRow,
   UserIdentityHeader,
   UserInsigniaPhrase,
   PhilosophyPercentagesPanel,
@@ -120,8 +119,9 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
             contentContainerStyle={styles.otherContent}
             showsVerticalScrollIndicator={false}
           >
-            <ProfileFollowButton userId={profile.id} clanId={profile.clanId} />
-            <UserFollowStats
+            <OtherProfileFollowRow
+              userId={profile.id}
+              clanId={profile.clanId}
               followersCount={profile.followersCount}
               followingCount={profile.followingCount}
             />

@@ -1,5 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import {
+  INSIGNIA_BOX_MARGIN_HORIZONTAL,
+  INSIGNIA_BOX_HEIGHT,
+  INSIGNIA_BOX_OFFSET_X,
+  INSIGNIA_BOX_OFFSET_Y,
+} from '@evoconn/constants/otherProfileLayout';
 
 type Props = {
   phrase: string;
@@ -7,7 +13,16 @@ type Props = {
 
 export const UserInsigniaPhrase = React.memo(function UserInsigniaPhrase({ phrase }: Props) {
   return (
-    <View style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        {
+          marginHorizontal: INSIGNIA_BOX_MARGIN_HORIZONTAL,
+          transform: [{ translateX: INSIGNIA_BOX_OFFSET_X }, { translateY: INSIGNIA_BOX_OFFSET_Y }],
+        },
+        INSIGNIA_BOX_HEIGHT !== undefined && { height: INSIGNIA_BOX_HEIGHT },
+      ]}
+    >
       <Text style={styles.text}>{phrase}</Text>
     </View>
   );
@@ -15,7 +30,6 @@ export const UserInsigniaPhrase = React.memo(function UserInsigniaPhrase({ phras
 
 const styles = StyleSheet.create({
   container: {
-    marginHorizontal: 20,
     paddingLeft: 14,
     paddingVertical: 14,
     backgroundColor: '#000000',

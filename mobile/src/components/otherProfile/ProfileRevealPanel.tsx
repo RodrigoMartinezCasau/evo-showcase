@@ -3,8 +3,7 @@ import { View, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { getOtherUserProfileOrFallback } from '@evoconn/data/mockOtherUsers';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
-import { ProfileFollowButton } from './ProfileFollowButton';
-import { UserFollowStats } from './UserFollowStats';
+import { OtherProfileFollowRow } from './OtherProfileFollowRow';
 import { UserIdentityHeader } from './UserIdentityHeader';
 import { UserInsigniaPhrase } from './UserInsigniaPhrase';
 import { PhilosophyPercentagesPanel } from './PhilosophyPercentagesPanel';
@@ -36,8 +35,12 @@ export const ProfileRevealPanel = React.memo(function ProfileRevealPanel({ autho
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
         >
-          <ProfileFollowButton userId={profile.id} clanId={profile.clanId} />
-          <UserFollowStats followersCount={profile.followersCount} followingCount={profile.followingCount} />
+          <OtherProfileFollowRow
+            userId={profile.id}
+            clanId={profile.clanId}
+            followersCount={profile.followersCount}
+            followingCount={profile.followingCount}
+          />
           <UserIdentityHeader username={profile.username} clanId={profile.clanId} rank={profile.rank} />
           <UserInsigniaPhrase phrase={profile.insigniaPhrase} />
           <PhilosophyPercentagesPanel percentages={profile.philosophyPercentages} />

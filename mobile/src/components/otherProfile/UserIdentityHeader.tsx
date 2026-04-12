@@ -2,6 +2,21 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { getTopBarInsigniaByHouse } from '@evoconn/utils/getTopBarInsigniaByHouse';
 import type { Rank } from '@evoconn/types';
+import {
+  SHIELD_OFFSET_X,
+  SHIELD_OFFSET_Y,
+  SHIELD_SCALE,
+  SHIELD_BASE_SIZE,
+  USERNAME_OFFSET_X,
+  USERNAME_OFFSET_Y,
+  USERNAME_FONT_SIZE,
+  CLAN_OFFSET_X,
+  CLAN_OFFSET_Y,
+  CLAN_FONT_SIZE,
+  RANK_OFFSET_X,
+  RANK_OFFSET_Y,
+  RANK_FONT_SIZE,
+} from '@evoconn/constants/otherProfileLayout';
 
 const RANK_LABELS: Record<Rank, string> = {
   aprendiz: 'Aprendiz',
@@ -14,8 +29,6 @@ type Props = {
   clanId: string | null;
   rank: Rank;
 };
-
-const SHIELD_SIZE = 62;
 
 export const UserIdentityHeader = React.memo(function UserIdentityHeader({
   username,
@@ -30,16 +43,56 @@ export const UserIdentityHeader = React.memo(function UserIdentityHeader({
   return (
     <View style={styles.container}>
       <View style={styles.textBlock}>
-        <Text style={styles.username} numberOfLines={1}>{username}</Text>
+        <Text
+          style={[
+            styles.username,
+            {
+              fontSize: USERNAME_FONT_SIZE,
+              transform: [{ translateX: USERNAME_OFFSET_X }, { translateY: USERNAME_OFFSET_Y }],
+            },
+          ]}
+          numberOfLines={1}
+        >
+          {username}
+        </Text>
         <View style={styles.clanRankRow}>
-          <Text style={styles.clanName}>{clanLabel}</Text>
-          <View style={styles.rankPill}>
-            <Text style={styles.rankText}>{RANK_LABELS[rank]}</Text>
+          <Text
+            style={[
+              styles.clanName,
+              {
+                fontSize: CLAN_FONT_SIZE,
+                transform: [{ translateX: CLAN_OFFSET_X }, { translateY: CLAN_OFFSET_Y }],
+              },
+            ]}
+          >
+            {clanLabel}
+          </Text>
+          <View
+            style={[
+              styles.rankPill,
+              { transform: [{ translateX: RANK_OFFSET_X }, { translateY: RANK_OFFSET_Y }] },
+            ]}
+          >
+            <Text style={[styles.rankText, { fontSize: RANK_FONT_SIZE }]}>{RANK_LABELS[rank]}</Text>
           </View>
         </View>
       </View>
-      <View style={styles.shieldWrap}>
-        <ShieldSvg width={SHIELD_SIZE} height={SHIELD_SIZE} />
+      <View
+        style={[
+          styles.shieldWrap,
+          {
+            width: SHIELD_BASE_SIZE,
+            height: SHIELD_BASE_SIZE,
+            marginTop: -SHIELD_BASE_SIZE / 2,
+            transform: [
+              { translateX: SHIELD_OFFSET_X },
+              { translateY: SHIELD_OFFSET_Y },
+              { scale: SHIELD_SCALE },
+            ],
+          },
+        ]}
+      >
+        <ShieldSvg width={SHIELD_BASE_SIZE} height={SHIELD_BASE_SIZE} />
       </View>
     </View>
   );
@@ -47,18 +100,14 @@ export const UserIdentityHeader = React.memo(function UserIdentityHeader({
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    position: 'relative',
     paddingHorizontal: 20,
   },
   textBlock: {
-    flex: 1,
-    marginRight: 12,
+    paddingRight: SHIELD_BASE_SIZE + 20,
   },
   username: {
     color: '#FFFFFF',
-    fontSize: 22,
     fontWeight: '800',
     letterSpacing: 0.6,
     marginBottom: 4,
@@ -69,7 +118,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   clanName: {
-    fontSize: 14,
     fontWeight: '600',
     letterSpacing: 0.3,
     color: '#FFFFFF',
@@ -83,13 +131,14 @@ const styles = StyleSheet.create({
   },
   rankText: {
     color: '#FFFFFF',
-    fontSize: 11,
     fontWeight: '600',
     opacity: 0.7,
   },
   shieldWrap: {
-    width: SHIELD_SIZE,
-    height: SHIELD_SIZE,
+    position: 'absolute',
+    right: 0,
+    top: '50%',
+    zIndex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },

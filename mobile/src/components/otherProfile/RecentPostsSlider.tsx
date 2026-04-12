@@ -2,6 +2,11 @@ import React, { useCallback } from 'react';
 import { View, Text, FlatList, StyleSheet, useWindowDimensions } from 'react-native';
 import type { CommunityPost } from '@evoconn/types';
 import { RecentPostCard } from './RecentPostCard';
+import {
+  LATEST_POSTS_LABEL_OFFSET_X,
+  LATEST_POSTS_LABEL_OFFSET_Y,
+  LATEST_POSTS_LABEL_FONT_SIZE,
+} from '@evoconn/constants/otherProfileLayout';
 
 type Props = {
   posts: CommunityPost[];
@@ -32,7 +37,20 @@ export const RecentPostsSlider = React.memo(function RecentPostsSlider({ posts, 
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Últimas publicaciones</Text>
+      <Text
+        style={[
+          styles.title,
+          {
+            fontSize: LATEST_POSTS_LABEL_FONT_SIZE,
+            transform: [
+              { translateX: LATEST_POSTS_LABEL_OFFSET_X },
+              { translateY: LATEST_POSTS_LABEL_OFFSET_Y },
+            ],
+          },
+        ]}
+      >
+        Últimas publicaciones
+      </Text>
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id}
@@ -54,7 +72,6 @@ const styles = StyleSheet.create({
   },
   title: {
     color: '#FFFFFF',
-    fontSize: 11,
     fontWeight: '600',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
