@@ -28,6 +28,7 @@ import {
 } from '@evoconn/constants/communityDrawerGesture';
 import { ReflectionDetailItem } from '@evoconn/components/ReflectionDetailItem';
 import { SearchScreen } from '@evoconn/components/SearchScreen';
+import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
 import { ProfileRevealPanel } from '@evoconn/components/otherProfile';
 
@@ -171,7 +172,13 @@ export default function CommunityScreen() {
   );
 
   const handleAuthorPress = useCallback(
-    (userId: string) => router.push({ pathname: '/profile/[id]', params: { id: userId } }),
+    (userId: string) => {
+      if (userId === mockCurrentUser.id) {
+        router.push('/my-profile');
+      } else {
+        router.push({ pathname: '/profile/[id]', params: { id: userId } });
+      }
+    },
     [router],
   );
   const handleClanPress = useCallback(
@@ -518,7 +525,7 @@ export default function CommunityScreen() {
     <View style={styles.container}>
       <AppTopBar
         onMenuPress={() => setSidebarOpen(true)}
-        onClanPress={() => router.push('/profile')}
+        onClanPress={() => router.push('/my-profile')}
       />
 
       <View style={[styles.contentArea, { height: feedItemHeight }]}>

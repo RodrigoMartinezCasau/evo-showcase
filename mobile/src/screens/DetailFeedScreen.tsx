@@ -18,6 +18,7 @@ import { AppTopBar, SidebarDrawer, BottomCommunityTabs } from '@evoconn/componen
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useFeedStore } from '@evoconn/hooks/useFeedStore';
 import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
+import { mockCurrentUser } from '@evoconn/data/mockUser';
 import {
   COMMUNITY_DRAWER_EDGE_ZONE_WIDTH,
   COMMUNITY_DRAWER_GESTURE_RANGE_X,
@@ -85,7 +86,13 @@ export default function DetailFeedScreen() {
   }, []);
 
   const handleAuthorPress = useCallback(
-    (userId: string) => router.push({ pathname: '/profile/[id]', params: { id: userId } }),
+    (userId: string) => {
+      if (userId === mockCurrentUser.id) {
+        router.push('/my-profile');
+      } else {
+        router.push({ pathname: '/profile/[id]', params: { id: userId } });
+      }
+    },
     [router],
   );
   const handleClanPress = useCallback(
@@ -217,7 +224,7 @@ export default function DetailFeedScreen() {
     <View style={styles.container}>
       <AppTopBar
         onMenuPress={() => setSidebarOpen(true)}
-        onClanPress={() => router.push('/profile')}
+        onClanPress={() => router.push('/my-profile')}
       />
 
       <FlatList

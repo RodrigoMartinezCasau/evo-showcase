@@ -294,7 +294,7 @@ export function SidebarDrawer({
           clanId={user.clanId}
           onPress={() => {
             onClose();
-            router.push('/profile');
+            router.push('/my-profile');
           }}
         />
         <SidebarFooterProfileText
@@ -303,7 +303,7 @@ export function SidebarDrawer({
           rank={user.rank}
           onPressProfile={() => {
             onClose();
-            router.push('/profile');
+            router.push('/my-profile');
           }}
           onPressClan={() => {
             onClose();

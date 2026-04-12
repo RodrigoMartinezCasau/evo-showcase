@@ -63,7 +63,7 @@ export function AppTopBar({
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
-  const handleClanPress = () => (onClanPress ? onClanPress() : router.push('/profile'));
+  const handleClanPress = () => (onClanPress ? onClanPress() : router.push('/my-profile'));
   const clanLabel =
     clanShortLabel ??
     (activeClan ? activeClan.slice(0, 2).toUpperCase() : '??');
