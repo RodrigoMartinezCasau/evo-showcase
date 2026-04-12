@@ -6,6 +6,7 @@ import {
   LATEST_POSTS_LABEL_OFFSET_X,
   LATEST_POSTS_LABEL_OFFSET_Y,
   LATEST_POSTS_LABEL_FONT_SIZE,
+  POSTS_SECTION_PADDING_TOP,
 } from '@evoconn/constants/personalProfileLayout';
 
 type Props = {
@@ -36,7 +37,7 @@ export const PersonalRecentPostsSlider = React.memo(function PersonalRecentPosts
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: POSTS_SECTION_PADDING_TOP }]}>
       <Text
         style={[
           styles.title,

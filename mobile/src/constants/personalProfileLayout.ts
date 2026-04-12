@@ -129,3 +129,49 @@ export const RANK_PROGRESS_VALUE = 0.6;
 export const LATEST_POSTS_LABEL_OFFSET_X = 3;
 export const LATEST_POSTS_LABEL_OFFSET_Y = 0;
 export const LATEST_POSTS_LABEL_FONT_SIZE = 14;
+
+/** Espacio vertical antes de "Últimas publicaciones" — menor = menos hueco con el bloque de arriba. */
+export const POSTS_SECTION_PADDING_TOP = 0;
+
+// ═══════════════════════════════════════════════════════════════════
+// ── Bottom blocks (3 squares: icon switch, friends, saved posts) ──
+// ═══════════════════════════════════════════════════════════════════
+
+// Shared container & sizing
+export const BOTTOM_BLOCKS_CONTAINER_OFFSET_X = 0;
+export const BOTTOM_BLOCKS_CONTAINER_OFFSET_Y = 0;
+/** Espacio horizontal entre cada bloque. */
+export const BOTTOM_BLOCKS_SPACING = 16;
+/** Tamaño (ancho × alto) de cada bloque cuadrado. */
+export const BOTTOM_BLOCK_SIZE = 120;
+export const BOTTOM_BLOCK_BORDER_RADIUS = 18;
+/** Margen horizontal del row de bloques. */
+export const BOTTOM_BLOCKS_MARGIN_HORIZONTAL = 20;
+/** Margen superior del row de bloques. */
+export const BOTTOM_BLOCKS_MARGIN_TOP = 10;
+
+// Block 1 — App icon / Clan star  (container-level position)
+export const ICON_SWITCH_OFFSET_X = 0;
+export const ICON_SWITCH_OFFSET_Y = 0;
+export const ICON_SWITCH_SCALE = 1;
+/** Estrella del clan DENTRO del cuadrado — posición y escala independientes del contenedor. */
+export const APP_ICON_STAR_OFFSET_X = 0;
+export const APP_ICON_STAR_OFFSET_Y = 10;
+export const APP_ICON_STAR_SCALE = 3.8;
+
+// Block 2 — Friends display
+export const FRIENDS_BLOCK_OFFSET_X = 0;
+export const FRIENDS_BLOCK_OFFSET_Y = 0;
+export const FRIENDS_BLOCK_SCALE = 1;
+
+// Block 3 — Saved posts  (container-level position)
+export const SAVED_BLOCK_OFFSET_X = 0;
+export const SAVED_BLOCK_OFFSET_Y = 0;
+export const SAVED_BLOCK_SCALE = 1;
+/** Texto "GUARDADOS" dentro del cuadrado — solo posición. */
+export const SAVED_LABEL_OFFSET_X = 0;
+export const SAVED_LABEL_OFFSET_Y = -1;
+/** Icono guardados DENTRO del cuadrado — posición y escala independientes del contenedor. */
+export const SAVED_ICON_OFFSET_X = 0;
+export const SAVED_ICON_OFFSET_Y = 0;
+export const SAVED_ICON_SCALE = 3;

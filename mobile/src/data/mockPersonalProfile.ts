@@ -1,6 +1,12 @@
 import type { CommunityPost, User } from '../types';
 import { mockCurrentUser } from './mockUser';
 
+export type FriendEntry = {
+  id: string;
+  username: string;
+  clanId: string | null;
+};
+
 export type PersonalProfile = {
   id: string;
   username: string;
@@ -13,6 +19,8 @@ export type PersonalProfile = {
   totalReflections: number;
   totalQuotes: number;
   recentPosts: CommunityPost[];
+  friends: FriendEntry[];
+  savedPosts: CommunityPost[];
 };
 
 const ME_AS_AUTHOR: User = {
@@ -57,6 +65,44 @@ export const MOCK_PERSONAL_PROFILE: PersonalProfile = {
       body: 'El hombre está condenado a ser libre.',
       quoteAuthor: 'Sartre',
       voteStats: { up: 210, down: 8, save: 45 },
+      createdAt: new Date().toISOString(),
+    },
+  ],
+  friends: [
+    { id: '1', username: '@DIEGOLLUBERES', clanId: 'nihilista' },
+    { id: '2', username: '@ALEJANDROSERRANO', clanId: 'estoico' },
+    { id: '4', username: '@HERNANCHACON', clanId: 'realista' },
+    { id: '5', username: '@CARLOSDUARTE', clanId: 'racionalista' },
+    { id: '6', username: '@MARIANALOPEZ', clanId: 'humanista' },
+    { id: '7', username: '@PABLOMORENO', clanId: 'existencialista' },
+    { id: '8', username: '@SOFIAREYES', clanId: 'trascendentalista' },
+  ],
+  savedPosts: [
+    {
+      id: 'saved-1',
+      type: 'reflection',
+      author: { id: '1', username: '@DIEGOLLUBERES', clanId: 'nihilista', rank: 'maestro' },
+      title: 'AHORRAR TIEMPO SUCKS',
+      body: 'Intentamos ganar minutos, pero la vida no se acelera.',
+      voteStats: { up: 508, down: 347, save: 31 },
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: 'saved-2',
+      type: 'phrase',
+      author: { id: '2', username: '@ALEJANDROSERRANO', clanId: 'estoico', rank: 'filosofo' },
+      body: 'No busques la felicidad fuera. Construye el camino desde dentro.',
+      quoteAuthor: 'Nietzsche',
+      voteStats: { up: 1870, down: 22, save: 145 },
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: 'saved-3',
+      type: 'reflection',
+      author: { id: '4', username: '@HERNANCHACON', clanId: 'realista', rank: 'aprendiz' },
+      title: 'NO TENGAS MIEDO PRECIOSA',
+      body: 'El miedo es la brújula que señala exactamente adonde necesitas ir.',
+      voteStats: { up: 420, down: 12, save: 88 },
       createdAt: new Date().toISOString(),
     },
   ],

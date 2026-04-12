@@ -16,6 +16,7 @@ import {
   PersonalRankProgression,
   PersonalPhilosophyPanel,
   PersonalRecentPostsSlider,
+  PersonalBottomBlocks,
 } from '@evoconn/components/personalProfile';
 import type { CommunityPost } from '@evoconn/types';
 
@@ -78,6 +79,12 @@ export default function PersonalProfileScreen() {
             <PersonalRankProgression rank={profileWithClan.rank} />
             <PersonalPhilosophyPanel percentages={profileWithClan.philosophyPercentages} />
             <PersonalRecentPostsSlider posts={profileWithClan.recentPosts} onPostPress={handlePostPress} />
+            <PersonalBottomBlocks
+              clanId={profileWithClan.clanId}
+              friends={profileWithClan.friends}
+              savedPosts={profileWithClan.savedPosts}
+              onSavedPostPress={handlePostPress}
+            />
             <View style={styles.bottomSpacer} />
           </ScrollView>
         </ReflectionBackground>
