@@ -54,12 +54,12 @@ export const USERNAME_FONT_SIZE = 22;
 
 // ── Clan name text ─────────────────────────────────────────────────
 export const CLAN_OFFSET_X = 3;
-export const CLAN_OFFSET_Y = -6;
+export const CLAN_OFFSET_Y = -3;
 export const CLAN_FONT_SIZE = 20;
 
 // ── Rank text ──────────────────────────────────────────────────────
 export const RANK_OFFSET_X = 3;
-export const RANK_OFFSET_Y = -6;
+export const RANK_OFFSET_Y = -3;
 export const RANK_FONT_SIZE = 20;
 
 // ── Botón compartir (junto al username) ────────────────────────────
@@ -180,8 +180,8 @@ export const SAVED_BLOCK_OFFSET_Y = 0;
 export const SAVED_BLOCK_SCALE = 1;
 /** Texto "GUARDADOS" dentro del cuadrado — solo posición. */
 export const SAVED_LABEL_OFFSET_X = 0;
-export const SAVED_LABEL_OFFSET_Y = -1;
+export const SAVED_LABEL_OFFSET_Y = -2;
 /** Icono guardados DENTRO del cuadrado — posición y escala independientes del contenedor. */
 export const SAVED_ICON_OFFSET_X = 0;
 export const SAVED_ICON_OFFSET_Y = 0;
-export const SAVED_ICON_SCALE = 3;
+export const SAVED_ICON_SCALE = 2.8;

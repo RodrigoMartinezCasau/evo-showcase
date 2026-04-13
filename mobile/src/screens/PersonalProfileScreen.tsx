@@ -143,15 +143,21 @@ export default function PersonalProfileScreen() {
               totalReflections={profileWithClan.totalReflections}
               totalQuotes={profileWithClan.totalQuotes}
             />
+            <View style={styles.contentGap} />
             <PersonalIdentityHeader
               username={profileWithClan.username}
               clanId={profileWithClan.clanId}
               rank={profileWithClan.rank}
             />
+            <View style={styles.contentGap} />
             <PersonalInsigniaPhrase phrase={profileWithClan.insigniaPhrase} />
+            <View style={styles.contentGap} />
             <PersonalRankProgression rank={profileWithClan.rank} />
+            <View style={styles.contentGap} />
             <PersonalPhilosophyPanel percentages={profileWithClan.philosophyPercentages} />
+            <View style={styles.contentGap} />
             <PersonalRecentPostsSlider posts={profileWithClan.recentPosts} onPostPress={handleRecentPostPress} />
+            <View style={styles.contentGap} />
             <PersonalBottomBlocks
               clanId={profileWithClan.clanId}
               friends={profileWithClan.friends}
@@ -213,7 +219,9 @@ const styles = StyleSheet.create({
   content: {
     paddingTop: 24,
     paddingBottom: 48,
-    gap: 20,
+  },
+  contentGap: {
+    height: 20,
   },
   bottomSpacer: {
     height: 20,
