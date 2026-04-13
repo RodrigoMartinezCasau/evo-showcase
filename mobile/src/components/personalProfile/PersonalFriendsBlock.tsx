@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Pressable,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { getClanColor } from '@evoconn/constants/clanColors';
 import type { FriendEntry } from '@evoconn/data/mockPersonalProfile';
 import {
@@ -25,6 +26,7 @@ type Props = {
 };
 
 export const PersonalFriendsBlock = React.memo(function PersonalFriendsBlock({ friends }: Props) {
+  const router = useRouter();
   const [expanded, setExpanded] = useState(false);
 
   const preview = friends.slice(0, PREVIEW_COUNT);
@@ -32,15 +34,31 @@ export const PersonalFriendsBlock = React.memo(function PersonalFriendsBlock({ f
   const handleOpen = useCallback(() => setExpanded(true), []);
   const handleClose = useCallback(() => setExpanded(false), []);
 
+  const handleFriendPress = useCallback(
+    (friend: FriendEntry) => {
+      // Close the modal first so no overlay remains on top of the profile
+      setExpanded(false);
+      // Small delay lets the modal animate out before pushing the new screen
+      setTimeout(() => {
+        router.push({ pathname: '/profile/[id]', params: { id: friend.id } });
+      }, 150);
+    },
+    [router],
+  );
+
   const renderFriend = useCallback(
     ({ item }: { item: FriendEntry }) => (
-      <View style={modalStyles.row}>
+      <TouchableOpacity
+        activeOpacity={0.65}
+        onPress={() => handleFriendPress(item)}
+        style={modalStyles.row}
+      >
         <Text style={[modalStyles.username, { color: getClanColor(item.clanId) }]}>
           {item.username}
         </Text>
-      </View>
+      </TouchableOpacity>
     ),
-    [],
+    [handleFriendPress],
   );
 
   return (
