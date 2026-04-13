@@ -60,7 +60,7 @@ export const CLAN_FONT_SIZE = 20;
 // ── Rank text ──────────────────────────────────────────────────────
 export const RANK_OFFSET_X = 3;
 export const RANK_OFFSET_Y = -3;
-export const RANK_FONT_SIZE = 20;
+export const RANK_FONT_SIZE = 18;
 
 // ── Botón compartir (junto al username) ────────────────────────────
 export const SHARE_BUTTON_OFFSET_X = -6;

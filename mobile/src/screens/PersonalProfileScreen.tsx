@@ -157,6 +157,7 @@ export default function PersonalProfileScreen() {
               username={profileWithClan.username}
               clanId={profileWithClan.clanId}
               rank={profileWithClan.rank}
+              onShieldPress={profileWithClan.clanId ? () => router.push({ pathname: '/clan/[id]', params: { id: profileWithClan.clanId! } }) : undefined}
             />
             <View style={styles.contentGap} />
             <PersonalInsigniaPhrase phrase={profileWithClan.insigniaPhrase} />

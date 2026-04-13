@@ -31,12 +31,14 @@ type Props = {
   username: string;
   clanId: string | null;
   rank: Rank;
+  onShieldPress?: () => void;
 };
 
 export const UserIdentityHeader = React.memo(function UserIdentityHeader({
   username,
   clanId,
   rank,
+  onShieldPress,
 }: Props) {
   const ShieldSvg = useMemo(() => getTopBarInsigniaByHouse(clanId), [clanId]);
   const clanLabel = clanId
@@ -105,7 +107,11 @@ export const UserIdentityHeader = React.memo(function UserIdentityHeader({
           </View>
         </View>
       </View>
-      <View
+      <TouchableOpacity
+        activeOpacity={onShieldPress ? 0.7 : 1}
+        onPress={onShieldPress}
+        disabled={!onShieldPress}
+        hitSlop={8}
         style={[
           styles.shieldWrap,
           {
@@ -121,7 +127,7 @@ export const UserIdentityHeader = React.memo(function UserIdentityHeader({
         ]}
       >
         <ShieldSvg width={SHIELD_BASE_SIZE} height={SHIELD_BASE_SIZE} />
-      </View>
+      </TouchableOpacity>
     </View>
   );
 });

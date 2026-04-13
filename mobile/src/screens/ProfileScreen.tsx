@@ -198,6 +198,7 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
               username={profile.username}
               clanId={profile.clanId}
               rank={profile.rank}
+              onShieldPress={profile.clanId ? () => router.push({ pathname: '/clan/[id]', params: { id: profile.clanId! } }) : undefined}
             />
             <UserInsigniaPhrase phrase={profile.insigniaPhrase} />
             <PhilosophyPercentagesPanel percentages={profile.philosophyPercentages} />
