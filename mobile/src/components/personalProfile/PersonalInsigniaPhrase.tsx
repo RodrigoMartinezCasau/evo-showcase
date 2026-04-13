@@ -11,42 +11,45 @@ import {
   INSIGNIA_EDIT_ICON_SAFE_PADDING,
 } from '@evoconn/constants/personalProfileLayout';
 
-// ── Pencil reserved-area computation ─────────────────────────────────────
-// The pencil button has padding: 4 on each side + fontSize: 16 → ~24px layout box.
-// CSS transforms are visual-only, so the layout anchor stays at (top:8, right:8)
-// but the VISUAL footprint is scaled by INSIGNIA_EDIT_ICON_SCALE.
-// translateX shifts the visual position horizontally (positive = further right).
-// We compute the minimum right padding the text must keep to never collide.
+// ─── Pencil layout (NO transforms on the TouchableOpacity) ───────────────
+//
+// REASON: React Native's touch system uses the pre-transform layout frame.
+// If we put translateX/Y/scale on the TouchableOpacity, the icon moves visually
+// but the tap target stays at the original layout position — creating a dead zone.
+//
+// Fix: convert all offset/scale values to real layout properties so the
+// touch frame and visual frame are always identical.
 
-const PENCIL_LAYOUT_SIZE = 24; // TouchableOpacity layout box width (padding 4*2 + icon 16)
-const PENCIL_LAYOUT_RIGHT = 8;  // right: 8 anchor in the container
-const CONTAINER_PADDING_RIGHT = 14; // container's existing paddingRight
+const PENCIL_BASE_TOP       = 8;   // default top inside container
+const PENCIL_BASE_RIGHT     = 8;   // default right inside container
+const PENCIL_BASE_FONT_SIZE = 16;  // base icon glyph size
+const PENCIL_BASE_SIZE      = 24;  // base TouchableOpacity box (padding 4×2 + font 16)
+const CONTAINER_PADDING_RIGHT = 14;
 
-// How far from the right edge of the container the pencil's visual left boundary is:
-//   pencilLayoutRight  → layout anchor from right
-// + PENCIL_LAYOUT_SIZE * SCALE → visual width (scaled outward from center, so adds half each side,
-//   but since the anchor is the layout center and scale grows symmetrically, the left edge of the
-//   visual area extends further left by (PENCIL_LAYOUT_SIZE * SCALE / 2 + PENCIL_LAYOUT_SIZE / 2))
-//   Simplified conservatively: full visual width from the anchor's right-edge offset.
-// - INSIGNIA_EDIT_ICON_OFFSET_X → positive moveX shifts right (further from text), negative = more overlap
-const pencilVisualExtentFromRight =
-  PENCIL_LAYOUT_RIGHT +
-  PENCIL_LAYOUT_SIZE * INSIGNIA_EDIT_ICON_SCALE +
-  INSIGNIA_EDIT_ICON_SAFE_PADDING -
-  INSIGNIA_EDIT_ICON_OFFSET_X; // subtract: positive offsetX moves pencil right, needs less protection
+// Derived layout values — these update automatically when editors change
+const PENCIL_TOP       = PENCIL_BASE_TOP + INSIGNIA_EDIT_ICON_OFFSET_Y;
+const PENCIL_RIGHT     = PENCIL_BASE_RIGHT - INSIGNIA_EDIT_ICON_OFFSET_X;
+const PENCIL_BOX_SIZE  = Math.max(24, PENCIL_BASE_SIZE  * INSIGNIA_EDIT_ICON_SCALE);
+const PENCIL_FONT_SIZE = PENCIL_BASE_FONT_SIZE * INSIGNIA_EDIT_ICON_SCALE;
 
-// Extra inset for the text wrapper (on top of container's own paddingRight)
+// ─── Text reserved-area computation ─────────────────────────────────────
+// How far the pencil's right edge is from the container's right edge:
+//   PENCIL_RIGHT                    → right anchor (layout)
+//   PENCIL_BOX_SIZE                 → icon width (layout, already scaled)
+//   INSIGNIA_EDIT_ICON_SAFE_PADDING → extra clearance
+// Minus CONTAINER_PADDING_RIGHT which the container already provides.
+
 const PENCIL_TEXT_EXTRA_RIGHT = Math.max(
   0,
-  pencilVisualExtentFromRight - CONTAINER_PADDING_RIGHT,
+  PENCIL_RIGHT + PENCIL_BOX_SIZE + INSIGNIA_EDIT_ICON_SAFE_PADDING - CONTAINER_PADDING_RIGHT,
 );
 
 // ─────────────────────────────────────────────────────────────────────────
 
 type Props = {
   phrase: string;
-  /** When provided, a pencil icon appears in the top-right corner and
-   *  the text automatically reserves space for it. */
+  /** When provided, a pencil icon appears in the top-right corner of the box
+   *  and the text automatically reserves space around it. */
   onEdit?: () => void;
 };
 
@@ -68,29 +71,23 @@ export const PersonalInsigniaPhrase = React.memo(function PersonalInsigniaPhrase
       {onEdit !== undefined && (
         <TouchableOpacity
           onPress={onEdit}
-          hitSlop={10}
           activeOpacity={0.6}
+          hitSlop={8}
           style={[
             styles.editBtn,
             {
-              transform: [
-                { translateX: INSIGNIA_EDIT_ICON_OFFSET_X },
-                { translateY: INSIGNIA_EDIT_ICON_OFFSET_Y },
-                { scale: INSIGNIA_EDIT_ICON_SCALE },
-              ],
+              top: PENCIL_TOP,
+              right: PENCIL_RIGHT,
+              width: PENCIL_BOX_SIZE,
+              height: PENCIL_BOX_SIZE,
             },
           ]}
         >
-          <Text style={styles.editIcon}>✎</Text>
+          <Text style={[styles.editIcon, { fontSize: PENCIL_FONT_SIZE }]}>✎</Text>
         </TouchableOpacity>
       )}
 
-      {/*
-        Text lives in its own View with a dynamic right inset that grows with
-        the pencil's visual footprint. When onEdit is undefined the inset is 0
-        (no extra padding, same as before). The container's paddingRight:14
-        already accounts for the base clearance.
-      */}
+      {/* Text wrapper reserves space where the pencil sits */}
       <View style={{ paddingRight: onEdit !== undefined ? PENCIL_TEXT_EXTRA_RIGHT : 0 }}>
         <Text style={styles.text}>{phrase}</Text>
       </View>
@@ -115,14 +112,13 @@ const styles = StyleSheet.create({
   },
   editBtn: {
     position: 'absolute',
-    top: 8,
-    right: 8,
     zIndex: 2,
-    padding: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   editIcon: {
-    fontSize: 16,
     color: '#FFFFFF',
     textAlign: 'center',
+    includeFontPadding: false,
   },
 });

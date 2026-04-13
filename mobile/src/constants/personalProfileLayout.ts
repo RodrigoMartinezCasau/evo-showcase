@@ -43,7 +43,7 @@ export const INSIGNIA_BOX_OFFSET_Y = -15;
 
 // ── Insignia phrase edit (pencil) icon ─────────────────────────────
 export const INSIGNIA_EDIT_ICON_OFFSET_X = -5;
-export const INSIGNIA_EDIT_ICON_OFFSET_Y = 5;
+export const INSIGNIA_EDIT_ICON_OFFSET_Y = 0;
 export const INSIGNIA_EDIT_ICON_SCALE = 2;
 /** Extra padding around the pencil's visual area to keep text clear of it. */
 export const INSIGNIA_EDIT_ICON_SAFE_PADDING = -18;
