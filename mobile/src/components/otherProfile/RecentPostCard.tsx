@@ -3,11 +3,11 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import type { CommunityPost } from '@evoconn/types';
 import { PROFILE_POST_PREVIEW_LAYOUT as L } from '@evoconn/constants/postPreviewLayout';
 
-// Same SVG icons as the "Para ti" action column
-import UpvoteIcon from '../../assets/detailActions/31.svg';
-import DownvoteIcon from '../../assets/detailActions/29.svg';
-import SavedIcon from '../../assets/detailActions/33.svg';
-import FlechaIcon from '../../assets/detailActions/flecha.svg';
+// Active (colored) versions — same assets as "Para ti" active state
+import UpvoteIcon from '../../assets/detailActions/32.svg';   // green  #89D957
+import DownvoteIcon from '../../assets/detailActions/30.svg'; // red    #ff4a31
+import SavedIcon from '../../assets/detailActions/34.svg';    // yellow #ffde59
+import FlechaIcon from '../../assets/detailActions/flecha.svg'; // currentColor → computed from %
 
 type Props = {
   post: CommunityPost;
@@ -19,6 +19,12 @@ function voteRatioPct(up: number, down: number): number {
   return Math.round((up / Math.max(1, up + down)) * 100);
 }
 
+function flechaColor(pct: number): string {
+  if (pct >= 90) return '#89D957';
+  if (pct >= 50) return '#ffde59';
+  return '#ff4a31';
+}
+
 export const RecentPostCard = React.memo(function RecentPostCard({ post, cardWidth, onPress }: Props) {
   const isPhrase = post.type === 'phrase';
   const typeLabel = isPhrase ? 'FRASE' : 'REFLEXIÓN';
@@ -26,10 +32,15 @@ export const RecentPostCard = React.memo(function RecentPostCard({ post, cardWid
     ? post.body
     : (post.title ?? post.body.slice(0, 80));
 
-  // ── Derived stats-bar dimensions from the single scale editor ──────────
-  const barScale     = L.profilePreviewStatsBarScale;
-  const iconPx       = Math.round(L.profilePreviewStatsIconBaseSize * barScale);
-  const countFontSz  = Math.round(L.profilePreviewStatsCountBaseFontSize * barScale);
+  const pct         = voteRatioPct(post.voteStats.up, post.voteStats.down);
+  const pctColor    = flechaColor(pct);
+
+  // ── Derived stats-bar dimensions — all scale from ONE constant ──────────
+  const barScale    = L.profilePreviewStatsBarScale;
+  const iconPx      = Math.round(L.profilePreviewStatsIconBaseSize * barScale);
+  const countFontSz = Math.round(L.profilePreviewStatsCountBaseFontSize * barScale);
+  const colGap      = Math.round(3 * barScale);
+  const rowGap      = Math.round(L.profilePreviewStatsColSpacing * barScale);
 
   return (
     <TouchableOpacity
@@ -100,12 +111,13 @@ export const RecentPostCard = React.memo(function RecentPostCard({ post, cardWid
             },
           ]}
         >
-          <View style={styles.statsRow}>
+          <View style={[styles.statsRow, { gap: rowGap }]}>
 
             {/* ── Upvote column: icon on top, count below ── */}
             <View
               style={[
                 styles.statCol,
+                { gap: colGap },
                 {
                   transform: [
                     { translateX: L.profilePreviewUpColOffsetX },
@@ -126,6 +138,7 @@ export const RecentPostCard = React.memo(function RecentPostCard({ post, cardWid
             <View
               style={[
                 styles.statCol,
+                { gap: colGap },
                 {
                   transform: [
                     { translateX: L.profilePreviewDownColOffsetX },
@@ -146,6 +159,7 @@ export const RecentPostCard = React.memo(function RecentPostCard({ post, cardWid
             <View
               style={[
                 styles.statCol,
+                { gap: colGap },
                 {
                   transform: [
                     { translateX: L.profilePreviewSavedColOffsetX },
@@ -166,6 +180,7 @@ export const RecentPostCard = React.memo(function RecentPostCard({ post, cardWid
             <View
               style={[
                 styles.statCol,
+                { gap: colGap },
                 {
                   transform: [
                     { translateX: L.profilePreviewPercentageColOffsetX },
@@ -186,10 +201,10 @@ export const RecentPostCard = React.memo(function RecentPostCard({ post, cardWid
                   ],
                 }}
               >
-                <FlechaIcon width={iconPx} height={iconPx} />
+                <FlechaIcon width={iconPx} height={iconPx} color={pctColor} />
               </View>
-              <Text style={[styles.statPercentage, { fontSize: countFontSz, lineHeight: Math.ceil(countFontSz * 1.25) }]}>
-                {voteRatioPct(post.voteStats.up, post.voteStats.down)}%
+              <Text style={[styles.statPercentage, { fontSize: countFontSz, lineHeight: Math.ceil(countFontSz * 1.25), color: pctColor }]}>
+                {pct}%
               </Text>
             </View>
 
@@ -248,11 +263,11 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: 10,
+    // gap set dynamically: Math.round(10 * barScale)
   },
   statCol: {
     alignItems: 'center',
-    gap: 3,
+    // gap set dynamically: Math.round(3 * barScale)
   },
   statCount: {
     color: '#FFFFFF',

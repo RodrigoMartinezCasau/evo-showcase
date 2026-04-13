@@ -35,11 +35,18 @@ export const PROFILE_POST_PREVIEW_LAYOUT = {
 
   // ─── Stats bar — ONE unified size editor ─────────────────────────────────
   /**
-   * Single scale that controls the size of the ENTIRE stats bar:
-   * icon pixel dimensions + count font size all scale together.
-   * 1 = default, 0.8 = smaller, 1.3 = larger.
+   * Single scale that controls the ENTIRE stats bar uniformly:
+   *   - icon pixel size   = profilePreviewStatsIconBaseSize   × scale
+   *   - number font size  = profilePreviewStatsCountBaseFontSize × scale
+   *   - gap between cols  = 10px × scale  (proportional, never breaks layout)
+   *   - gap icon↔number   = 3px  × scale
+   *   - flecha icon scale = profilePreviewFlechaIconScale × scale (stacks)
+   *
+   * Outer black card is NEVER affected. Safe range: 0.6 – 2.0.
+   * Current default is 1.0 (22px icons, 20px numbers).
+   * Previous value was 1.5 — reduce here to make everything smaller.
    */
-  profilePreviewStatsBarScale: 1.5,
+  profilePreviewStatsBarScale: 1,
   /** Base icon size in pixels at scale 1. */
   profilePreviewStatsIconBaseSize: 22,
   /** Base font size for the count numbers at scale 1. */
@@ -48,6 +55,15 @@ export const PROFILE_POST_PREVIEW_LAYOUT = {
   // ─── Stats block position (moves the whole bar, does not resize it) ───────
   profilePreviewStatsBlockOffsetX: 0,
   profilePreviewStatsBlockOffsetY: 0,
+
+  // ─── Uniform spacing between stat columns ────────────────────────────────
+  /**
+   * Gap in pixels between each stat column (upvote / downvote / saved / %).
+   * All four gaps are identical. This is applied AFTER barScale — raise or
+   * lower this value independently to tighten or loosen the row.
+   * Default 10 (same as before). Safe range: 4 – 28.
+   */
+  profilePreviewStatsColSpacing: 30,
 
   // ─── Fine-tune per-column positions (icon + its count move together) ──────
   profilePreviewUpColOffsetX: 0,
