@@ -3,9 +3,6 @@ import { View, Text, FlatList, StyleSheet, useWindowDimensions } from 'react-nat
 import type { CommunityPost } from '@evoconn/types';
 import { PersonalRecentPostCard } from './PersonalRecentPostCard';
 import {
-  LATEST_POSTS_LABEL_OFFSET_X,
-  LATEST_POSTS_LABEL_OFFSET_Y,
-  LATEST_POSTS_LABEL_FONT_SIZE,
   POSTS_SECTION_PADDING_TOP,
   PERSONAL_LATEST_POSTS_SPACING,
 } from '@evoconn/constants/personalProfileLayout';
@@ -39,20 +36,6 @@ export const PersonalRecentPostsSlider = React.memo(function PersonalRecentPosts
 
   return (
     <View style={[styles.container, { paddingTop: POSTS_SECTION_PADDING_TOP, marginTop: PERSONAL_LATEST_POSTS_SPACING }]}>
-      <Text
-        style={[
-          styles.title,
-          {
-            fontSize: LATEST_POSTS_LABEL_FONT_SIZE,
-            transform: [
-              { translateX: LATEST_POSTS_LABEL_OFFSET_X },
-              { translateY: LATEST_POSTS_LABEL_OFFSET_Y },
-            ],
-          },
-        ]}
-      >
-        Últimas publicaciones
-      </Text>
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id}
@@ -70,14 +53,6 @@ export const PersonalRecentPostsSlider = React.memo(function PersonalRecentPosts
 const styles = StyleSheet.create({
   container: {
     marginHorizontal: 20,
-    gap: 10,
-  },
-  title: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    opacity: 0.7,
   },
   list: {
     paddingRight: 20,

@@ -77,7 +77,6 @@ export const SHARE_BUTTON_OFFSET_X = -7;
 export const SHARE_BUTTON_OFFSET_Y = -5;
 export const SHARE_BUTTON_SIZE = 28;
 
-// ── "Últimas publicaciones" label ──────────────────────────────────
-export const LATEST_POSTS_LABEL_OFFSET_X = 3;
-export const LATEST_POSTS_LABEL_OFFSET_Y = 0;
-export const LATEST_POSTS_LABEL_FONT_SIZE = 14;
+/** Espacio vertical ENTRE el panel de porcentajes filosóficos y la fila de tarjetas.
+ *  Reducir → acerca las tarjetas al bloque de arriba. No afecta a otros espaciados. */
+export const OTHER_LATEST_POSTS_SPACING = -10;

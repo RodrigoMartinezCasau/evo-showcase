@@ -25,6 +25,27 @@ function flechaColor(pct: number): string {
   return '#ff4a31';
 }
 
+function compactCount(n: number): string {
+  if (n >= 1_000_000) return `${Math.floor(n / 1_000_000)}M`;
+  if (n >= 1_000) return `${Math.floor(n / 1_000)}k`;
+  return String(n);
+}
+
+function timeSince(isoDate: string): string {
+  const diffMs = Date.now() - new Date(isoDate).getTime();
+  const mins   = Math.floor(diffMs / 60_000);
+  if (mins < 1)    return 'ahora';
+  if (mins < 60)   return `${mins} min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24)  return `${hours} h`;
+  const days  = Math.floor(hours / 24);
+  const months = Math.floor(days / 30);
+  if (months < 1)  return `${days} d`;
+  if (months < 12) return `${months} ${months === 1 ? 'mes' : 'meses'}`;
+  const years = Math.floor(months / 12);
+  return `${years} ${years === 1 ? 'año' : 'años'}`;
+}
+
 export const RecentPostCard = React.memo(function RecentPostCard({ post, cardWidth, onPress }: Props) {
   const isPhrase = post.type === 'phrase';
   const typeLabel = isPhrase ? 'FRASE' : 'REFLEXIÓN';
@@ -34,6 +55,7 @@ export const RecentPostCard = React.memo(function RecentPostCard({ post, cardWid
 
   const pct         = voteRatioPct(post.voteStats.up, post.voteStats.down);
   const pctColor    = flechaColor(pct);
+  const timeStr     = timeSince(post.createdAt);
 
   // ── Derived stats-bar dimensions — all scale from ONE constant ──────────
   const barScale    = L.profilePreviewStatsBarScale;
@@ -64,19 +86,34 @@ export const RecentPostCard = React.memo(function RecentPostCard({ post, cardWid
         {/* ── Top: type label + main text ── */}
         <View style={styles.topSection}>
 
-          {/* Type label */}
-          <View
-            style={{
-              transform: [
-                { translateX: L.profilePreviewTypeLabelOffsetX },
-                { translateY: L.profilePreviewTypeLabelOffsetY },
-                { scale: L.profilePreviewTypeLabelScale },
-              ],
-            }}
-          >
-            <Text style={[styles.typeLabel, { color: L.profilePreviewTypeLabelColor }]}>
-              {typeLabel}
-            </Text>
+          {/* Type label + time since publication on the same row */}
+          <View style={styles.metaRow}>
+            <View
+              style={{
+                transform: [
+                  { translateX: L.profilePreviewTypeLabelOffsetX },
+                  { translateY: L.profilePreviewTypeLabelOffsetY },
+                  { scale: L.profilePreviewTypeLabelScale },
+                ],
+              }}
+            >
+              <Text style={[styles.typeLabel, { color: L.profilePreviewTypeLabelColor }]}>
+                {typeLabel}
+              </Text>
+            </View>
+            <View
+              style={{
+                transform: [
+                  { translateX: L.profilePreviewTimeLabelOffsetX },
+                  { translateY: L.profilePreviewTimeLabelOffsetY },
+                  { scale: L.profilePreviewTimeLabelScale },
+                ],
+              }}
+            >
+              <Text style={[styles.timeLabel, { color: L.profilePreviewTimeLabelColor }]}>
+                · {timeStr}
+              </Text>
+            </View>
           </View>
 
           {/* Main content */}
@@ -130,7 +167,7 @@ export const RecentPostCard = React.memo(function RecentPostCard({ post, cardWid
                 <UpvoteIcon width={iconPx} height={iconPx} />
               </View>
               <Text style={[styles.statCount, { fontSize: countFontSz, lineHeight: Math.ceil(countFontSz * 1.25) }]}>
-                {post.voteStats.up}
+                {compactCount(post.voteStats.up)}
               </Text>
             </View>
 
@@ -151,7 +188,7 @@ export const RecentPostCard = React.memo(function RecentPostCard({ post, cardWid
                 <DownvoteIcon width={iconPx} height={iconPx} />
               </View>
               <Text style={[styles.statCount, { fontSize: countFontSz, lineHeight: Math.ceil(countFontSz * 1.25) }]}>
-                {post.voteStats.down}
+                {compactCount(post.voteStats.down)}
               </Text>
             </View>
 
@@ -172,7 +209,7 @@ export const RecentPostCard = React.memo(function RecentPostCard({ post, cardWid
                 <SavedIcon width={iconPx} height={iconPx} />
               </View>
               <Text style={[styles.statCount, { fontSize: countFontSz, lineHeight: Math.ceil(countFontSz * 1.25) }]}>
-                {post.voteStats.save}
+                {compactCount(post.voteStats.save)}
               </Text>
             </View>
 
@@ -235,11 +272,22 @@ const styles = StyleSheet.create({
   topSection: {
     gap: 6,
   },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flexWrap: 'nowrap',
+  },
   typeLabel: {
     fontSize: 9,
     fontWeight: '700',
     letterSpacing: 1.2,
     textTransform: 'uppercase',
+    lineHeight: 12,
+  },
+  timeLabel: {
+    fontSize: 9,
+    fontWeight: '500',
     lineHeight: 12,
   },
   reflectionTitle: {

@@ -2,11 +2,7 @@ import React, { useCallback } from 'react';
 import { View, Text, FlatList, StyleSheet, useWindowDimensions } from 'react-native';
 import type { CommunityPost } from '@evoconn/types';
 import { RecentPostCard } from './RecentPostCard';
-import {
-  LATEST_POSTS_LABEL_OFFSET_X,
-  LATEST_POSTS_LABEL_OFFSET_Y,
-  LATEST_POSTS_LABEL_FONT_SIZE,
-} from '@evoconn/constants/otherProfileLayout';
+import { OTHER_LATEST_POSTS_SPACING } from '@evoconn/constants/otherProfileLayout';
 
 type Props = {
   posts: CommunityPost[];
@@ -36,21 +32,7 @@ export const RecentPostsSlider = React.memo(function RecentPostsSlider({ posts, 
   }
 
   return (
-    <View style={styles.container}>
-      <Text
-        style={[
-          styles.title,
-          {
-            fontSize: LATEST_POSTS_LABEL_FONT_SIZE,
-            transform: [
-              { translateX: LATEST_POSTS_LABEL_OFFSET_X },
-              { translateY: LATEST_POSTS_LABEL_OFFSET_Y },
-            ],
-          },
-        ]}
-      >
-        Últimas publicaciones
-      </Text>
+    <View style={[styles.container, { marginTop: OTHER_LATEST_POSTS_SPACING }]}>
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id}
@@ -68,14 +50,6 @@ export const RecentPostsSlider = React.memo(function RecentPostsSlider({ posts, 
 const styles = StyleSheet.create({
   container: {
     marginHorizontal: 20,
-    gap: 10,
-  },
-  title: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    opacity: 0.7,
   },
   list: {
     paddingRight: 20,

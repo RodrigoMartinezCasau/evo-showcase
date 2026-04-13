@@ -22,11 +22,21 @@ export const PROFILE_POST_PREVIEW_LAYOUT = {
   profilePreviewContentScale: 1,
 
   // ─── Type label ("REFLEXIÓN" / "FRASE") ──────────────────────────────────
-  profilePreviewTypeLabelOffsetX: 0,
+  profilePreviewTypeLabelOffsetX: 12,
   profilePreviewTypeLabelOffsetY: 0,
-  profilePreviewTypeLabelScale: 1,
+  profilePreviewTypeLabelScale: 1.4,
   /** Hex or rgba string for the type-label colour. */
   profilePreviewTypeLabelColor: 'rgba(255,255,255,0.40)',
+
+  // ─── Time label ("14 min", "3 h", "7 meses", "2 años") ──────────────────
+  /** Horizontal offset of the time-since-publication label (independent of type label). */
+  profilePreviewTimeLabelOffsetX: 30,
+  /** Vertical offset of the time-since-publication label. */
+  profilePreviewTimeLabelOffsetY: 0,
+  /** Scale of the time-since-publication label. */
+  profilePreviewTimeLabelScale: 1.4,
+  /** Colour of the time label — matches the type label by default. */
+  profilePreviewTimeLabelColor: 'rgba(255,255,255,0.40)',
 
   // ─── Main content (title for reflection · phrase text for frase) ──────────
   profilePreviewMainTextOffsetX: 0,
@@ -63,7 +73,7 @@ export const PROFILE_POST_PREVIEW_LAYOUT = {
    * lower this value independently to tighten or loosen the row.
    * Default 10 (same as before). Safe range: 4 – 28.
    */
-  profilePreviewStatsColSpacing: 30,
+  profilePreviewStatsColSpacing: 20,
 
   // ─── Fine-tune per-column positions (icon + its count move together) ──────
   profilePreviewUpColOffsetX: 0,
