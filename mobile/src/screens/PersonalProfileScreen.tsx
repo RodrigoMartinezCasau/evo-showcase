@@ -41,7 +41,7 @@ const ANIM_DURATION = 200;
 export default function PersonalProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { width: screenW } = useWindowDimensions();
+  const { width: screenW, height: screenH } = useWindowDimensions();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { thoughts } = useThoughts();
@@ -71,15 +71,20 @@ export default function PersonalProfileScreen() {
     setPhraseEditorOpen(false);
   }, []);
 
+  // Top bar height (matches OtherUserProfileView calculation).
+  const topBarHeight = 60 + insets.top;
   // Bottom bar height — used for scroll padding and detail panel item height.
   const bottomBarHeight =
     BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
     insets.bottom +
     BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
     20;
+  // Content area height: profile wrap stops exactly above the bottom bar,
+  // matching the OtherUserProfileView layout so the rounded bottom corners
+  // of ReflectionBackground's bgClip are visually above the bottom tab bar.
+  const contentHeight = screenH - topBarHeight - bottomBarHeight;
 
-  // Measured height of the profile content area (set via onLayout once stable).
-  // Only used by ProfileDetailPanel — the profile area itself uses flex: 1.
+  // ProfileDetailPanel still needs an explicit pixel height.
   const contentHeightRef = useRef(0);
   const onProfileWrapLayout = useCallback(
     (e: { nativeEvent: { layout: { height: number } } }) => {
@@ -171,11 +176,11 @@ export default function PersonalProfileScreen() {
         onClanPress={() => {/* already on personal profile */}}
       />
 
-      <View style={styles.profileWrap} onLayout={onProfileWrapLayout}>
+      <View style={[styles.profileWrap, { height: contentHeight }]} onLayout={onProfileWrapLayout}>
         <ReflectionBackground clan={profileWithClan.clanId}>
           <ScrollView
             style={styles.scroll}
-            contentContainerStyle={[styles.content, { paddingBottom: bottomBarHeight + 28 }]}
+            contentContainerStyle={styles.content}
             showsVerticalScrollIndicator={false}
           >
             <PersonalFollowRow
@@ -376,7 +381,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: evoconnColors.background },
   scroll: { flex: 1 },
   profileWrap: {
-    flex: 1,
     overflow: 'hidden',
   },
   content: {
