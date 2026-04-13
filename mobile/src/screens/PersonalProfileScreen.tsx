@@ -27,7 +27,7 @@ const ANIM_DURATION = 200;
 export default function PersonalProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { width: screenW, height: screenH } = useWindowDimensions();
+  const { width: screenW } = useWindowDimensions();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const [bottomTab] = useState<'siguiendo' | 'mas-votadas' | 'para-ti' | 'search'>('para-ti');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -36,13 +36,22 @@ export default function PersonalProfileScreen() {
   const profile = getPersonalProfile();
   const profileWithClan = { ...profile, clanId: activeClan };
 
-  const topBarHeight = 60 + insets.top;
+  // Bottom bar height — used for scroll padding and detail panel item height.
   const bottomBarHeight =
     BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
     insets.bottom +
     BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
     20;
-  const contentHeight = screenH - topBarHeight - bottomBarHeight;
+
+  // Measured height of the profile content area (set via onLayout once stable).
+  // Only used by ProfileDetailPanel — the profile area itself uses flex: 1.
+  const contentHeightRef = useRef(0);
+  const onProfileWrapLayout = useCallback(
+    (e: { nativeEvent: { layout: { height: number } } }) => {
+      contentHeightRef.current = e.nativeEvent.layout.height;
+    },
+    [],
+  );
 
   // ─── Expanded post detail panel ────────────────────────────────────
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -127,11 +136,11 @@ export default function PersonalProfileScreen() {
         onClanPress={() => {/* already on personal profile */}}
       />
 
-      <View style={[styles.profileWrap, { height: contentHeight }]}>
+      <View style={styles.profileWrap} onLayout={onProfileWrapLayout}>
         <ReflectionBackground clan={profileWithClan.clanId}>
           <ScrollView
             style={styles.scroll}
-            contentContainerStyle={styles.content}
+            contentContainerStyle={[styles.content, { paddingBottom: bottomBarHeight + 28 }]}
             showsVerticalScrollIndicator={false}
           >
             <PersonalFollowRow
@@ -173,7 +182,7 @@ export default function PersonalProfileScreen() {
           <ProfileDetailPanel
             data={detailFeed.data}
             initialIndex={detailFeed.initialIndex}
-            itemHeight={contentHeight}
+            itemHeight={contentHeightRef.current}
             slideAnim={slideAnim}
             screenW={screenW}
             onClose={closeDetailFeed}
@@ -214,11 +223,11 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: evoconnColors.background },
   scroll: { flex: 1 },
   profileWrap: {
+    flex: 1,
     overflow: 'hidden',
   },
   content: {
     paddingTop: 24,
-    paddingBottom: 48,
   },
   contentGap: {
     height: 20,

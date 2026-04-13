@@ -27,6 +27,17 @@ const RANK_LABELS: Record<Rank, string> = {
   filosofo: 'Filósofo',
 };
 
+// Explicit line-heights prevent text-measurement variance across remounts.
+const USERNAME_LINE_HEIGHT = Math.ceil(USERNAME_FONT_SIZE * 1.3);
+const CLAN_LINE_HEIGHT = Math.ceil(CLAN_FONT_SIZE * 1.3);
+const RANK_LINE_HEIGHT = Math.ceil(RANK_FONT_SIZE * 1.3);
+
+// Deterministic row heights so the container never reflows.
+const USERNAME_ROW_HEIGHT = USERNAME_LINE_HEIGHT;
+const USERNAME_ROW_MARGIN_BOTTOM = 4;
+const CLAN_ROW_HEIGHT = Math.max(CLAN_LINE_HEIGHT, RANK_LINE_HEIGHT + 6); // 6 = pill paddingV*2
+const CONTAINER_HEIGHT = USERNAME_ROW_HEIGHT + USERNAME_ROW_MARGIN_BOTTOM + CLAN_ROW_HEIGHT;
+
 type Props = {
   username: string;
   clanId: string | null;
@@ -51,14 +62,16 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
   }, [username]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { height: CONTAINER_HEIGHT }]}>
       <View style={styles.textBlock}>
-        <View style={styles.usernameRow}>
+        {/* Username row */}
+        <View style={[styles.usernameRow, { height: USERNAME_ROW_HEIGHT, marginBottom: USERNAME_ROW_MARGIN_BOTTOM }]}>
           <Text
             style={[
               styles.username,
               {
                 fontSize: USERNAME_FONT_SIZE,
+                lineHeight: USERNAME_LINE_HEIGHT,
                 transform: [{ translateX: USERNAME_OFFSET_X }, { translateY: USERNAME_OFFSET_Y }],
               },
             ]}
@@ -66,6 +79,7 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
           >
             {username}
           </Text>
+          <View style={{ width: 10 }} />
           <TouchableOpacity
             onPress={handleShare}
             hitSlop={10}
@@ -83,28 +97,36 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
             <ShareIcon size={SHARE_BUTTON_SIZE} />
           </TouchableOpacity>
         </View>
-        <View style={styles.clanRankRow}>
+
+        {/* Clan + rank row */}
+        <View style={[styles.clanRankRow, { height: CLAN_ROW_HEIGHT }]}>
           <Text
             style={[
               styles.clanName,
               {
                 fontSize: CLAN_FONT_SIZE,
+                lineHeight: CLAN_LINE_HEIGHT,
                 transform: [{ translateX: CLAN_OFFSET_X }, { translateY: CLAN_OFFSET_Y }],
               },
             ]}
           >
             {clanLabel}
           </Text>
+          <View style={{ width: 8 }} />
           <View
             style={[
               styles.rankPill,
               { transform: [{ translateX: RANK_OFFSET_X }, { translateY: RANK_OFFSET_Y }] },
             ]}
           >
-            <Text style={[styles.rankText, { fontSize: RANK_FONT_SIZE }]}>{RANK_LABELS[rank]}</Text>
+            <Text style={[styles.rankText, { fontSize: RANK_FONT_SIZE, lineHeight: RANK_LINE_HEIGHT }]}>
+              {RANK_LABELS[rank]}
+            </Text>
           </View>
         </View>
       </View>
+
+      {/* Shield — absolute, does not affect layout height */}
       <View
         style={[
           styles.shieldWrap,
@@ -129,7 +151,7 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
 function ShareIcon({ size }: { size: number }) {
   return (
     <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
-      <Text style={{ fontSize: size * 0.85, color: '#FFFFFF', opacity: 0.85 }}>↗</Text>
+      <Text style={{ fontSize: size * 0.85, lineHeight: Math.ceil(size * 0.85 * 1.3), color: '#FFFFFF', opacity: 0.85 }}>↗</Text>
     </View>
   );
 }
@@ -145,8 +167,6 @@ const styles = StyleSheet.create({
   usernameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 4,
   },
   username: {
     color: '#FFFFFF',
@@ -161,7 +181,6 @@ const styles = StyleSheet.create({
   clanRankRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
   },
   clanName: {
     fontWeight: '600',
