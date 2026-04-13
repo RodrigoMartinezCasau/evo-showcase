@@ -13,6 +13,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppTopBar, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
+import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
 import { ProfileDetailPanel } from '@evoconn/components/ProfileDetailPanel';
@@ -84,7 +85,6 @@ export default function ClanScreen() {
     20;
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [bottomTab] = useState<'siguiendo' | 'mas-votadas' | 'para-ti' | 'search'>('para-ti');
 
   // ─── Detail panel for post expansion ─────────────────────────────
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -145,9 +145,9 @@ export default function ClanScreen() {
     [closeDetailFeed, clanId, router],
   );
 
-  const handleBottomTabChange = useCallback(() => {
+  const handleBottomTabChange = useCallback((tab: TabId) => {
     if (detailFeed) { closeDetailFeed(); return; }
-    router.replace('/(tabs)');
+    router.replace({ pathname: '/(tabs)', params: { tab } });
   }, [detailFeed, closeDetailFeed, router]);
 
   const handleMemberPress = useCallback(
@@ -433,7 +433,7 @@ export default function ClanScreen() {
           },
         ]}
       >
-        <BottomCommunityTabs activeTab={bottomTab} onTabChange={handleBottomTabChange} />
+        <BottomCommunityTabs activeTab={null} onTabChange={handleBottomTabChange} />
       </View>
 
       <SidebarDrawer

@@ -6,6 +6,7 @@ import { evoconnColors } from '@evoconn/theme/colors';
 import { mockCurrentUser, mockUserStats } from '@evoconn/data/mockUser';
 import { getOtherUserProfileOrFallback } from '@evoconn/data/mockOtherUsers';
 import { AppTopBar, RankBadge, ClanBanner, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
+import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { getClanCardColor } from '@evoconn/theme/theme';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
@@ -90,7 +91,6 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
   const profile = getOtherUserProfileOrFallback(userId);
   const insets = useSafeAreaInsets();
   const { width: screenW, height: screenH } = useWindowDimensions();
-  const [bottomTab] = useState<'siguiendo' | 'mas-votadas' | 'para-ti' | 'search'>('para-ti');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { thoughts } = useThoughts();
 
@@ -165,12 +165,12 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
     [router],
   );
 
-  const handleBottomTabChange = useCallback(() => {
+  const handleBottomTabChange = useCallback((tab: TabId) => {
     if (detailFeed) {
       closeDetailFeed();
       return;
     }
-    router.replace('/(tabs)');
+    router.replace({ pathname: '/(tabs)', params: { tab } });
   }, [detailFeed, closeDetailFeed, router]);
 
   return (
@@ -237,7 +237,7 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
           },
         ]}
       >
-        <BottomCommunityTabs activeTab={bottomTab} onTabChange={handleBottomTabChange} />
+        <BottomCommunityTabs activeTab={null} onTabChange={handleBottomTabChange} />
       </View>
 
       <SidebarDrawer

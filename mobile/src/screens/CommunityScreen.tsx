@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   AppTopBar,
@@ -79,8 +79,11 @@ const TAB_INDEX: Record<TabId, number> = {
   'search': 3,
 };
 
+const VALID_TAB_IDS: TabId[] = ['siguiendo', 'mas-votadas', 'para-ti', 'search'];
+
 export default function CommunityScreen() {
   const router = useRouter();
+  const { tab: tabParam } = useLocalSearchParams<{ tab?: string }>();
   const insets = useSafeAreaInsets();
   const { width: screenW, height: screenH } = useWindowDimensions();
   const { followingSet } = useFollowState();
@@ -90,6 +93,12 @@ export default function CommunityScreen() {
   const drawerOpenProgress = useRef(new Animated.Value(0)).current;
   const gestureCommittingRef = useRef(false);
   const [activeTab, setActiveTab] = useState<TabId>('siguiendo');
+
+  useEffect(() => {
+    if (tabParam && VALID_TAB_IDS.includes(tabParam as TabId)) {
+      setActiveTab(tabParam as TabId);
+    }
+  }, [tabParam]);
   const [searchQuery, setSearchQuery] = useState('');
   const [feedScrollEnabled, setFeedScrollEnabled] = useState(true);
 

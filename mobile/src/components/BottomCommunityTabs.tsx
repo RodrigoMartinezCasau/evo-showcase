@@ -17,10 +17,11 @@ const TABS = [
   { id: 'search', label: 'SEARCH' },
 ] as const;
 
-type TabId = (typeof TABS)[number]['id'];
+export type TabId = (typeof TABS)[number]['id'];
 
 type BottomCommunityTabsProps = {
-  activeTab: TabId;
+  /** Pass null to show no tab as active (e.g. on profile / clan screens). */
+  activeTab: TabId | null;
   onTabChange: (tab: TabId) => void;
 };
 
@@ -34,10 +35,10 @@ export function BottomCommunityTabs({ activeTab, onTabChange }: BottomCommunityT
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const selectedColor = getSidebarFooterClanLineColor(activeClan);
   const LupitaIcon = useMemo(() => {
-    if (activeTab !== 'search') {
-      return BOTTOM_BAR_DEFAULT_LUPITA;
+    if (activeTab === 'search') {
+      return getBottomBarLupitaByHouse(activeClan);
     }
-    return getBottomBarLupitaByHouse(activeClan);
+    return BOTTOM_BAR_DEFAULT_LUPITA;
   }, [activeTab, activeClan]);
   const lupEd = BOTTOM_BAR_LAYOUT.BOTTOM_BAR_LUPITA_EDITOR;
   const lupitaPx = Math.round(
@@ -49,7 +50,7 @@ export function BottomCommunityTabs({ activeTab, onTabChange }: BottomCommunityT
   return (
     <View style={styles.bar}>
       {TABS.map((tab) => {
-        const isActive = activeTab === tab.id;
+        const isActive = activeTab !== null && activeTab === tab.id;
         const uw = underlineWidthForTab(tab.id);
         const th = BOTTOM_BAR_LAYOUT.BOTTOM_BAR_UNDERLINE_THICKNESS;
         const lupUnderlineShiftX =

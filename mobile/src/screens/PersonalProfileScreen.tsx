@@ -19,6 +19,7 @@ import { evoconnColors } from '@evoconn/theme/colors';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { getPersonalProfile } from '@evoconn/data/mockPersonalProfile';
 import { AppTopBar, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
+import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
@@ -42,7 +43,6 @@ export default function PersonalProfileScreen() {
   const insets = useSafeAreaInsets();
   const { width: screenW } = useWindowDimensions();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
-  const [bottomTab] = useState<'siguiendo' | 'mas-votadas' | 'para-ti' | 'search'>('para-ti');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { thoughts } = useThoughts();
 
@@ -156,12 +156,12 @@ export default function PersonalProfileScreen() {
     [router],
   );
 
-  const handleBottomTabChange = useCallback(() => {
+  const handleBottomTabChange = useCallback((tab: TabId) => {
     if (detailFeed) {
       closeDetailFeed();
       return;
     }
-    router.replace('/(tabs)');
+    router.replace({ pathname: '/(tabs)', params: { tab } });
   }, [detailFeed, closeDetailFeed, router]);
 
   return (
@@ -239,7 +239,7 @@ export default function PersonalProfileScreen() {
           },
         ]}
       >
-        <BottomCommunityTabs activeTab={bottomTab} onTabChange={handleBottomTabChange} />
+        <BottomCommunityTabs activeTab={null} onTabChange={handleBottomTabChange} />
       </View>
 
       <SidebarDrawer
