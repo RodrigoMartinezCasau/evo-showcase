@@ -5,10 +5,18 @@
  * affecting the outer black card dimensions or horizontal scroll.
  *
  * Applies to both PersonalRecentPostCard and RecentPostCard (OtherUser).
+ * Both REFLECTION and FRASE cards share this same config object.
  */
 export const REFLECTION_PREVIEW_LAYOUT = {
 
-  // ─── Title ────────────────────────────────────────────────────────────────
+  // ─── Type label ("REFLEXIÓN" / "FRASE") ──────────────────────────────────
+  typeLabelOffsetX: 0,
+  typeLabelOffsetY: 0,
+  typeLabelScale: 1,
+  /** Hex or rgba string for the type label colour. */
+  typeLabelColor: 'rgba(255,255,255,0.40)',
+
+  // ─── Main content (title for reflection · phrase text for frase) ──────────
   titleOffsetX: 0,
   titleOffsetY: 0,
   titleScale: 1,

@@ -15,6 +15,10 @@ function voteRatioPct(up: number, down: number): number {
 
 export const RecentPostCard = React.memo(function RecentPostCard({ post, cardWidth, onPress }: Props) {
   const isPhrase = post.type === 'phrase';
+  const typeLabel = isPhrase ? 'FRASE' : 'REFLEXIÓN';
+  const mainText = isPhrase
+    ? post.body
+    : (post.title ?? post.body.slice(0, 80));
 
   return (
     <TouchableOpacity
@@ -22,152 +26,151 @@ export const RecentPostCard = React.memo(function RecentPostCard({ post, cardWid
       onPress={() => onPress(post)}
       style={[styles.card, { width: cardWidth }]}
     >
-      {isPhrase ? (
-        /* ─── Phrase: unchanged ─────────────────────────────────────── */
-        <>
-          <View style={styles.phraseWrap}>
-            <Text style={styles.quoteMarks}>"</Text>
-            <Text style={styles.phraseBody} numberOfLines={5}>{post.body}</Text>
-            {post.quoteAuthor ? (
-              <Text style={styles.quoteAuthor}>— {post.quoteAuthor}</Text>
-            ) : null}
-          </View>
-          <View style={styles.footer}>
-            <Text style={styles.footerStat}>▲ {post.voteStats.up}</Text>
-            <Text style={styles.footerType}>Frase</Text>
-          </View>
-        </>
-      ) : (
-        /* ─── Reflection: title only + stats ────────────────────────── */
-        <View style={styles.reflectionWrap}>
+      {/* ── Unified card content ── */}
+      <View style={styles.topSection}>
 
-          {/* Title */}
+        {/* Type label */}
+        <View
+          style={{
+            transform: [
+              { translateX: L.typeLabelOffsetX },
+              { translateY: L.typeLabelOffsetY },
+              { scale: L.typeLabelScale },
+            ],
+          }}
+        >
+          <Text style={[styles.typeLabel, { color: L.typeLabelColor }]}>
+            {typeLabel}
+          </Text>
+        </View>
+
+        {/* Main content: title (reflection) or phrase text (frase) */}
+        <View
+          style={{
+            transform: [
+              { translateX: L.titleOffsetX },
+              { translateY: L.titleOffsetY },
+              { scale: L.titleScale },
+            ],
+          }}
+        >
+          <Text
+            style={isPhrase ? styles.phraseBody : styles.reflectionTitle}
+            numberOfLines={isPhrase ? 4 : 2}
+          >
+            {mainText}
+          </Text>
+        </View>
+
+      </View>
+
+      {/* ── Stats block ── */}
+      <View
+        style={{
+          transform: [
+            { translateX: L.statsBlockOffsetX },
+            { translateY: L.statsBlockOffsetY },
+            { scale: L.statsBlockScale },
+          ],
+        }}
+      >
+        <View style={styles.statsRow}>
+
+          {/* ▲ icon */}
           <View
             style={{
               transform: [
-                { translateX: L.titleOffsetX },
-                { translateY: L.titleOffsetY },
-                { scale: L.titleScale },
+                { translateX: L.upIconOffsetX },
+                { translateY: L.upIconOffsetY },
+                { scale: L.upIconScale },
               ],
             }}
           >
-            <Text style={styles.reflectionTitle} numberOfLines={2}>
-              {post.title ?? post.body.slice(0, 80)}
+            <Text style={styles.statIconUp}>▲</Text>
+          </View>
+
+          {/* up count */}
+          <View
+            style={{
+              transform: [
+                { translateX: L.upCountOffsetX },
+                { translateY: L.upCountOffsetY },
+                { scale: L.upCountScale },
+              ],
+            }}
+          >
+            <Text style={styles.statCount}>{post.voteStats.up}</Text>
+          </View>
+
+          {/* ▼ icon */}
+          <View
+            style={{
+              transform: [
+                { translateX: L.downIconOffsetX },
+                { translateY: L.downIconOffsetY },
+                { scale: L.downIconScale },
+              ],
+            }}
+          >
+            <Text style={styles.statIconDown}>▼</Text>
+          </View>
+
+          {/* down count */}
+          <View
+            style={{
+              transform: [
+                { translateX: L.downCountOffsetX },
+                { translateY: L.downCountOffsetY },
+                { scale: L.downCountScale },
+              ],
+            }}
+          >
+            <Text style={styles.statCount}>{post.voteStats.down}</Text>
+          </View>
+
+          {/* ★ icon */}
+          <View
+            style={{
+              transform: [
+                { translateX: L.savedIconOffsetX },
+                { translateY: L.savedIconOffsetY },
+                { scale: L.savedIconScale },
+              ],
+            }}
+          >
+            <Text style={styles.statIconSaved}>★</Text>
+          </View>
+
+          {/* saved count */}
+          <View
+            style={{
+              transform: [
+                { translateX: L.savedCountOffsetX },
+                { translateY: L.savedCountOffsetY },
+                { scale: L.savedCountScale },
+              ],
+            }}
+          >
+            <Text style={styles.statCount}>{post.voteStats.save}</Text>
+          </View>
+
+          {/* percentage */}
+          <View
+            style={{
+              transform: [
+                { translateX: L.percentageOffsetX },
+                { translateY: L.percentageOffsetY },
+                { scale: L.percentageScale },
+              ],
+            }}
+          >
+            <Text style={styles.statPercentage}>
+              {voteRatioPct(post.voteStats.up, post.voteStats.down)}%
             </Text>
           </View>
 
-          {/* Stats block */}
-          <View
-            style={[
-              styles.statsBlock,
-              {
-                transform: [
-                  { translateX: L.statsBlockOffsetX },
-                  { translateY: L.statsBlockOffsetY },
-                  { scale: L.statsBlockScale },
-                ],
-              },
-            ]}
-          >
-            <View style={styles.statsRow}>
-
-              {/* ▲ icon */}
-              <View
-                style={{
-                  transform: [
-                    { translateX: L.upIconOffsetX },
-                    { translateY: L.upIconOffsetY },
-                    { scale: L.upIconScale },
-                  ],
-                }}
-              >
-                <Text style={styles.statIconUp}>▲</Text>
-              </View>
-
-              {/* up count */}
-              <View
-                style={{
-                  transform: [
-                    { translateX: L.upCountOffsetX },
-                    { translateY: L.upCountOffsetY },
-                    { scale: L.upCountScale },
-                  ],
-                }}
-              >
-                <Text style={styles.statCount}>{post.voteStats.up}</Text>
-              </View>
-
-              {/* ▼ icon */}
-              <View
-                style={{
-                  transform: [
-                    { translateX: L.downIconOffsetX },
-                    { translateY: L.downIconOffsetY },
-                    { scale: L.downIconScale },
-                  ],
-                }}
-              >
-                <Text style={styles.statIconDown}>▼</Text>
-              </View>
-
-              {/* down count */}
-              <View
-                style={{
-                  transform: [
-                    { translateX: L.downCountOffsetX },
-                    { translateY: L.downCountOffsetY },
-                    { scale: L.downCountScale },
-                  ],
-                }}
-              >
-                <Text style={styles.statCount}>{post.voteStats.down}</Text>
-              </View>
-
-              {/* ★ icon */}
-              <View
-                style={{
-                  transform: [
-                    { translateX: L.savedIconOffsetX },
-                    { translateY: L.savedIconOffsetY },
-                    { scale: L.savedIconScale },
-                  ],
-                }}
-              >
-                <Text style={styles.statIconSaved}>★</Text>
-              </View>
-
-              {/* saved count */}
-              <View
-                style={{
-                  transform: [
-                    { translateX: L.savedCountOffsetX },
-                    { translateY: L.savedCountOffsetY },
-                    { scale: L.savedCountScale },
-                  ],
-                }}
-              >
-                <Text style={styles.statCount}>{post.voteStats.save}</Text>
-              </View>
-
-              {/* percentage */}
-              <View
-                style={{
-                  transform: [
-                    { translateX: L.percentageOffsetX },
-                    { translateY: L.percentageOffsetY },
-                    { scale: L.percentageScale },
-                  ],
-                }}
-              >
-                <Text style={styles.statPercentage}>
-                  {voteRatioPct(post.voteStats.up, post.voteStats.down)}%
-                </Text>
-              </View>
-
-            </View>
-          </View>
         </View>
-      )}
+      </View>
     </TouchableOpacity>
   );
 });
@@ -183,58 +186,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     minHeight: 170,
   },
-
-  /* ── Phrase ─────────────────────────────────────────────────────────── */
-  phraseWrap: {
+  topSection: {
     flex: 1,
-    justifyContent: 'center',
+    gap: 6,
   },
-  quoteMarks: {
-    color: 'rgba(255,255,255,0.25)',
-    fontSize: 32,
-    fontWeight: '800',
-    lineHeight: 32,
-    marginBottom: 2,
-  },
-  phraseBody: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontStyle: 'italic',
-    lineHeight: 19,
-  },
-  quoteAuthor: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    marginTop: 6,
-    opacity: 0.7,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 10,
-    paddingTop: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255,255,255,0.12)',
-  },
-  footerStat: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '600',
-    opacity: 0.7,
-  },
-  footerType: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    letterSpacing: 0.4,
+  typeLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
-    opacity: 0.5,
-  },
-
-  /* ── Reflection ──────────────────────────────────────────────────────── */
-  reflectionWrap: {
-    flex: 1,
-    justifyContent: 'space-between',
+    lineHeight: 12,
   },
   reflectionTitle: {
     color: '#FFFFFF',
@@ -243,8 +204,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
     lineHeight: 20,
   },
-  statsBlock: {
-    // space-between in reflectionWrap naturally pushes this to the bottom
+  phraseBody: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontStyle: 'italic',
+    lineHeight: 19,
   },
   statsRow: {
     flexDirection: 'row',
