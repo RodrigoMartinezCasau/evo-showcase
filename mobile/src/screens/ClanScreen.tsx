@@ -32,9 +32,6 @@ import {
   CLAN_DESC_MARGIN_HORIZONTAL,
   CLAN_DESC_OFFSET_X,
   CLAN_DESC_OFFSET_Y,
-  CLAN_JOIN_BUTTON_OFFSET_X,
-  CLAN_JOIN_BUTTON_OFFSET_Y,
-  CLAN_JOIN_BUTTON_SCALE,
   CLAN_STATS_OFFSET_X,
   CLAN_STATS_OFFSET_Y,
   CLAN_STATS_MARGIN_HORIZONTAL,
@@ -88,7 +85,6 @@ export default function ClanScreen() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [bottomTab] = useState<'siguiendo' | 'mas-votadas' | 'para-ti' | 'search'>('para-ti');
-  const [joined, setJoined] = useState(false);
 
   // ─── Detail panel for post expansion ─────────────────────────────
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -236,7 +232,7 @@ export default function ClanScreen() {
           >
             {/* ── Header ── */}
             <View style={styles.headerWrap}>
-              {/* Clan name + join button on left */}
+              {/* Clan name on left */}
               <View style={styles.headerLeft}>
                 <Text
                   style={[
@@ -254,28 +250,6 @@ export default function ClanScreen() {
                 >
                   {clan.name.toUpperCase()}
                 </Text>
-
-                {/* Join / Joined button */}
-                <TouchableOpacity
-                  activeOpacity={0.75}
-                  onPress={() => setJoined((v) => !v)}
-                  style={[
-                    styles.joinButton,
-                    joined && { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: clanColor },
-                    {
-                      borderColor: joined ? clanColor : '#FFFFFF',
-                      transform: [
-                        { translateX: CLAN_JOIN_BUTTON_OFFSET_X },
-                        { translateY: CLAN_JOIN_BUTTON_OFFSET_Y },
-                        { scale: CLAN_JOIN_BUTTON_SCALE },
-                      ],
-                    },
-                  ]}
-                >
-                  <Text style={[styles.joinText, joined && { color: clanColor }]}>
-                    {joined ? '✓ SIGUIENDO CLAN' : '+ UNIRSE AL CLAN'}
-                  </Text>
-                </TouchableOpacity>
               </View>
 
               {/* Shield on right */}
@@ -493,7 +467,6 @@ const styles = StyleSheet.create({
   headerLeft: {
     flex: 1,
     paddingRight: CLAN_SHIELD_BASE_SIZE + 20,
-    gap: 10,
   },
   clanName: {
     fontWeight: '800',
@@ -507,22 +480,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1,
-  },
-
-  // Join button
-  joinButton: {
-    alignSelf: 'flex-start',
-    borderWidth: 1.5,
-    borderRadius: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    backgroundColor: 'transparent',
-  },
-  joinText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.6,
   },
 
   // Description
