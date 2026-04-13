@@ -2,6 +2,7 @@ import os
 import uuid
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 from sqlalchemy import Column, Text
 from sqlmodel import Field, Session, SQLModel, create_engine
@@ -37,6 +38,22 @@ class PhysicalSpecSnapshot(SQLModel, table=True):
     message_id: str = Field(foreign_key="message.id")
     spec_json: str = Field(sa_column=Column(Text))
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class PhilosophicalProfile(SQLModel, table=True):
+    """Persists AI-generated philosophical profile blocks per user."""
+
+    __tablename__ = "philosophical_profile"
+
+    user_id: str = Field(primary_key=True)
+    summary: Optional[str] = Field(default=None, sa_column=Column(Text))
+    summary_updated_at: Optional[datetime] = Field(default=None)
+    philosophers: Optional[str] = Field(default=None, sa_column=Column(Text))
+    philosophers_updated_at: Optional[datetime] = Field(default=None)
+    books: Optional[str] = Field(default=None, sa_column=Column(Text))
+    books_updated_at: Optional[datetime] = Field(default=None)
+    jobs: Optional[str] = Field(default=None, sa_column=Column(Text))
+    jobs_updated_at: Optional[datetime] = Field(default=None)
 
 
 def init_db():

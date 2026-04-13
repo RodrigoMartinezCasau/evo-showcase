@@ -29,7 +29,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from checks import CheckRunner
-from db import Conversation, Message, get_session, init_db, new_id, save_spec
+from db import Conversation, Message, PhilosophicalProfile, get_session, init_db, new_id, save_spec
 from pipeline import run_pipeline
 from schemas import PhysicalSpec
 
@@ -130,6 +130,11 @@ async def beta_protection_middleware(request: Request, call_next):
             return True
         # Lazy-loaded blocks (facts, quotes, creator): do NOT count toward daily quota (1 use = main reply only)
         # if p.startswith("/messages/") and any(...): return True  # disabled
+        # Philosophical profile AI generation (each block costs 1 use)
+        if p.startswith("/philosophy-profile/") and any(
+            p.endswith(s) for s in ("/summary", "/philosophers", "/books", "/jobs")
+        ):
+            return True
         return False
 
     is_generation = _is_generation_endpoint(path, request.method)
@@ -1359,3 +1364,228 @@ def creator(payload: CreatorRequest):
             allowed_science_ids=[],
             allowed_quote_ids=[],
         )
+
+
+# ─────────────────────── PHILOSOPHICAL PROFILE ───────────────────────────────
+
+class ClanPctItem(BaseModel):
+    clanId: str
+    label: str
+    pct: float
+
+
+class PhilosophyContextPayload(BaseModel):
+    username: str
+    clan_percentages: list[ClanPctItem]
+    rank: str
+    total_reflections: int = 0
+    total_quotes: int = 0
+    sample_reflections: list[str] = []
+    sample_phrases: list[str] = []
+    dominant_clan: str = ""
+
+
+def _philosophy_context_str(ctx: PhilosophyContextPayload) -> str:
+    lines = [
+        f"Usuario: {ctx.username}",
+        f"Rango filosófico: {ctx.rank}",
+        f"Clan dominante: {ctx.dominant_clan}",
+        f"Total reflexiones publicadas: {ctx.total_reflections}",
+        f"Total frases publicadas: {ctx.total_quotes}",
+        "Distribución filosófica:",
+    ]
+    for entry in sorted(ctx.clan_percentages, key=lambda x: -x.pct):
+        lines.append(f"  - {entry.label}: {entry.pct}%")
+    if ctx.sample_reflections:
+        lines.append("Reflexiones recientes del usuario:")
+        for r in ctx.sample_reflections[:5]:
+            lines.append(f"  - {r}")
+    if ctx.sample_phrases:
+        lines.append("Frases recientes del usuario:")
+        for p in ctx.sample_phrases[:5]:
+            lines.append(f"  - {p}")
+    return "\n".join(lines)
+
+
+def _get_or_init_profile(s, user_id: str) -> PhilosophicalProfile:
+    profile = s.get(PhilosophicalProfile, user_id)
+    if not profile:
+        profile = PhilosophicalProfile(user_id=user_id)
+        s.add(profile)
+    return profile
+
+
+@app.get("/philosophy-profile/{user_id}")
+def get_philosophy_profile(user_id: str):
+    """Return stored AI blocks for a user. GET — no quota consumed."""
+    with get_session() as s:
+        profile = s.get(PhilosophicalProfile, user_id)
+        if not profile:
+            return {
+                "user_id": user_id,
+                "summary": None, "summary_updated_at": None,
+                "philosophers": None, "philosophers_updated_at": None,
+                "books": None, "books_updated_at": None,
+                "jobs": None, "jobs_updated_at": None,
+            }
+        return {
+            "user_id": profile.user_id,
+            "summary": profile.summary,
+            "summary_updated_at": profile.summary_updated_at,
+            "philosophers": json.loads(profile.philosophers) if profile.philosophers else None,
+            "philosophers_updated_at": profile.philosophers_updated_at,
+            "books": json.loads(profile.books) if profile.books else None,
+            "books_updated_at": profile.books_updated_at,
+            "jobs": json.loads(profile.jobs) if profile.jobs else None,
+            "jobs_updated_at": profile.jobs_updated_at,
+        }
+
+
+@app.post("/philosophy-profile/{user_id}/summary")
+def generate_philosophy_summary(user_id: str, payload: PhilosophyContextPayload):
+    """Generate AI philosophical summary for the user. Costs 1 use."""
+    from llm import OpenAIClient
+    ctx_str = _philosophy_context_str(payload)
+    system = (
+        "Eres un sistema de análisis filosófico. Genera un perfil filosófico preciso, insightful y personal del usuario.\n"
+        "REGLAS:\n"
+        "- Tono: preciso, filosófico pero accesible. No excesivamente técnico.\n"
+        "- Longitud: 3-4 oraciones densas. No más.\n"
+        "- Debe sentirse personal basado en los datos reales del usuario.\n"
+        "- Solo genera el texto del perfil, nada más.\n"
+        "- Responde EN ESPAÑOL."
+    )
+    user_prompt = (
+        f"Genera el perfil filosófico de este usuario basado en sus datos:\n\n{ctx_str}\n\n"
+        "Escribe un perfil filosófico breve (3-4 oraciones) que capture la esencia de su pensamiento."
+    )
+    try:
+        llm = OpenAIClient()
+        result = llm.complete(system=system, user=user_prompt, language="es", max_tokens=350, prompt_id="PHIL_SUMMARY")
+        with get_session() as s:
+            profile = _get_or_init_profile(s, user_id)
+            profile.summary = result
+            profile.summary_updated_at = datetime.utcnow()
+            s.add(profile)
+            s.commit()
+        return {"summary": result, "updated_at": datetime.utcnow().isoformat()}
+    except Exception as e:
+        logger.error("generate_philosophy_summary error: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/philosophy-profile/{user_id}/philosophers")
+def generate_similar_philosophers(user_id: str, payload: PhilosophyContextPayload):
+    """Generate 3 most similar philosophers. Costs 1 use."""
+    from llm import OpenAIClient
+    ctx_str = _philosophy_context_str(payload)
+    system = (
+        "Eres un experto en filosofía. Identifica los 3 filósofos más similares al usuario.\n"
+        "REGLAS:\n"
+        "- Devuelve EXACTAMENTE 3 filósofos.\n"
+        "- Cada uno: nombre y porcentaje de similitud (0-100).\n"
+        "- Devuelve SOLO JSON, sin markdown. Formato: [{\"name\": \"Nombre\", \"pct\": 82}, ...]"
+    )
+    user_prompt = (
+        f"Identifica los 3 filósofos más similares a este usuario:\n\n{ctx_str}\n\n"
+        "Devuelve SOLO el JSON array de 3 filósofos con nombre y porcentaje."
+    )
+    try:
+        llm = OpenAIClient()
+        raw = llm.complete(system=system, user=user_prompt, language=None, max_tokens=200, prompt_id="PHIL_PHILOSOPHERS")
+        raw = raw.strip()
+        if raw.startswith("```"):
+            lines = raw.split("\n")
+            lines = lines[1:] if lines[0].startswith("```") else lines
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            raw = "\n".join(lines)
+        data = json.loads(raw)
+        with get_session() as s:
+            profile = _get_or_init_profile(s, user_id)
+            profile.philosophers = json.dumps(data, ensure_ascii=False)
+            profile.philosophers_updated_at = datetime.utcnow()
+            s.add(profile)
+            s.commit()
+        return {"philosophers": data, "updated_at": datetime.utcnow().isoformat()}
+    except Exception as e:
+        logger.error("generate_similar_philosophers error: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/philosophy-profile/{user_id}/books")
+def generate_book_recommendations(user_id: str, payload: PhilosophyContextPayload):
+    """Generate book recommendations. Costs 1 use."""
+    from llm import OpenAIClient
+    ctx_str = _philosophy_context_str(payload)
+    system = (
+        "Eres un experto en literatura filosófica. Recomienda libros para el usuario.\n"
+        "REGLAS:\n"
+        "- Entre 2 y 4 libros.\n"
+        "- Basate en el perfil filosófico real del usuario.\n"
+        "- Devuelve SOLO JSON. Formato: [{\"title\": \"Título\", \"author\": \"Autor\"}, ...]"
+    )
+    user_prompt = (
+        f"Recomienda libros para este usuario filosófico:\n\n{ctx_str}\n\n"
+        "Devuelve SOLO el JSON array de libros."
+    )
+    try:
+        llm = OpenAIClient()
+        raw = llm.complete(system=system, user=user_prompt, language=None, max_tokens=300, prompt_id="PHIL_BOOKS")
+        raw = raw.strip()
+        if raw.startswith("```"):
+            lines = raw.split("\n")
+            lines = lines[1:] if lines[0].startswith("```") else lines
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            raw = "\n".join(lines)
+        data = json.loads(raw)
+        with get_session() as s:
+            profile = _get_or_init_profile(s, user_id)
+            profile.books = json.dumps(data, ensure_ascii=False)
+            profile.books_updated_at = datetime.utcnow()
+            s.add(profile)
+            s.commit()
+        return {"books": data, "updated_at": datetime.utcnow().isoformat()}
+    except Exception as e:
+        logger.error("generate_book_recommendations error: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/philosophy-profile/{user_id}/jobs")
+def generate_job_recommendations(user_id: str, payload: PhilosophyContextPayload):
+    """Generate job/study recommendations. Costs 1 use."""
+    from llm import OpenAIClient
+    ctx_str = _philosophy_context_str(payload)
+    system = (
+        "Eres un orientador vocacional con profundo conocimiento filosófico.\n"
+        "REGLAS:\n"
+        "- Entre 2 y 4 recomendaciones de carreras o áreas de estudio.\n"
+        "- Basate en el estilo de pensamiento filosófico del usuario.\n"
+        "- Devuelve SOLO JSON. Formato: [{\"title\": \"Carrera\", \"reason\": \"Razón breve\"}, ...]"
+    )
+    user_prompt = (
+        f"Recomienda carreras o estudios para este usuario filosófico:\n\n{ctx_str}\n\n"
+        "Devuelve SOLO el JSON array de recomendaciones."
+    )
+    try:
+        llm = OpenAIClient()
+        raw = llm.complete(system=system, user=user_prompt, language=None, max_tokens=300, prompt_id="PHIL_JOBS")
+        raw = raw.strip()
+        if raw.startswith("```"):
+            lines = raw.split("\n")
+            lines = lines[1:] if lines[0].startswith("```") else lines
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            raw = "\n".join(lines)
+        data = json.loads(raw)
+        with get_session() as s:
+            profile = _get_or_init_profile(s, user_id)
+            profile.jobs = json.dumps(data, ensure_ascii=False)
+            profile.jobs_updated_at = datetime.utcnow()
+            s.add(profile)
+            s.commit()
+        return {"jobs": data, "updated_at": datetime.utcnow().isoformat()}
+    except Exception as e:
+        logger.error("generate_job_recommendations error: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))

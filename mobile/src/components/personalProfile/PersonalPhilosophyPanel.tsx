@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import {
   PHILOSOPHY_PERCENTAGES_PANEL_OFFSET_X,
   PHILOSOPHY_PERCENTAGES_PANEL_OFFSET_Y,
@@ -11,10 +11,43 @@ type PctEntry = { clanId: string; label: string; pct: number };
 
 type Props = {
   percentages: PctEntry[];
+  /** When provided, wraps the panel in a TouchableOpacity (personal profile only). */
+  onPress?: () => void;
 };
 
-export const PersonalPhilosophyPanel = React.memo(function PersonalPhilosophyPanel({ percentages }: Props) {
+export const PersonalPhilosophyPanel = React.memo(function PersonalPhilosophyPanel({
+  percentages,
+  onPress,
+}: Props) {
   const sorted = [...percentages].sort((a, b) => b.pct - a.pct);
+
+  const inner = (
+    <View
+      style={[
+        styles.container,
+        PHILOSOPHY_PERCENTAGES_PANEL_WIDTH !== undefined && {
+          width: PHILOSOPHY_PERCENTAGES_PANEL_WIDTH,
+          alignSelf: 'center',
+          marginHorizontal: 0,
+        },
+        PHILOSOPHY_PERCENTAGES_PANEL_HEIGHT !== undefined && { height: PHILOSOPHY_PERCENTAGES_PANEL_HEIGHT },
+      ]}
+    >
+      <View style={styles.titleRow}>
+        <Text style={styles.title}>Pensamiento filosófico</Text>
+        {onPress && <Text style={styles.expandHint}>Ver detalle →</Text>}
+      </View>
+      {sorted.map((entry) => (
+        <View key={entry.clanId} style={styles.row}>
+          <Text style={styles.label} numberOfLines={1}>{entry.label}</Text>
+          <View style={styles.barTrack}>
+            <View style={[styles.barFill, { width: `${entry.pct}%` }]} />
+          </View>
+          <Text style={styles.pct}>{entry.pct}%</Text>
+        </View>
+      ))}
+    </View>
+  );
 
   return (
     <View
@@ -28,28 +61,13 @@ export const PersonalPhilosophyPanel = React.memo(function PersonalPhilosophyPan
         },
       ]}
     >
-      <View
-        style={[
-          styles.container,
-          PHILOSOPHY_PERCENTAGES_PANEL_WIDTH !== undefined && {
-            width: PHILOSOPHY_PERCENTAGES_PANEL_WIDTH,
-            alignSelf: 'center',
-            marginHorizontal: 0,
-          },
-          PHILOSOPHY_PERCENTAGES_PANEL_HEIGHT !== undefined && { height: PHILOSOPHY_PERCENTAGES_PANEL_HEIGHT },
-        ]}
-      >
-      <Text style={styles.title}>Pensamiento filosófico</Text>
-      {sorted.map((entry) => (
-        <View key={entry.clanId} style={styles.row}>
-          <Text style={styles.label} numberOfLines={1}>{entry.label}</Text>
-          <View style={styles.barTrack}>
-            <View style={[styles.barFill, { width: `${entry.pct}%` }]} />
-          </View>
-          <Text style={styles.pct}>{entry.pct}%</Text>
-        </View>
-      ))}
-      </View>
+      {onPress ? (
+        <TouchableOpacity onPress={onPress} activeOpacity={0.75}>
+          {inner}
+        </TouchableOpacity>
+      ) : (
+        inner
+      )}
     </View>
   );
 });
@@ -65,14 +83,24 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 10,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+  },
   title: {
     color: '#FFFFFF',
     fontSize: 11,
     fontWeight: '600',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
-    marginBottom: 2,
     opacity: 0.7,
+  },
+  expandHint: {
+    color: 'rgba(255,255,255,0.40)',
+    fontSize: 11,
+    fontWeight: '500',
   },
   row: {
     flexDirection: 'row',

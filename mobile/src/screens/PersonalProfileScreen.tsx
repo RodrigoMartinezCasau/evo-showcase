@@ -204,7 +204,10 @@ export default function PersonalProfileScreen() {
             <View style={styles.contentGap} />
             <PersonalRankProgression rank={profileWithClan.rank} />
             <View style={styles.contentGap} />
-            <PersonalPhilosophyPanel percentages={profileWithClan.philosophyPercentages} />
+            <PersonalPhilosophyPanel
+              percentages={profileWithClan.philosophyPercentages}
+              onPress={() => router.push('/philosophy-profile')}
+            />
             <View style={styles.contentGap} />
             <PersonalRecentPostsSlider posts={profileWithClan.recentPosts} onPostPress={handleRecentPostPress} />
             <View style={styles.contentGap} />
