@@ -6,59 +6,71 @@
  *
  * Applies to both PersonalRecentPostCard and RecentPostCard (OtherUser).
  * Both REFLECTION and FRASE cards share this same config object.
+ *
+ * Icons are the same SVGs used in the "Para ti" action column:
+ *   detailActions/31    → upvote
+ *   detailActions/29    → downvote
+ *   detailActions/33    → saved
+ *   detailActions/flecha → percentage (double-arrow cycle icon)
  */
-export const REFLECTION_PREVIEW_LAYOUT = {
+export const PROFILE_POST_PREVIEW_LAYOUT = {
+
+  // ─── Whole internal content group ────────────────────────────────────────
+  /** Moves/scales ALL internal content without touching the outer black card. */
+  profilePreviewContentOffsetX: 0,
+  profilePreviewContentOffsetY: 0,
+  profilePreviewContentScale: 1,
 
   // ─── Type label ("REFLEXIÓN" / "FRASE") ──────────────────────────────────
-  typeLabelOffsetX: 0,
-  typeLabelOffsetY: 0,
-  typeLabelScale: 1,
-  /** Hex or rgba string for the type label colour. */
-  typeLabelColor: 'rgba(255,255,255,0.40)',
+  profilePreviewTypeLabelOffsetX: 0,
+  profilePreviewTypeLabelOffsetY: 0,
+  profilePreviewTypeLabelScale: 1,
+  /** Hex or rgba string for the type-label colour. */
+  profilePreviewTypeLabelColor: 'rgba(255,255,255,0.40)',
 
   // ─── Main content (title for reflection · phrase text for frase) ──────────
-  titleOffsetX: 0,
-  titleOffsetY: 0,
-  titleScale: 1,
+  profilePreviewMainTextOffsetX: 0,
+  profilePreviewMainTextOffsetY: 0,
+  profilePreviewMainTextScale: 1,
 
-  // ─── Stats block (the whole group moves/scales together) ─────────────────
-  statsBlockOffsetX: 0,
-  statsBlockOffsetY: 0,
-  statsBlockScale: 1,
+  // ─── Stats bar — ONE unified size editor ─────────────────────────────────
+  /**
+   * Single scale that controls the size of the ENTIRE stats bar:
+   * icon pixel dimensions + count font size all scale together.
+   * 1 = default, 0.8 = smaller, 1.3 = larger.
+   */
+  profilePreviewStatsBarScale: 1.5,
+  /** Base icon size in pixels at scale 1. */
+  profilePreviewStatsIconBaseSize: 22,
+  /** Base font size for the count numbers at scale 1. */
+  profilePreviewStatsCountBaseFontSize: 20,
 
-  // ─── Upvote icon (▲) ─────────────────────────────────────────────────────
-  upIconOffsetX: 0,
-  upIconOffsetY: 0,
-  upIconScale: 1,
+  // ─── Stats block position (moves the whole bar, does not resize it) ───────
+  profilePreviewStatsBlockOffsetX: 0,
+  profilePreviewStatsBlockOffsetY: 0,
 
-  // ─── Upvote count ─────────────────────────────────────────────────────────
-  upCountOffsetX: 0,
-  upCountOffsetY: 0,
-  upCountScale: 1,
+  // ─── Fine-tune per-column positions (icon + its count move together) ──────
+  profilePreviewUpColOffsetX: 0,
+  profilePreviewUpColOffsetY: 0,
 
-  // ─── Downvote icon (▼) ───────────────────────────────────────────────────
-  downIconOffsetX: 0,
-  downIconOffsetY: 0,
-  downIconScale: 1,
+  profilePreviewDownColOffsetX: 0,
+  profilePreviewDownColOffsetY: 0,
 
-  // ─── Downvote count ───────────────────────────────────────────────────────
-  downCountOffsetX: 0,
-  downCountOffsetY: 0,
-  downCountScale: 1,
+  profilePreviewSavedColOffsetX: 0,
+  profilePreviewSavedColOffsetY: 0,
 
-  // ─── Saved icon (★) ──────────────────────────────────────────────────────
-  savedIconOffsetX: 0,
-  savedIconOffsetY: 0,
-  savedIconScale: 1,
+  // ─── Percentage column (flecha.svg icon on top, percentage text below) ─────
+  profilePreviewPercentageColOffsetX: 0,
+  profilePreviewPercentageColOffsetY: 0,
 
-  // ─── Saved count ──────────────────────────────────────────────────────────
-  savedCountOffsetX: 0,
-  savedCountOffsetY: 0,
-  savedCountScale: 1,
-
-  // ─── Vote-ratio percentage ────────────────────────────────────────────────
-  percentageOffsetX: 0,
-  percentageOffsetY: 0,
-  percentageScale: 1,
+  /**
+   * Individual scale for the flecha icon ONLY.
+   * The flecha SVG's arrows occupy roughly 50 % of its 600×600 viewBox,
+   * so the default is 1.8 to visually match the upvote/downvote/saved icons.
+   * Adjust freely without affecting outer card or other columns.
+   */
+  profilePreviewFlechaIconScale: 1.8,
+  profilePreviewFlechaIconOffsetX: 0,
+  profilePreviewFlechaIconOffsetY: 0,
 
 } as const;
