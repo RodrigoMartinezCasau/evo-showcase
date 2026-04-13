@@ -41,6 +41,13 @@ export const INSIGNIA_BOX_HEIGHT: number | undefined = undefined;
 export const INSIGNIA_BOX_OFFSET_X = -50;
 export const INSIGNIA_BOX_OFFSET_Y = -15;
 
+// ── Insignia phrase edit (pencil) icon ─────────────────────────────
+export const INSIGNIA_EDIT_ICON_OFFSET_X = -5;
+export const INSIGNIA_EDIT_ICON_OFFSET_Y = 5;
+export const INSIGNIA_EDIT_ICON_SCALE = 2;
+/** Extra padding around the pencil's visual area to keep text clear of it. */
+export const INSIGNIA_EDIT_ICON_SAFE_PADDING = -18;
+
 // ── Panel porcentajes filosóficos ──────────────────────────────────
 export const PHILOSOPHY_PERCENTAGES_PANEL_OFFSET_X = 0;
 export const PHILOSOPHY_PERCENTAGES_PANEL_OFFSET_Y = -10;

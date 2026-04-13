@@ -1,5 +1,18 @@
 import React, { useCallback, useState, useRef } from 'react';
-import { View, ScrollView, StyleSheet, Animated, Easing, useWindowDimensions } from 'react-native';
+import {
+  View,
+  ScrollView,
+  StyleSheet,
+  Animated,
+  Easing,
+  useWindowDimensions,
+  Modal,
+  TextInput,
+  Text,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
@@ -35,6 +48,28 @@ export default function PersonalProfileScreen() {
 
   const profile = getPersonalProfile();
   const profileWithClan = { ...profile, clanId: activeClan };
+
+  // ─── Insignia phrase local state (ready for backend integration) ──
+  const [insigniaPhrase, setInsigniaPhrase] = useState(profileWithClan.insigniaPhrase);
+  const [phraseEditorOpen, setPhraseEditorOpen] = useState(false);
+  const [phraseEditDraft, setPhraseEditDraft] = useState('');
+
+  const handlePhraseEditOpen = useCallback(() => {
+    setPhraseEditDraft(insigniaPhrase);
+    setPhraseEditorOpen(true);
+  }, [insigniaPhrase]);
+
+  const handlePhraseEditSave = useCallback(() => {
+    const trimmed = phraseEditDraft.trim();
+    if (trimmed.length > 0) {
+      setInsigniaPhrase(trimmed);
+    }
+    setPhraseEditorOpen(false);
+  }, [phraseEditDraft]);
+
+  const handlePhraseEditCancel = useCallback(() => {
+    setPhraseEditorOpen(false);
+  }, []);
 
   // Bottom bar height — used for scroll padding and detail panel item height.
   const bottomBarHeight =
@@ -160,7 +195,7 @@ export default function PersonalProfileScreen() {
               onShieldPress={profileWithClan.clanId ? () => router.push({ pathname: '/clan/[id]', params: { id: profileWithClan.clanId! } }) : undefined}
             />
             <View style={styles.contentGap} />
-            <PersonalInsigniaPhrase phrase={profileWithClan.insigniaPhrase} />
+            <PersonalInsigniaPhrase phrase={insigniaPhrase} onEdit={handlePhraseEditOpen} />
             <View style={styles.contentGap} />
             <PersonalRankProgression rank={profileWithClan.rank} />
             <View style={styles.contentGap} />
@@ -216,9 +251,126 @@ export default function PersonalProfileScreen() {
           router.push({ pathname: '/reflection', params: { thoughtId: id } });
         }}
       />
+
+      {/* ── Insignia phrase editor modal ── */}
+      <Modal
+        visible={phraseEditorOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={handlePhraseEditCancel}
+      >
+        <KeyboardAvoidingView
+          style={editorStyles.backdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableOpacity
+            style={editorStyles.backdropTap}
+            activeOpacity={1}
+            onPress={handlePhraseEditCancel}
+          />
+          <View style={editorStyles.sheet}>
+            <Text style={editorStyles.title}>Editar frase insignia</Text>
+            <TextInput
+              style={editorStyles.input}
+              value={phraseEditDraft}
+              onChangeText={setPhraseEditDraft}
+              multiline
+              maxLength={160}
+              placeholder="Escribe tu frase..."
+              placeholderTextColor="rgba(255,255,255,0.35)"
+              autoFocus
+              selectionColor="#FFFFFF"
+            />
+            <Text style={editorStyles.counter}>{phraseEditDraft.length}/160</Text>
+            <View style={editorStyles.buttons}>
+              <TouchableOpacity style={editorStyles.cancelBtn} onPress={handlePhraseEditCancel}>
+                <Text style={editorStyles.cancelTxt}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={editorStyles.saveBtn} onPress={handlePhraseEditSave}>
+                <Text style={editorStyles.saveTxt}>Guardar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
+
+const editorStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    justifyContent: 'flex-end',
+  },
+  backdropTap: {
+    flex: 1,
+  },
+  sheet: {
+    backgroundColor: '#111111',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 36,
+    gap: 14,
+  },
+  title: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    textAlign: 'center',
+  },
+  input: {
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontStyle: 'italic',
+    lineHeight: 22,
+    letterSpacing: 0.2,
+    padding: 14,
+    minHeight: 90,
+    textAlignVertical: 'top',
+  },
+  counter: {
+    color: 'rgba(255,255,255,0.35)',
+    fontSize: 11,
+    textAlign: 'right',
+    marginTop: -8,
+  },
+  buttons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  cancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+  },
+  cancelTxt: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  saveBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+  },
+  saveTxt: {
+    color: '#000000',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+});
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: evoconnColors.background },
