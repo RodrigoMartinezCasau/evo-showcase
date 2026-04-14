@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, StyleSheet, useWindowDimensions, TouchableOpacity } from 'react-native';
 import Svg, {
   Rect,
   Defs,
@@ -55,6 +55,7 @@ const RANK_LABELS: Record<Rank, string> = {
 type Props = {
   rank: Rank;
   progress?: number;
+  onPress?: () => void;
 };
 
 /**
@@ -64,6 +65,7 @@ type Props = {
 export const PersonalRankProgression = React.memo(function PersonalRankProgression({
   rank,
   progress = RANK_PROGRESS_VALUE,
+  onPress,
 }: Props) {
   const { width: screenW } = useWindowDimensions();
 
@@ -126,7 +128,10 @@ export const PersonalRankProgression = React.memo(function PersonalRankProgressi
         },
       ]}
     >
-      <View
+      <TouchableOpacity
+        onPress={onPress}
+        activeOpacity={onPress ? 0.8 : 1}
+        disabled={!onPress}
         style={[
           styles.container,
           {
@@ -254,7 +259,7 @@ export const PersonalRankProgression = React.memo(function PersonalRankProgressi
             )}
           </Svg>
         </View>
-      </View>
+      </TouchableOpacity>
     </View>
   );
 });

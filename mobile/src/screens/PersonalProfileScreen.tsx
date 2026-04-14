@@ -202,7 +202,7 @@ export default function PersonalProfileScreen() {
             <View style={styles.contentGap} />
             <PersonalInsigniaPhrase phrase={insigniaPhrase} onEdit={handlePhraseEditOpen} />
             <View style={styles.contentGap} />
-            <PersonalRankProgression rank={profileWithClan.rank} />
+            <PersonalRankProgression rank={profileWithClan.rank} onPress={() => router.push('/philosophy-profile')} />
             <View style={styles.contentGap} />
             <PersonalPhilosophyPanel
               percentages={profileWithClan.philosophyPercentages}
