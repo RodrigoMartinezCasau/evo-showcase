@@ -6,6 +6,16 @@ import {
   PHILOSOPHY_PERCENTAGES_PANEL_WIDTH,
   PHILOSOPHY_PERCENTAGES_PANEL_HEIGHT,
 } from '@evoconn/constants/personalProfileLayout';
+import {
+  PHILOSOPHY_BANNER_SCALE,
+  PHILOSOPHY_BANNER_OFFSET_X,
+  PHILOSOPHY_BANNER_OFFSET_Y,
+  PHILOSOPHY_ROW_GAP,
+  PHILOSOPHY_CONTAINER_PADDING_VERTICAL,
+  PHILOSOPHY_CONTAINER_PADDING_HORIZONTAL,
+  PHILOSOPHY_ROW_HEIGHT,
+} from '@evoconn/constants/philosophyBannerLayout';
+import { PhilosophyClanBanner } from '@evoconn/components/shared/PhilosophyClanBanner';
 
 type PctEntry = { clanId: string; label: string; pct: number };
 
@@ -37,9 +47,24 @@ export const PersonalPhilosophyPanel = React.memo(function PersonalPhilosophyPan
         <Text style={styles.title}>Pensamiento filosófico</Text>
         {onPress && <Text style={styles.expandHint}>Ver detalle →</Text>}
       </View>
-      {sorted.map((entry) => (
-        <View key={entry.clanId} style={styles.row}>
-          <Text style={styles.label} numberOfLines={1}>{entry.label}</Text>
+      {sorted.map((entry, i) => (
+        <View
+          key={entry.clanId}
+          style={[
+            styles.row,
+            i > 0 && { marginTop: PHILOSOPHY_ROW_GAP },
+            PHILOSOPHY_ROW_HEIGHT !== undefined && { height: PHILOSOPHY_ROW_HEIGHT, overflow: 'hidden' },
+          ]}
+        >
+          <PhilosophyClanBanner
+            clanId={entry.clanId}
+            label={entry.label}
+            scale={PHILOSOPHY_BANNER_SCALE}
+            offsetX={PHILOSOPHY_BANNER_OFFSET_X}
+            offsetY={PHILOSOPHY_BANNER_OFFSET_Y}
+            containerWidth={110}
+            fallbackTextStyle={styles.label}
+          />
           <View style={styles.barTrack}>
             <View style={[styles.barFill, { width: `${entry.pct}%` }]} />
           </View>
@@ -80,8 +105,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     backgroundColor: '#000000',
     borderRadius: 14,
-    padding: 16,
-    gap: 10,
+    paddingVertical: PHILOSOPHY_CONTAINER_PADDING_VERTICAL,
+    paddingHorizontal: PHILOSOPHY_CONTAINER_PADDING_HORIZONTAL,
   },
   titleRow: {
     flexDirection: 'row',

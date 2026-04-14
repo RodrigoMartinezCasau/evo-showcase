@@ -5,6 +5,16 @@
  */
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import {
+  EXPANDED_PHILOSOPHY_BANNER_SCALE,
+  EXPANDED_PHILOSOPHY_BANNER_OFFSET_X,
+  EXPANDED_PHILOSOPHY_BANNER_OFFSET_Y,
+  EXPANDED_PHILOSOPHY_ROW_GAP,
+  EXPANDED_PHILOSOPHY_CONTAINER_PADDING_VERTICAL,
+  EXPANDED_PHILOSOPHY_CONTAINER_PADDING_HORIZONTAL,
+  EXPANDED_PHILOSOPHY_ROW_HEIGHT,
+} from '@evoconn/constants/philosophyBannerLayout';
+import { PhilosophyClanBanner } from '@evoconn/components/shared/PhilosophyClanBanner';
 
 const ALL_CLANS: { clanId: string; label: string }[] = [
   { clanId: 'nihilista', label: 'Nihilista' },
@@ -46,12 +56,24 @@ export const ClanPercentagesTable = React.memo(function ClanPercentagesTable({
     <View style={styles.card}>
       <Text style={styles.sectionTitle}>Distribución filosófica completa</Text>
       {sorted.map((entry, i) => (
-        <View key={entry.clanId} style={styles.row}>
+        <View
+          key={entry.clanId}
+          style={[
+            styles.row,
+            i > 0 && { marginTop: EXPANDED_PHILOSOPHY_ROW_GAP },
+            EXPANDED_PHILOSOPHY_ROW_HEIGHT !== undefined && { height: EXPANDED_PHILOSOPHY_ROW_HEIGHT, overflow: 'hidden' },
+          ]}
+        >
           <View style={styles.labelWrap}>
-            {i === 0 && <View style={styles.dominantDot} />}
-            <Text style={[styles.label, i === 0 && styles.dominantLabel]} numberOfLines={1}>
-              {entry.label}
-            </Text>
+            <PhilosophyClanBanner
+              clanId={entry.clanId}
+              label={entry.label}
+              scale={EXPANDED_PHILOSOPHY_BANNER_SCALE}
+              offsetX={EXPANDED_PHILOSOPHY_BANNER_OFFSET_X}
+              offsetY={EXPANDED_PHILOSOPHY_BANNER_OFFSET_Y}
+              containerWidth={i === 0 ? 116 : 122}
+              fallbackTextStyle={i === 0 ? styles.dominantLabel : styles.label}
+            />
           </View>
           <View style={styles.barTrack}>
             <View style={[styles.barFill, { width: `${entry.pct}%` }]} />
@@ -67,8 +89,8 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#000000',
     borderRadius: 14,
-    padding: 16,
-    gap: 10,
+    paddingVertical: EXPANDED_PHILOSOPHY_CONTAINER_PADDING_VERTICAL,
+    paddingHorizontal: EXPANDED_PHILOSOPHY_CONTAINER_PADDING_HORIZONTAL,
   },
   sectionTitle: {
     color: '#FFFFFF',
@@ -89,12 +111,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-  },
-  dominantDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#FFFFFF',
   },
   label: {
     color: 'rgba(255,255,255,0.7)',
