@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 import time
 import uuid
+from datetime import datetime
 
 # Ensure sibling modules (checks, db, pipeline, etc.) are importable
 # regardless of whether uvicorn is launched from the project root or backend/.
