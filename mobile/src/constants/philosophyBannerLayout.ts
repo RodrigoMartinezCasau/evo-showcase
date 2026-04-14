@@ -31,25 +31,22 @@ export const EXPANDED_PHILOSOPHY_BANNER_OFFSET_Y = 25;
 
 // ─── Container padding ────────────────────────────────────────────────────────
 
-/**
- * Vertical padding (top + bottom) of the black container in profile panels
- * (PersonalPhilosophyPanel + PhilosophyPercentagesPanel).
- */
-export const PHILOSOPHY_CONTAINER_PADDING_VERTICAL = 10;
+/** Space between the top edge of the black container and the title (profile panels). */
+export const PHILOSOPHY_CONTAINER_PADDING_TOP = 20;
 
-/**
- * Horizontal padding (left + right) of the black container in profile panels.
- */
+/** Space between the last row and the bottom edge of the black container (profile panels). */
+export const PHILOSOPHY_CONTAINER_PADDING_BOTTOM = 14;
+
+/** Horizontal padding (left + right) of the black container in profile panels. */
 export const PHILOSOPHY_CONTAINER_PADDING_HORIZONTAL = 16;
 
-/**
- * Vertical padding of the black container in the expanded philosophy table.
- */
-export const EXPANDED_PHILOSOPHY_CONTAINER_PADDING_VERTICAL = 10;
+/** Space between the top edge of the black container and the title (expanded table). */
+export const EXPANDED_PHILOSOPHY_CONTAINER_PADDING_TOP = 20;
 
-/**
- * Horizontal padding of the black container in the expanded philosophy table.
- */
+/** Space between the last row and the bottom edge of the black container (expanded table). */
+export const EXPANDED_PHILOSOPHY_CONTAINER_PADDING_BOTTOM = 14;
+
+/** Horizontal padding of the black container in the expanded philosophy table. */
 export const EXPANDED_PHILOSOPHY_CONTAINER_PADDING_HORIZONTAL = 16;
 
 // ─── Row spacing ─────────────────────────────────────────────────────────────

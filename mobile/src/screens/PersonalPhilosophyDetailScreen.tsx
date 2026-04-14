@@ -228,16 +228,16 @@ export default function PersonalPhilosophyDetailScreen() {
 
             <View style={styles.gap} />
 
-            {/* 2. Detailed rank / progression */}
+            {/* 2. Full clan percentages table */}
+            <ClanPercentagesTable percentages={profile.philosophyPercentages} />
+
+            <View style={styles.gap} />
+
+            {/* 3. Detailed rank / progression */}
             <DetailedRankCard
               dominantClanLabel={dominant.label}
               dominantPct={dominant.pct}
             />
-
-            <View style={styles.gap} />
-
-            {/* 3. Full clan percentages table */}
-            <ClanPercentagesTable percentages={profile.philosophyPercentages} />
 
             <View style={styles.gap} />
 

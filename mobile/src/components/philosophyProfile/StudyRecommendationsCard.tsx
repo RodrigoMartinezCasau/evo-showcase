@@ -41,7 +41,7 @@ export const StudyRecommendationsCard = React.memo(function StudyRecommendations
         </View>
       ) : (
         <Text style={styles.placeholder}>
-          Pulsa ↻ para obtener recomendaciones de carrera. Cuesta 1 uso.
+          Pulsa ↻ para obtener recomendaciones de carrera. 
         </Text>
       )}
     </AiBlockCard>

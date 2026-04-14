@@ -44,7 +44,7 @@ export const SimilarPhilosophersCard = React.memo(function SimilarPhilosophersCa
         </View>
       ) : (
         <Text style={styles.placeholder}>
-          Pulsa ↻ para generar los filósofos más similares a ti con IA. Cuesta 1 uso.
+          Pulsa ↻ para conocer los filósofos más similares a ti. 
         </Text>
       )}
     </AiBlockCard>

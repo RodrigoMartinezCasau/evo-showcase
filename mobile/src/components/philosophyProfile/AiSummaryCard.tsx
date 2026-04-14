@@ -25,7 +25,7 @@ export const AiSummaryCard = React.memo(function AiSummaryCard({
         <Text style={styles.body}>{summary}</Text>
       ) : (
         <Text style={styles.placeholder}>
-          Pulsa ↻ para generar tu perfil filosófico con IA. Cuesta 1 uso.
+          Pulsa ↻ para conocer detalles de tu pensamiento filosófico. 
         </Text>
       )}
     </AiBlockCard>

@@ -41,7 +41,7 @@ export const BookRecommendationsCard = React.memo(function BookRecommendationsCa
         </View>
       ) : (
         <Text style={styles.placeholder}>
-          Pulsa ↻ para obtener lecturas recomendadas. Cuesta 1 uso.
+          Pulsa ↻ para obtener recomendaciones de lectura. 
         </Text>
       )}
     </AiBlockCard>

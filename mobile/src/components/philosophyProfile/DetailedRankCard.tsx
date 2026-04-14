@@ -5,8 +5,15 @@
  *   50 – <90  → Maestro
  *   90 – 100  → Filósofo
  */
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
+import {
+  RANK_BAR_GRADIENT_START,
+  RANK_BAR_GRADIENT_END,
+  RANK_BAR_BACKGROUND_COLOR,
+  RANK_BAR_RADIUS,
+} from '@evoconn/constants/personalProfileLayout';
 
 type Props = {
   dominantClanLabel: string;
@@ -42,6 +49,15 @@ export const DetailedRankCard = React.memo(function DetailedRankCard({
   const { rank, nextRank, remaining } = getRankInfo(dominantPct);
   const fill = getBarFill(dominantPct);
 
+  const [trackW, setTrackW] = useState(0);
+  const onTrackLayout = useCallback(
+    (e: { nativeEvent: { layout: { width: number } } }) => {
+      setTrackW(e.nativeEvent.layout.width);
+    },
+    [],
+  );
+  const fillW = Math.round(trackW * fill);
+
   return (
     <View style={styles.card}>
       <Text style={styles.sectionTitle}>Rango filosófico</Text>
@@ -55,9 +71,27 @@ export const DetailedRankCard = React.memo(function DetailedRankCard({
 
       <Text style={styles.clanLine}>{dominantClanLabel}</Text>
 
-      {/* Progress bar */}
-      <View style={styles.barTrack}>
-        <View style={[styles.barFill, { width: `${Math.round(fill * 100)}%` }]} />
+      {/* Progress bar — gradient matches PersonalRankProgression */}
+      <View style={styles.barTrack} onLayout={onTrackLayout}>
+        {trackW > 0 && fillW > 0 && (
+          <Svg width={trackW} height={styles.barTrack.height} style={StyleSheet.absoluteFillObject}>
+            <Defs>
+              <LinearGradient id="drc_grad" x1="0" y1="0" x2="1" y2="0">
+                <Stop offset="0" stopColor={RANK_BAR_GRADIENT_START} stopOpacity="1" />
+                <Stop offset="1" stopColor={RANK_BAR_GRADIENT_END} stopOpacity="1" />
+              </LinearGradient>
+            </Defs>
+            <Rect
+              x={0}
+              y={0}
+              width={fillW}
+              height={styles.barTrack.height}
+              rx={RANK_BAR_RADIUS}
+              ry={RANK_BAR_RADIUS}
+              fill="url(#drc_grad)"
+            />
+          </Svg>
+        )}
       </View>
 
       {/* Threshold labels */}
@@ -75,7 +109,7 @@ export const DetailedRankCard = React.memo(function DetailedRankCard({
       {/* Progress message */}
       {remaining !== null ? (
         <Text style={styles.progressMsg}>
-          Faltan <Text style={styles.progressHighlight}>{remaining}%</Text> para {nextRank}
+          Falta un <Text style={styles.progressHighlight}>{remaining}%</Text> para {nextRank}
         </Text>
       ) : (
         <Text style={styles.progressMsg}>
@@ -131,15 +165,10 @@ const styles = StyleSheet.create({
   },
   barTrack: {
     height: 8,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 4,
+    backgroundColor: RANK_BAR_BACKGROUND_COLOR,
+    borderRadius: RANK_BAR_RADIUS,
     overflow: 'hidden',
     marginTop: 4,
-  },
-  barFill: {
-    height: '100%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 4,
   },
   thresholdRow: {
     flexDirection: 'row',
