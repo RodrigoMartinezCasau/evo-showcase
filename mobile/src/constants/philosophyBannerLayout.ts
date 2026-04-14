@@ -83,6 +83,26 @@ export const PHILOSOPHY_ROW_HEIGHT: number | undefined = 46;
  */
 export const EXPANDED_PHILOSOPHY_ROW_HEIGHT: number | undefined = 46;
 
+// ─── Bar gradient clan colors ─────────────────────────────────────────────────
+
+/**
+ * Right-end color for each clan's progress bar gradient (left = white).
+ * Matches the clan's primary identity color.
+ */
+export const PHILOSOPHY_BAR_CLAN_COLORS: Record<string, string> = {
+  nihilista:        '#bdb29c',
+  cientista:        '#54d5cf',
+  estoico:          '#818a41',
+  existencialista:  '#c93a39',
+  racionalista:     '#395df2',
+  humanista:        '#efb318',
+  realista:         '#a2a3a8',
+  trascendentalista:'#cb6ce6',
+};
+
+/** Fallback gradient end color when clanId is unknown. */
+export const PHILOSOPHY_BAR_DEFAULT_COLOR = '#FFFFFF';
+
 // ─── Base size (shared) ───────────────────────────────────────────────────────
 
 /**

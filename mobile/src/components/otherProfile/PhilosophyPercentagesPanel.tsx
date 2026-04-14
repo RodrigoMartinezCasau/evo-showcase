@@ -14,8 +14,11 @@ import {
   PHILOSOPHY_CONTAINER_PADDING_VERTICAL,
   PHILOSOPHY_CONTAINER_PADDING_HORIZONTAL,
   PHILOSOPHY_ROW_HEIGHT,
+  PHILOSOPHY_BAR_CLAN_COLORS,
+  PHILOSOPHY_BAR_DEFAULT_COLOR,
 } from '@evoconn/constants/philosophyBannerLayout';
 import { PhilosophyClanBanner } from '@evoconn/components/shared/PhilosophyClanBanner';
+import { GradientBarFill } from '@evoconn/components/shared/GradientBarFill';
 
 type PctEntry = { clanId: string; label: string; pct: number };
 
@@ -69,7 +72,13 @@ export const PhilosophyPercentagesPanel = React.memo(function PhilosophyPercenta
             fallbackTextStyle={styles.label}
           />
           <View style={styles.barTrack}>
-            <View style={[styles.barFill, { width: `${entry.pct}%` }]} />
+            <GradientBarFill
+              widthStyle={`${entry.pct}%`}
+              height={7}
+              radius={4}
+              clanColor={PHILOSOPHY_BAR_CLAN_COLORS[entry.clanId] ?? PHILOSOPHY_BAR_DEFAULT_COLOR}
+              gradId={entry.clanId}
+            />
           </View>
           <Text style={styles.pct}>{entry.pct}%</Text>
         </View>

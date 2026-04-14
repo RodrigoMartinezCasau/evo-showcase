@@ -13,8 +13,11 @@ import {
   EXPANDED_PHILOSOPHY_CONTAINER_PADDING_VERTICAL,
   EXPANDED_PHILOSOPHY_CONTAINER_PADDING_HORIZONTAL,
   EXPANDED_PHILOSOPHY_ROW_HEIGHT,
+  PHILOSOPHY_BAR_CLAN_COLORS,
+  PHILOSOPHY_BAR_DEFAULT_COLOR,
 } from '@evoconn/constants/philosophyBannerLayout';
 import { PhilosophyClanBanner } from '@evoconn/components/shared/PhilosophyClanBanner';
+import { GradientBarFill } from '@evoconn/components/shared/GradientBarFill';
 
 const ALL_CLANS: { clanId: string; label: string }[] = [
   { clanId: 'nihilista', label: 'Nihilista' },
@@ -76,7 +79,13 @@ export const ClanPercentagesTable = React.memo(function ClanPercentagesTable({
             />
           </View>
           <View style={styles.barTrack}>
-            <View style={[styles.barFill, { width: `${entry.pct}%` }]} />
+            <GradientBarFill
+              widthStyle={`${entry.pct}%`}
+              height={6}
+              radius={3}
+              clanColor={PHILOSOPHY_BAR_CLAN_COLORS[entry.clanId] ?? PHILOSOPHY_BAR_DEFAULT_COLOR}
+              gradId={`exp_${entry.clanId}`}
+            />
           </View>
           <Text style={[styles.pct, entry.pct === 0 && styles.pctZero]}>{entry.pct}%</Text>
         </View>
