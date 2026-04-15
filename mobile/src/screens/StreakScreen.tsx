@@ -28,6 +28,7 @@ import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
 import { fetchStreak, type StreakData } from '@evoconn/services/streakApi';
 import { CalendarGrid } from '@evoconn/components/shared/CalendarGrid';
 import { getTopBarRachaTopByHouse } from '@evoconn/utils/getTopBarRachaTopByHouse';
+import { getClanStreakColors } from '@evoconn/constants/clanStreakColors';
 import {
   STREAK_CARD_PADDING_H,
   STREAK_CARD_PADDING_V,
@@ -61,8 +62,9 @@ export default function StreakScreen() {
   const profile = getPersonalProfile();
   const { thoughts } = useThoughts();
 
-  const activeClan = useActiveClan(mockCurrentUser.clanId);
-  const FireIcon = getTopBarRachaTopByHouse(activeClan);
+  const activeClan  = useActiveClan(mockCurrentUser.clanId);
+  const FireIcon    = getTopBarRachaTopByHouse(activeClan);
+  const clanColors  = getClanStreakColors(activeClan);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [data, setData] = useState<StreakData | null>(null);
@@ -185,8 +187,9 @@ export default function StreakScreen() {
                 </Text>
                 <CalendarGrid
                   activeDays={data.activity_log}
-                  activeColor={evoconnColors.neonGreen}
+                  activeColor={clanColors.tertiary}
                   today={today}
+                  variant="streak-line"
                 />
               </View>
 
@@ -199,7 +202,7 @@ export default function StreakScreen() {
                 </Text>
                 <CalendarGrid
                   activeDays={data.frases_log}
-                  activeColor="#C56BEA"
+                  activeColor={clanColors.secondary}
                   today={today}
                 />
               </View>
@@ -213,7 +216,7 @@ export default function StreakScreen() {
                 </Text>
                 <CalendarGrid
                   activeDays={data.reflexiones_log}
-                  activeColor="#E53935"
+                  activeColor={clanColors.primary}
                   today={today}
                 />
               </View>

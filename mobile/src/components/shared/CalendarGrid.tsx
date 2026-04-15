@@ -1,7 +1,12 @@
 /**
  * A monthly calendar grid.
- * Active days are shown as colored circles; inactive days are dark grey.
- * The current day gets a white border highlight.
+ *
+ * variant='circles'     (default) — active days shown as filled circles.
+ * variant='streak-line' — active runs shown as one continuous rounded pill per row,
+ *                         with flat ends where it connects to the adjacent row.
+ *
+ * Active day text is always black; inactive day text is dim white.
+ * The current day gets a white border highlight in both variants.
  */
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
@@ -16,7 +21,7 @@ import {
 type Props = {
   /** YYYY-MM-DD strings for days that have activity. */
   activeDays: string[];
-  /** Accent color for active day circles. */
+  /** Accent color for active marks (circles or pill). */
   activeColor: string;
   /** Optional label shown above the grid. */
   label?: string;
@@ -24,25 +29,28 @@ type Props = {
   today?: string;
   /** Override scale. */
   scale?: number;
-  /**
-   * Shared horizontal offset for the calendar content block.
-   * Defaults to STREAK_CALENDAR_OFFSET_X from layout constants.
-   */
+  /** Shared horizontal offset for the calendar content block. */
   offsetX?: number;
-  /**
-   * Shared vertical offset for the calendar content block.
-   * Defaults to STREAK_CALENDAR_OFFSET_Y from layout constants.
-   */
+  /** Shared vertical offset for the calendar content block. */
   offsetY?: number;
+  /**
+   * 'circles'     = standard separate filled circles per active day (default).
+   * 'streak-line' = active consecutive days shown as one continuous rounded pill.
+   */
+  variant?: 'circles' | 'streak-line';
 };
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
 const DAY_NAMES = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                     'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+// ─── Month grid builder ───────────────────────────────────────────────────────
 
 function buildMonthGrid(year: number, month: number): (number | null)[][] {
-  // month: 1-12
   const firstDay = new Date(year, month - 1, 1).getDay(); // 0=Sun
-  // Shift so Monday=0
-  const firstOffset = (firstDay + 6) % 7;
+  const firstOffset = (firstDay + 6) % 7;                 // shift so Mon=0
   const daysInMonth = new Date(year, month, 0).getDate();
   const cells: (number | null)[] = Array(firstOffset).fill(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
@@ -52,34 +60,152 @@ function buildMonthGrid(year: number, month: number): (number | null)[][] {
   return rows;
 }
 
-const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+// ─── Streak-line row renderer ─────────────────────────────────────────────────
+
+type StreakRowProps = {
+  row: (number | null)[];
+  rowIndex: number;
+  allRows: (number | null)[][];
+  activeSet: Set<string>;
+  datePrefix: string; // 'YYYY-MM'
+  cell: number;
+  gap: number;
+  activeColor: string;
+  todayStr: string;
+  scale: number;
+  isFirst: boolean;
+};
+
+function StreakLineRow({
+  row, rowIndex, allRows, activeSet, datePrefix,
+  cell, gap, activeColor, todayStr, scale, isFirst,
+}: StreakRowProps) {
+  // Which columns are active in this row?
+  const activeCols: boolean[] = row.map((day) => {
+    if (!day) return false;
+    return activeSet.has(`${datePrefix}-${String(day).padStart(2, '0')}`);
+  });
+
+  // Find consecutive runs of active columns
+  type Run = { start: number; end: number };
+  const runs: Run[] = [];
+  let s = -1;
+  for (let i = 0; i < 7; i++) {
+    if (activeCols[i]) { if (s === -1) s = i; }
+    else if (s !== -1) { runs.push({ start: s, end: i - 1 }); s = -1; }
+  }
+  if (s !== -1) runs.push({ start: s, end: 6 });
+
+  // Cross-row connection flags (checked at col boundary only)
+  const prevRow = rowIndex > 0 ? allRows[rowIndex - 1] : null;
+  const nextRow = rowIndex < allRows.length - 1 ? allRows[rowIndex + 1] : null;
+
+  function isDayActive(r: (number | null)[], col: number): boolean {
+    const day = r[col];
+    if (!day) return false;
+    return activeSet.has(`${datePrefix}-${String(day).padStart(2, '0')}`);
+  }
+
+  const prevLastActive  = prevRow ? isDayActive(prevRow, 6) : false;
+  const nextFirstActive = nextRow ? isDayActive(nextRow, 0) : false;
+
+  // Total row width (same as 7*cell + 6*gap)
+  const rowW = 7 * cell + 6 * gap;
+  const r    = cell / 2;
+
+  return (
+    <View style={[styles.streakRow, { height: cell, marginTop: isFirst ? 0 : gap }]}>
+      {/* ── Pill backgrounds (absolute, behind day numbers) ── */}
+      {runs.map((run) => {
+        const connectLeft  = run.start === 0 && prevLastActive;
+        const connectRight = run.end   === 6 && nextFirstActive;
+
+        const pillLeft  = connectLeft  ? 0    : run.start * (cell + gap);
+        const pillRight = connectRight ? rowW : run.end   * (cell + gap) + cell;
+        const pillWidth = pillRight - pillLeft;
+
+        return (
+          <View
+            key={`pill-${run.start}-${run.end}`}
+            style={{
+              position: 'absolute',
+              left: pillLeft,
+              top: 0,
+              width: pillWidth,
+              height: cell,
+              backgroundColor: activeColor,
+              borderTopLeftRadius:     connectLeft  ? 0 : r,
+              borderBottomLeftRadius:  connectLeft  ? 0 : r,
+              borderTopRightRadius:    connectRight ? 0 : r,
+              borderBottomRightRadius: connectRight ? 0 : r,
+            }}
+          />
+        );
+      })}
+
+      {/* ── Day cells (absolute, on top of pills) ── */}
+      <View style={[styles.streakCellRow, { gap }]}>
+        {row.map((day, ci) => {
+          if (!day) return <View key={ci} style={{ width: cell, height: cell }} />;
+          const dateStr  = `${datePrefix}-${String(day).padStart(2, '0')}`;
+          const isActive = activeSet.has(dateStr);
+          const isToday  = dateStr === todayStr;
+          return (
+            <View
+              key={ci}
+              style={[
+                { width: cell, height: cell, borderRadius: r,
+                  alignItems: 'center', justifyContent: 'center' },
+                isToday && styles.todayBorder,
+              ]}
+            >
+              <Text
+                style={{
+                  color:      isActive ? '#000000' : 'rgba(255,255,255,0.45)',
+                  fontSize:   10 * scale,
+                  fontWeight: isActive ? '700' : '500',
+                }}
+              >
+                {day}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export const CalendarGrid = React.memo(function CalendarGrid({
   activeDays,
   activeColor,
   label,
   today,
-  scale = STREAK_CALENDAR_SCALE,
+  scale   = STREAK_CALENDAR_SCALE,
   offsetX = STREAK_CALENDAR_OFFSET_X,
   offsetY = STREAK_CALENDAR_OFFSET_Y,
+  variant = 'circles',
 }: Props) {
   const todayStr = today ?? new Date().toISOString().slice(0, 10);
   const [ty, tm] = todayStr.split('-').map(Number);
-  const activeSet = useMemo(() => new Set(activeDays), [activeDays]);
-  const rows = useMemo(() => buildMonthGrid(ty, tm), [ty, tm]);
+  const activeSet   = useMemo(() => new Set(activeDays), [activeDays]);
+  const rows        = useMemo(() => buildMonthGrid(ty, tm), [ty, tm]);
+  const datePrefix  = `${ty}-${String(tm).padStart(2, '0')}`;
 
   const cell = STREAK_DAY_CELL_SIZE * scale;
-  const gap = STREAK_DAY_CELL_GAP * scale;
+  const gap  = STREAK_DAY_CELL_GAP  * scale;
 
   return (
     <View>
-      {/* Title and month label stay fixed — not affected by offset */}
+      {/* Month label — fixed, not moved by offset */}
       {label && <Text style={styles.label}>{label}</Text>}
       <Text style={styles.monthLabel}>{MONTH_NAMES[tm - 1]} {ty}</Text>
 
-      {/* Calendar content wrapper — shifted by the shared position editors */}
+      {/* Calendar content — shifted by shared position editors */}
       <View style={{ transform: [{ translateX: offsetX }, { translateY: offsetY }] }}>
-        {/* Day name headers */}
+        {/* Weekday header row */}
         <View style={[styles.row, { gap }]}>
           {DAY_NAMES.map((d) => (
             <View key={d} style={[styles.cell, { width: cell, height: cell }]}>
@@ -88,44 +214,66 @@ export const CalendarGrid = React.memo(function CalendarGrid({
           ))}
         </View>
 
-        {/* Day rows */}
-        {rows.map((row, ri) => (
-          <View key={ri} style={[styles.row, { gap, marginTop: gap }]}>
-            {row.map((day, ci) => {
-              if (!day) return <View key={ci} style={[styles.cell, { width: cell, height: cell }]} />;
-              const dateStr = `${ty}-${String(tm).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-              const isActive = activeSet.has(dateStr);
-              const isToday = dateStr === todayStr;
-              return (
-                <View
-                  key={ci}
-                  style={[
-                    styles.cell,
-                    styles.dayCell,
-                    { width: cell, height: cell, borderRadius: cell / 2 },
-                    isActive && { backgroundColor: activeColor },
-                    !isActive && { backgroundColor: 'rgba(255,255,255,0.07)' },
-                    isToday && styles.todayBorder,
-                  ]}
-                >
-                  <Text
+        {variant === 'streak-line' ? (
+          /* ── Streak-line variant ── */
+          rows.map((row, ri) => (
+            <StreakLineRow
+              key={ri}
+              row={row}
+              rowIndex={ri}
+              allRows={rows}
+              activeSet={activeSet}
+              datePrefix={datePrefix}
+              cell={cell}
+              gap={gap}
+              activeColor={activeColor}
+              todayStr={todayStr}
+              scale={scale}
+              isFirst={ri === 0}
+            />
+          ))
+        ) : (
+          /* ── Circles variant (default) ── */
+          rows.map((row, ri) => (
+            <View key={ri} style={[styles.row, { gap, marginTop: gap }]}>
+              {row.map((day, ci) => {
+                if (!day) return <View key={ci} style={[styles.cell, { width: cell, height: cell }]} />;
+                const dateStr  = `${ty}-${String(tm).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const isActive = activeSet.has(dateStr);
+                const isToday  = dateStr === todayStr;
+                return (
+                  <View
+                    key={ci}
                     style={[
-                      styles.dayNum,
-                      { fontSize: 10 * scale },
-                      isActive && styles.dayNumActive,
+                      styles.cell,
+                      styles.dayCell,
+                      { width: cell, height: cell, borderRadius: cell / 2 },
+                      isActive  && { backgroundColor: activeColor },
+                      !isActive && { backgroundColor: 'rgba(255,255,255,0.07)' },
+                      isToday   && styles.todayBorder,
                     ]}
                   >
-                    {day}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-        ))}
+                    <Text
+                      style={[
+                        styles.dayNum,
+                        { fontSize: 10 * scale },
+                        isActive && styles.dayNumActive,
+                      ]}
+                    >
+                      {day}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          ))
+        )}
       </View>
     </View>
   );
 });
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   label: {
@@ -168,5 +316,17 @@ const styles = StyleSheet.create({
   dayNumActive: {
     color: '#000000',
     fontWeight: '700',
+  },
+  // Streak-line row container: relative so absolute pills are anchored here
+  streakRow: {
+    position: 'relative',
+  },
+  // Day-numbers row sits on top of the absolute pills
+  streakCellRow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });
