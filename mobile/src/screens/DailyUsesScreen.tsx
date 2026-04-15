@@ -20,11 +20,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getPersonalProfile } from '@evoconn/data/mockPersonalProfile';
+import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { AppTopBar, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
+import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
 import { fetchUsesLog, type UsesLogData } from '@evoconn/services/streakApi';
+import { getTopBarUsosByHouse } from '@evoconn/utils/getTopBarUsosByHouse';
 import {
   STREAK_CARD_PADDING_H,
   STREAK_CARD_PADDING_V,
@@ -36,6 +39,11 @@ import {
   USES_BAR_HEIGHT,
   USES_BAR_RADIUS,
   USES_HEATMAP_SCALE,
+  USAGE_HEART_ICON_SCALE,
+  USAGE_HEART_ICON_OFFSET_X,
+  USAGE_HEART_ICON_OFFSET_Y,
+  USAGE_SUMMARY_TEXT_GROUP_OFFSET_X,
+  USAGE_SUMMARY_TEXT_GROUP_OFFSET_Y,
 } from '@evoconn/constants/streakLayout';
 
 const DAILY_LIMIT = 30;
@@ -154,6 +162,9 @@ export default function DailyUsesScreen() {
   const profile = getPersonalProfile();
   const { thoughts } = useThoughts();
 
+  const activeClan = useActiveClan(mockCurrentUser.clanId);
+  const HeartIcon  = getTopBarUsosByHouse(activeClan);
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [log, setLog] = useState<UsesLogData>({});
   const [loading, setLoading] = useState(true);
@@ -223,12 +234,52 @@ export default function DailyUsesScreen() {
             <>
               {/* ── Hero: uses count ── */}
               <View style={[styles.card, styles.heroCard]}>
-                <Text style={[styles.usesCount, { fontSize: STREAK_COUNT_FONT_SIZE }]}>
-                  ❤️ {remaining}
-                </Text>
-                <Text style={styles.usesUnit}>usos restantes hoy</Text>
-                <Text style={styles.usesSub}>{usedToday} / {DAILY_LIMIT} usados</Text>
-                <View style={{ width: '100%', marginTop: 8 }}>
+                {/* Top row: heart icon + grouped text block */}
+                <View style={styles.heroRow}>
+
+                  {/* Heart icon — independent; transform never reflows the text group */}
+                  <View
+                    style={[
+                      styles.heartIconWrap,
+                      {
+                        width: STREAK_COUNT_FONT_SIZE,
+                        height: STREAK_COUNT_FONT_SIZE,
+                        transform: [
+                          { translateX: USAGE_HEART_ICON_OFFSET_X },
+                          { translateY: USAGE_HEART_ICON_OFFSET_Y },
+                          { scale: USAGE_HEART_ICON_SCALE },
+                        ],
+                      },
+                    ]}
+                  >
+                    <HeartIcon
+                      width={STREAK_COUNT_FONT_SIZE}
+                      height={STREAK_COUNT_FONT_SIZE}
+                    />
+                  </View>
+
+                  {/* Text group — all three lines move together via shared offsets */}
+                  <View
+                    style={[
+                      styles.summaryTextGroup,
+                      {
+                        transform: [
+                          { translateX: USAGE_SUMMARY_TEXT_GROUP_OFFSET_X },
+                          { translateY: USAGE_SUMMARY_TEXT_GROUP_OFFSET_Y },
+                        ],
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.usesCount, { fontSize: STREAK_COUNT_FONT_SIZE }]}>
+                      {remaining}
+                    </Text>
+                    <Text style={styles.usesUnit}>usos restantes hoy</Text>
+                    <Text style={styles.usesSub}>{usedToday} / {DAILY_LIMIT} usados</Text>
+                  </View>
+                </View>
+
+                {/* Progress bar — spans full card width below the row */}
+                <View style={styles.barWrap}>
                   <GradBar used={usedToday} limit={DAILY_LIMIT} />
                 </View>
               </View>
@@ -248,7 +299,7 @@ export default function DailyUsesScreen() {
               {/* ── Info block ── */}
               <View style={styles.card}>
                 <Text style={styles.infoText}>
-                  Cada generación con IA consume 1 uso. Los usos se reinician cada día.
+                  Cada generación consume 1 uso. Los usos se reinician cada día.
                 </Text>
               </View>
 
@@ -298,8 +349,24 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   heroCard: {
+    flexDirection: 'column',
+    gap: 12,
+  },
+  heroRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 16,
+  },
+  heartIconWrap: {
+    // Independent wrapper — transform here never reflows the text group
+  },
+  summaryTextGroup: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 2,
+  },
+  barWrap: {
+    width: '100%',
   },
   sectionTitle: {
     color: 'rgba(255,255,255,0.5)',

@@ -111,3 +111,39 @@ export const USES_HEATMAP_CELL_GAP = 4;
 
 /** Scale multiplier for the heatmap. */
 export const USES_HEATMAP_SCALE = 1.0;
+
+// ─── Usage heart icon (hero card) ────────────────────────────────────────────
+
+/**
+ * Scale of the clan-based heart SVG shown in the top usage summary card.
+ * 1 = default size. Increasing makes the icon larger; does not affect card or text.
+ */
+export const USAGE_HEART_ICON_SCALE = 2.3;
+
+/**
+ * Horizontal offset (px) of the heart icon inside the usage hero card.
+ * Positive = right, negative = left. Does not reflow the text group.
+ */
+export const USAGE_HEART_ICON_OFFSET_X = 90;
+
+/**
+ * Vertical offset (px) of the heart icon inside the usage hero card.
+ * Positive = down, negative = up. Does not reflow the text group.
+ */
+export const USAGE_HEART_ICON_OFFSET_Y = -10;
+
+// ─── Usage summary text group (hero card) ────────────────────────────────────
+
+/**
+ * Horizontal offset (px) of the full text group (number + labels) to the right
+ * of the heart icon inside the top usage summary card.
+ * Positive = right, negative = left. Moves ALL texts together; heart icon unchanged.
+ */
+export const USAGE_SUMMARY_TEXT_GROUP_OFFSET_X = 110;
+
+/**
+ * Vertical offset (px) of the full text group (number + labels) to the right
+ * of the heart icon inside the top usage summary card.
+ * Positive = down, negative = up. Moves ALL texts together; heart icon unchanged.
+ */
+export const USAGE_SUMMARY_TEXT_GROUP_OFFSET_Y = 0;
