@@ -251,7 +251,7 @@ export default function StreakScreen() {
                   {data.streak_best > 0 && (
                     <Text style={styles.bestStreak}>
                       Mejor racha:{' '}
-                      <Text style={{ color: evoconnColors.neonGreen }}>{data.streak_best} días</Text>
+                      <Text style={{ color: clanColors.tertiary }}>{data.streak_best} días</Text>
                     </Text>
                   )}
                 </View>
