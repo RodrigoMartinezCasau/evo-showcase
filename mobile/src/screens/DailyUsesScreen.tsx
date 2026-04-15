@@ -30,6 +30,7 @@ import {
   STREAK_CARD_PADDING_V,
   STREAK_SECTION_GAP,
   STREAK_CARD_RADIUS,
+  STREAK_CARD_BACKGROUND,
   STREAK_COUNT_FONT_SIZE,
   STREAK_LABEL_FONT_SIZE,
   USES_BAR_HEIGHT,
@@ -290,7 +291,7 @@ const styles = StyleSheet.create({
     height: STREAK_SECTION_GAP,
   },
   card: {
-    backgroundColor: '#000000',
+    backgroundColor: STREAK_CARD_BACKGROUND,
     borderRadius: STREAK_CARD_RADIUS,
     paddingHorizontal: STREAK_CARD_PADDING_H,
     paddingVertical: STREAK_CARD_PADDING_V,

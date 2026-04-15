@@ -16,6 +16,9 @@ export const STREAK_SECTION_GAP = 12;
 /** Border radius of section cards. */
 export const STREAK_CARD_RADIUS = 14;
 
+/** Background color of all section cards in the streak and usage displays. */
+export const STREAK_CARD_BACKGROUND = '#0b0b0f';
+
 // ─── Header ───────────────────────────────────────────────────────────────────
 
 /** Font size of the large streak number. */
