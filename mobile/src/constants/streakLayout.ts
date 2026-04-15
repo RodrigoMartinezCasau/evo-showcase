@@ -63,13 +63,29 @@ export const STREAK_FIRE_ICON_SCALE = 2.5;
  * Horizontal offset (px) of the fire icon inside the hero card.
  * Positive = right, negative = left. Does not reflow surrounding text.
  */
-export const STREAK_FIRE_ICON_OFFSET_X = -100;
+export const STREAK_FIRE_ICON_OFFSET_X = 70;
 
 /**
  * Vertical offset (px) of the fire icon inside the hero card.
  * Positive = down, negative = up. Does not reflow surrounding text.
  */
-export const STREAK_FIRE_ICON_OFFSET_Y = 30;
+export const STREAK_FIRE_ICON_OFFSET_Y = 0;
+
+// ─── Streak summary text group (hero card) ───────────────────────────────────
+
+/**
+ * Horizontal offset (px) of the full text group (number + labels) to the right
+ * of the fire icon inside the top summary card.
+ * Positive = right, negative = left. Moves ALL texts together; fire icon unchanged.
+ */
+export const STREAK_SUMMARY_TEXT_GROUP_OFFSET_X = 80;
+
+/**
+ * Vertical offset (px) of the full text group (number + labels) to the right
+ * of the fire icon inside the top summary card.
+ * Positive = down, negative = up. Moves ALL texts together; fire icon unchanged.
+ */
+export const STREAK_SUMMARY_TEXT_GROUP_OFFSET_Y = 0;
 
 // ─── Stats block ─────────────────────────────────────────────────────────────
 

@@ -40,6 +40,8 @@ import {
   STREAK_FIRE_ICON_SCALE,
   STREAK_FIRE_ICON_OFFSET_X,
   STREAK_FIRE_ICON_OFFSET_Y,
+  STREAK_SUMMARY_TEXT_GROUP_OFFSET_X,
+  STREAK_SUMMARY_TEXT_GROUP_OFFSET_Y,
 } from '@evoconn/constants/streakLayout';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -129,38 +131,49 @@ export default function StreakScreen() {
             <>
               {/* ── Hero: streak count ── */}
               <View style={[styles.card, styles.heroCard]}>
-                {/* Fire icon + number row */}
-                <View style={styles.heroCountRow}>
-                  {/* Clan fire icon — independent wrapper, does not reflow the number */}
-                  <View
-                    style={[
-                      styles.fireIconWrap,
-                      {
-                        transform: [
-                          { translateX: STREAK_FIRE_ICON_OFFSET_X },
-                          { translateY: STREAK_FIRE_ICON_OFFSET_Y },
-                          { scale: STREAK_FIRE_ICON_SCALE },
-                        ],
-                      },
-                    ]}
-                  >
-                    <FireIcon
-                      width={STREAK_COUNT_FONT_SIZE}
-                      height={STREAK_COUNT_FONT_SIZE}
-                    />
-                  </View>
+                {/* Fire icon — independent, not inside text group */}
+                <View
+                  style={[
+                    styles.fireIconWrap,
+                    {
+                      transform: [
+                        { translateX: STREAK_FIRE_ICON_OFFSET_X },
+                        { translateY: STREAK_FIRE_ICON_OFFSET_Y },
+                        { scale: STREAK_FIRE_ICON_SCALE },
+                      ],
+                    },
+                  ]}
+                >
+                  <FireIcon
+                    width={STREAK_COUNT_FONT_SIZE}
+                    height={STREAK_COUNT_FONT_SIZE}
+                  />
+                </View>
+
+                {/* Text group — all four texts move together via shared offsets */}
+                <View
+                  style={[
+                    styles.summaryTextGroup,
+                    {
+                      transform: [
+                        { translateX: STREAK_SUMMARY_TEXT_GROUP_OFFSET_X },
+                        { translateY: STREAK_SUMMARY_TEXT_GROUP_OFFSET_Y },
+                      ],
+                    },
+                  ]}
+                >
                   <Text style={[styles.streakCount, { fontSize: STREAK_COUNT_FONT_SIZE }]}>
                     {data.streak_current}
                   </Text>
+                  <Text style={styles.streakUnit}>días seguidos</Text>
+                  <Text style={styles.streakSub}>Mantén tu consistencia diaria</Text>
+                  {data.streak_best > 0 && (
+                    <Text style={styles.bestStreak}>
+                      Mejor racha:{' '}
+                      <Text style={{ color: evoconnColors.neonGreen }}>{data.streak_best} días</Text>
+                    </Text>
+                  )}
                 </View>
-                <Text style={styles.streakUnit}>días seguidos</Text>
-                <Text style={styles.streakSub}>Mantén tu consistencia diaria</Text>
-                {data.streak_best > 0 && (
-                  <Text style={styles.bestStreak}>
-                    Mejor racha:{' '}
-                    <Text style={{ color: evoconnColors.neonGreen }}>{data.streak_best} días</Text>
-                  </Text>
-                )}
               </View>
 
               <View style={styles.gap} />
@@ -279,16 +292,17 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   heroCard: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  heroCountRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 16,
   },
   fireIconWrap: {
-    // Independent wrapper — transform here never reflowes the sibling Text
+    // Independent wrapper — transform here never reflows the text group
+  },
+  summaryTextGroup: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 2,
   },
   sectionTitle: {
     color: 'rgba(255,255,255,0.5)',
