@@ -6,6 +6,7 @@
  * Content scrolls between the two fixed bars.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import {
   View,
   Text,
@@ -29,8 +30,14 @@ import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
 import { fetchStreak, type StreakData } from '@evoconn/services/streakApi';
 import { CalendarGrid } from '@evoconn/components/shared/CalendarGrid';
 import { getTopBarRachaTopByHouse } from '@evoconn/utils/getTopBarRachaTopByHouse';
-import { getTopBarFueguitoByHouse } from '@evoconn/utils/getTopBarFueguitoByHouse';
 import { getClanStreakColors } from '@evoconn/constants/clanStreakColors';
+import FuegoApagadoIcon from '../assets/topbar/fueguitoSvg/fuego-apagado.svg';
+import {
+  IS_DEBUG_STREAK_MODE,
+  debugStreakIsActiveThisSession,
+  addDebugStreakListener,
+  removeDebugStreakListener,
+} from '../debug/debugStreakMode';
 import {
   STREAK_CARD_PADDING_H,
   STREAK_CARD_PADDING_V,
@@ -65,10 +72,10 @@ export default function StreakScreen() {
   const profile = getPersonalProfile();
   const { thoughts } = useThoughts();
 
-  const activeClan    = useActiveClan(mockCurrentUser.clanId);
-  const FireIcon      = getTopBarRachaTopByHouse(activeClan);   // active (encendido)
-  const FueguitoIcon  = getTopBarFueguitoByHouse(activeClan);   // inactive (apagado)
-  const clanColors    = getClanStreakColors(activeClan);
+  const activeClan = useActiveClan(mockCurrentUser.clanId);
+  const FireIcon   = getTopBarRachaTopByHouse(activeClan); // encendido — clan-specific active fire
+  const clanColors = getClanStreakColors(activeClan);
+  // Apagado state always uses the single shared "fuego apagado.svg" (not clan-specific).
 
   // ─── Fire icon transition animation ─────────────────────────────────────────
   // 0 = apagado fully visible; 1 = encendido fully visible
@@ -98,16 +105,26 @@ export default function StreakScreen() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Fire icon state sync:
-  //   - On initial data load  → set values INSTANTLY (no animation).
-  //   - On false → true later → animate once (user just continued streak today).
-  //   - All other changes     → set values instantly, no animation.
+  // ─── Fire icon state sync ──────────────────────────────────────────────────
+  //
+  //  Source of truth for "did the user continue the streak today?":
+  //   • DEBUG mode : debugStreakIsActiveThisSession() — session-only flag,
+  //                  always false on app launch, never touches the backend.
+  //   • PRODUCTION : data.activity_log.includes(today) — real backend data.
+  //
+  //  Rules:
+  //   • Initial data load    → set animated values INSTANTLY (no animation).
+  //   • false → true later   → play ignition animation once.
+  //   • All other changes    → set instantly, no animation.
   useEffect(() => {
     if (!data) return;
-    const isActiveToday = data.activity_log.includes(today);
+
+    const isActiveToday = IS_DEBUG_STREAK_MODE
+      ? debugStreakIsActiveThisSession()   // debug: always false until first publish
+      : data.activity_log.includes(today); // production: real backend data
 
     if (prevActiveRef.current === null) {
-      // ── Initial load: jump straight to the correct state, never animate ──
+      // Initial load — jump to correct state instantly, never animate.
       prevActiveRef.current = isActiveToday;
       transitionAnim.setValue(isActiveToday ? 1 : 0);
       scaleAnim.setValue(1);
@@ -120,16 +137,16 @@ export default function StreakScreen() {
     prevActiveRef.current = isActiveToday;
 
     if (isActiveToday && wasInactive) {
-      // ── Real transition: apagado → encendido (user just continued streak) ──
+      // Genuine apagado → encendido: play ignition animation.
       Animated.parallel([
         Animated.timing(transitionAnim, {
           toValue: 1,
-          duration: 350,
+          duration: 300,
           useNativeDriver: true,
         }),
         Animated.sequence([
           Animated.spring(scaleAnim, {
-            toValue: 1.25,
+            toValue: 1.2,
             friction: 4,
             tension: 250,
             useNativeDriver: true,
@@ -143,11 +160,85 @@ export default function StreakScreen() {
         ]),
       ]).start();
     } else {
-      // ── Any other change (encendido → apagado or edge cases): instant ──
+      // encendido → apagado or edge case: instant, no animation.
       transitionAnim.setValue(isActiveToday ? 1 : 0);
       scaleAnim.setValue(1);
     }
   }, [data, today, transitionAnim, scaleAnim]);
+
+  // ─── Debug live-activation listener ────────────────────────────────────────
+  //
+  //  When the user publishes a reflection/phrase while this screen is anywhere
+  //  in the navigation stack, debugMarkStreakActivated() fires this callback
+  //  in real time — so the animation plays at the exact moment of publishing,
+  //  even if the streak screen is not currently focused.
+  //
+  //  transitionAnim/scaleAnim are stable Animated.Value instances (useRef),
+  //  so it is always safe to reference them inside this subscription.
+  useEffect(() => {
+    if (!IS_DEBUG_STREAK_MODE) return;
+
+    const onActivated = () => {
+      // Guard: only run for the genuine false → true transition.
+      if (prevActiveRef.current !== false) return;
+
+      prevActiveRef.current = true;
+      Animated.parallel([
+        Animated.timing(transitionAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.spring(scaleAnim, {
+            toValue: 1.2,
+            friction: 4,
+            tension: 250,
+            useNativeDriver: true,
+          }),
+          Animated.spring(scaleAnim, {
+            toValue: 1.0,
+            friction: 6,
+            tension: 200,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start();
+    };
+
+    addDebugStreakListener(onActivated);
+    return () => removeDebugStreakListener(onActivated);
+  }, [transitionAnim, scaleAnim]); // stable refs — effectively runs once on mount
+
+  // ─── Focus-based debug state sync ──────────────────────────────────────────
+  //
+  //  Every time this screen gains focus (on mount AND on every navigation
+  //  return), re-check the debug flag and update the fire icon if the state
+  //  changed while the screen was in the background or unmounted.
+  //
+  //  This handles the most common real-world test flow:
+  //    1. Open StreakScreen → grey fire
+  //    2. Navigate back → StreakScreen unmounts, listener removed
+  //    3. Send a reflection → flag set, no listener active
+  //    4. Re-open StreakScreen → focus fires → flag is true → colored fire shown
+  useFocusEffect(
+    useCallback(() => {
+      if (!IS_DEBUG_STREAK_MODE) return;
+
+      const isActiveNow = debugStreakIsActiveThisSession();
+
+      if (isActiveNow && prevActiveRef.current === false) {
+        // Streak was activated while we were away → update instantly (no animation,
+        // since the user didn't witness the moment of activation this session).
+        prevActiveRef.current = true;
+        transitionAnim.setValue(1);
+        scaleAnim.setValue(1);
+      } else if (isActiveNow && prevActiveRef.current === null) {
+        // Data not loaded yet; data useEffect will handle it correctly on load.
+      }
+      // No action needed if already true or still false.
+    }, [transitionAnim, scaleAnim]),
+  );
 
   const handleBottomTabChange = useCallback(
     (tab: TabId) => {
@@ -212,14 +303,14 @@ export default function StreakScreen() {
                     },
                   ]}
                 >
-                  {/* Apagado layer — fades out when streak is continued today */}
+                  {/* Apagado layer — single shared SVG, fades out on activation */}
                   <Animated.View
                     style={[
                       StyleSheet.absoluteFill,
                       { opacity: Animated.subtract(1, transitionAnim) },
                     ]}
                   >
-                    <FueguitoIcon
+                    <FuegoApagadoIcon
                       width={STREAK_COUNT_FONT_SIZE}
                       height={STREAK_COUNT_FONT_SIZE}
                     />

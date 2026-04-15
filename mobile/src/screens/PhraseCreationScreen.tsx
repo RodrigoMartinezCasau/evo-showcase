@@ -34,6 +34,7 @@ import {
 import { getPublishStarByClan } from '@evoconn/utils/getDebateStarByClan';
 import type { DebateMessage } from '@evoconn/types/debate';
 import { useFeedStore, createPhrasePost } from '@evoconn/hooks/useFeedStore';
+import { debugMarkStreakActivated } from '../debug/debugStreakMode';
 import { normalizePhraseInnerForPublish } from '@evoconn/utils/phrasePublish';
 import type { SidebarFolder } from '@evoconn/types';
 
@@ -183,6 +184,7 @@ export default function PhraseCreationScreen() {
       const post = createPhrasePost(mockCurrentUser, phraseInner, authorName);
       (post as { id: string }).id = sourceId;
       publishPost(post);
+      debugMarkStreakActivated(); // no-op in production; triggers fire animation in dev
 
       const nextMessages: DebateMessage[] = [
         { role: 'user', content: rawPhraseFromUser.trim() },

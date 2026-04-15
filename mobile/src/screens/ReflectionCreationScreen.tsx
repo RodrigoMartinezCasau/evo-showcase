@@ -44,6 +44,7 @@ import { EMPTY_WELCOME_TRIPLE_STARS_LAYOUT as EMPTY_WELCOME_TRIPLE_STARS } from 
 import { getReflectionTripleStarsByHouse } from '@evoconn/utils/getReflectionTripleStarsByHouse';
 import { DebateResponseDisplay } from '@evoconn/components/debate';
 import { useFeedStore, createReflectionPost } from '@evoconn/hooks/useFeedStore';
+import { debugMarkStreakActivated } from '../debug/debugStreakMode';
 import { COMMUNITY_DRAWER_EDGE_ZONE_WIDTH } from '@evoconn/constants/communityDrawerGesture';
 import { useSidebarGesture } from '@evoconn/hooks/useSidebarGesture';
 
@@ -80,6 +81,7 @@ export default function ReflectionCreationScreen() {
         const post = createReflectionPost(mockCurrentUser, title, body);
         (post as any).id = sourceId;
         publishPost(post);
+        debugMarkStreakActivated(); // no-op in production; triggers fire animation in dev
       },
     [publishPost],
   );
