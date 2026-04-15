@@ -76,6 +76,8 @@ export default function StreakScreen() {
   const scaleAnim      = useRef(new Animated.Value(1)).current;
   const prevActiveRef  = useRef<boolean | null>(null);
 
+  const today = new Date().toISOString().slice(0, 10);
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [data, setData] = useState<StreakData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -96,15 +98,29 @@ export default function StreakScreen() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Animate fire icon whenever streak-today state is resolved
+  // Fire icon state sync:
+  //   - On initial data load  → set values INSTANTLY (no animation).
+  //   - On false → true later → animate once (user just continued streak today).
+  //   - All other changes     → set values instantly, no animation.
   useEffect(() => {
     if (!data) return;
     const isActiveToday = data.activity_log.includes(today);
-    if (prevActiveRef.current === isActiveToday) return;
+
+    if (prevActiveRef.current === null) {
+      // ── Initial load: jump straight to the correct state, never animate ──
+      prevActiveRef.current = isActiveToday;
+      transitionAnim.setValue(isActiveToday ? 1 : 0);
+      scaleAnim.setValue(1);
+      return;
+    }
+
+    if (prevActiveRef.current === isActiveToday) return; // no change
+
+    const wasInactive = prevActiveRef.current === false;
     prevActiveRef.current = isActiveToday;
 
-    if (isActiveToday) {
-      // Encendido: crossfade in + scale pop reward
+    if (isActiveToday && wasInactive) {
+      // ── Real transition: apagado → encendido (user just continued streak) ──
       Animated.parallel([
         Animated.timing(transitionAnim, {
           toValue: 1,
@@ -127,12 +143,8 @@ export default function StreakScreen() {
         ]),
       ]).start();
     } else {
-      // Apagado: simple crossfade out, no bounce
-      Animated.timing(transitionAnim, {
-        toValue: 0,
-        duration: 280,
-        useNativeDriver: true,
-      }).start();
+      // ── Any other change (encendido → apagado or edge cases): instant ──
+      transitionAnim.setValue(isActiveToday ? 1 : 0);
       scaleAnim.setValue(1);
     }
   }, [data, today, transitionAnim, scaleAnim]);
@@ -153,7 +165,6 @@ export default function StreakScreen() {
     20;
   const contentHeight = screenH - topBarHeight - bottomBarHeight;
 
-  const today = new Date().toISOString().slice(0, 10);
   const totalDays = data?.activity_log.length ?? 0;
 
   return (
