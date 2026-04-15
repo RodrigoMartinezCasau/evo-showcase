@@ -6,7 +6,6 @@
  * Content scrolls between the two fixed bars.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
 import {
   View,
   Text,
@@ -34,10 +33,8 @@ import { getClanStreakColors } from '@evoconn/constants/clanStreakColors';
 import FuegoApagadoIcon from '../assets/topbar/fueguitoSvg/fuego-apagado.svg';
 import {
   IS_DEBUG_STREAK_MODE,
-  debugStreakIsActiveThisSession,
-  addDebugStreakListener,
-  removeDebugStreakListener,
-} from '../debug/debugStreakMode';
+  useDebugStreak,
+} from '../debug/DebugStreakContext';
 import {
   STREAK_CARD_PADDING_H,
   STREAK_CARD_PADDING_V,
@@ -77,6 +74,11 @@ export default function StreakScreen() {
   const clanColors = getClanStreakColors(activeClan);
   // Apagado state always uses the single shared "fuego apagado.svg" (not clan-specific).
 
+  // ─── Debug streak reactive state ──────────────────────────────────────────
+  // hasSentToday comes from React Context (useState under the hood), so any
+  // change triggers a re-render here automatically — no listeners needed.
+  const { hasSentToday } = useDebugStreak();
+
   // ─── Fire icon transition animation ─────────────────────────────────────────
   // 0 = apagado fully visible; 1 = encendido fully visible
   const transitionAnim = useRef(new Animated.Value(0)).current;
@@ -105,140 +107,91 @@ export default function StreakScreen() {
 
   useEffect(() => { load(); }, [load]);
 
-  // ─── Fire icon state sync ──────────────────────────────────────────────────
+  // ─── Fire icon state: PRODUCTION mode ────────────────────────────────────
   //
-  //  Source of truth for "did the user continue the streak today?":
-  //   • DEBUG mode : debugStreakIsActiveThisSession() — session-only flag,
-  //                  always false on app launch, never touches the backend.
-  //   • PRODUCTION : data.activity_log.includes(today) — real backend data.
-  //
-  //  Rules:
-  //   • Initial data load    → set animated values INSTANTLY (no animation).
-  //   • false → true later   → play ignition animation once.
-  //   • All other changes    → set instantly, no animation.
+  //  In production, source of truth is data.activity_log from the backend.
+  //  Rules: initial load → instant (no animation). false→true → ignition anim.
   useEffect(() => {
+    if (IS_DEBUG_STREAK_MODE) return; // debug mode handled by its own effect below
     if (!data) return;
 
-    const isActiveToday = IS_DEBUG_STREAK_MODE
-      ? debugStreakIsActiveThisSession()   // debug: always false until first publish
-      : data.activity_log.includes(today); // production: real backend data
+    const isActiveToday = data.activity_log.includes(today);
 
     if (prevActiveRef.current === null) {
-      // Initial load — jump to correct state instantly, never animate.
       prevActiveRef.current = isActiveToday;
       transitionAnim.setValue(isActiveToday ? 1 : 0);
       scaleAnim.setValue(1);
+      // eslint-disable-next-line no-console
+      console.log(`[STREAK] Production: initial isActiveToday = ${isActiveToday}`);
       return;
     }
 
-    if (prevActiveRef.current === isActiveToday) return; // no change
+    if (prevActiveRef.current === isActiveToday) return;
 
     const wasInactive = prevActiveRef.current === false;
     prevActiveRef.current = isActiveToday;
 
     if (isActiveToday && wasInactive) {
-      // Genuine apagado → encendido: play ignition animation.
       Animated.parallel([
-        Animated.timing(transitionAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
+        Animated.timing(transitionAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
         Animated.sequence([
-          Animated.spring(scaleAnim, {
-            toValue: 1.2,
-            friction: 4,
-            tension: 250,
-            useNativeDriver: true,
-          }),
-          Animated.spring(scaleAnim, {
-            toValue: 1.0,
-            friction: 6,
-            tension: 200,
-            useNativeDriver: true,
-          }),
+          Animated.spring(scaleAnim, { toValue: 1.2, friction: 4, tension: 250, useNativeDriver: true }),
+          Animated.spring(scaleAnim, { toValue: 1.0, friction: 6, tension: 200, useNativeDriver: true }),
         ]),
       ]).start();
     } else {
-      // encendido → apagado or edge case: instant, no animation.
       transitionAnim.setValue(isActiveToday ? 1 : 0);
       scaleAnim.setValue(1);
     }
   }, [data, today, transitionAnim, scaleAnim]);
 
-  // ─── Debug live-activation listener ────────────────────────────────────────
+  // ─── Fire icon state: DEBUG mode ──────────────────────────────────────────
   //
-  //  When the user publishes a reflection/phrase while this screen is anywhere
-  //  in the navigation stack, debugMarkStreakActivated() fires this callback
-  //  in real time — so the animation plays at the exact moment of publishing,
-  //  even if the streak screen is not currently focused.
+  //  hasSentToday comes from React Context (useState), so React automatically
+  //  re-renders this component and re-runs this effect the instant any screen
+  //  in the app calls markStreakActivated() — no listeners, no focus tricks,
+  //  no stale snapshots.
   //
-  //  transitionAnim/scaleAnim are stable Animated.Value instances (useRef),
-  //  so it is always safe to reference them inside this subscription.
+  //  On mount: prevActiveRef is null → set fire state instantly (no animation).
+  //  false → true transition: play ignition animation once.
+  //  Subsequent calls (already true): no-op.
   useEffect(() => {
     if (!IS_DEBUG_STREAK_MODE) return;
 
-    const onActivated = () => {
-      // Guard: only run for the genuine false → true transition.
-      if (prevActiveRef.current !== false) return;
+    // eslint-disable-next-line no-console
+    console.log(`[DEBUG STREAK] hasSentToday changed → ${hasSentToday}. prevActiveRef = ${prevActiveRef.current}. Clan = ${activeClan}`);
 
-      prevActiveRef.current = true;
+    if (prevActiveRef.current === null) {
+      // First run (mount): jump to current state without animation.
+      prevActiveRef.current = hasSentToday;
+      transitionAnim.setValue(hasSentToday ? 1 : 0);
+      scaleAnim.setValue(1);
+      // eslint-disable-next-line no-console
+      console.log(`[DEBUG STREAK] Initial state: fire = ${hasSentToday ? 'ENCENDIDO (clan)' : 'APAGADO (grey)'}`);
+      return;
+    }
+
+    if (prevActiveRef.current === hasSentToday) return; // no change
+
+    const wasInactive = prevActiveRef.current === false;
+    prevActiveRef.current = hasSentToday;
+
+    if (hasSentToday && wasInactive) {
+      // Genuine apagado → encendido: play ignition animation.
+      // eslint-disable-next-line no-console
+      console.log(`[DEBUG STREAK] Fire activated! Playing ignition animation. Clan fire = ${activeClan}`);
       Animated.parallel([
-        Animated.timing(transitionAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
+        Animated.timing(transitionAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
         Animated.sequence([
-          Animated.spring(scaleAnim, {
-            toValue: 1.2,
-            friction: 4,
-            tension: 250,
-            useNativeDriver: true,
-          }),
-          Animated.spring(scaleAnim, {
-            toValue: 1.0,
-            friction: 6,
-            tension: 200,
-            useNativeDriver: true,
-          }),
+          Animated.spring(scaleAnim, { toValue: 1.2, friction: 4, tension: 250, useNativeDriver: true }),
+          Animated.spring(scaleAnim, { toValue: 1.0, friction: 6, tension: 200, useNativeDriver: true }),
         ]),
       ]).start();
-    };
-
-    addDebugStreakListener(onActivated);
-    return () => removeDebugStreakListener(onActivated);
-  }, [transitionAnim, scaleAnim]); // stable refs — effectively runs once on mount
-
-  // ─── Focus-based debug state sync ──────────────────────────────────────────
-  //
-  //  Every time this screen gains focus (on mount AND on every navigation
-  //  return), re-check the debug flag and update the fire icon if the state
-  //  changed while the screen was in the background or unmounted.
-  //
-  //  This handles the most common real-world test flow:
-  //    1. Open StreakScreen → grey fire
-  //    2. Navigate back → StreakScreen unmounts, listener removed
-  //    3. Send a reflection → flag set, no listener active
-  //    4. Re-open StreakScreen → focus fires → flag is true → colored fire shown
-  useFocusEffect(
-    useCallback(() => {
-      if (!IS_DEBUG_STREAK_MODE) return;
-
-      const isActiveNow = debugStreakIsActiveThisSession();
-
-      if (isActiveNow && prevActiveRef.current === false) {
-        // Streak was activated while we were away → update instantly (no animation,
-        // since the user didn't witness the moment of activation this session).
-        prevActiveRef.current = true;
-        transitionAnim.setValue(1);
-        scaleAnim.setValue(1);
-      } else if (isActiveNow && prevActiveRef.current === null) {
-        // Data not loaded yet; data useEffect will handle it correctly on load.
-      }
-      // No action needed if already true or still false.
-    }, [transitionAnim, scaleAnim]),
-  );
+    } else {
+      transitionAnim.setValue(hasSentToday ? 1 : 0);
+      scaleAnim.setValue(1);
+    }
+  }, [hasSentToday, activeClan, transitionAnim, scaleAnim]);
 
   const handleBottomTabChange = useCallback(
     (tab: TabId) => {

@@ -62,9 +62,10 @@ function heatmapColor(count: number, limit: number): string {
 function lastNDays(n: number): string[] {
   const result: string[] = [];
   const now = new Date();
+  // Use UTC midnight for today so DST transitions never produce duplicate dates.
+  const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
   for (let i = n - 1; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
+    const d = new Date(todayUtc - i * 86_400_000);
     result.push(d.toISOString().slice(0, 10));
   }
   return result;

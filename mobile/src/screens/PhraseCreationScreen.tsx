@@ -34,7 +34,7 @@ import {
 import { getPublishStarByClan } from '@evoconn/utils/getDebateStarByClan';
 import type { DebateMessage } from '@evoconn/types/debate';
 import { useFeedStore, createPhrasePost } from '@evoconn/hooks/useFeedStore';
-import { debugMarkStreakActivated } from '../debug/debugStreakMode';
+import { useDebugStreak } from '../debug/DebugStreakContext';
 import { normalizePhraseInnerForPublish } from '@evoconn/utils/phrasePublish';
 import type { SidebarFolder } from '@evoconn/types';
 
@@ -73,6 +73,7 @@ export default function PhraseCreationScreen() {
   } = useThoughts();
   const { folders } = useConversationFolders();
   const { publishPost } = useFeedStore();
+  const { markStreakActivated } = useDebugStreak();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const clanColor = getChatUserAccentColor(activeClan);
 
@@ -184,7 +185,9 @@ export default function PhraseCreationScreen() {
       const post = createPhrasePost(mockCurrentUser, phraseInner, authorName);
       (post as { id: string }).id = sourceId;
       publishPost(post);
-      debugMarkStreakActivated(); // no-op in production; triggers fire animation in dev
+      // eslint-disable-next-line no-console
+      console.log('[DEBUG STREAK] Phrase sent successfully → marking streak activated.');
+      markStreakActivated();
 
       const nextMessages: DebateMessage[] = [
         { role: 'user', content: rawPhraseFromUser.trim() },
@@ -199,7 +202,7 @@ export default function PhraseCreationScreen() {
       publishAuthorRef.current = '';
       Keyboard.dismiss();
     },
-    [publishPost, updateThought],
+    [publishPost, updateThought, markStreakActivated],
   );
 
   const handleAssignPhraseToFolder = useCallback(
