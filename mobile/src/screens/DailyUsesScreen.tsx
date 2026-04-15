@@ -28,6 +28,7 @@ import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
 import { fetchUsesLog, type UsesLogData } from '@evoconn/services/streakApi';
 import { getTopBarUsosByHouse } from '@evoconn/utils/getTopBarUsosByHouse';
+import { getClanStreakColors } from '@evoconn/constants/clanStreakColors';
 import {
   STREAK_CARD_PADDING_H,
   STREAK_CARD_PADDING_V,
@@ -73,10 +74,14 @@ function lastNDays(n: number): string[] {
 
 // ─── Progress bar ─────────────────────────────────────────────────────────────
 
-function GradBar({ used, limit }: { used: number; limit: number }) {
+/** Clan primary color for the progress bar fill. Used when no clan is set. */
+const NO_CLAN_BAR_COLOR = '#ff66c4';
+
+function GradBar({ used, limit, clanColor }: { used: number; limit: number; clanColor: string }) {
   const [w, setW] = useState(0);
-  const fillW = w > 0 ? Math.round(w * Math.min(used / limit, 1)) : 0;
-  const color = heatmapColor(used, limit);
+  const ratio = Math.min(used / limit, 1);
+  const fillW = w > 0 ? Math.round(w * ratio) : 0;
+
   return (
     <View
       style={[styles.barTrack, { height: USES_BAR_HEIGHT, borderRadius: USES_BAR_RADIUS }]}
@@ -85,9 +90,20 @@ function GradBar({ used, limit }: { used: number; limit: number }) {
       {w > 0 && fillW > 0 && (
         <Svg width={w} height={USES_BAR_HEIGHT} style={StyleSheet.absoluteFillObject}>
           <Defs>
-            <LinearGradient id="usesGrad" x1="0" y1="0" x2="1" y2="0">
+            {/*
+             * gradientUnits="userSpaceOnUse" + x2={fillW} makes the gradient
+             * stretch from 0 to fillW (the actual filled pixels), so the right
+             * edge of the fill always shows the full clan color regardless of
+             * how much of the bar is filled.
+             */}
+            <LinearGradient
+              id="usesGrad"
+              x1={0} y1={0}
+              x2={fillW} y2={0}
+              gradientUnits="userSpaceOnUse"
+            >
               <Stop offset="0" stopColor="#FFFFFF" stopOpacity="1" />
-              <Stop offset="1" stopColor={color} stopOpacity="1" />
+              <Stop offset="1" stopColor={clanColor} stopOpacity="1" />
             </LinearGradient>
           </Defs>
           <Rect
@@ -180,8 +196,12 @@ export default function DailyUsesScreen() {
   const profile = getPersonalProfile();
   const { thoughts } = useThoughts();
 
-  const activeClan = useActiveClan(mockCurrentUser.clanId);
-  const HeartIcon  = getTopBarUsosByHouse(activeClan);
+  const activeClan   = useActiveClan(mockCurrentUser.clanId);
+  const HeartIcon    = getTopBarUsosByHouse(activeClan);
+  // Bar color: clan primary if the user has a clan, pink fallback if they don't.
+  const barClanColor = activeClan
+    ? getClanStreakColors(activeClan).primary
+    : NO_CLAN_BAR_COLOR;
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [log, setLog] = useState<UsesLogData>({});
@@ -298,7 +318,7 @@ export default function DailyUsesScreen() {
 
                 {/* Progress bar — spans full card width below the row */}
                 <View style={styles.barWrap}>
-                  <GradBar used={usedToday} limit={DAILY_LIMIT} />
+                  <GradBar used={usedToday} limit={DAILY_LIMIT} clanColor={barClanColor} />
                 </View>
               </View>
 
