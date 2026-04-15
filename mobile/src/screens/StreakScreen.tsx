@@ -5,7 +5,7 @@
  * Layout: standard app shell (AppTopBar + BottomCommunityTabs).
  * Content scrolls between the two fixed bars.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   useWindowDimensions,
+  Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,6 +29,7 @@ import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
 import { fetchStreak, type StreakData } from '@evoconn/services/streakApi';
 import { CalendarGrid } from '@evoconn/components/shared/CalendarGrid';
 import { getTopBarRachaTopByHouse } from '@evoconn/utils/getTopBarRachaTopByHouse';
+import { getTopBarFueguitoByHouse } from '@evoconn/utils/getTopBarFueguitoByHouse';
 import { getClanStreakColors } from '@evoconn/constants/clanStreakColors';
 import {
   STREAK_CARD_PADDING_H,
@@ -62,9 +64,16 @@ export default function StreakScreen() {
   const profile = getPersonalProfile();
   const { thoughts } = useThoughts();
 
-  const activeClan  = useActiveClan(mockCurrentUser.clanId);
-  const FireIcon    = getTopBarRachaTopByHouse(activeClan);
-  const clanColors  = getClanStreakColors(activeClan);
+  const activeClan    = useActiveClan(mockCurrentUser.clanId);
+  const FireIcon      = getTopBarRachaTopByHouse(activeClan);   // active (encendido)
+  const FueguitoIcon  = getTopBarFueguitoByHouse(activeClan);   // inactive (apagado)
+  const clanColors    = getClanStreakColors(activeClan);
+
+  // ─── Fire icon transition animation ─────────────────────────────────────────
+  // 0 = apagado fully visible; 1 = encendido fully visible
+  const transitionAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim      = useRef(new Animated.Value(1)).current;
+  const prevActiveRef  = useRef<boolean | null>(null);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [data, setData] = useState<StreakData | null>(null);
@@ -85,6 +94,47 @@ export default function StreakScreen() {
   }, [profile.id]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Animate fire icon whenever streak-today state is resolved
+  useEffect(() => {
+    if (!data) return;
+    const isActiveToday = data.activity_log.includes(today);
+    if (prevActiveRef.current === isActiveToday) return;
+    prevActiveRef.current = isActiveToday;
+
+    if (isActiveToday) {
+      // Encendido: crossfade in + scale pop reward
+      Animated.parallel([
+        Animated.timing(transitionAnim, {
+          toValue: 1,
+          duration: 350,
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.spring(scaleAnim, {
+            toValue: 1.25,
+            friction: 4,
+            tension: 250,
+            useNativeDriver: true,
+          }),
+          Animated.spring(scaleAnim, {
+            toValue: 1.0,
+            friction: 6,
+            tension: 200,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start();
+    } else {
+      // Apagado: simple crossfade out, no bounce
+      Animated.timing(transitionAnim, {
+        toValue: 0,
+        duration: 280,
+        useNativeDriver: true,
+      }).start();
+      scaleAnim.setValue(1);
+    }
+  }, [data, today, transitionAnim, scaleAnim]);
 
   const handleBottomTabChange = useCallback(
     (tab: TabId) => {
@@ -133,11 +183,15 @@ export default function StreakScreen() {
             <>
               {/* ── Hero: streak count ── */}
               <View style={[styles.card, styles.heroCard]}>
-                {/* Fire icon — independent, not inside text group */}
+                {/* Fire icon — independent, not inside text group.
+                    Two icons are cross-faded: apagado (inactive) ↔ encendido (clan).
+                    Both share the same position/scale editors. */}
                 <View
                   style={[
                     styles.fireIconWrap,
                     {
+                      width: STREAK_COUNT_FONT_SIZE,
+                      height: STREAK_COUNT_FONT_SIZE,
                       transform: [
                         { translateX: STREAK_FIRE_ICON_OFFSET_X },
                         { translateY: STREAK_FIRE_ICON_OFFSET_Y },
@@ -146,10 +200,34 @@ export default function StreakScreen() {
                     },
                   ]}
                 >
-                  <FireIcon
-                    width={STREAK_COUNT_FONT_SIZE}
-                    height={STREAK_COUNT_FONT_SIZE}
-                  />
+                  {/* Apagado layer — fades out when streak is continued today */}
+                  <Animated.View
+                    style={[
+                      StyleSheet.absoluteFill,
+                      { opacity: Animated.subtract(1, transitionAnim) },
+                    ]}
+                  >
+                    <FueguitoIcon
+                      width={STREAK_COUNT_FONT_SIZE}
+                      height={STREAK_COUNT_FONT_SIZE}
+                    />
+                  </Animated.View>
+
+                  {/* Encendido layer — fades in + scale-pops when streak is continued today */}
+                  <Animated.View
+                    style={[
+                      StyleSheet.absoluteFill,
+                      {
+                        opacity: transitionAnim,
+                        transform: [{ scale: scaleAnim }],
+                      },
+                    ]}
+                  >
+                    <FireIcon
+                      width={STREAK_COUNT_FONT_SIZE}
+                      height={STREAK_COUNT_FONT_SIZE}
+                    />
+                  </Animated.View>
                 </View>
 
                 {/* Text group — all four texts move together via shared offsets */}
