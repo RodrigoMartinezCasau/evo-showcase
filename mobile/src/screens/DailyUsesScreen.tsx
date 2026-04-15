@@ -104,7 +104,13 @@ function GradBar({ used, limit }: { used: number; limit: number }) {
 // ─── Heatmap ─────────────────────────────────────────────────────────────────
 
 function UsesHeatmap({ log, scale }: { log: UsesLogData; scale: number }) {
-  const { USES_HEATMAP_CELL_SIZE, USES_HEATMAP_CELL_GAP } = require('@evoconn/constants/streakLayout');
+  const {
+    USES_HEATMAP_CELL_SIZE,
+    USES_HEATMAP_CELL_GAP,
+    USES_HEATMAP_GRID_OFFSET_X,
+    USES_HEATMAP_GRID_OFFSET_Y,
+    USES_HEATMAP_GRID_SCALE,
+  } = require('@evoconn/constants/streakLayout');
   const days = lastNDays(84);
   const cell = USES_HEATMAP_CELL_SIZE * scale;
   const gap = USES_HEATMAP_CELL_GAP * scale;
@@ -114,24 +120,35 @@ function UsesHeatmap({ log, scale }: { log: UsesLogData; scale: number }) {
 
   return (
     <View>
-      <View style={{ flexDirection: 'row', gap }}>
-        {weeks.map((week, wi) => (
-          <View key={wi} style={{ gap }}>
-            {week.map((day) => {
-              const count = log[day] ?? 0;
-              const isToday = day === new Date().toISOString().slice(0, 10);
-              return (
-                <View
-                  key={day}
-                  style={[
-                    { width: cell, height: cell, borderRadius: 3 * scale, backgroundColor: heatmapColor(count, DAILY_LIMIT) },
-                    isToday && { borderWidth: 1.5, borderColor: '#FFFFFF' },
-                  ]}
-                />
-              );
-            })}
-          </View>
-        ))}
+      {/* Grid wrapper — transform applies to day cells ONLY, not the legend */}
+      <View
+        style={{
+          transform: [
+            { translateX: USES_HEATMAP_GRID_OFFSET_X },
+            { translateY: USES_HEATMAP_GRID_OFFSET_Y },
+            { scale: USES_HEATMAP_GRID_SCALE },
+          ],
+        }}
+      >
+        <View style={{ flexDirection: 'row', gap }}>
+          {weeks.map((week, wi) => (
+            <View key={wi} style={{ gap }}>
+              {week.map((day) => {
+                const count = log[day] ?? 0;
+                const isToday = day === new Date().toISOString().slice(0, 10);
+                return (
+                  <View
+                    key={day}
+                    style={[
+                      { width: cell, height: cell, borderRadius: 3 * scale, backgroundColor: heatmapColor(count, DAILY_LIMIT) },
+                      isToday && { borderWidth: 1.5, borderColor: '#FFFFFF' },
+                    ]}
+                  />
+                );
+              })}
+            </View>
+          ))}
+        </View>
       </View>
 
       <View style={styles.legendRow}>
