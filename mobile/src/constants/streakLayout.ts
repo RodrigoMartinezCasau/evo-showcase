@@ -30,7 +30,7 @@ export const STREAK_LABEL_FONT_SIZE = 11;
 // ─── Calendar grid ────────────────────────────────────────────────────────────
 
 /** Scale multiplier for the entire calendar grid (1 = default). */
-export const STREAK_CALENDAR_SCALE = 1.0;
+export const STREAK_CALENDAR_SCALE = 1.2;
 
 /** Size (px) of each day cell in the calendar grid. */
 export const STREAK_DAY_CELL_SIZE = 32;
@@ -39,18 +39,15 @@ export const STREAK_DAY_CELL_SIZE = 32;
 export const STREAK_DAY_CELL_GAP = 4;
 
 /**
- * Shared horizontal offset (px) applied to the calendar content block
- * (weekday labels row + day circles) inside every calendar card.
- * Positive = shift right, negative = shift left.
- * Affects: Actividad general, Frases, and Reflexiones calendars equally.
+ * Fine-tune horizontal offset (px) applied AFTER auto-centering.
+ * 0 = perfectly centered. Positive = nudge right, negative = nudge left.
+ * Calendars are always centered automatically; use this only for minor adjustments.
  */
-export const STREAK_CALENDAR_OFFSET_X = 70;
+export const STREAK_CALENDAR_OFFSET_X = 0;
 
 /**
- * Shared vertical offset (px) applied to the calendar content block
- * (weekday labels row + day circles) inside every calendar card.
+ * Fine-tune vertical offset (px) applied to the calendar content block.
  * Positive = shift down, negative = shift up.
- * Affects: Actividad general, Frases, and Reflexiones calendars equally.
  */
 export const STREAK_CALENDAR_OFFSET_Y = 0;
 

@@ -175,12 +175,15 @@ export const CalendarGrid = React.memo(function CalendarGrid({
   const gap  = STREAK_DAY_CELL_GAP  * scale;
 
   return (
-    <View>
-      {/* Month label — fixed, not moved by offset */}
+    <View style={styles.outerWrap}>
+      {/* Month label — fixed, not moved by offset or scale */}
       {label && <Text style={styles.label}>{label}</Text>}
       <Text style={styles.monthLabel}>{MONTH_NAMES[tm - 1]} {ty}</Text>
 
-      {/* Calendar content — shifted by shared position editors */}
+      {/* Auto-centering wrapper — fills card width so the calendar is always
+          horizontally centered regardless of STREAK_CALENDAR_SCALE value.
+          offsetX/Y are applied inside so they nudge from the centered position. */}
+      <View style={styles.calendarCenterWrap}>
       <View style={{ transform: [{ translateX: offsetX }, { translateY: offsetY }] }}>
         {/* Weekday header row */}
         <View style={[styles.row, { gap }]}>
@@ -246,6 +249,7 @@ export const CalendarGrid = React.memo(function CalendarGrid({
           ))
         )}
       </View>
+      </View>{/* end calendarCenterWrap */}
     </View>
   );
 });
@@ -253,6 +257,15 @@ export const CalendarGrid = React.memo(function CalendarGrid({
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  /** Fills the card's content width so the calendar can center within it. */
+  outerWrap: {
+    width: '100%',
+  },
+  /** Centers the calendar grid horizontally within the card at any scale. */
+  calendarCenterWrap: {
+    width: '100%',
+    alignItems: 'center',
+  },
   label: {
     color: 'rgba(255,255,255,0.5)',
     fontSize: 10,
