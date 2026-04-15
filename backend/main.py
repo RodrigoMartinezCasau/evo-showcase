@@ -30,7 +30,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from checks import CheckRunner
-from db import Conversation, Message, PhilosophicalProfile, get_session, init_db, new_id, save_spec
+from db import Conversation, Message, PhilosophicalProfile, UserStreak, UsesLog, get_session, init_db, new_id, save_spec
 from pipeline import run_pipeline
 from schemas import PhysicalSpec
 
@@ -83,8 +83,13 @@ async def beta_protection_middleware(request: Request, call_next):
     """
     path = request.url.path
 
-    # Skip health and CORS preflight
-    if path == "/health" or request.method == "OPTIONS":
+    # Skip health, CORS preflight, and non-AI data endpoints (streak / uses-log)
+    if (
+        path == "/health"
+        or request.method == "OPTIONS"
+        or path.startswith("/streak/")
+        or path.startswith("/uses-log/")
+    ):
         return await call_next(request)
 
     # API key check (when configured)
@@ -1590,3 +1595,164 @@ def generate_job_recommendations(user_id: str, payload: PhilosophyContextPayload
     except Exception as e:
         logger.error("generate_job_recommendations error: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# STREAK ENDPOINTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+import json as _json
+
+
+def _get_or_init_streak(s, user_id: str) -> UserStreak:
+    row = s.get(UserStreak, user_id)
+    if row is None:
+        row = UserStreak(
+            user_id=user_id,
+            streak_current=0,
+            streak_best=0,
+            last_activity_date=None,
+            activity_log="[]",
+            frases_log="[]",
+            reflexiones_log="[]",
+            updated_at=datetime.utcnow(),
+        )
+        s.add(row)
+        s.flush()
+    return row
+
+
+def _recalculate_streak(activity_log: list[str], today: str) -> tuple[int, str | None]:
+    """Return (current_streak, last_activity_date) from a sorted list of YYYY-MM-DD dates."""
+    if not activity_log:
+        return 0, None
+    from datetime import date as _date, timedelta
+    dates = sorted(set(activity_log), reverse=True)
+    last = dates[0]
+    # If the most recent activity is more than 1 day before today → streak is broken
+    last_d = _date.fromisoformat(last)
+    today_d = _date.fromisoformat(today)
+    if (today_d - last_d).days > 1:
+        return 0, last
+    streak = 1
+    for i in range(1, len(dates)):
+        cur = _date.fromisoformat(dates[i])
+        prev = _date.fromisoformat(dates[i - 1])
+        if (prev - cur).days == 1:
+            streak += 1
+        else:
+            break
+    return streak, last
+
+
+class StreakActivityPayload(BaseModel):
+    type: str   # "frase" | "reflexion"
+    date: str   # YYYY-MM-DD — the day the activity occurred
+
+
+@app.get("/streak/{user_id}")
+def get_streak(user_id: str):
+    """Return current streak data + activity logs for the last 90 days."""
+    with get_session() as s:
+        row = _get_or_init_streak(s, user_id)
+        s.commit()
+        today = datetime.utcnow().strftime("%Y-%m-%d")
+        activity = _json.loads(row.activity_log or "[]")
+        frases = _json.loads(row.frases_log or "[]")
+        reflexiones = _json.loads(row.reflexiones_log or "[]")
+        # Recalculate streak in case a day was skipped since last access
+        streak, last = _recalculate_streak(activity, today)
+        return {
+            "streak_current": streak,
+            "streak_best": row.streak_best,
+            "last_activity_date": last,
+            "activity_log": activity,
+            "frases_log": frases,
+            "reflexiones_log": reflexiones,
+        }
+
+
+@app.post("/streak/{user_id}/activity")
+def record_streak_activity(user_id: str, payload: StreakActivityPayload):
+    """Record that the user sent a frase or reflexion on the given day."""
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    date = payload.date or today
+
+    with get_session() as s:
+        row = _get_or_init_streak(s, user_id)
+
+        activity = _json.loads(row.activity_log or "[]")
+        frases = _json.loads(row.frases_log or "[]")
+        reflexiones = _json.loads(row.reflexiones_log or "[]")
+
+        # Add the date to the relevant logs (deduplicated)
+        if date not in activity:
+            activity.append(date)
+        if payload.type == "frase" and date not in frases:
+            frases.append(date)
+        if payload.type == "reflexion" and date not in reflexiones:
+            reflexiones.append(date)
+
+        # Keep only last 365 days to bound storage
+        cutoff = (datetime.utcnow().replace(month=1, day=1)).strftime("%Y-%m-%d")
+        activity = [d for d in activity if d >= cutoff]
+        frases = [d for d in frases if d >= cutoff]
+        reflexiones = [d for d in reflexiones if d >= cutoff]
+
+        streak, last = _recalculate_streak(activity, today)
+        best = max(row.streak_best, streak)
+
+        row.activity_log = _json.dumps(activity)
+        row.frases_log = _json.dumps(frases)
+        row.reflexiones_log = _json.dumps(reflexiones)
+        row.streak_current = streak
+        row.streak_best = best
+        row.last_activity_date = last
+        row.updated_at = datetime.utcnow()
+        s.add(row)
+        s.commit()
+
+        logger.info("[streak] user=%s date=%s type=%s streak=%d", user_id, date, payload.type, streak)
+        return {
+            "streak_current": streak,
+            "streak_best": best,
+            "last_activity_date": last,
+            "activity_log": activity,
+            "frases_log": frases,
+            "reflexiones_log": reflexiones,
+        }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# USES LOG ENDPOINTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/uses-log/{user_id}")
+def get_uses_log(user_id: str):
+    """Return the last 90 days of daily AI-use counts for the user."""
+    with get_session() as s:
+        from sqlmodel import select
+        rows = s.exec(
+            select(UsesLog).where(UsesLog.user_id == user_id)
+        ).all()
+        log = {r.date: r.count for r in rows}
+        return {"uses_log": log}
+
+
+@app.post("/uses-log/{user_id}/record")
+def record_uses_log(user_id: str, request: Request):
+    """Increment the use count for today for the given user. Called by frontend after each successful AI generation."""
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    with get_session() as s:
+        from sqlmodel import select
+        row = s.exec(
+            select(UsesLog).where(UsesLog.user_id == user_id, UsesLog.date == today)
+        ).first()
+        if row is None:
+            row = UsesLog(user_id=user_id, date=today, count=1)
+        else:
+            row.count += 1
+        s.add(row)
+        s.commit()
+        logger.info("[uses_log] user=%s date=%s count=%d", user_id, today, row.count)
+        return {"date": today, "count": row.count}

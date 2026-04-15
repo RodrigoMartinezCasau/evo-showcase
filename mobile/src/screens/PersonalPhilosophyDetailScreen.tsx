@@ -51,6 +51,7 @@ import {
   type JobEntry,
   type PhilosophyContext,
 } from '@evoconn/services/philosophyProfileApi';
+import { recordUsesLog } from '@evoconn/services/streakApi';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -138,6 +139,7 @@ export default function PersonalPhilosophyDetailScreen() {
       const res = await generateSummary(profile.id, ctx);
       setSummaryText(res.summary);
       setSummaryState('success');
+      recordUsesLog(profile.id).catch(() => {});
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Error';
       setSummaryState(isNoUsesError(msg) ? 'no_uses' : 'error');
@@ -152,6 +154,7 @@ export default function PersonalPhilosophyDetailScreen() {
       const res = await generatePhilosophers(profile.id, ctx);
       setPhilosophers(res.philosophers);
       setPhilosophersState('success');
+      recordUsesLog(profile.id).catch(() => {});
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Error';
       setPhilosophersState(isNoUsesError(msg) ? 'no_uses' : 'error');
@@ -166,6 +169,7 @@ export default function PersonalPhilosophyDetailScreen() {
       const res = await generateBooks(profile.id, ctx);
       setBooks(res.books);
       setBooksState('success');
+      recordUsesLog(profile.id).catch(() => {});
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Error';
       setBooksState(isNoUsesError(msg) ? 'no_uses' : 'error');
@@ -180,6 +184,7 @@ export default function PersonalPhilosophyDetailScreen() {
       const res = await generateJobs(profile.id, ctx);
       setJobs(res.jobs);
       setJobsState('success');
+      recordUsesLog(profile.id).catch(() => {});
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Error';
       setJobsState(isNoUsesError(msg) ? 'no_uses' : 'error');

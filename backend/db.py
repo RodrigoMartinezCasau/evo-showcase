@@ -56,6 +56,36 @@ class PhilosophicalProfile(SQLModel, table=True):
     jobs_updated_at: Optional[datetime] = Field(default=None)
 
 
+class UserStreak(SQLModel, table=True):
+    """Persistent streak tracking per user."""
+
+    __tablename__ = "user_streak"
+
+    user_id: str = Field(primary_key=True)
+    streak_current: int = Field(default=0)
+    streak_best: int = Field(default=0)
+    # ISO date of last activity (YYYY-MM-DD), or None
+    last_activity_date: Optional[str] = Field(default=None)
+    # JSON-encoded list of YYYY-MM-DD strings — days with any activity
+    activity_log: Optional[str] = Field(default=None, sa_column=Column(Text))
+    # JSON-encoded list of days where the user sent a frase
+    frases_log: Optional[str] = Field(default=None, sa_column=Column(Text))
+    # JSON-encoded list of days where the user sent a reflexion
+    reflexiones_log: Optional[str] = Field(default=None, sa_column=Column(Text))
+    updated_at: Optional[datetime] = Field(default=None)
+
+
+class UsesLog(SQLModel, table=True):
+    """Persists daily AI-use counts per user for the heatmap calendar."""
+
+    __tablename__ = "uses_log"
+
+    id: str = Field(primary_key=True, default_factory=lambda: uuid.uuid4().hex)
+    user_id: str = Field(index=True)
+    date: str = Field(index=True)   # YYYY-MM-DD
+    count: int = Field(default=0)
+
+
 def init_db():
     SQLModel.metadata.create_all(engine)
 
