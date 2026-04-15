@@ -1,7 +1,9 @@
 /**
  * DailyUsesScreen — shows daily AI-use consumption.
  * Progress bar for today + heatmap calendar of historical usage.
- * Connected to real backend data via streakApi.
+ *
+ * Layout: standard app shell (AppTopBar + BottomCommunityTabs).
+ * Content scrolls between the two fixed bars.
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -11,12 +13,17 @@ import {
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
+  useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getPersonalProfile } from '@evoconn/data/mockPersonalProfile';
+import { AppTopBar, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
+import type { TabId } from '@evoconn/components/BottomCommunityTabs';
+import { useThoughts } from '@evoconn/hooks/useThoughts';
+import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
 import { fetchUsesLog, type UsesLogData } from '@evoconn/services/streakApi';
 import {
   STREAK_CARD_PADDING_H,
@@ -27,8 +34,6 @@ import {
   STREAK_LABEL_FONT_SIZE,
   USES_BAR_HEIGHT,
   USES_BAR_RADIUS,
-  USES_HEATMAP_CELL_SIZE,
-  USES_HEATMAP_CELL_GAP,
   USES_HEATMAP_SCALE,
 } from '@evoconn/constants/streakLayout';
 
@@ -39,13 +44,12 @@ const DAILY_LIMIT = 30;
 function heatmapColor(count: number, limit: number): string {
   if (count === 0) return 'rgba(255,255,255,0.07)';
   const ratio = count / limit;
-  if (ratio <= 0.1) return '#2d6a4f';   // very light green
-  if (ratio <= 0.3) return '#40916c';   // green
-  if (ratio <= 0.6) return '#f4a261';   // orange
-  return '#e63946';                      // red
+  if (ratio <= 0.1) return '#2d6a4f';
+  if (ratio <= 0.3) return '#40916c';
+  if (ratio <= 0.6) return '#f4a261';
+  return '#e63946';
 }
 
-/** Last N days as YYYY-MM-DD strings, most-recent last. */
 function lastNDays(n: number): string[] {
   const result: string[] = [];
   const now = new Date();
@@ -56,8 +60,6 @@ function lastNDays(n: number): string[] {
   }
   return result;
 }
-
-const MONTH_NAMES_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
 // ─── Progress bar ─────────────────────────────────────────────────────────────
 
@@ -71,11 +73,7 @@ function GradBar({ used, limit }: { used: number; limit: number }) {
       onLayout={(e) => setW(e.nativeEvent.layout.width)}
     >
       {w > 0 && fillW > 0 && (
-        <Svg
-          width={w}
-          height={USES_BAR_HEIGHT}
-          style={StyleSheet.absoluteFillObject}
-        >
+        <Svg width={w} height={USES_BAR_HEIGHT} style={StyleSheet.absoluteFillObject}>
           <Defs>
             <LinearGradient id="usesGrad" x1="0" y1="0" x2="1" y2="0">
               <Stop offset="0" stopColor="#FFFFFF" stopOpacity="1" />
@@ -97,11 +95,11 @@ function GradBar({ used, limit }: { used: number; limit: number }) {
 // ─── Heatmap ─────────────────────────────────────────────────────────────────
 
 function UsesHeatmap({ log, scale }: { log: UsesLogData; scale: number }) {
-  const days = lastNDays(84); // 12 weeks
+  const { USES_HEATMAP_CELL_SIZE, USES_HEATMAP_CELL_GAP } = require('@evoconn/constants/streakLayout');
+  const days = lastNDays(84);
   const cell = USES_HEATMAP_CELL_SIZE * scale;
   const gap = USES_HEATMAP_CELL_GAP * scale;
 
-  // Group into weeks (7 days each)
   const weeks: string[][] = [];
   for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
 
@@ -112,18 +110,12 @@ function UsesHeatmap({ log, scale }: { log: UsesLogData; scale: number }) {
           <View key={wi} style={{ gap }}>
             {week.map((day) => {
               const count = log[day] ?? 0;
-              const bg = heatmapColor(count, DAILY_LIMIT);
               const isToday = day === new Date().toISOString().slice(0, 10);
               return (
                 <View
                   key={day}
                   style={[
-                    {
-                      width: cell,
-                      height: cell,
-                      borderRadius: 3 * scale,
-                      backgroundColor: bg,
-                    },
+                    { width: cell, height: cell, borderRadius: 3 * scale, backgroundColor: heatmapColor(count, DAILY_LIMIT) },
                     isToday && { borderWidth: 1.5, borderColor: '#FFFFFF' },
                   ]}
                 />
@@ -133,17 +125,17 @@ function UsesHeatmap({ log, scale }: { log: UsesLogData; scale: number }) {
         ))}
       </View>
 
-      {/* Legend */}
       <View style={styles.legendRow}>
         <Text style={styles.legendText}>Menos</Text>
         {[0, 0.05, 0.2, 0.5, 0.85].map((r, i) => (
           <View
             key={i}
-            style={[
-              styles.legendCell,
-              { width: cell * 0.8, height: cell * 0.8, borderRadius: 2 * scale },
-              { backgroundColor: heatmapColor(Math.round(r * DAILY_LIMIT), DAILY_LIMIT) },
-            ]}
+            style={{
+              width: cell * 0.8,
+              height: cell * 0.8,
+              borderRadius: 2 * scale,
+              backgroundColor: heatmapColor(Math.round(r * DAILY_LIMIT), DAILY_LIMIT),
+            }}
           />
         ))}
         <Text style={styles.legendText}>Más</Text>
@@ -157,8 +149,11 @@ function UsesHeatmap({ log, scale }: { log: UsesLogData; scale: number }) {
 export default function DailyUsesScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { height: screenH } = useWindowDimensions();
   const profile = getPersonalProfile();
+  const { thoughts } = useThoughts();
 
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [log, setLog] = useState<UsesLogData>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -180,95 +175,119 @@ export default function DailyUsesScreen() {
 
   useEffect(() => { load(); }, [load]);
 
+  const handleBottomTabChange = useCallback(
+    (tab: TabId) => {
+      router.replace({ pathname: '/(tabs)', params: { tab } });
+    },
+    [router],
+  );
+
+  // ─── Layout heights ───────────────────────────────────────────────────────
+  const topBarHeight = 60 + insets.top;
+  const bottomBarHeight =
+    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
+    insets.bottom +
+    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
+    20;
+  const contentHeight = screenH - topBarHeight - bottomBarHeight;
+
   const usedToday = log[today] ?? 0;
   const remaining = Math.max(DAILY_LIMIT - usedToday, 0);
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* ── Top bar ── */}
-      <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
-          <Text style={styles.backIcon}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.topBarTitle}>Usos diarios</Text>
-        <View style={{ width: 36 }} />
+    <View style={styles.container}>
+      <AppTopBar
+        onMenuPress={() => setSidebarOpen(true)}
+        onClanPress={() => router.back()}
+      />
+
+      <View style={[styles.contentWrap, { height: contentHeight }]}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {loading ? (
+            <View style={styles.center}>
+              <ActivityIndicator color={evoconnColors.neonGreen} size="large" />
+            </View>
+          ) : error ? (
+            <View style={styles.center}>
+              <Text style={styles.errorText}>{error}</Text>
+              <TouchableOpacity onPress={load} style={styles.retryBtn}>
+                <Text style={styles.retryText}>Reintentar</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              {/* ── Hero: uses count ── */}
+              <View style={[styles.card, styles.heroCard]}>
+                <Text style={[styles.usesCount, { fontSize: STREAK_COUNT_FONT_SIZE }]}>
+                  ❤️ {remaining}
+                </Text>
+                <Text style={styles.usesUnit}>usos restantes hoy</Text>
+                <Text style={styles.usesSub}>{usedToday} / {DAILY_LIMIT} usados</Text>
+                <View style={{ width: '100%', marginTop: 8 }}>
+                  <GradBar used={usedToday} limit={DAILY_LIMIT} />
+                </View>
+              </View>
+
+              <View style={styles.gap} />
+
+              {/* ── Heatmap ── */}
+              <View style={styles.card}>
+                <Text style={[styles.sectionTitle, { fontSize: STREAK_LABEL_FONT_SIZE }]}>
+                  HISTORIAL DE USOS (12 SEMANAS)
+                </Text>
+                <UsesHeatmap log={log} scale={USES_HEATMAP_SCALE} />
+              </View>
+
+              <View style={styles.gap} />
+
+              {/* ── Info block ── */}
+              <View style={styles.card}>
+                <Text style={styles.infoText}>
+                  Cada generación con IA consume 1 uso. Los usos se reinician cada día.
+                </Text>
+              </View>
+
+              <View style={styles.bottomSpacer} />
+            </>
+          )}
+        </ScrollView>
       </View>
 
-      <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        {loading ? (
-          <View style={styles.center}>
-            <ActivityIndicator color={evoconnColors.neonGreen} size="large" />
-          </View>
-        ) : error ? (
-          <View style={styles.center}>
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity onPress={load} style={styles.retryBtn}>
-              <Text style={styles.retryText}>Reintentar</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
-            {/* ── Hero: uses count ── */}
-            <View style={[styles.card, styles.heroCard]}>
-              <Text style={[styles.usesCount, { fontSize: STREAK_COUNT_FONT_SIZE }]}>
-                ❤️ {remaining}
-              </Text>
-              <Text style={styles.usesUnit}>usos restantes hoy</Text>
-              <Text style={styles.usesSub}>{usedToday} / {DAILY_LIMIT} usados</Text>
-              <View style={{ width: '100%', marginTop: 8 }}>
-                <GradBar used={usedToday} limit={DAILY_LIMIT} />
-              </View>
-            </View>
+      <BottomCommunityTabs activeTab={null} onTabChange={handleBottomTabChange} />
 
-            {/* ── Heatmap ── */}
-            <View style={styles.card}>
-              <Text style={[styles.sectionTitle, { fontSize: STREAK_LABEL_FONT_SIZE }]}>
-                HISTORIAL DE USOS (12 SEMANAS)
-              </Text>
-              <UsesHeatmap log={log} scale={USES_HEATMAP_SCALE} />
-            </View>
-
-            {/* ── Info block ── */}
-            <View style={[styles.card, styles.infoCard]}>
-              <Text style={styles.infoText}>
-                Cada generación con IA consume 1 uso. Los usos se reinician cada día.
-              </Text>
-            </View>
-          </>
-        )}
-      </ScrollView>
+      <SidebarDrawer
+        visible={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        conversations={thoughts}
+        onConversationPress={(id) =>
+          router.push({ pathname: '/reflection', params: { thoughtId: id } })
+        }
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
+  container: {
     flex: 1,
     backgroundColor: evoconnColors.background,
   },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
-  },
-  backBtn: { width: 36, alignItems: 'flex-start' },
-  backIcon: { color: '#FFFFFF', fontSize: 22 },
-  topBarTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+  contentWrap: {
+    overflow: 'hidden',
   },
   scroll: {
-    padding: 16,
-    gap: STREAK_SECTION_GAP,
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  gap: {
+    height: STREAK_SECTION_GAP,
   },
   card: {
     backgroundColor: '#000000',
@@ -310,14 +329,10 @@ const styles = StyleSheet.create({
     gap: 4,
     marginTop: 10,
   },
-  legendCell: {
-    // sized dynamically
-  },
   legendText: {
     color: 'rgba(255,255,255,0.35)',
     fontSize: 10,
   },
-  infoCard: {},
   infoText: {
     color: 'rgba(255,255,255,0.4)',
     fontSize: 12,
@@ -344,5 +359,8 @@ const styles = StyleSheet.create({
   retryText: {
     color: evoconnColors.neonGreen,
     fontWeight: '600',
+  },
+  bottomSpacer: {
+    height: 24,
   },
 });

@@ -51,6 +51,26 @@ export const STREAK_CALENDAR_OFFSET_X = 70;
  */
 export const STREAK_CALENDAR_OFFSET_Y = 0;
 
+// ─── Streak fire icon (hero card) ────────────────────────────────────────────
+
+/**
+ * Scale of the clan-based fire SVG shown in the top summary card.
+ * 1 = default size. Increasing makes the icon larger; does not affect card or text.
+ */
+export const STREAK_FIRE_ICON_SCALE = 2.5;
+
+/**
+ * Horizontal offset (px) of the fire icon inside the hero card.
+ * Positive = right, negative = left. Does not reflow surrounding text.
+ */
+export const STREAK_FIRE_ICON_OFFSET_X = -100;
+
+/**
+ * Vertical offset (px) of the fire icon inside the hero card.
+ * Positive = down, negative = up. Does not reflow surrounding text.
+ */
+export const STREAK_FIRE_ICON_OFFSET_Y = 30;
+
 // ─── Stats block ─────────────────────────────────────────────────────────────
 
 /** Font size of the stats numbers. */

@@ -1,7 +1,9 @@
 /**
  * StreakScreen — shows the user's daily activity streak.
  * Three calendars (general / frases / reflexiones) + weekly stats.
- * Connected to real backend data via streakApi.
+ *
+ * Layout: standard app shell (AppTopBar + BottomCommunityTabs).
+ * Content scrolls between the two fixed bars.
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -11,13 +13,21 @@ import {
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
+  useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getPersonalProfile } from '@evoconn/data/mockPersonalProfile';
+import { mockCurrentUser } from '@evoconn/data/mockUser';
+import { AppTopBar, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
+import type { TabId } from '@evoconn/components/BottomCommunityTabs';
+import { useThoughts } from '@evoconn/hooks/useThoughts';
+import { useActiveClan } from '@evoconn/debug/DebugClanContext';
+import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
 import { fetchStreak, type StreakData } from '@evoconn/services/streakApi';
 import { CalendarGrid } from '@evoconn/components/shared/CalendarGrid';
+import { getTopBarRachaTopByHouse } from '@evoconn/utils/getTopBarRachaTopByHouse';
 import {
   STREAK_CARD_PADDING_H,
   STREAK_CARD_PADDING_V,
@@ -27,6 +37,9 @@ import {
   STREAK_LABEL_FONT_SIZE,
   STREAK_STATS_NUMBER_FONT_SIZE,
   STREAK_STATS_UNIT_FONT_SIZE,
+  STREAK_FIRE_ICON_SCALE,
+  STREAK_FIRE_ICON_OFFSET_X,
+  STREAK_FIRE_ICON_OFFSET_Y,
 } from '@evoconn/constants/streakLayout';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -42,8 +55,14 @@ function weeklyAverage(log: string[], totalDays: number): string {
 export default function StreakScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { height: screenH } = useWindowDimensions();
   const profile = getPersonalProfile();
+  const { thoughts } = useThoughts();
 
+  const activeClan = useActiveClan(mockCurrentUser.clanId);
+  const FireIcon = getTopBarRachaTopByHouse(activeClan);
+
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [data, setData] = useState<StreakData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +73,7 @@ export default function StreakScreen() {
     try {
       const res = await fetchStreak(profile.id);
       setData(res);
-    } catch (e) {
+    } catch {
       setError('No se pudo cargar la racha. Verifica tu conexión.');
     } finally {
       setLoading(false);
@@ -63,144 +82,194 @@ export default function StreakScreen() {
 
   useEffect(() => { load(); }, [load]);
 
+  const handleBottomTabChange = useCallback(
+    (tab: TabId) => {
+      router.replace({ pathname: '/(tabs)', params: { tab } });
+    },
+    [router],
+  );
+
+  // ─── Layout heights (same pattern as PersonalPhilosophyDetailScreen) ────────
+  const topBarHeight = 60 + insets.top;
+  const bottomBarHeight =
+    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
+    insets.bottom +
+    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
+    20;
+  const contentHeight = screenH - topBarHeight - bottomBarHeight;
+
   const today = new Date().toISOString().slice(0, 10);
   const totalDays = data?.activity_log.length ?? 0;
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* ── Top bar ── */}
-      <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
-          <Text style={styles.backIcon}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.topBarTitle}>Racha</Text>
-        <View style={{ width: 36 }} />
-      </View>
+    <View style={styles.container}>
+      <AppTopBar
+        onMenuPress={() => setSidebarOpen(true)}
+        onClanPress={() => router.back()}
+      />
 
-      <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        {loading ? (
-          <View style={styles.center}>
-            <ActivityIndicator color={evoconnColors.neonGreen} size="large" />
-          </View>
-        ) : error ? (
-          <View style={styles.center}>
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity onPress={load} style={styles.retryBtn}>
-              <Text style={styles.retryText}>Reintentar</Text>
-            </TouchableOpacity>
-          </View>
-        ) : data ? (
-          <>
-            {/* ── Hero: streak count ── */}
-            <View style={[styles.card, styles.heroCard]}>
-              <Text style={[styles.streakCount, { fontSize: STREAK_COUNT_FONT_SIZE }]}>
-                🔥 {data.streak_current}
-              </Text>
-              <Text style={styles.streakUnit}>días seguidos</Text>
-              <Text style={styles.streakSub}>Mantén tu consistencia diaria</Text>
-              {data.streak_best > 0 && (
-                <Text style={styles.bestStreak}>
-                  Mejor racha: <Text style={{ color: evoconnColors.neonGreen }}>{data.streak_best} días</Text>
-                </Text>
-              )}
+      <View style={[styles.contentWrap, { height: contentHeight }]}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {loading ? (
+            <View style={styles.center}>
+              <ActivityIndicator color={evoconnColors.neonGreen} size="large" />
             </View>
-
-            {/* ── Calendar: general ── */}
-            <View style={styles.card}>
-              <Text style={[styles.sectionTitle, { fontSize: STREAK_LABEL_FONT_SIZE }]}>
-                ACTIVIDAD GENERAL
-              </Text>
-              <CalendarGrid
-                activeDays={data.activity_log}
-                activeColor={evoconnColors.neonGreen}
-                today={today}
-              />
+          ) : error ? (
+            <View style={styles.center}>
+              <Text style={styles.errorText}>{error}</Text>
+              <TouchableOpacity onPress={load} style={styles.retryBtn}>
+                <Text style={styles.retryText}>Reintentar</Text>
+              </TouchableOpacity>
             </View>
-
-            {/* ── Calendar: frases ── */}
-            <View style={styles.card}>
-              <Text style={[styles.sectionTitle, { fontSize: STREAK_LABEL_FONT_SIZE }]}>
-                FRASES
-              </Text>
-              <CalendarGrid
-                activeDays={data.frases_log}
-                activeColor="#C56BEA"
-                today={today}
-              />
-            </View>
-
-            {/* ── Calendar: reflexiones ── */}
-            <View style={styles.card}>
-              <Text style={[styles.sectionTitle, { fontSize: STREAK_LABEL_FONT_SIZE }]}>
-                REFLEXIONES
-              </Text>
-              <CalendarGrid
-                activeDays={data.reflexiones_log}
-                activeColor="#E53935"
-                today={today}
-              />
-            </View>
-
-            {/* ── Stats ── */}
-            <View style={[styles.card, styles.statsCard]}>
-              <Text style={[styles.sectionTitle, { fontSize: STREAK_LABEL_FONT_SIZE }]}>
-                MEDIAS SEMANALES
-              </Text>
-              <View style={styles.statsRow}>
-                <View style={styles.statBlock}>
-                  <Text style={[styles.statNum, { fontSize: STREAK_STATS_NUMBER_FONT_SIZE }]}>
-                    {weeklyAverage(data.frases_log, totalDays)}
-                  </Text>
-                  <Text style={[styles.statLabel, { fontSize: STREAK_STATS_UNIT_FONT_SIZE }]}>
-                    frases / semana
+          ) : data ? (
+            <>
+              {/* ── Hero: streak count ── */}
+              <View style={[styles.card, styles.heroCard]}>
+                {/* Fire icon + number row */}
+                <View style={styles.heroCountRow}>
+                  {/* Clan fire icon — independent wrapper, does not reflow the number */}
+                  <View
+                    style={[
+                      styles.fireIconWrap,
+                      {
+                        transform: [
+                          { translateX: STREAK_FIRE_ICON_OFFSET_X },
+                          { translateY: STREAK_FIRE_ICON_OFFSET_Y },
+                          { scale: STREAK_FIRE_ICON_SCALE },
+                        ],
+                      },
+                    ]}
+                  >
+                    <FireIcon
+                      width={STREAK_COUNT_FONT_SIZE}
+                      height={STREAK_COUNT_FONT_SIZE}
+                    />
+                  </View>
+                  <Text style={[styles.streakCount, { fontSize: STREAK_COUNT_FONT_SIZE }]}>
+                    {data.streak_current}
                   </Text>
                 </View>
-                <View style={styles.statDivider} />
-                <View style={styles.statBlock}>
-                  <Text style={[styles.statNum, { fontSize: STREAK_STATS_NUMBER_FONT_SIZE }]}>
-                    {weeklyAverage(data.reflexiones_log, totalDays)}
+                <Text style={styles.streakUnit}>días seguidos</Text>
+                <Text style={styles.streakSub}>Mantén tu consistencia diaria</Text>
+                {data.streak_best > 0 && (
+                  <Text style={styles.bestStreak}>
+                    Mejor racha:{' '}
+                    <Text style={{ color: evoconnColors.neonGreen }}>{data.streak_best} días</Text>
                   </Text>
-                  <Text style={[styles.statLabel, { fontSize: STREAK_STATS_UNIT_FONT_SIZE }]}>
-                    reflexiones / semana
-                  </Text>
+                )}
+              </View>
+
+              <View style={styles.gap} />
+
+              {/* ── Calendar: general ── */}
+              <View style={styles.card}>
+                <Text style={[styles.sectionTitle, { fontSize: STREAK_LABEL_FONT_SIZE }]}>
+                  ACTIVIDAD GENERAL
+                </Text>
+                <CalendarGrid
+                  activeDays={data.activity_log}
+                  activeColor={evoconnColors.neonGreen}
+                  today={today}
+                />
+              </View>
+
+              <View style={styles.gap} />
+
+              {/* ── Calendar: frases ── */}
+              <View style={styles.card}>
+                <Text style={[styles.sectionTitle, { fontSize: STREAK_LABEL_FONT_SIZE }]}>
+                  FRASES
+                </Text>
+                <CalendarGrid
+                  activeDays={data.frases_log}
+                  activeColor="#C56BEA"
+                  today={today}
+                />
+              </View>
+
+              <View style={styles.gap} />
+
+              {/* ── Calendar: reflexiones ── */}
+              <View style={styles.card}>
+                <Text style={[styles.sectionTitle, { fontSize: STREAK_LABEL_FONT_SIZE }]}>
+                  REFLEXIONES
+                </Text>
+                <CalendarGrid
+                  activeDays={data.reflexiones_log}
+                  activeColor="#E53935"
+                  today={today}
+                />
+              </View>
+
+              <View style={styles.gap} />
+
+              {/* ── Stats ── */}
+              <View style={[styles.card, styles.statsCard]}>
+                <Text style={[styles.sectionTitle, { fontSize: STREAK_LABEL_FONT_SIZE }]}>
+                  MEDIAS SEMANALES
+                </Text>
+                <View style={styles.statsRow}>
+                  <View style={styles.statBlock}>
+                    <Text style={[styles.statNum, { fontSize: STREAK_STATS_NUMBER_FONT_SIZE }]}>
+                      {weeklyAverage(data.frases_log, totalDays)}
+                    </Text>
+                    <Text style={[styles.statLabel, { fontSize: STREAK_STATS_UNIT_FONT_SIZE }]}>
+                      frases / semana
+                    </Text>
+                  </View>
+                  <View style={styles.statDivider} />
+                  <View style={styles.statBlock}>
+                    <Text style={[styles.statNum, { fontSize: STREAK_STATS_NUMBER_FONT_SIZE }]}>
+                      {weeklyAverage(data.reflexiones_log, totalDays)}
+                    </Text>
+                    <Text style={[styles.statLabel, { fontSize: STREAK_STATS_UNIT_FONT_SIZE }]}>
+                      reflexiones / semana
+                    </Text>
+                  </View>
                 </View>
               </View>
-            </View>
-          </>
-        ) : null}
-      </ScrollView>
+
+              <View style={styles.bottomSpacer} />
+            </>
+          ) : null}
+        </ScrollView>
+      </View>
+
+      <BottomCommunityTabs activeTab={null} onTabChange={handleBottomTabChange} />
+
+      <SidebarDrawer
+        visible={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        conversations={thoughts}
+        onConversationPress={(id) =>
+          router.push({ pathname: '/reflection', params: { thoughtId: id } })
+        }
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
+  container: {
     flex: 1,
     backgroundColor: evoconnColors.background,
   },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
-  },
-  backBtn: { width: 36, alignItems: 'flex-start' },
-  backIcon: { color: '#FFFFFF', fontSize: 22 },
-  topBarTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+  contentWrap: {
+    overflow: 'hidden',
   },
   scroll: {
-    padding: 16,
-    gap: STREAK_SECTION_GAP,
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  gap: {
+    height: STREAK_SECTION_GAP,
   },
   card: {
     backgroundColor: '#000000',
@@ -212,6 +281,14 @@ const styles = StyleSheet.create({
   heroCard: {
     alignItems: 'center',
     gap: 4,
+  },
+  heroCountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  fireIconWrap: {
+    // Independent wrapper — transform here never reflowes the sibling Text
   },
   sectionTitle: {
     color: 'rgba(255,255,255,0.5)',
@@ -283,5 +360,8 @@ const styles = StyleSheet.create({
   retryText: {
     color: evoconnColors.neonGreen,
     fontWeight: '600',
+  },
+  bottomSpacer: {
+    height: 24,
   },
 });
