@@ -96,52 +96,29 @@ function StreakLineRow({
   }
   if (s !== -1) runs.push({ start: s, end: 6 });
 
-  // Cross-row connection flags (checked at col boundary only)
-  const prevRow = rowIndex > 0 ? allRows[rowIndex - 1] : null;
-  const nextRow = rowIndex < allRows.length - 1 ? allRows[rowIndex + 1] : null;
-
-  function isDayActive(r: (number | null)[], col: number): boolean {
-    const day = r[col];
-    if (!day) return false;
-    return activeSet.has(`${datePrefix}-${String(day).padStart(2, '0')}`);
-  }
-
-  const prevLastActive  = prevRow ? isDayActive(prevRow, 6) : false;
-  const nextFirstActive = nextRow ? isDayActive(nextRow, 0) : false;
-
-  // Total row width (same as 7*cell + 6*gap)
-  const rowW = 7 * cell + 6 * gap;
-  const r    = cell / 2;
+  // Each row always gets its own fully-rounded ends — no cross-row flattening.
+  const pillLeft  = (run: { start: number; end: number }) => run.start * (cell + gap);
+  const pillWidth = (run: { start: number; end: number }) =>
+    (run.end - run.start) * (cell + gap) + cell;
+  const r = cell / 2;
 
   return (
     <View style={[styles.streakRow, { height: cell, marginTop: isFirst ? 0 : gap }]}>
       {/* ── Pill backgrounds (absolute, behind day numbers) ── */}
-      {runs.map((run) => {
-        const connectLeft  = run.start === 0 && prevLastActive;
-        const connectRight = run.end   === 6 && nextFirstActive;
-
-        const pillLeft  = connectLeft  ? 0    : run.start * (cell + gap);
-        const pillRight = connectRight ? rowW : run.end   * (cell + gap) + cell;
-        const pillWidth = pillRight - pillLeft;
-
-        return (
-          <View
-            key={`pill-${run.start}-${run.end}`}
-            style={{
-              position: 'absolute',
-              left: pillLeft,
-              top: 0,
-              width: pillWidth,
-              height: cell,
-              backgroundColor: activeColor,
-              borderTopLeftRadius:     connectLeft  ? 0 : r,
-              borderBottomLeftRadius:  connectLeft  ? 0 : r,
-              borderTopRightRadius:    connectRight ? 0 : r,
-              borderBottomRightRadius: connectRight ? 0 : r,
-            }}
-          />
-        );
-      })}
+      {runs.map((run) => (
+        <View
+          key={`pill-${run.start}-${run.end}`}
+          style={{
+            position: 'absolute',
+            left: pillLeft(run),
+            top: 0,
+            width: pillWidth(run),
+            height: cell,
+            backgroundColor: activeColor,
+            borderRadius: r,   // fully rounded on all four corners, every row
+          }}
+        />
+      ))}
 
       {/* ── Day cells (absolute, on top of pills) ── */}
       <View style={[styles.streakCellRow, { gap }]}>
