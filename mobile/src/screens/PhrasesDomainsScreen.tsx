@@ -23,9 +23,19 @@ import { AppTopBar, BottomCommunityTabs, SidebarDrawer } from '@evoconn/componen
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useQuotes } from '@evoconn/hooks/QuotesContext';
+import { useActiveClan } from '@evoconn/debug/DebugClanContext';
+import { getTopBarLapizByHouse } from '@evoconn/utils/getTopBarLapizByHouse';
 import { getQuotesByDomain } from '@evoconn/data/quotes';
 import { TOTAL_QUOTES_IN_DB } from '@evoconn/logic/quotes/getDomainStats';
 import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
+import {
+  QUOTES_PENCIL_ICON_SCALE,
+  QUOTES_PENCIL_ICON_OFFSET_X,
+  QUOTES_PENCIL_ICON_OFFSET_Y,
+  QUOTES_SUMMARY_TEXT_GROUP_OFFSET_X,
+  QUOTES_SUMMARY_TEXT_GROUP_OFFSET_Y,
+} from '@evoconn/constants/streakLayout';
+import { mockCurrentUser } from '@evoconn/data/mockUser';
 import type { DomainStats } from '@evoconn/logic/quotes/getDomainStats';
 import type { Quote } from '@evoconn/types/quotes';
 
@@ -204,9 +214,12 @@ function DomainCard({ stat, onPress }: DomainCardProps) {
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function PhrasesDomainsScreen() {
-  const router    = useRouter();
-  const insets    = useSafeAreaInsets();
+  const router      = useRouter();
+  const insets      = useSafeAreaInsets();
   const { thoughts } = useThoughts();
+
+  const activeClan  = useActiveClan(mockCurrentUser.clanId);
+  const LapizIcon   = useMemo(() => getTopBarLapizByHouse(activeClan), [activeClan]);
 
   const { totalUnlocked, domainStats, unlockedPhraseIds } = useQuotes();
   const unlockedSet = useMemo(() => new Set(unlockedPhraseIds), [unlockedPhraseIds]);
@@ -255,29 +268,60 @@ export default function PhrasesDomainsScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* ── Summary card ──────────────────────────────────────────────────── */}
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryCount}>{totalUnlocked}</Text>
-          <Text style={styles.summaryLabel}>FRASES DESBLOQUEADAS</Text>
-          <View style={styles.summaryDivider} />
-          <View style={styles.summarySubRow}>
-            <Text style={styles.summarySubLeft}>
-              de {TOTAL_QUOTES_IN_DB} en total
-            </Text>
-            <Text style={styles.summarySubRight}>
-              {TOTAL_QUOTES_IN_DB - totalUnlocked} por desbloquear
-            </Text>
+        <View style={[styles.summaryCard, styles.heroCard]}>
+          {/* ── Pencil icon — clan-based, same pattern as streak fire icon ── */}
+          <View
+            style={[
+              styles.pencilIconWrap,
+              {
+                width:  PHRASES_COUNT_FONT,
+                height: PHRASES_COUNT_FONT,
+                transform: [
+                  { translateX: QUOTES_PENCIL_ICON_OFFSET_X },
+                  { translateY: QUOTES_PENCIL_ICON_OFFSET_Y },
+                  { scale:      QUOTES_PENCIL_ICON_SCALE     },
+                ],
+              },
+            ]}
+          >
+            <LapizIcon width={PHRASES_COUNT_FONT} height={PHRASES_COUNT_FONT} />
           </View>
-          {/* Overall progress bar */}
-          <View style={[styles.progressTrack, { marginTop: 10 }]}>
-            <View
-              style={[
-                styles.progressFill,
-                {
-                  width: `${Math.round((totalUnlocked / TOTAL_QUOTES_IN_DB) * 100)}%` as `${number}%`,
-                  backgroundColor: '#C2A23E',
-                },
-              ]}
-            />
+
+          {/* ── Text group + sub-content ── */}
+          <View
+            style={[
+              styles.summaryTextGroup,
+              {
+                transform: [
+                  { translateX: QUOTES_SUMMARY_TEXT_GROUP_OFFSET_X },
+                  { translateY: QUOTES_SUMMARY_TEXT_GROUP_OFFSET_Y },
+                ],
+              },
+            ]}
+          >
+            <Text style={styles.summaryCount}>{totalUnlocked}</Text>
+            <Text style={styles.summaryLabel}>FRASES DESBLOQUEADAS</Text>
+            <View style={styles.summaryDivider} />
+            <View style={styles.summarySubRow}>
+              <Text style={styles.summarySubLeft}>
+                de {TOTAL_QUOTES_IN_DB} en total
+              </Text>
+              <Text style={styles.summarySubRight}>
+                {TOTAL_QUOTES_IN_DB - totalUnlocked} por desbloquear
+              </Text>
+            </View>
+            {/* Overall progress bar */}
+            <View style={[styles.progressTrack, { marginTop: 10 }]}>
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    width: `${Math.round((totalUnlocked / TOTAL_QUOTES_IN_DB) * 100)}%` as `${number}%`,
+                    backgroundColor: '#C2A23E',
+                  },
+                ]}
+              />
+            </View>
           </View>
         </View>
 
@@ -346,7 +390,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: PHRASES_CARD_PADDING_H,
     paddingVertical: PHRASES_CARD_PADDING_V + 4,
     marginBottom: PHRASES_SECTION_GAP + 4,
+  },
+  // hero row mirrors StreakScreen heroCard: icon wrap + text group side by side
+  heroCard: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 16,
+  },
+  // pencilIconWrap: fixed-size container; transforms move only the icon, not text
+  pencilIconWrap: {
+    // size set inline via width/height props
+  },
+  // text group: column with number + label + divider + sub-row + progress bar
+  summaryTextGroup: {
+    flex: 1,
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 2,
   },
   summaryCount: {
     color: evoconnColors.text,

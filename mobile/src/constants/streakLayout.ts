@@ -167,3 +167,35 @@ export const USAGE_SUMMARY_TEXT_GROUP_OFFSET_X = 110;
  * Positive = down, negative = up. Moves ALL texts together; heart icon unchanged.
  */
 export const USAGE_SUMMARY_TEXT_GROUP_OFFSET_Y = 0;
+
+// ─── Quotes pencil icon (hero card in PhrasesDomainsScreen) ──────────────────
+
+/**
+ * Scale of the clan-based pencil SVG shown in the top summary card of the
+ * Frases/Quotes display. 1 = default size. Does not affect the card or text.
+ */
+export const QUOTES_PENCIL_ICON_SCALE = 2.2;
+
+/**
+ * Horizontal offset (px) of the pencil icon inside the quotes hero card.
+ * Positive = right, negative = left. Does not reflow the text group.
+ */
+export const QUOTES_PENCIL_ICON_OFFSET_X = 40;
+
+/**
+ * Vertical offset (px) of the pencil icon inside the quotes hero card.
+ * Positive = down, negative = up. Does not reflow the text group.
+ */
+export const QUOTES_PENCIL_ICON_OFFSET_Y = 0;
+
+/**
+ * Horizontal offset (px) of the text group (count + label) inside the quotes hero card.
+ * Positive = right, negative = left. Moves ALL texts together; pencil icon unchanged.
+ */
+export const QUOTES_SUMMARY_TEXT_GROUP_OFFSET_X = 0;
+
+/**
+ * Vertical offset (px) of the text group inside the quotes hero card.
+ * Positive = down, negative = up. Moves ALL texts together; pencil icon unchanged.
+ */
+export const QUOTES_SUMMARY_TEXT_GROUP_OFFSET_Y = 0;
