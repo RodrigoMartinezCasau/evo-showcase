@@ -13,6 +13,8 @@ import Svg73 from '../assets/profiles/nuevosPerfiles4Svg/73.svg';
 import Svg74 from '../assets/profiles/nuevosPerfiles4Svg/74.svg';
 import Svg75 from '../assets/profiles/nuevosPerfiles4Svg/75.svg';
 import Svg76 from '../assets/profiles/nuevosPerfiles4Svg/76.svg';
+// ── Sin clan profile icon ─────────────────────────────────────────────────────
+import SvgSinClan from '../assets/profiles/nuevosPerfiles4Svg/sin-clan.svg';
 
 export type ClanProfileSvgProps = {
   width?: number;
@@ -31,13 +33,17 @@ const PROFILE_BY_CLAN: Record<ClanId, FC<ClanProfileSvgProps>> = {
   estoico:           Svg76,
 };
 
-/** Fallback shown when the user has no clan. */
+/** Icon shown for users with no clan assigned — "Icono perfil sin clan.svg". */
+export const CLAN_PROFILE_SIN_CLAN: FC<ClanProfileSvgProps> = SvgSinClan;
+
+/** Fallback for an unknown clan key (should not normally occur). */
 export const CLAN_PROFILE_DEFAULT: FC<ClanProfileSvgProps> = Svg69;
 
 export function getClanProfileByHouse(
   house?: string | null,
 ): FC<ClanProfileSvgProps> {
-  if (house == null || house === '') return CLAN_PROFILE_DEFAULT;
+  // No clan → use the dedicated sin-clan icon.
+  if (house == null || house === '') return CLAN_PROFILE_SIN_CLAN;
   const key = house.trim().toLowerCase() as ClanId;
   return (
     (PROFILE_BY_CLAN as Record<string, FC<ClanProfileSvgProps> | undefined>)[key] ??

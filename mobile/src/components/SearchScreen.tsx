@@ -19,6 +19,13 @@ import { searchUsers, type ScoredUser } from '../utils/searchUsers';
 const MAX_RECENTS = 10;
 const DEBOUNCE_MS = 250;
 
+// ── Search result profile icon editors ────────────────────────────────────────
+// Affect ONLY the SVG inside each result row — not the row layout.
+const SEARCH_PROFILE_ICON_BASE_SIZE = 40; // px — rendered size of the SVG
+const SEARCH_PROFILE_ICON_SCALE     = 1.2; // 1 = default
+const SEARCH_PROFILE_ICON_OFFSET_X  = 0;   // positive = right
+const SEARCH_PROFILE_ICON_OFFSET_Y  = 0;   // positive = down
+
 type SearchScreenProps = {
   onUserPress: (userId: string) => void;
 };
@@ -96,8 +103,21 @@ export function SearchScreen({ onUserPress }: SearchScreenProps) {
         activeOpacity={0.7}
         onPress={() => handleUserPress(item)}
       >
-        <View style={[styles.avatar, { borderColor: clanColor }]}>
-          <ProfileSvg width={36} height={36} />
+        <View style={styles.avatarWrap}>
+          <View
+            style={{
+              transform: [
+                { translateX: SEARCH_PROFILE_ICON_OFFSET_X },
+                { translateY: SEARCH_PROFILE_ICON_OFFSET_Y },
+                { scale: SEARCH_PROFILE_ICON_SCALE },
+              ],
+            }}
+          >
+            <ProfileSvg
+              width={SEARCH_PROFILE_ICON_BASE_SIZE}
+              height={SEARCH_PROFILE_ICON_BASE_SIZE}
+            />
+          </View>
         </View>
         <View style={styles.resultInfo}>
           <Text style={[styles.resultUsername, { fontSize: SL.fontSize - 2 }]}>
@@ -232,12 +252,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 4,
   },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 2,
-    backgroundColor: evoconnColors.card,
+  avatarWrap: {
+    width: SEARCH_PROFILE_ICON_BASE_SIZE,
+    height: SEARCH_PROFILE_ICON_BASE_SIZE,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,

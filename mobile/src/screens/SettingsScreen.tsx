@@ -49,9 +49,9 @@ const SETTINGS_ICON_INNER_OFFSET_Y = 0;
 
 // ── Profile avatar icon controls ───────────────────────────────────────────────
 // Affect ONLY the SVG glyph inside the avatar circle — not the circle itself.
-const PROFILE_ICON_SCALE   = 1.1;
+const PROFILE_ICON_SCALE   = 1.3;
 const PROFILE_ICON_OFFSET_X = 0;
-const PROFILE_ICON_OFFSET_Y = 0;
+const PROFILE_ICON_OFFSET_Y = -3;
 const PROFILE_ICON_BASE_SIZE = 54; // px — fits comfortably inside the 60px circle
 
 const IC = {
@@ -580,13 +580,8 @@ const styles = StyleSheet.create({
   avatar: {
     width: 60,
     height: 60,
-    borderRadius: 30,
-    backgroundColor: '#1c1c2a',
-    borderWidth: 2,
-    borderColor: evoconnColors.neonGreen,
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
   },
   avatarEditBadge: {
     position: 'absolute',
