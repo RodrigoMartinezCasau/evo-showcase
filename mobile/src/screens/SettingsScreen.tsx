@@ -24,6 +24,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { mockCurrentUser, mockUserStats } from '@evoconn/data/mockUser';
 import { AppTopBar, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
@@ -36,6 +37,14 @@ import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
 const CARD_BG   = '#0b0b0f';
 const DIVIDER   = 'rgba(255,255,255,0.06)';
 const ICON_SIZE = 34;
+
+// ── Global inner-icon layout controls ─────────────────────────────────────────
+// These affect ONLY the Ionicons glyphs rendered inside the colored squares.
+// They do NOT change the square containers, colors, positions, or any other UI.
+const SETTINGS_ICON_INNER_SIZE    = 18;   // glyph size in points
+const SETTINGS_ICON_INNER_SCALE   = 1;    // uniform scale (1 = default)
+const SETTINGS_ICON_INNER_OFFSET_X = 0;   // horizontal nudge inside the square
+const SETTINGS_ICON_INNER_OFFSET_Y = 0;   // vertical nudge inside the square
 
 const IC = {
   blue:   '#3B82F6',
@@ -86,6 +95,32 @@ interface ToggleState {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
+/**
+ * Renders a single Ionicons glyph with the shared global offset and scale
+ * applied. Only the glyph moves — the colored square container is unaffected.
+ */
+function IconInner({
+  name,
+  color = '#ffffff',
+}: {
+  name: React.ComponentProps<typeof Ionicons>['name'];
+  color?: string;
+}) {
+  return (
+    <View
+      style={{
+        transform: [
+          { translateX: SETTINGS_ICON_INNER_OFFSET_X },
+          { translateY: SETTINGS_ICON_INNER_OFFSET_Y },
+          { scale: SETTINGS_ICON_INNER_SCALE },
+        ],
+      }}
+    >
+      <Ionicons name={name} size={SETTINGS_ICON_INNER_SIZE} color={color} />
+    </View>
+  );
+}
+
 interface RowProps {
   row:            SettingRow;
   isFirst:        boolean;
@@ -121,7 +156,7 @@ function SettingsRow({ row, isFirst, isLast, toggleState, onToggleChange }: RowP
           activeOpacity={0.75}
         >
           <View style={[styles.iconBox, { backgroundColor: IC.amber }]}>
-            <Text style={styles.iconChar}>⭐</Text>
+            <IconInner name="star" />
           </View>
           <View style={styles.rowContent}>
             <Text style={styles.upgradeLabel}>Actualizar a Premium</Text>
@@ -145,7 +180,7 @@ function SettingsRow({ row, isFirst, isLast, toggleState, onToggleChange }: RowP
           activeOpacity={0.7}
         >
           <View style={[styles.iconBox, { backgroundColor: IC.red }]}>
-            <Text style={styles.iconChar}>{row.icon}</Text>
+            <IconInner name={row.icon as React.ComponentProps<typeof Ionicons>['name']} />
           </View>
           <Text style={styles.dangerLabel}>{row.label}</Text>
           <Text style={styles.chevron}>›</Text>
@@ -164,7 +199,7 @@ function SettingsRow({ row, isFirst, isLast, toggleState, onToggleChange }: RowP
         disabled={isInfo}
       >
         <View style={[styles.iconBox, { backgroundColor: row.iconBg }]}>
-          <Text style={styles.iconChar}>{row.icon}</Text>
+          <IconInner name={row.icon as React.ComponentProps<typeof Ionicons>['name']} />
         </View>
 
         <View style={styles.rowContent}>
@@ -326,87 +361,87 @@ export default function SettingsScreen() {
       id: 'account',
       title: 'CUENTA',
       rows: [
-        { id: 'email',   label: 'Correo electrónico', value: 'rodrigo@evoconn.app', icon: '✉', iconBg: IC.blue,   type: 'navigate' },
-        { id: 'phone',   label: 'Teléfono',           value: 'No vinculado',        icon: '☎', iconBg: IC.blue,   type: 'navigate' },
-        { id: 'pass',    label: 'Contraseña y seguridad',                           icon: '🔐', iconBg: IC.slate,  type: 'navigate' },
-        { id: 'linked',  label: 'Cuentas vinculadas',  subtitle: 'Google, Apple…',  icon: '⛓', iconBg: IC.gray,   type: 'navigate' },
+        { id: 'email',   label: 'Correo electrónico', value: 'rodrigo@evoconn.app', icon: 'mail-outline',          iconBg: IC.blue,   type: 'navigate' },
+        { id: 'phone',   label: 'Teléfono',           value: 'No vinculado',        icon: 'call-outline',          iconBg: IC.blue,   type: 'navigate' },
+        { id: 'pass',    label: 'Contraseña y seguridad',                           icon: 'lock-closed-outline',   iconBg: IC.slate,  type: 'navigate' },
+        { id: 'linked',  label: 'Cuentas vinculadas',  subtitle: 'Google, Apple…',  icon: 'link-outline',          iconBg: IC.gray,   type: 'navigate' },
       ],
     },
     {
       id: 'subscription',
       title: 'SUSCRIPCIÓN',
       rows: [
-        { id: 'plan',    label: 'Plan actual',  value: 'Gratis',  icon: '✦', iconBg: IC.gray,  type: 'info' },
-        { id: 'upgrade', label: '',             icon: '⭐',       iconBg: IC.amber,              type: 'upgrade' },
-        { id: 'restore', label: 'Restaurar compras',              icon: '↩', iconBg: IC.gray,  type: 'action' },
+        { id: 'plan',    label: 'Plan actual',  value: 'Gratis',  icon: 'card-outline',    iconBg: IC.gray,  type: 'info' },
+        { id: 'upgrade', label: '',             icon: 'star',     iconBg: IC.amber,         type: 'upgrade' },
+        { id: 'restore', label: 'Restaurar compras',              icon: 'refresh-outline', iconBg: IC.gray,  type: 'action' },
       ],
     },
     {
       id: 'personalization',
       title: 'PERSONALIZACIÓN',
       rows: [
-        { id: 'theme',    label: 'Tema',                     value: 'Oscuro',    icon: '◐', iconBg: IC.purple, type: 'navigate' },
-        { id: 'lang',     label: 'Idioma',                   value: 'Español',   icon: '🌐', iconBg: IC.cyan,   type: 'navigate' },
-        { id: 'notifs',   label: 'Notificaciones',                               icon: '🔔', iconBg: IC.pink,   type: 'toggle',   onToggleKey: 'notifications' },
-        { id: 'pref-int', label: 'Intensidad filosófica',    value: 'Alta',      icon: '≡', iconBg: IC.purple, type: 'navigate' },
-        { id: 'pref-deb', label: 'Estilo de debate',         value: 'Socrático', icon: '⚖', iconBg: IC.teal,   type: 'navigate' },
-        { id: 'pref-con', label: 'Preferencia de contenido', value: 'Frases',    icon: '⊕', iconBg: IC.neon,   type: 'navigate' },
+        { id: 'theme',    label: 'Tema',                     value: 'Oscuro',    icon: 'moon-outline',           iconBg: IC.purple, type: 'navigate' },
+        { id: 'lang',     label: 'Idioma',                   value: 'Español',   icon: 'globe-outline',          iconBg: IC.cyan,   type: 'navigate' },
+        { id: 'notifs',   label: 'Notificaciones',                               icon: 'notifications-outline',  iconBg: IC.pink,   type: 'toggle',   onToggleKey: 'notifications' },
+        { id: 'pref-int', label: 'Intensidad filosófica',    value: 'Alta',      icon: 'options-outline',        iconBg: IC.purple, type: 'navigate' },
+        { id: 'pref-deb', label: 'Estilo de debate',         value: 'Socrático', icon: 'chatbubbles-outline',    iconBg: IC.teal,   type: 'navigate' },
+        { id: 'pref-con', label: 'Preferencia de contenido', value: 'Frases',    icon: 'list-outline',           iconBg: IC.neon,   type: 'navigate' },
       ],
     },
     {
       id: 'ai',
       title: 'INTELIGENCIA ARTIFICIAL',
       rows: [
-        { id: 'ai-uses',   label: 'Usos de IA hoy',       value: `${usesLeft} / 30`,  icon: '⚡', iconBg: IC.green, type: 'info' },
-        { id: 'ai-mode',   label: 'Modo de IA',            value: 'Equilibrado',       icon: '🧠', iconBg: IC.green, type: 'navigate' },
-        { id: 'ai-sci',    label: 'Datos científicos',     subtitle: 'Incluir en respuestas',  icon: '⚗', iconBg: IC.cyan,   type: 'toggle', onToggleKey: 'scientificFacts' },
-        { id: 'ai-phi',    label: 'Referencias filosóficas', subtitle: 'Citar filósofos',      icon: '📚', iconBg: IC.purple, type: 'toggle', onToggleKey: 'philosopherRefs' },
-        { id: 'ai-contra', label: 'Contraargumentos',      subtitle: 'Añadir perspectivas opuestas', icon: '⇄', iconBg: IC.slate, type: 'toggle', onToggleKey: 'counterArguments' },
+        { id: 'ai-uses',   label: 'Usos de IA hoy',         value: `${usesLeft} / 30`,            icon: 'flash-outline',          iconBg: IC.green,  type: 'info' },
+        { id: 'ai-mode',   label: 'Modo de IA',              value: 'Equilibrado',                 icon: 'hardware-chip-outline',  iconBg: IC.green,  type: 'navigate' },
+        { id: 'ai-sci',    label: 'Datos científicos',       subtitle: 'Incluir en respuestas',    icon: 'flask-outline',          iconBg: IC.cyan,   type: 'toggle', onToggleKey: 'scientificFacts' },
+        { id: 'ai-phi',    label: 'Referencias filosóficas', subtitle: 'Citar filósofos',          icon: 'book-outline',           iconBg: IC.purple, type: 'toggle', onToggleKey: 'philosopherRefs' },
+        { id: 'ai-contra', label: 'Contraargumentos',        subtitle: 'Añadir perspectivas opuestas', icon: 'git-compare-outline', iconBg: IC.slate, type: 'toggle', onToggleKey: 'counterArguments' },
       ],
     },
     {
       id: 'privacy',
       title: 'PRIVACIDAD Y DATOS',
       rows: [
-        { id: 'data-use',  label: 'Uso de datos',                               icon: '📊', iconBg: IC.slate,  type: 'navigate' },
-        { id: 'download',  label: 'Descargar mis datos',                         icon: '↓', iconBg: IC.slate,  type: 'action' },
-        { id: 'pub-prof',  label: 'Perfil público', subtitle: 'Visible para todos', icon: '👁', iconBg: IC.gray,   type: 'toggle', onToggleKey: 'publicProfile' },
-        { id: 'show-stat', label: 'Mostrar estadísticas',                        icon: '📈', iconBg: IC.gray,   type: 'toggle', onToggleKey: 'showStats' },
-        { id: 'delete',    label: 'Eliminar cuenta',                             icon: '✕', iconBg: IC.red,    type: 'danger', onPress: confirmDeleteAccount },
+        { id: 'data-use',  label: 'Uso de datos',                                  icon: 'pie-chart-outline',    iconBg: IC.slate,  type: 'navigate' },
+        { id: 'download',  label: 'Descargar mis datos',                            icon: 'download-outline',     iconBg: IC.slate,  type: 'action' },
+        { id: 'pub-prof',  label: 'Perfil público',  subtitle: 'Visible para todos', icon: 'eye-outline',         iconBg: IC.gray,   type: 'toggle', onToggleKey: 'publicProfile' },
+        { id: 'show-stat', label: 'Mostrar estadísticas',                           icon: 'bar-chart-outline',    iconBg: IC.gray,   type: 'toggle', onToggleKey: 'showStats' },
+        { id: 'delete',    label: 'Eliminar cuenta',                                icon: 'trash-outline',        iconBg: IC.red,    type: 'danger', onPress: confirmDeleteAccount },
       ],
     },
     {
       id: 'community',
       title: 'COMUNIDAD',
       rows: [
-        { id: 'blocked',   label: 'Usuarios bloqueados',             icon: '🚫', iconBg: IC.slate,  type: 'navigate' },
-        { id: 'reports',   label: 'Historial de reportes',           icon: '⚑', iconBg: IC.slate,  type: 'navigate' },
-        { id: 'mod',       label: 'Preferencias de moderación',      icon: '⊘', iconBg: IC.gray,   type: 'navigate' },
+        { id: 'blocked',   label: 'Usuarios bloqueados',           icon: 'person-remove-outline',       iconBg: IC.slate,  type: 'navigate' },
+        { id: 'reports',   label: 'Historial de reportes',         icon: 'flag-outline',                iconBg: IC.slate,  type: 'navigate' },
+        { id: 'mod',       label: 'Preferencias de moderación',    icon: 'shield-checkmark-outline',    iconBg: IC.gray,   type: 'navigate' },
       ],
     },
     {
       id: 'support',
       title: 'SOPORTE',
       rows: [
-        { id: 'bug',     label: 'Reportar un error',  icon: '🐛', iconBg: IC.pink,  type: 'action' },
-        { id: 'help',    label: 'Centro de ayuda',    icon: '❓', iconBg: IC.cyan,  type: 'action' },
-        { id: 'contact', label: 'Contactar soporte',  icon: '✉', iconBg: IC.blue,  type: 'action' },
+        { id: 'bug',     label: 'Reportar un error',  icon: 'bug-outline',                    iconBg: IC.pink,  type: 'action' },
+        { id: 'help',    label: 'Centro de ayuda',    icon: 'help-circle-outline',            iconBg: IC.cyan,  type: 'action' },
+        { id: 'contact', label: 'Contactar soporte',  icon: 'chatbubble-ellipses-outline',    iconBg: IC.blue,  type: 'action' },
       ],
     },
     {
       id: 'legal',
       title: 'LEGAL',
       rows: [
-        { id: 'terms',   label: 'Términos de servicio',   icon: '📄', iconBg: IC.gray, type: 'navigate' },
-        { id: 'privacy', label: 'Política de privacidad', icon: '🔏', iconBg: IC.gray, type: 'navigate' },
+        { id: 'terms',   label: 'Términos de servicio',   icon: 'document-text-outline',  iconBg: IC.gray, type: 'navigate' },
+        { id: 'privacy', label: 'Política de privacidad', icon: 'shield-outline',         iconBg: IC.gray, type: 'navigate' },
       ],
     },
     {
       id: 'info',
       title: 'INFORMACIÓN',
       rows: [
-        { id: 'version', label: 'Versión',      value: '1.0.0', icon: 'ℹ', iconBg: IC.gray, type: 'info' },
-        { id: 'build',   label: 'Build',        value: '(42)',  icon: '⊡', iconBg: IC.gray, type: 'info' },
+        { id: 'version', label: 'Versión', value: '1.0.0', icon: 'information-circle-outline', iconBg: IC.gray, type: 'info' },
+        { id: 'build',   label: 'Build',   value: '(42)',   icon: 'cube-outline',               iconBg: IC.gray, type: 'info' },
       ],
     },
   ];
@@ -612,9 +647,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
-  },
-  iconChar: {
-    fontSize: 16,
   },
   rowContent: {
     flex: 1,
