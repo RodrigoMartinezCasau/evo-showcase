@@ -16,6 +16,7 @@ import { getTopBarInsigniaByHouse } from '@evoconn/utils/getTopBarInsigniaByHous
 import FuegoApagadoIcon from '../assets/topbar/fueguitoSvg/fuego-apagado.svg';
 import { useDebugStreak, IS_DEBUG_STREAK_MODE } from '../debug/DebugStreakContext';
 import { useDebugStats } from '../debug/DebugStatsContext';
+import { useQuotes } from '../hooks/QuotesContext';
 
 type AppTopBarProps = {
   onMenuPress: () => void;
@@ -72,8 +73,9 @@ export function AppTopBar({
     (activeClan ? activeClan.slice(0, 2).toUpperCase() : '??');
 
   const { streakDays, remainingUses } = useDebugStats();
+  const { totalUnlocked } = useQuotes();
 
-  const pencilCount = counts?.pencil ?? mockUserStats.unlockedPhrases;
+  const pencilCount = counts?.pencil ?? totalUnlocked;
   const fireCount   = counts?.fire   ?? streakDays;
   const heartCount  = counts?.heart  ?? remainingUses;
 
