@@ -1,5 +1,5 @@
 /**
- * A monthly calendar grid.
+ * A monthly calendar grid with left/right month navigation.
  *
  * variant='circles'     (default) — active days shown as filled circles.
  * variant='streak-line' — active runs shown as one continuous rounded pill per row,
@@ -7,9 +7,14 @@
  *
  * Active day text is always black; inactive day text is dim white.
  * The current day gets a white border highlight in both variants.
+ *
+ * Navigation:
+ *   - Users can go back up to MAX_MONTHS_BACK (12) months.
+ *   - Users cannot navigate forward past the current month.
+ *   - Tapping an arrow plays a lightweight slide animation.
  */
-import React, { useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import {
   STREAK_DAY_CELL_SIZE,
   STREAK_DAY_CELL_GAP,
@@ -42,9 +47,23 @@ type Props = {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const DAY_NAMES = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+const DAY_NAMES   = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                      'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+const MAX_MONTHS_BACK = 12;
+const NAV_SLIDE_DIST  = 350; // px — wider than any calendar grid
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Returns [year, month 1-12] for the month `offset` steps from [baseY, baseM]. */
+function getViewedYearMonth(baseY: number, baseM: number, offset: number): [number, number] {
+  let m = baseM + offset;
+  let y = baseY;
+  while (m <= 0) { m += 12; y -= 1; }
+  while (m > 12) { m -= 12; y += 1; }
+  return [y, m];
+}
 
 // ─── Month grid builder ───────────────────────────────────────────────────────
 
@@ -167,88 +186,138 @@ export const CalendarGrid = React.memo(function CalendarGrid({
 }: Props) {
   const todayStr = today ?? new Date().toISOString().slice(0, 10);
   const [ty, tm] = todayStr.split('-').map(Number);
-  const activeSet   = useMemo(() => new Set(activeDays), [activeDays]);
-  const rows        = useMemo(() => buildMonthGrid(ty, tm), [ty, tm]);
-  const datePrefix  = `${ty}-${String(tm).padStart(2, '0')}`;
+
+  // ── Month navigation state ────────────────────────────────────────────────
+  const [monthOffset, setMonthOffset] = useState(0);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
+  const [vy, vm] = useMemo(
+    () => getViewedYearMonth(ty, tm, monthOffset),
+    [ty, tm, monthOffset],
+  );
+
+  const atMin = monthOffset <= -MAX_MONTHS_BACK;
+  const atMax = monthOffset >= 0;
+
+  const handlePrev = useCallback(() => {
+    if (atMin) return;
+    slideAnim.setValue(-NAV_SLIDE_DIST);
+    setMonthOffset(o => o - 1);
+    Animated.timing(slideAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+  }, [atMin, slideAnim]);
+
+  const handleNext = useCallback(() => {
+    if (atMax) return;
+    slideAnim.setValue(NAV_SLIDE_DIST);
+    setMonthOffset(o => o + 1);
+    Animated.timing(slideAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+  }, [atMax, slideAnim]);
+
+  // ── Calendar data ─────────────────────────────────────────────────────────
+  const activeSet  = useMemo(() => new Set(activeDays), [activeDays]);
+  const rows       = useMemo(() => buildMonthGrid(vy, vm), [vy, vm]);
+  const datePrefix = `${vy}-${String(vm).padStart(2, '0')}`;
 
   const cell = STREAK_DAY_CELL_SIZE * scale;
   const gap  = STREAK_DAY_CELL_GAP  * scale;
 
   return (
     <View style={styles.outerWrap}>
-      {/* Month label — fixed, not moved by offset or scale */}
       {label && <Text style={styles.label}>{label}</Text>}
-      <Text style={styles.monthLabel}>{MONTH_NAMES[tm - 1]} {ty}</Text>
 
-      {/* Auto-centering wrapper — fills card width so the calendar is always
-          horizontally centered regardless of STREAK_CALENDAR_SCALE value.
-          offsetX/Y are applied inside so they nudge from the centered position. */}
-      <View style={styles.calendarCenterWrap}>
-      <View style={{ transform: [{ translateX: offsetX }, { translateY: offsetY }] }}>
-        {/* Weekday header row */}
-        <View style={[styles.row, { gap }]}>
-          {DAY_NAMES.map((d) => (
-            <View key={d} style={[styles.cell, { width: cell, height: cell }]}>
-              <Text style={[styles.dayName, { fontSize: 9 * scale }]}>{d}</Text>
-            </View>
-          ))}
-        </View>
+      {/* ── Month navigation row ── */}
+      <View style={styles.monthNavRow}>
+        <TouchableOpacity
+          onPress={handlePrev}
+          disabled={atMin}
+          hitSlop={{ top: 8, bottom: 8, left: 12, right: 12 }}
+        >
+          <Text style={[styles.navArrow, atMin && styles.navArrowDisabled]}>‹</Text>
+        </TouchableOpacity>
 
-        {variant === 'streak-line' ? (
-          /* ── Streak-line variant ── */
-          rows.map((row, ri) => (
-            <StreakLineRow
-              key={ri}
-              row={row}
-              rowIndex={ri}
-              allRows={rows}
-              activeSet={activeSet}
-              datePrefix={datePrefix}
-              cell={cell}
-              gap={gap}
-              activeColor={activeColor}
-              todayStr={todayStr}
-              scale={scale}
-              isFirst={ri === 0}
-            />
-          ))
-        ) : (
-          /* ── Circles variant (default) ── */
-          rows.map((row, ri) => (
-            <View key={ri} style={[styles.row, { gap, marginTop: gap }]}>
-              {row.map((day, ci) => {
-                if (!day) return <View key={ci} style={[styles.cell, { width: cell, height: cell }]} />;
-                const dateStr  = `${ty}-${String(tm).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                const isActive = activeSet.has(dateStr);
-                const isToday  = dateStr === todayStr;
-                return (
-                  <View
-                    key={ci}
-                    style={[
-                      styles.cell,
-                      styles.dayCell,
-                      { width: cell, height: cell, borderRadius: cell / 2 },
-                      isActive  && { backgroundColor: activeColor },
-                      !isActive && { backgroundColor: 'rgba(255,255,255,0.07)' },
-                      isToday   && styles.todayBorder,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.dayNum,
-                        { fontSize: 10 * scale },
-                        isActive && styles.dayNumActive,
-                      ]}
-                    >
-                      {day}
-                    </Text>
-                  </View>
-                );
-              })}
-            </View>
-          ))
-        )}
+        <Text style={styles.monthLabel}>{MONTH_NAMES[vm - 1]} {vy}</Text>
+
+        <TouchableOpacity
+          onPress={handleNext}
+          disabled={atMax}
+          hitSlop={{ top: 8, bottom: 8, left: 12, right: 12 }}
+        >
+          <Text style={[styles.navArrow, atMax && styles.navArrowDisabled]}>›</Text>
+        </TouchableOpacity>
       </View>
+
+      {/* ── Calendar grid — slides on month change ── */}
+      <View style={styles.calendarCenterWrap}>
+        <Animated.View style={{ transform: [{ translateX: slideAnim }] }}>
+          {/* offsetX/Y nudge applied inside so they operate from the centered position */}
+          <View style={{ transform: [{ translateX: offsetX }, { translateY: offsetY }] }}>
+
+            {/* Weekday header row */}
+            <View style={[styles.row, { gap }]}>
+              {DAY_NAMES.map((d) => (
+                <View key={d} style={[styles.cell, { width: cell, height: cell }]}>
+                  <Text style={[styles.dayName, { fontSize: 9 * scale }]}>{d}</Text>
+                </View>
+              ))}
+            </View>
+
+            {variant === 'streak-line' ? (
+              /* ── Streak-line variant ── */
+              rows.map((row, ri) => (
+                <StreakLineRow
+                  key={ri}
+                  row={row}
+                  rowIndex={ri}
+                  allRows={rows}
+                  activeSet={activeSet}
+                  datePrefix={datePrefix}
+                  cell={cell}
+                  gap={gap}
+                  activeColor={activeColor}
+                  todayStr={todayStr}
+                  scale={scale}
+                  isFirst={ri === 0}
+                />
+              ))
+            ) : (
+              /* ── Circles variant (default) ── */
+              rows.map((row, ri) => (
+                <View key={ri} style={[styles.row, { gap, marginTop: gap }]}>
+                  {row.map((day, ci) => {
+                    if (!day) return <View key={ci} style={[styles.cell, { width: cell, height: cell }]} />;
+                    const dateStr  = `${datePrefix}-${String(day).padStart(2, '0')}`;
+                    const isActive = activeSet.has(dateStr);
+                    const isToday  = dateStr === todayStr;
+                    return (
+                      <View
+                        key={ci}
+                        style={[
+                          styles.cell,
+                          styles.dayCell,
+                          { width: cell, height: cell, borderRadius: cell / 2 },
+                          isActive  && { backgroundColor: activeColor },
+                          !isActive && { backgroundColor: 'rgba(255,255,255,0.07)' },
+                          isToday   && styles.todayBorder,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.dayNum,
+                            { fontSize: 10 * scale },
+                            isActive && styles.dayNumActive,
+                          ]}
+                        >
+                          {day}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              ))
+            )}
+
+          </View>
+        </Animated.View>
       </View>{/* end calendarCenterWrap */}
     </View>
   );
@@ -261,11 +330,6 @@ const styles = StyleSheet.create({
   outerWrap: {
     width: '100%',
   },
-  /** Centers the calendar grid horizontally within the card at any scale. */
-  calendarCenterWrap: {
-    width: '100%',
-    alignItems: 'center',
-  },
   label: {
     color: 'rgba(255,255,255,0.5)',
     fontSize: 10,
@@ -274,11 +338,39 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 6,
   },
+
+  // ── Month navigation row ──
+  monthNavRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  navArrow: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 22,
+    fontWeight: '300',
+    width: 24,
+    textAlign: 'center',
+  },
+  navArrowDisabled: {
+    color: 'rgba(255,255,255,0.18)',
+  },
   monthLabel: {
     color: 'rgba(255,255,255,0.7)',
     fontSize: 13,
     fontWeight: '600',
-    marginBottom: 8,
+    flex: 1,
+    textAlign: 'center',
+  },
+
+  // ── Calendar grid wrap ──
+  /** Centers the calendar grid horizontally within the card at any scale.
+   *  overflow:hidden clips the slide animation to the card bounds. */
+  calendarCenterWrap: {
+    width: '100%',
+    alignItems: 'center',
+    overflow: 'hidden',
   },
   row: {
     flexDirection: 'row',

@@ -5,7 +5,7 @@
  * Layout: standard app shell (AppTopBar + BottomCommunityTabs).
  * Content scrolls between the two fixed bars.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
+  Animated,
   useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -52,7 +53,18 @@ import {
   USAGE_SUMMARY_TEXT_GROUP_OFFSET_Y,
 } from '@evoconn/constants/streakLayout';
 
-const DAILY_LIMIT = 30;
+const DAILY_LIMIT     = 30;
+const MAX_MONTHS_BACK = 12;
+const NAV_SLIDE_DIST  = 350; // px — wider than any calendar grid
+
+/** Returns [year, month 1-12] for the month `offset` steps from [baseY, baseM]. */
+function getViewedYearMonth(baseY: number, baseM: number, offset: number): [number, number] {
+  let m = baseM + offset;
+  let y = baseY;
+  while (m <= 0) { m += 12; y -= 1; }
+  while (m > 12) { m -= 12; y += 1; }
+  return [y, m];
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -134,10 +146,38 @@ function GradBar({ used, limit, clanColor }: { used: number; limit: number; clan
 // ─── Usage calendar ───────────────────────────────────────────────────────────
 
 function UsesCalendarGrid({ log, limit }: { log: UsesLogData; limit: number }) {
-  const todayStr   = new Date().toISOString().slice(0, 10);
-  const [ty, tm]   = todayStr.split('-').map(Number);
-  const rows       = buildUsageMonthGrid(ty, tm);
-  const datePrefix = `${ty}-${String(tm).padStart(2, '0')}`;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [ty, tm] = todayStr.split('-').map(Number);
+
+  // ── Month navigation state ────────────────────────────────────────────────
+  const [monthOffset, setMonthOffset] = useState(0);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
+  const [vy, vm] = React.useMemo(
+    () => getViewedYearMonth(ty, tm, monthOffset),
+    [ty, tm, monthOffset],
+  );
+
+  const atMin = monthOffset <= -MAX_MONTHS_BACK;
+  const atMax = monthOffset >= 0;
+
+  const handlePrev = useCallback(() => {
+    if (atMin) return;
+    slideAnim.setValue(-NAV_SLIDE_DIST);
+    setMonthOffset(o => o - 1);
+    Animated.timing(slideAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+  }, [atMin, slideAnim]);
+
+  const handleNext = useCallback(() => {
+    if (atMax) return;
+    slideAnim.setValue(NAV_SLIDE_DIST);
+    setMonthOffset(o => o + 1);
+    Animated.timing(slideAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+  }, [atMax, slideAnim]);
+
+  // ── Calendar data ─────────────────────────────────────────────────────────
+  const rows       = buildUsageMonthGrid(vy, vm);
+  const datePrefix = `${vy}-${String(vm).padStart(2, '0')}`;
 
   const cell = STREAK_DAY_CELL_SIZE * USES_CALENDAR_SCALE;
   const gap  = STREAK_DAY_CELL_GAP  * USES_CALENDAR_SCALE;
@@ -145,72 +185,93 @@ function UsesCalendarGrid({ log, limit }: { log: UsesLogData; limit: number }) {
 
   return (
     <View style={{ width: '100%' }}>
-      {/* Month label */}
-      <Text style={styles.calMonthLabel}>
-        {USAGE_MONTH_NAMES[tm - 1]} {ty}
-      </Text>
 
-      {/* Centered calendar block */}
-      <View style={{ width: '100%', alignItems: 'center' }}>
-        <View
-          style={{
-            transform: [
-              { translateX: USES_CALENDAR_OFFSET_X },
-              { translateY: USES_CALENDAR_OFFSET_Y },
-            ],
-          }}
+      {/* ── Month navigation row ── */}
+      <View style={styles.calMonthNavRow}>
+        <TouchableOpacity
+          onPress={handlePrev}
+          disabled={atMin}
+          hitSlop={{ top: 8, bottom: 8, left: 12, right: 12 }}
         >
-          {/* Weekday header */}
-          <View style={{ flexDirection: 'row', gap }}>
-            {USAGE_DAY_NAMES.map((d) => (
-              <View
-                key={d}
-                style={{ width: cell, height: cell, alignItems: 'center', justifyContent: 'center' }}
-              >
-                <Text style={{ color: 'rgba(255,255,255,0.35)', fontWeight: '600', fontSize: 9 * USES_CALENDAR_SCALE }}>
-                  {d}
-                </Text>
+          <Text style={[styles.calNavArrow, atMin && styles.calNavArrowDisabled]}>‹</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.calMonthLabel}>
+          {USAGE_MONTH_NAMES[vm - 1]} {vy}
+        </Text>
+
+        <TouchableOpacity
+          onPress={handleNext}
+          disabled={atMax}
+          hitSlop={{ top: 8, bottom: 8, left: 12, right: 12 }}
+        >
+          <Text style={[styles.calNavArrow, atMax && styles.calNavArrowDisabled]}>›</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* ── Calendar grid — slides on month change ── */}
+      <View style={{ width: '100%', alignItems: 'center', overflow: 'hidden' }}>
+        <Animated.View style={{ transform: [{ translateX: slideAnim }] }}>
+          <View
+            style={{
+              transform: [
+                { translateX: USES_CALENDAR_OFFSET_X },
+                { translateY: USES_CALENDAR_OFFSET_Y },
+              ],
+            }}
+          >
+            {/* Weekday header */}
+            <View style={{ flexDirection: 'row', gap }}>
+              {USAGE_DAY_NAMES.map((d) => (
+                <View
+                  key={d}
+                  style={{ width: cell, height: cell, alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Text style={{ color: 'rgba(255,255,255,0.35)', fontWeight: '600', fontSize: 9 * USES_CALENDAR_SCALE }}>
+                    {d}
+                  </Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Day rows */}
+            {rows.map((row, ri) => (
+              <View key={ri} style={{ flexDirection: 'row', gap, marginTop: gap }}>
+                {row.map((day, ci) => {
+                  if (!day) return <View key={ci} style={{ width: cell, height: cell }} />;
+                  const dateStr = `${datePrefix}-${String(day).padStart(2, '0')}`;
+                  const count   = log[dateStr] ?? 0;
+                  const isToday = dateStr === todayStr;
+                  const color   = usageColor(count, limit);
+                  const hasUses = count > 0;
+                  return (
+                    <View
+                      key={ci}
+                      style={[
+                        {
+                          width: cell, height: cell, borderRadius: r,
+                          backgroundColor: color,
+                          alignItems: 'center', justifyContent: 'center',
+                        },
+                        isToday && { borderWidth: 1.5, borderColor: '#FFFFFF' },
+                      ]}
+                    >
+                      <Text
+                        style={{
+                          color:      hasUses ? '#FFFFFF' : 'rgba(255,255,255,0.35)',
+                          fontSize:   10 * USES_CALENDAR_SCALE,
+                          fontWeight: hasUses ? '700' : '500',
+                        }}
+                      >
+                        {day}
+                      </Text>
+                    </View>
+                  );
+                })}
               </View>
             ))}
           </View>
-
-          {/* Day rows */}
-          {rows.map((row, ri) => (
-            <View key={ri} style={{ flexDirection: 'row', gap, marginTop: gap }}>
-              {row.map((day, ci) => {
-                if (!day) return <View key={ci} style={{ width: cell, height: cell }} />;
-                const dateStr = `${datePrefix}-${String(day).padStart(2, '0')}`;
-                const count   = log[dateStr] ?? 0;
-                const isToday = dateStr === todayStr;
-                const color   = usageColor(count, limit);
-                const hasUses = count > 0;
-                return (
-                  <View
-                    key={ci}
-                    style={[
-                      {
-                        width: cell, height: cell, borderRadius: r,
-                        backgroundColor: color,
-                        alignItems: 'center', justifyContent: 'center',
-                      },
-                      isToday && { borderWidth: 1.5, borderColor: '#FFFFFF' },
-                    ]}
-                  >
-                    <Text
-                      style={{
-                        color:      hasUses ? '#FFFFFF' : 'rgba(255,255,255,0.35)',
-                        fontSize:   10 * USES_CALENDAR_SCALE,
-                        fontWeight: hasUses ? '700' : '500',
-                      }}
-                    >
-                      {day}
-                    </Text>
-                  </View>
-                );
-              })}
-            </View>
-          ))}
-        </View>
+        </Animated.View>
       </View>
 
       {/* Legend — circles matching the calendar style */}
@@ -494,11 +555,28 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.10)',
     overflow: 'hidden',
   },
+  calMonthNavRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  calNavArrow: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 22,
+    fontWeight: '300',
+    width: 24,
+    textAlign: 'center',
+  },
+  calNavArrowDisabled: {
+    color: 'rgba(255,255,255,0.18)',
+  },
   calMonthLabel: {
     color: 'rgba(255,255,255,0.7)',
     fontSize: 13,
     fontWeight: '600',
-    marginBottom: 8,
+    flex: 1,
+    textAlign: 'center',
   },
   legendRow: {
     flexDirection: 'row',
