@@ -36,6 +36,24 @@ import {
   useDebugStreak,
 } from '../debug/DebugStreakContext';
 import { IS_DEBUG_STATS_MODE, useDebugStats } from '../debug/DebugStatsContext';
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Returns an array of the last `n` YYYY-MM-DD strings up to and including today,
+ * computed in UTC to avoid DST edge cases.
+ * Used in debug mode to synthesise a streak calendar from simulatedStreakDays.
+ */
+function generateLastNDays(n: number): string[] {
+  if (n <= 0) return [];
+  const result: string[] = [];
+  const now = new Date();
+  const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  for (let i = n - 1; i >= 0; i--) {
+    result.push(new Date(todayUtc - i * 86_400_000).toISOString().slice(0, 10));
+  }
+  return result;
+}
 import {
   STREAK_CARD_PADDING_H,
   STREAK_CARD_PADDING_V,
@@ -80,6 +98,14 @@ export default function StreakScreen() {
 
   // ─── Debug stats (streak days / remaining uses simulation) ────────────────
   const { streakDays, setRealStreakDays } = useDebugStats();
+
+  // In debug mode generate a "last N consecutive days" calendar from the
+  // simulated streak count; in production use the real activity_log from the API.
+  // useMemo so the array reference only changes when streakDays / data changes.
+  const computedActivityLog = React.useMemo(
+    () => (IS_DEBUG_STATS_MODE ? generateLastNDays(streakDays) : (data?.activity_log ?? [])),
+    [streakDays, data],
+  );
 
   // ─── Fire icon transition animation ─────────────────────────────────────────
   // 0 = apagado fully visible; 1 = encendido fully visible
@@ -324,7 +350,7 @@ export default function StreakScreen() {
                   ACTIVIDAD GENERAL
                 </Text>
                 <CalendarGrid
-                  activeDays={data.activity_log}
+                  activeDays={computedActivityLog}
                   activeColor={clanColors.tertiary}
                   today={today}
                   variant="streak-line"

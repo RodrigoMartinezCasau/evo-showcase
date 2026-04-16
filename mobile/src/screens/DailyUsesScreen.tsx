@@ -38,9 +38,13 @@ import {
   STREAK_CARD_BACKGROUND,
   STREAK_COUNT_FONT_SIZE,
   STREAK_LABEL_FONT_SIZE,
+  STREAK_DAY_CELL_SIZE,
+  STREAK_DAY_CELL_GAP,
   USES_BAR_HEIGHT,
   USES_BAR_RADIUS,
-  USES_HEATMAP_SCALE,
+  USES_CALENDAR_SCALE,
+  USES_CALENDAR_OFFSET_X,
+  USES_CALENDAR_OFFSET_Y,
   USAGE_HEART_ICON_SCALE,
   USAGE_HEART_ICON_OFFSET_X,
   USAGE_HEART_ICON_OFFSET_Y,
@@ -52,7 +56,7 @@ const DAILY_LIMIT = 30;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function heatmapColor(count: number, limit: number): string {
+function usageColor(count: number, limit: number): string {
   if (count === 0) return 'rgba(255,255,255,0.07)';
   const ratio = count / limit;
   if (ratio <= 0.1) return '#2d6a4f';
@@ -61,16 +65,24 @@ function heatmapColor(count: number, limit: number): string {
   return '#e63946';
 }
 
-function lastNDays(n: number): string[] {
-  const result: string[] = [];
-  const now = new Date();
-  // Use UTC midnight for today so DST transitions never produce duplicate dates.
-  const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-  for (let i = n - 1; i >= 0; i--) {
-    const d = new Date(todayUtc - i * 86_400_000);
-    result.push(d.toISOString().slice(0, 10));
-  }
-  return result;
+// ─── Calendar helpers ─────────────────────────────────────────────────────────
+
+const USAGE_DAY_NAMES   = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+const USAGE_MONTH_NAMES = [
+  'Enero','Febrero','Marzo','Abril','Mayo','Junio',
+  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre',
+];
+
+function buildUsageMonthGrid(year: number, month: number): (number | null)[][] {
+  const firstDay    = new Date(year, month - 1, 1).getDay(); // 0 = Sun
+  const firstOffset = (firstDay + 6) % 7;                   // Mon = 0
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const cells: (number | null)[] = Array(firstOffset).fill(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
+  const rows: (number | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
+  return rows;
 }
 
 // ─── Progress bar ─────────────────────────────────────────────────────────────
@@ -119,49 +131,81 @@ function GradBar({ used, limit, clanColor }: { used: number; limit: number; clan
   );
 }
 
-// ─── Heatmap ─────────────────────────────────────────────────────────────────
+// ─── Usage calendar ───────────────────────────────────────────────────────────
 
-function UsesHeatmap({ log, scale }: { log: UsesLogData; scale: number }) {
-  const {
-    USES_HEATMAP_CELL_SIZE,
-    USES_HEATMAP_CELL_GAP,
-    USES_HEATMAP_GRID_OFFSET_X,
-    USES_HEATMAP_GRID_OFFSET_Y,
-    USES_HEATMAP_GRID_SCALE,
-  } = require('@evoconn/constants/streakLayout');
-  const days = lastNDays(84);
-  const cell = USES_HEATMAP_CELL_SIZE * scale;
-  const gap = USES_HEATMAP_CELL_GAP * scale;
+function UsesCalendarGrid({ log, limit }: { log: UsesLogData; limit: number }) {
+  const todayStr   = new Date().toISOString().slice(0, 10);
+  const [ty, tm]   = todayStr.split('-').map(Number);
+  const rows       = buildUsageMonthGrid(ty, tm);
+  const datePrefix = `${ty}-${String(tm).padStart(2, '0')}`;
 
-  const weeks: string[][] = [];
-  for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
+  const cell = STREAK_DAY_CELL_SIZE * USES_CALENDAR_SCALE;
+  const gap  = STREAK_DAY_CELL_GAP  * USES_CALENDAR_SCALE;
+  const r    = cell / 2;
 
   return (
-    <View>
-      {/* Grid wrapper — transform applies to day cells ONLY, not the legend */}
-      <View
-        style={{
-          transform: [
-            { translateX: USES_HEATMAP_GRID_OFFSET_X },
-            { translateY: USES_HEATMAP_GRID_OFFSET_Y },
-            { scale: USES_HEATMAP_GRID_SCALE },
-          ],
-        }}
-      >
-        <View style={{ flexDirection: 'row', gap }}>
-          {weeks.map((week, wi) => (
-            <View key={wi} style={{ gap }}>
-              {week.map((day) => {
-                const count = log[day] ?? 0;
-                const isToday = day === new Date().toISOString().slice(0, 10);
+    <View style={{ width: '100%' }}>
+      {/* Month label */}
+      <Text style={styles.calMonthLabel}>
+        {USAGE_MONTH_NAMES[tm - 1]} {ty}
+      </Text>
+
+      {/* Centered calendar block */}
+      <View style={{ width: '100%', alignItems: 'center' }}>
+        <View
+          style={{
+            transform: [
+              { translateX: USES_CALENDAR_OFFSET_X },
+              { translateY: USES_CALENDAR_OFFSET_Y },
+            ],
+          }}
+        >
+          {/* Weekday header */}
+          <View style={{ flexDirection: 'row', gap }}>
+            {USAGE_DAY_NAMES.map((d) => (
+              <View
+                key={d}
+                style={{ width: cell, height: cell, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Text style={{ color: 'rgba(255,255,255,0.35)', fontWeight: '600', fontSize: 9 * USES_CALENDAR_SCALE }}>
+                  {d}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Day rows */}
+          {rows.map((row, ri) => (
+            <View key={ri} style={{ flexDirection: 'row', gap, marginTop: gap }}>
+              {row.map((day, ci) => {
+                if (!day) return <View key={ci} style={{ width: cell, height: cell }} />;
+                const dateStr = `${datePrefix}-${String(day).padStart(2, '0')}`;
+                const count   = log[dateStr] ?? 0;
+                const isToday = dateStr === todayStr;
+                const color   = usageColor(count, limit);
+                const hasUses = count > 0;
                 return (
                   <View
-                    key={day}
+                    key={ci}
                     style={[
-                      { width: cell, height: cell, borderRadius: 3 * scale, backgroundColor: heatmapColor(count, DAILY_LIMIT) },
+                      {
+                        width: cell, height: cell, borderRadius: r,
+                        backgroundColor: color,
+                        alignItems: 'center', justifyContent: 'center',
+                      },
                       isToday && { borderWidth: 1.5, borderColor: '#FFFFFF' },
                     ]}
-                  />
+                  >
+                    <Text
+                      style={{
+                        color:      hasUses ? '#FFFFFF' : 'rgba(255,255,255,0.35)',
+                        fontSize:   10 * USES_CALENDAR_SCALE,
+                        fontWeight: hasUses ? '700' : '500',
+                      }}
+                    >
+                      {day}
+                    </Text>
+                  </View>
                 );
               })}
             </View>
@@ -169,16 +213,17 @@ function UsesHeatmap({ log, scale }: { log: UsesLogData; scale: number }) {
         </View>
       </View>
 
+      {/* Legend — circles matching the calendar style */}
       <View style={styles.legendRow}>
         <Text style={styles.legendText}>Menos</Text>
-        {[0, 0.05, 0.2, 0.5, 0.85].map((r, i) => (
+        {[0, 0.05, 0.2, 0.5, 0.85].map((ratio, i) => (
           <View
             key={i}
             style={{
-              width: cell * 0.8,
-              height: cell * 0.8,
-              borderRadius: 2 * scale,
-              backgroundColor: heatmapColor(Math.round(r * DAILY_LIMIT), DAILY_LIMIT),
+              width: cell * 0.65,
+              height: cell * 0.65,
+              borderRadius: cell * 0.325,
+              backgroundColor: usageColor(Math.round(ratio * limit), limit),
             }}
           />
         ))}
@@ -247,13 +292,22 @@ export default function DailyUsesScreen() {
 
   const usedToday = log[today] ?? 0;
   const realRemaining = Math.max(DAILY_LIMIT - usedToday, 0);
+
   // Push real value into shared context whenever it changes so the top bar
   // can reflect it in production mode.
   useEffect(() => {
     setRealRemainingUses(realRemaining);
   }, [realRemaining, setRealRemainingUses]);
-  // In debug mode show the simulated value; in prod show the real one.
-  const remaining = IS_DEBUG_STATS_MODE ? remainingUses : realRemaining;
+
+  // ─── Single source of truth for all usage UI ─────────────────────────────
+  // In debug mode every UI element (summary, bar, text, calendar) derives
+  // from remainingUses; in prod everything derives from the real API log.
+  const computedRemaining  = IS_DEBUG_STATS_MODE ? remainingUses : realRemaining;
+  const computedUsedToday  = Math.max(0, DAILY_LIMIT - computedRemaining);
+  // Override today's entry in the log so the calendar matches the simulated value.
+  const computedLog        = IS_DEBUG_STATS_MODE
+    ? { ...log, [today]: computedUsedToday }
+    : log;
 
   return (
     <View style={styles.container}>
@@ -320,27 +374,27 @@ export default function DailyUsesScreen() {
                     ]}
                   >
                     <Text style={[styles.usesCount, { fontSize: STREAK_COUNT_FONT_SIZE }]}>
-                      {remaining}
+                      {computedRemaining}
                     </Text>
                     <Text style={styles.usesUnit}>usos restantes hoy</Text>
-                    <Text style={styles.usesSub}>{usedToday} / {DAILY_LIMIT} usados</Text>
+                    <Text style={styles.usesSub}>{computedUsedToday} / {DAILY_LIMIT} usados</Text>
                   </View>
                 </View>
 
                 {/* Progress bar — spans full card width below the row */}
                 <View style={styles.barWrap}>
-                  <GradBar used={usedToday} limit={DAILY_LIMIT} clanColor={barClanColor} />
+                  <GradBar used={computedUsedToday} limit={DAILY_LIMIT} clanColor={barClanColor} />
                 </View>
               </View>
 
               <View style={styles.gap} />
 
-              {/* ── Heatmap ── */}
+              {/* ── Usage calendar ── */}
               <View style={styles.card}>
                 <Text style={[styles.sectionTitle, { fontSize: STREAK_LABEL_FONT_SIZE }]}>
-                  HISTORIAL DE USOS (12 SEMANAS)
+                  HISTORIAL DE USOS
                 </Text>
-                <UsesHeatmap log={log} scale={USES_HEATMAP_SCALE} />
+                <UsesCalendarGrid log={computedLog} limit={DAILY_LIMIT} />
               </View>
 
               <View style={styles.gap} />
@@ -439,6 +493,12 @@ const styles = StyleSheet.create({
   barTrack: {
     backgroundColor: 'rgba(255,255,255,0.10)',
     overflow: 'hidden',
+  },
+  calMonthLabel: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 8,
   },
   legendRow: {
     flexDirection: 'row',

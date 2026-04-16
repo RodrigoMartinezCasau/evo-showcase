@@ -112,28 +112,25 @@ export const USES_HEATMAP_CELL_GAP = 4;
 /** Scale multiplier for the heatmap. */
 export const USES_HEATMAP_SCALE = 1.0;
 
-// ─── Usage history grid (heatmap cells block) ─────────────────────────────────
+// ─── Usage history calendar ───────────────────────────────────────────────────
 
 /**
- * Horizontal offset (px) of the full 12-week heatmap grid.
+ * Scale multiplier for the usage history calendar.
+ * Mirrors STREAK_CALENDAR_SCALE — increase to make cells larger.
+ */
+export const USES_CALENDAR_SCALE = 1.2;
+
+/**
+ * Horizontal nudge (px) of the usage calendar content block.
  * Positive = right, negative = left.
- * Does NOT affect the legend, title, or any other element.
  */
-export const USES_HEATMAP_GRID_OFFSET_X = -10;
+export const USES_CALENDAR_OFFSET_X = 0;
 
 /**
- * Vertical offset (px) of the full 12-week heatmap grid.
+ * Vertical nudge (px) of the usage calendar content block.
  * Positive = down, negative = up.
- * Does NOT affect the legend, title, or any other element.
  */
-export const USES_HEATMAP_GRID_OFFSET_Y = 0;
-
-/**
- * Scale multiplier for the whole 12-week heatmap grid block.
- * 1 = default size. Grows/shrinks all cells and their spacing as one unit.
- * Does NOT affect the legend, title, or any other element.
- */
-export const USES_HEATMAP_GRID_SCALE = 1;
+export const USES_CALENDAR_OFFSET_Y = 0;
 
 // ─── Usage heart icon (hero card) ────────────────────────────────────────────
 
