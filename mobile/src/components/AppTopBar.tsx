@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { View, TouchableOpacity, StyleSheet, Text } from 'react-native';
+import React, { useMemo, useRef, useEffect } from 'react';
+import { View, TouchableOpacity, StyleSheet, Text, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,6 +13,8 @@ import { getTopBarLapizByHouse } from '@evoconn/utils/getTopBarLapizByHouse';
 import { getTopBarUsosByHouse } from '@evoconn/utils/getTopBarUsosByHouse';
 import { getTopBarRachaTopByHouse } from '@evoconn/utils/getTopBarRachaTopByHouse';
 import { getTopBarInsigniaByHouse } from '@evoconn/utils/getTopBarInsigniaByHouse';
+import FuegoApagadoIcon from '../assets/topbar/fueguitoSvg/fuego-apagado.svg';
+import { useDebugStreak, IS_DEBUG_STREAK_MODE } from '../debug/DebugStreakContext';
 
 type AppTopBarProps = {
   onMenuPress: () => void;
@@ -78,6 +80,38 @@ export function AppTopBar({
   const UsosIcon = useMemo(() => getTopBarUsosByHouse(activeClan), [activeClan]);
   const RachaIcon = useMemo(() => getTopBarRachaTopByHouse(activeClan), [activeClan]);
   const InsigniaIcon = useMemo(() => getTopBarInsigniaByHouse(activeClan), [activeClan]);
+
+  // ─── Top-bar fire icon animation (grey → clan on first send of the day) ────
+  const { hasSentToday } = useDebugStreak();
+  const fireAnim    = useRef(new Animated.Value(0)).current;
+  const prevFireRef = useRef<boolean | null>(null);
+
+  useEffect(() => {
+    if (!IS_DEBUG_STREAK_MODE) return;
+
+    if (prevFireRef.current === null) {
+      // Initial render: set state instantly, no animation.
+      prevFireRef.current = hasSentToday;
+      fireAnim.setValue(hasSentToday ? 1 : 0);
+      return;
+    }
+
+    if (prevFireRef.current === hasSentToday) return; // no change
+
+    const wasInactive = prevFireRef.current === false;
+    prevFireRef.current = hasSentToday;
+
+    if (hasSentToday && wasInactive) {
+      // Grey → clan fire: simple fade, matches the StreakScreen transition.
+      Animated.timing(fireAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      fireAnim.setValue(hasSentToday ? 1 : 0);
+    }
+  }, [hasSentToday, fireAnim]);
 
   const starFrame = iconFrame(TOP_BAR_LAYOUT.STAR_SIZE, topBarIconFrameScale.evoStar);
   const shieldFrame = iconFrame(TOP_BAR_LAYOUT.SHIELD_SIZE, topBarIconFrameScale.shield);
@@ -186,7 +220,33 @@ export function AppTopBar({
                 topBarIconEditorStyle('fireIcon', 'fireIcon'),
               ]}
             >
-              <RachaIcon width={counterIconFrame.width} height={counterIconFrame.height} />
+              {IS_DEBUG_STREAK_MODE ? (
+                <>
+                  {/* Apagado (grey) layer — visible when hasSentToday = false */}
+                  <Animated.View
+                    style={[
+                      StyleSheet.absoluteFill,
+                      { opacity: Animated.subtract(1, fireAnim) },
+                    ]}
+                  >
+                    <FuegoApagadoIcon
+                      width={counterIconFrame.width}
+                      height={counterIconFrame.height}
+                    />
+                  </Animated.View>
+                  {/* Encendido (clan) layer — fades in on first send */}
+                  <Animated.View
+                    style={[StyleSheet.absoluteFill, { opacity: fireAnim }]}
+                  >
+                    <RachaIcon
+                      width={counterIconFrame.width}
+                      height={counterIconFrame.height}
+                    />
+                  </Animated.View>
+                </>
+              ) : (
+                <RachaIcon width={counterIconFrame.width} height={counterIconFrame.height} />
+              )}
             </View>
             {showCounters && (
               <View
