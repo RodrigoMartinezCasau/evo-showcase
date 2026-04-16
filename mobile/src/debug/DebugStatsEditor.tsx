@@ -10,9 +10,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDebugStats, SIMULATED_TOTAL_DAILY_USES } from './DebugStatsContext';
+import { TOTAL_QUOTES_IN_DB } from '@evoconn/logic/quotes/getDomainStats';
 
-const STREAK_PRESETS = [0, 1, 3, 7, 17, 30, 60, 100];
-const USES_PRESETS = [0, 3, 10, 20, 28, 30];
+const STREAK_PRESETS  = [0, 1, 3, 7, 17, 30, 60, 100];
+const USES_PRESETS    = [0, 3, 10, 20, 28, 30];
+const PHRASES_PRESETS = [0, 10, 20, 30, 50, TOTAL_QUOTES_IN_DB];
 
 /**
  * Floating FAB + bottom-sheet editor for simulated streak days and remaining uses.
@@ -25,6 +27,8 @@ export function DebugStatsEditor() {
     setSimulatedStreakDays,
     simulatedRemainingUses,
     setSimulatedRemainingUses,
+    simulatedUnlockedPhrases,
+    setSimulatedUnlockedPhrases,
   } = useDebugStats();
   const insets = useSafeAreaInsets();
 
@@ -122,6 +126,48 @@ export function DebugStatsEditor() {
                 onPress={() => setSimulatedRemainingUses(v)}
               >
                 <Text style={[styles.presetText, simulatedRemainingUses === v && styles.presetTextActive]}>
+                  {v}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {/* ── Unlocked phrases ── */}
+          <Text style={[styles.sectionLabel, { marginTop: 20 }]}>✏️  UNLOCKED PHRASES</Text>
+          <View style={styles.stepRow}>
+            <TouchableOpacity
+              style={styles.stepBtn}
+              activeOpacity={0.7}
+              onPress={() => setSimulatedUnlockedPhrases(simulatedUnlockedPhrases - 1)}
+            >
+              <Text style={styles.stepBtnText}>−</Text>
+            </TouchableOpacity>
+            <Text style={styles.valueText}>
+              {simulatedUnlockedPhrases}
+              <Text style={styles.valueTextSub}> / {TOTAL_QUOTES_IN_DB}</Text>
+            </Text>
+            <TouchableOpacity
+              style={styles.stepBtn}
+              activeOpacity={0.7}
+              onPress={() => setSimulatedUnlockedPhrases(simulatedUnlockedPhrases + 1)}
+            >
+              <Text style={styles.stepBtnText}>+</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.presetScroll}
+            contentContainerStyle={styles.presetContent}
+          >
+            {PHRASES_PRESETS.map((v) => (
+              <TouchableOpacity
+                key={v}
+                style={[styles.preset, simulatedUnlockedPhrases === v && styles.presetActive]}
+                activeOpacity={0.7}
+                onPress={() => setSimulatedUnlockedPhrases(v)}
+              >
+                <Text style={[styles.presetText, simulatedUnlockedPhrases === v && styles.presetTextActive]}>
                   {v}
                 </Text>
               </TouchableOpacity>

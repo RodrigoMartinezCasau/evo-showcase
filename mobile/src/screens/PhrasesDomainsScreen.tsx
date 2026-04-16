@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from 'react-native';
+import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -35,6 +36,8 @@ import {
   QUOTES_SUMMARY_TEXT_GROUP_OFFSET_X,
   QUOTES_SUMMARY_TEXT_GROUP_OFFSET_Y,
 } from '@evoconn/constants/streakLayout';
+import { getClanStreakColors } from '@evoconn/constants/clanStreakColors';
+import { IS_DEBUG_STATS_MODE, useDebugStats } from '@evoconn/debug/DebugStatsContext';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import type { DomainStats } from '@evoconn/logic/quotes/getDomainStats';
 import type { Quote } from '@evoconn/types/quotes';
@@ -50,6 +53,65 @@ const PHRASES_COUNT_FONT     = 52;
 const PHRASES_LABEL_FONT     = 11;
 const PHRASES_DOMAIN_FONT    = 14;
 const PHRASES_PROGRESS_H     = 5;
+const PHRASES_PROGRESS_RADIUS = 999;
+
+/** Fallback bar color for users without a clan. */
+const NO_CLAN_BAR_COLOR = '#ff66c4';
+
+// ─── Gradient progress bar (mirrors DailyUsesScreen GradBar) ─────────────────
+
+function GradBar({
+  unlocked,
+  total,
+  clanColor,
+}: {
+  unlocked: number;
+  total:    number;
+  clanColor: string;
+}) {
+  const [barW, setBarW] = useState(0);
+  const ratio  = total > 0 ? Math.min(unlocked / total, 1) : 0;
+  const fillW  = barW > 0 ? Math.round(barW * ratio) : 0;
+
+  return (
+    <View
+      style={[styles.progressTrack, { marginTop: 10 }]}
+      onLayout={(e) => setBarW(e.nativeEvent.layout.width)}
+    >
+      {barW > 0 && fillW > 0 && (
+        <Svg
+          width={barW}
+          height={PHRASES_PROGRESS_H}
+          style={StyleSheet.absoluteFillObject}
+        >
+          <Defs>
+            {/*
+             * gradientUnits="userSpaceOnUse" + x2={fillW} keeps the gradient
+             * WHITE → CLAN across the actual filled pixels only, so the clan
+             * color always appears at the rightmost edge of the fill regardless
+             * of how many phrases are unlocked.
+             */}
+            <LinearGradient
+              id="phrasesGrad"
+              x1={0} y1={0}
+              x2={fillW} y2={0}
+              gradientUnits="userSpaceOnUse"
+            >
+              <Stop offset="0" stopColor="#FFFFFF" stopOpacity="1" />
+              <Stop offset="1" stopColor={clanColor}  stopOpacity="1" />
+            </LinearGradient>
+          </Defs>
+          <Rect
+            x={0} y={0}
+            width={fillW} height={PHRASES_PROGRESS_H}
+            rx={PHRASES_PROGRESS_RADIUS} ry={PHRASES_PROGRESS_RADIUS}
+            fill="url(#phrasesGrad)"
+          />
+        </Svg>
+      )}
+    </View>
+  );
+}
 
 // ─── Domain detail modal ──────────────────────────────────────────────────────
 
@@ -221,8 +283,18 @@ export default function PhrasesDomainsScreen() {
   const activeClan  = useActiveClan(mockCurrentUser.clanId);
   const LapizIcon   = useMemo(() => getTopBarLapizByHouse(activeClan), [activeClan]);
 
+  // Clan bar color: primary clan color or pink fallback for no-clan users.
+  const barClanColor = useMemo(
+    () => (activeClan ? getClanStreakColors(activeClan).primary : NO_CLAN_BAR_COLOR),
+    [activeClan],
+  );
+
   const { totalUnlocked, domainStats, unlockedPhraseIds } = useQuotes();
   const unlockedSet = useMemo(() => new Set(unlockedPhraseIds), [unlockedPhraseIds]);
+
+  // In debug mode the simulated count overrides the real unlocked count.
+  const { unlockedPhrases: simulatedUnlocked } = useDebugStats();
+  const computedUnlocked = IS_DEBUG_STATS_MODE ? simulatedUnlocked : totalUnlocked;
 
   const [sidebarOpen,  setSidebarOpen]  = useState(false);
   const [activeTab,    setActiveTab]    = useState<TabId>('feed');
@@ -299,7 +371,7 @@ export default function PhrasesDomainsScreen() {
               },
             ]}
           >
-            <Text style={styles.summaryCount}>{totalUnlocked}</Text>
+            <Text style={styles.summaryCount}>{computedUnlocked}</Text>
             <Text style={styles.summaryLabel}>FRASES DESBLOQUEADAS</Text>
             <View style={styles.summaryDivider} />
             <View style={styles.summarySubRow}>
@@ -307,21 +379,15 @@ export default function PhrasesDomainsScreen() {
                 de {TOTAL_QUOTES_IN_DB} en total
               </Text>
               <Text style={styles.summarySubRight}>
-                {TOTAL_QUOTES_IN_DB - totalUnlocked} por desbloquear
+                {Math.max(0, TOTAL_QUOTES_IN_DB - computedUnlocked)} por desbloquear
               </Text>
             </View>
-            {/* Overall progress bar */}
-            <View style={[styles.progressTrack, { marginTop: 10 }]}>
-              <View
-                style={[
-                  styles.progressFill,
-                  {
-                    width: `${Math.round((totalUnlocked / TOTAL_QUOTES_IN_DB) * 100)}%` as `${number}%`,
-                    backgroundColor: '#C2A23E',
-                  },
-                ]}
-              />
-            </View>
+            {/* Overall progress bar — WHITE → clan primary gradient */}
+            <GradBar
+              unlocked={computedUnlocked}
+              total={TOTAL_QUOTES_IN_DB}
+              clanColor={barClanColor}
+            />
           </View>
         </View>
 
