@@ -45,6 +45,7 @@ import { getReflectionTripleStarsByHouse } from '@evoconn/utils/getReflectionTri
 import { DebateResponseDisplay } from '@evoconn/components/debate';
 import { useFeedStore, createReflectionPost } from '@evoconn/hooks/useFeedStore';
 import { useDebugStreak } from '../debug/DebugStreakContext';
+import { useAISettings } from '@evoconn/hooks/AISettingsContext';
 import { COMMUNITY_DRAWER_EDGE_ZONE_WIDTH } from '@evoconn/constants/communityDrawerGesture';
 import { useSidebarGesture } from '@evoconn/hooks/useSidebarGesture';
 
@@ -72,6 +73,7 @@ export default function ReflectionCreationScreen() {
   const { publishPost } = useFeedStore();
   const publishedRef = useRef<Set<string>>(new Set());
   const { markStreakActivated } = useDebugStreak();
+  const { includeReflectiveQuestion, includePhilosophicalReferences } = useAISettings();
 
   const doPublish = useCallback(
     (messageId: string | undefined, userText: string) =>
@@ -178,7 +180,10 @@ export default function ReflectionCreationScreen() {
         setMessages((prev) => [...prev, placeholder]);
         scrollToEnd();
 
-        const resp = await debateApi.sendMessage(id, text);
+        const resp = await debateApi.sendMessage(id, text, undefined, {
+          includeReflectiveQuestion,
+          includePhilosophicalReferences,
+        });
         // Reflection sent successfully → activate streak (first send of the day only).
         // eslint-disable-next-line no-console
         console.log('[STREAK] Reflection created/sent → marking streak activated.');
@@ -221,7 +226,7 @@ export default function ReflectionCreationScreen() {
         setSending(false);
       }
     },
-    [sending, debateId, createThought, updateThought, messages.length, revealAssistantText, scrollToEnd, thoughts, markStreakActivated],
+    [sending, debateId, createThought, updateThought, messages.length, revealAssistantText, scrollToEnd, thoughts, markStreakActivated, includeReflectiveQuestion, includePhilosophicalReferences],
   );
 
   const conversationItems = useMemo(

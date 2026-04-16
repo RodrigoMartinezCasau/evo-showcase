@@ -12,6 +12,7 @@ import {
 import { evoconnColors } from '../theme/colors';
 import { getClanColor } from '../constants/clanColors';
 import { SEARCH_LAYOUT as SL } from '../constants/searchScreenLayout';
+import { getClanProfileByHouse } from '../utils/getClanProfileByHouse';
 import { mockSearchableUsers } from '../data/mockSearchUsers';
 import { searchUsers, type ScoredUser } from '../utils/searchUsers';
 
@@ -87,7 +88,8 @@ export function SearchScreen({ onUserPress }: SearchScreenProps) {
   const showResults = debouncedQuery.trim().length > 0;
 
   const renderResultItem = useCallback(({ item }: { item: ScoredUser }) => {
-    const clanColor = getClanColor(item.clanId);
+    const clanColor  = getClanColor(item.clanId);
+    const ProfileSvg = getClanProfileByHouse(item.clanId);
     return (
       <TouchableOpacity
         style={[styles.resultItem, { height: SL.resultItemHeight }]}
@@ -95,9 +97,7 @@ export function SearchScreen({ onUserPress }: SearchScreenProps) {
         onPress={() => handleUserPress(item)}
       >
         <View style={[styles.avatar, { borderColor: clanColor }]}>
-          <Text style={styles.avatarLetter}>
-            {item.username.replace('@', '').charAt(0)}
-          </Text>
+          <ProfileSvg width={36} height={36} />
         </View>
         <View style={styles.resultInfo}>
           <Text style={[styles.resultUsername, { fontSize: SL.fontSize - 2 }]}>

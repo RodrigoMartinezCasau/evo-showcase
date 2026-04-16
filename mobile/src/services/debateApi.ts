@@ -154,12 +154,23 @@ export async function getDebate(id: string): Promise<DebateThread | null> {
   };
 }
 
+export interface AIFlags {
+  /** When false the backend omits the Socratic follow-up question. */
+  includeReflectiveQuestion?: boolean;
+  /** When false the backend omits philosopher citations. */
+  includePhilosophicalReferences?: boolean;
+}
+
 export async function sendMessage(
   debateId: string,
   message: string,
   requestId?: string,
+  flags?: AIFlags,
 ): Promise<SendMessageResponse> {
   const url = `${_apiUrl}/debates/${debateId}/chat`;
+  const body: Record<string, unknown> = { message };
+  if (flags?.includeReflectiveQuestion === false)    body.include_reflective_question    = false;
+  if (flags?.includePhilosophicalReferences === false) body.include_philosophical_references = false;
   let res: Response;
   try {
     res = await fetch(
@@ -167,7 +178,7 @@ export async function sendMessage(
       withApiKey({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify(body),
         requestId,
       }),
     );

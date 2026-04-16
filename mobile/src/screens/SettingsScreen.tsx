@@ -9,9 +9,9 @@
  * Architecture:
  *   - SECTIONS_CONFIG generates all section/row data.
  *   - SettingsSection + SettingsRow handle all visual rendering.
- *   - Toggle state is managed locally (ready to wire to a real store).
+ *   - Toggle state is managed locally and synced to AISettingsContext.
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -31,6 +31,9 @@ import { AppTopBar, BottomCommunityTabs, SidebarDrawer } from '@evoconn/componen
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
+import { useActiveClan } from '@evoconn/debug/DebugClanContext';
+import { getClanProfileByHouse } from '@evoconn/utils/getClanProfileByHouse';
+import { useAISettings } from '@evoconn/hooks/AISettingsContext';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -39,12 +42,17 @@ const DIVIDER   = 'rgba(255,255,255,0.06)';
 const ICON_SIZE = 34;
 
 // ── Global inner-icon layout controls ─────────────────────────────────────────
-// These affect ONLY the Ionicons glyphs rendered inside the colored squares.
-// They do NOT change the square containers, colors, positions, or any other UI.
-const SETTINGS_ICON_INNER_SIZE    = 18;   // glyph size in points
-const SETTINGS_ICON_INNER_SCALE   = 1;    // uniform scale (1 = default)
-const SETTINGS_ICON_INNER_OFFSET_X = 0;   // horizontal nudge inside the square
-const SETTINGS_ICON_INNER_OFFSET_Y = 0;   // vertical nudge inside the square
+const SETTINGS_ICON_INNER_SIZE    = 18;
+const SETTINGS_ICON_INNER_SCALE   = 1;
+const SETTINGS_ICON_INNER_OFFSET_X = 0;
+const SETTINGS_ICON_INNER_OFFSET_Y = 0;
+
+// ── Profile avatar icon controls ───────────────────────────────────────────────
+// Affect ONLY the SVG glyph inside the avatar circle — not the circle itself.
+const PROFILE_ICON_SCALE   = 1.1;
+const PROFILE_ICON_OFFSET_X = 0;
+const PROFILE_ICON_OFFSET_Y = 0;
+const PROFILE_ICON_BASE_SIZE = 54; // px — fits comfortably inside the 60px circle
 
 const IC = {
   blue:   '#3B82F6',
@@ -65,17 +73,17 @@ const IC = {
 type RowType = 'navigate' | 'toggle' | 'info' | 'action' | 'danger' | 'upgrade';
 
 interface SettingRow {
-  id:          string;
-  label:       string;
-  subtitle?:   string;
-  icon:        string;
-  iconBg:      string;
-  type:        RowType;
-  value?:      string;
-  checked?:    boolean;
+  id:           string;
+  label:        string;
+  subtitle?:    string;
+  icon:         string;
+  iconBg:       string;
+  type:         RowType;
+  value?:       string;
+  checked?:     boolean;
   onToggleKey?: keyof ToggleState;
   hideDivider?: boolean;
-  onPress?:    () => void;
+  onPress?:     () => void;
 }
 
 interface SettingSection {
@@ -85,20 +93,14 @@ interface SettingSection {
 }
 
 interface ToggleState {
-  notifications:     boolean;
-  scientificFacts:   boolean;
-  philosopherRefs:   boolean;
-  counterArguments:  boolean;
-  publicProfile:     boolean;
-  showStats:         boolean;
+  notifications:          boolean;
+  reflectiveQuestion:     boolean;
+  philosophicalRefs:      boolean;
+  publicProfile:          boolean;
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-/**
- * Renders a single Ionicons glyph with the shared global offset and scale
- * applied. Only the glyph moves — the colored square container is unaffected.
- */
 function IconInner({
   name,
   color = '#ffffff',
@@ -138,7 +140,7 @@ function SettingsRow({ row, isFirst, isLast, toggleState, onToggleChange }: RowP
   const handlePress = useCallback(() => {
     if (row.onPress) { row.onPress(); return; }
     if (isDanger)    { return; }
-    if (isUpgrade)   { Alert.alert('Premium', 'Próximamente: planes y suscripciones.'); return; }
+    if (isUpgrade)   { return; }
     if (!isInfo && !isToggle) {
       Alert.alert('Próximamente', 'Esta sección está en desarrollo.');
     }
@@ -152,7 +154,7 @@ function SettingsRow({ row, isFirst, isLast, toggleState, onToggleChange }: RowP
         {!isFirst && <View style={styles.divider} />}
         <TouchableOpacity
           style={[styles.row, styles.upgradeRow]}
-          onPress={handlePress}
+          onPress={row.onPress ?? handlePress}
           activeOpacity={0.75}
         >
           <View style={[styles.iconBox, { backgroundColor: IC.amber }]}>
@@ -196,7 +198,7 @@ function SettingsRow({ row, isFirst, isLast, toggleState, onToggleChange }: RowP
         style={styles.row}
         onPress={handlePress}
         activeOpacity={isInfo || isToggle ? 1 : 0.7}
-        disabled={isInfo}
+        disabled={isInfo && !row.onPress}
       >
         <View style={[styles.iconBox, { backgroundColor: row.iconBg }]}>
           <IconInner name={row.icon as React.ComponentProps<typeof Ionicons>['name']} />
@@ -259,8 +261,10 @@ function SettingsSection({ section, toggleState, onToggleChange }: SectionProps)
 // ─── Profile header ───────────────────────────────────────────────────────────
 
 function ProfileHeader() {
-  const initials = mockCurrentUser.username.slice(0, 1).toUpperCase();
-  const rank     = mockCurrentUser.rank
+  const activeClan  = useActiveClan(mockCurrentUser.clanId);
+  const ProfileIcon = useMemo(() => getClanProfileByHouse(activeClan), [activeClan]);
+
+  const rank = mockCurrentUser.rank
     ? mockCurrentUser.rank.charAt(0).toUpperCase() + mockCurrentUser.rank.slice(1)
     : 'Aprendiz';
 
@@ -270,10 +274,23 @@ function ProfileHeader() {
       activeOpacity={0.8}
       onPress={() => Alert.alert('Próximamente', 'El editor de perfil está en desarrollo.')}
     >
-      {/* Avatar */}
+      {/* Avatar — clan SVG replaces the initial letter */}
       <View style={styles.avatarWrap}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarInitials}>{initials}</Text>
+          <View
+            style={{
+              transform: [
+                { translateX: PROFILE_ICON_OFFSET_X },
+                { translateY: PROFILE_ICON_OFFSET_Y },
+                { scale: PROFILE_ICON_SCALE },
+              ],
+            }}
+          >
+            <ProfileIcon
+              width={PROFILE_ICON_BASE_SIZE}
+              height={PROFILE_ICON_BASE_SIZE}
+            />
+          </View>
         </View>
         <View style={styles.avatarEditBadge}>
           <Text style={styles.avatarEditChar}>✎</Text>
@@ -303,18 +320,25 @@ export default function SettingsScreen() {
   const { thoughts }              = useThoughts();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // ── AI Settings context ───────────────────────────────────────────────────
+  const {
+    setIncludeReflectiveQuestion,
+    setIncludePhilosophicalReferences,
+  } = useAISettings();
+
   const [toggles, setToggles] = useState<ToggleState>({
-    notifications:    true,
-    scientificFacts:  true,
-    philosopherRefs:  true,
-    counterArguments: false,
-    publicProfile:    true,
-    showStats:        true,
+    notifications:      true,
+    reflectiveQuestion: true,
+    philosophicalRefs:  true,
+    publicProfile:      true,
   });
 
   const onToggleChange = useCallback((key: keyof ToggleState, val: boolean) => {
     setToggles((prev) => ({ ...prev, [key]: val }));
-  }, []);
+    // Sync AI output flags to context
+    if (key === 'reflectiveQuestion')  setIncludeReflectiveQuestion(val);
+    if (key === 'philosophicalRefs')   setIncludePhilosophicalReferences(val);
+  }, [setIncludeReflectiveQuestion, setIncludePhilosophicalReferences]);
 
   const handleBottomTabChange = useCallback(
     (tab: TabId) => {
@@ -355,85 +379,92 @@ export default function SettingsScreen() {
     );
   }, []);
 
-  // Config-driven sections — easy to extend without touching UI logic.
+  // Subscription rows all show this message (no backend, no navigation).
+  const showSubscriptionAlert = useCallback(() => {
+    Alert.alert(
+      '',
+      'La app no cuenta con versiones premium todavía, gracias por la intención de apoyo igualmente ;)',
+      [{ text: 'OK' }],
+    );
+  }, []);
+
+  // Config-driven sections.
   const SECTIONS: SettingSection[] = [
     {
       id: 'account',
       title: 'CUENTA',
       rows: [
-        { id: 'email',   label: 'Correo electrónico', value: 'rodrigo@evoconn.app', icon: 'mail-outline',          iconBg: IC.blue,   type: 'navigate' },
-        { id: 'phone',   label: 'Teléfono',           value: 'No vinculado',        icon: 'call-outline',          iconBg: IC.blue,   type: 'navigate' },
-        { id: 'pass',    label: 'Contraseña y seguridad',                           icon: 'lock-closed-outline',   iconBg: IC.slate,  type: 'navigate' },
-        { id: 'linked',  label: 'Cuentas vinculadas',  subtitle: 'Google, Apple…',  icon: 'link-outline',          iconBg: IC.gray,   type: 'navigate' },
+        { id: 'email',   label: 'Correo electrónico', value: 'rodrigo@evoconn.app', icon: 'mail-outline',        iconBg: IC.blue,  type: 'navigate' },
+        { id: 'phone',   label: 'Teléfono',           value: 'No vinculado',        icon: 'call-outline',        iconBg: IC.blue,  type: 'navigate' },
+        { id: 'pass',    label: 'Contraseña y seguridad',                           icon: 'lock-closed-outline', iconBg: IC.slate, type: 'navigate' },
+        { id: 'linked',  label: 'Cuentas vinculadas',  subtitle: 'Google, Apple…',  icon: 'link-outline',        iconBg: IC.gray,  type: 'navigate' },
       ],
     },
     {
       id: 'subscription',
       title: 'SUSCRIPCIÓN',
       rows: [
-        { id: 'plan',    label: 'Plan actual',  value: 'Gratis',  icon: 'card-outline',    iconBg: IC.gray,  type: 'info' },
-        { id: 'upgrade', label: '',             icon: 'star',     iconBg: IC.amber,         type: 'upgrade' },
-        { id: 'restore', label: 'Restaurar compras',              icon: 'refresh-outline', iconBg: IC.gray,  type: 'action' },
+        { id: 'plan',    label: 'Plan actual', value: 'Gratis', icon: 'card-outline',    iconBg: IC.gray,  type: 'navigate', onPress: showSubscriptionAlert },
+        { id: 'upgrade', label: '',            icon: 'star',    iconBg: IC.amber,         type: 'upgrade',  onPress: showSubscriptionAlert },
+        { id: 'restore', label: 'Restaurar compras',            icon: 'refresh-outline', iconBg: IC.gray,  type: 'action',   onPress: showSubscriptionAlert },
       ],
     },
     {
       id: 'personalization',
       title: 'PERSONALIZACIÓN',
       rows: [
-        { id: 'theme',    label: 'Tema',                     value: 'Oscuro',    icon: 'moon-outline',           iconBg: IC.purple, type: 'navigate' },
-        { id: 'lang',     label: 'Idioma',                   value: 'Español',   icon: 'globe-outline',          iconBg: IC.cyan,   type: 'navigate' },
-        { id: 'notifs',   label: 'Notificaciones',                               icon: 'notifications-outline',  iconBg: IC.pink,   type: 'toggle',   onToggleKey: 'notifications' },
-        { id: 'pref-int', label: 'Intensidad filosófica',    value: 'Alta',      icon: 'options-outline',        iconBg: IC.purple, type: 'navigate' },
-        { id: 'pref-deb', label: 'Estilo de debate',         value: 'Socrático', icon: 'chatbubbles-outline',    iconBg: IC.teal,   type: 'navigate' },
-        { id: 'pref-con', label: 'Preferencia de contenido', value: 'Frases',    icon: 'list-outline',           iconBg: IC.neon,   type: 'navigate' },
+        // Tema, Intensidad filosófica, Estilo de debate removed (not yet available).
+        { id: 'lang',   label: 'Idioma',          value: 'Español', icon: 'globe-outline',         iconBg: IC.cyan,  type: 'info' },
+        { id: 'notifs', label: 'Notificaciones',                    icon: 'notifications-outline', iconBg: IC.pink,  type: 'toggle', onToggleKey: 'notifications' },
+        { id: 'pref-con', label: 'Preferencia de contenido', value: 'Frases', icon: 'list-outline', iconBg: IC.neon, type: 'navigate' },
       ],
     },
     {
       id: 'ai',
       title: 'INTELIGENCIA ARTIFICIAL',
       rows: [
-        { id: 'ai-uses',   label: 'Usos de IA hoy',         value: `${usesLeft} / 30`,            icon: 'flash-outline',          iconBg: IC.green,  type: 'info' },
-        { id: 'ai-mode',   label: 'Modo de IA',              value: 'Equilibrado',                 icon: 'hardware-chip-outline',  iconBg: IC.green,  type: 'navigate' },
-        { id: 'ai-sci',    label: 'Datos científicos',       subtitle: 'Incluir en respuestas',    icon: 'flask-outline',          iconBg: IC.cyan,   type: 'toggle', onToggleKey: 'scientificFacts' },
-        { id: 'ai-phi',    label: 'Referencias filosóficas', subtitle: 'Citar filósofos',          icon: 'book-outline',           iconBg: IC.purple, type: 'toggle', onToggleKey: 'philosopherRefs' },
-        { id: 'ai-contra', label: 'Contraargumentos',        subtitle: 'Añadir perspectivas opuestas', icon: 'git-compare-outline', iconBg: IC.slate, type: 'toggle', onToggleKey: 'counterArguments' },
+        { id: 'ai-uses',   label: 'Usos de IA hoy',         value: `${usesLeft} / 30`,         icon: 'flash-outline',        iconBg: IC.green,  type: 'info' },
+        // Modo de IA removed.
+        { id: 'ai-ref-q',  label: 'Preguntas reflexivas',   subtitle: 'Incluir pregunta socrática',     icon: 'flask-outline',        iconBg: IC.cyan,   type: 'toggle', onToggleKey: 'reflectiveQuestion' },
+        { id: 'ai-phi',    label: 'Referencias filosóficas', subtitle: 'Citar filósofos',               icon: 'book-outline',         iconBg: IC.purple, type: 'toggle', onToggleKey: 'philosophicalRefs' },
+        // Contraargumentos always ON — no toggle shown.
       ],
     },
     {
       id: 'privacy',
       title: 'PRIVACIDAD Y DATOS',
       rows: [
-        { id: 'data-use',  label: 'Uso de datos',                                  icon: 'pie-chart-outline',    iconBg: IC.slate,  type: 'navigate' },
-        { id: 'download',  label: 'Descargar mis datos',                            icon: 'download-outline',     iconBg: IC.slate,  type: 'action' },
-        { id: 'pub-prof',  label: 'Perfil público',  subtitle: 'Visible para todos', icon: 'eye-outline',         iconBg: IC.gray,   type: 'toggle', onToggleKey: 'publicProfile' },
-        { id: 'show-stat', label: 'Mostrar estadísticas',                           icon: 'bar-chart-outline',    iconBg: IC.gray,   type: 'toggle', onToggleKey: 'showStats' },
-        { id: 'delete',    label: 'Eliminar cuenta',                                icon: 'trash-outline',        iconBg: IC.red,    type: 'danger', onPress: confirmDeleteAccount },
+        { id: 'data-use',  label: 'Uso de datos',                                  icon: 'pie-chart-outline', iconBg: IC.slate, type: 'navigate' },
+        { id: 'download',  label: 'Descargar mis datos',                            icon: 'download-outline',  iconBg: IC.slate, type: 'action' },
+        { id: 'pub-prof',  label: 'Perfil público', subtitle: 'Visible para todos', icon: 'eye-outline',       iconBg: IC.gray,  type: 'toggle', onToggleKey: 'publicProfile' },
+        // Mostrar estadísticas removed.
+        { id: 'delete',    label: 'Eliminar cuenta',                                icon: 'trash-outline',     iconBg: IC.red,   type: 'danger', onPress: confirmDeleteAccount },
       ],
     },
     {
       id: 'community',
       title: 'COMUNIDAD',
       rows: [
-        { id: 'blocked',   label: 'Usuarios bloqueados',           icon: 'person-remove-outline',       iconBg: IC.slate,  type: 'navigate' },
-        { id: 'reports',   label: 'Historial de reportes',         icon: 'flag-outline',                iconBg: IC.slate,  type: 'navigate' },
-        { id: 'mod',       label: 'Preferencias de moderación',    icon: 'shield-checkmark-outline',    iconBg: IC.gray,   type: 'navigate' },
+        { id: 'blocked',   label: 'Usuarios bloqueados',           icon: 'person-remove-outline',    iconBg: IC.slate, type: 'navigate' },
+        { id: 'reports',   label: 'Historial de reportes',         icon: 'flag-outline',             iconBg: IC.slate, type: 'navigate' },
+        { id: 'mod',       label: 'Preferencias de moderación',    icon: 'shield-checkmark-outline', iconBg: IC.gray,  type: 'navigate' },
       ],
     },
     {
       id: 'support',
       title: 'SOPORTE',
       rows: [
-        { id: 'bug',     label: 'Reportar un error',  icon: 'bug-outline',                    iconBg: IC.pink,  type: 'action' },
-        { id: 'help',    label: 'Centro de ayuda',    icon: 'help-circle-outline',            iconBg: IC.cyan,  type: 'action' },
-        { id: 'contact', label: 'Contactar soporte',  icon: 'chatbubble-ellipses-outline',    iconBg: IC.blue,  type: 'action' },
+        { id: 'bug',     label: 'Reportar un error', icon: 'bug-outline',                 iconBg: IC.pink,  type: 'action' },
+        { id: 'help',    label: 'Centro de ayuda',   icon: 'help-circle-outline',         iconBg: IC.cyan,  type: 'action' },
+        { id: 'contact', label: 'Contactar soporte', icon: 'chatbubble-ellipses-outline', iconBg: IC.blue,  type: 'action' },
       ],
     },
     {
       id: 'legal',
       title: 'LEGAL',
       rows: [
-        { id: 'terms',   label: 'Términos de servicio',   icon: 'document-text-outline',  iconBg: IC.gray, type: 'navigate' },
-        { id: 'privacy', label: 'Política de privacidad', icon: 'shield-outline',         iconBg: IC.gray, type: 'navigate' },
+        { id: 'terms',   label: 'Términos de servicio',   icon: 'document-text-outline', iconBg: IC.gray, type: 'navigate' },
+        { id: 'privacy', label: 'Política de privacidad', icon: 'shield-outline',        iconBg: IC.gray, type: 'navigate' },
       ],
     },
     {
@@ -462,7 +493,7 @@ export default function SettingsScreen() {
           {/* ── Page title ── */}
           <Text style={styles.pageTitle}>Ajustes</Text>
 
-          {/* ── Profile header ── */}
+          {/* ── Profile header (clan SVG avatar) ── */}
           <ProfileHeader />
 
           {/* ── Dynamic sections ── */}
@@ -555,12 +586,7 @@ const styles = StyleSheet.create({
     borderColor: evoconnColors.neonGreen,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  avatarInitials: {
-    color: evoconnColors.neonGreen,
-    fontSize: 24,
-    fontWeight: '800',
-    letterSpacing: -0.5,
+    overflow: 'hidden',
   },
   avatarEditBadge: {
     position: 'absolute',
@@ -696,7 +722,7 @@ const styles = StyleSheet.create({
   // ── Upgrade row ──
   upgradeRow: {
     backgroundColor: 'rgba(217,175,51,0.07)',
-    borderRadius: 0, // contained within sectionCard
+    borderRadius: 0,
     paddingVertical: 14,
   },
   upgradeLabel: {
