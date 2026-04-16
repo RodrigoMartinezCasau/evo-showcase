@@ -35,6 +35,7 @@ import {
   IS_DEBUG_STREAK_MODE,
   useDebugStreak,
 } from '../debug/DebugStreakContext';
+import { IS_DEBUG_STATS_MODE, useDebugStats } from '../debug/DebugStatsContext';
 import {
   STREAK_CARD_PADDING_H,
   STREAK_CARD_PADDING_V,
@@ -75,9 +76,10 @@ export default function StreakScreen() {
   // Apagado state always uses the single shared "fuego apagado.svg" (not clan-specific).
 
   // ─── Debug streak reactive state ──────────────────────────────────────────
-  // hasSentToday comes from React Context (useState under the hood), so any
-  // change triggers a re-render here automatically — no listeners needed.
   const { hasSentToday } = useDebugStreak();
+
+  // ─── Debug stats (streak days / remaining uses simulation) ────────────────
+  const { streakDays, setRealStreakDays } = useDebugStats();
 
   // ─── Fire icon transition animation ─────────────────────────────────────────
   // 0 = apagado fully visible; 1 = encendido fully visible
@@ -98,12 +100,14 @@ export default function StreakScreen() {
     try {
       const res = await fetchStreak(profile.id);
       setData(res);
+      // Push real value into shared context so the top bar can reflect it in prod.
+      setRealStreakDays(res.streak_current);
     } catch {
       setError('No se pudo cargar la racha. Verifica tu conexión.');
     } finally {
       setLoading(false);
     }
-  }, [profile.id]);
+  }, [profile.id, setRealStreakDays]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -299,7 +303,7 @@ export default function StreakScreen() {
                   ]}
                 >
                   <Text style={[styles.streakCount, { fontSize: STREAK_COUNT_FONT_SIZE }]}>
-                    {data.streak_current}
+                    {IS_DEBUG_STATS_MODE ? streakDays : data.streak_current}
                   </Text>
                   <Text style={styles.streakUnit}>días seguidos</Text>
                   <Text style={styles.streakSub}>Mantén tu consistencia diaria</Text>

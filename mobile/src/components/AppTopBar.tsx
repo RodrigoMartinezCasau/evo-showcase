@@ -15,6 +15,7 @@ import { getTopBarRachaTopByHouse } from '@evoconn/utils/getTopBarRachaTopByHous
 import { getTopBarInsigniaByHouse } from '@evoconn/utils/getTopBarInsigniaByHouse';
 import FuegoApagadoIcon from '../assets/topbar/fueguitoSvg/fuego-apagado.svg';
 import { useDebugStreak, IS_DEBUG_STREAK_MODE } from '../debug/DebugStreakContext';
+import { useDebugStats } from '../debug/DebugStatsContext';
 
 type AppTopBarProps = {
   onMenuPress: () => void;
@@ -70,9 +71,11 @@ export function AppTopBar({
     clanShortLabel ??
     (activeClan ? activeClan.slice(0, 2).toUpperCase() : '??');
 
+  const { streakDays, remainingUses } = useDebugStats();
+
   const pencilCount = counts?.pencil ?? mockUserStats.unlockedPhrases;
-  const fireCount = counts?.fire ?? mockUserStats.streak;
-  const heartCount = counts?.heart ?? mockUserStats.dailyUsesLeft;
+  const fireCount   = counts?.fire   ?? streakDays;
+  const heartCount  = counts?.heart  ?? remainingUses;
 
   const EstrellaIcon = useMemo(() => getTopBarEstrellaByHouse(activeClan), [activeClan]);
   const starTintColor = useMemo(() => getTopBarStarColor(activeClan), [activeClan]);

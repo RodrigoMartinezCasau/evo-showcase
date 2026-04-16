@@ -25,6 +25,7 @@ import { AppTopBar, BottomCommunityTabs, SidebarDrawer } from '@evoconn/componen
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
+import { IS_DEBUG_STATS_MODE, useDebugStats } from '../debug/DebugStatsContext';
 import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
 import { fetchUsesLog, type UsesLogData } from '@evoconn/services/streakApi';
 import { getTopBarUsosByHouse } from '@evoconn/utils/getTopBarUsosByHouse';
@@ -203,6 +204,9 @@ export default function DailyUsesScreen() {
     ? getClanStreakColors(activeClan).primary
     : NO_CLAN_BAR_COLOR;
 
+  // ─── Debug stats (streak days / remaining uses simulation) ────────────────
+  const { remainingUses, setRealRemainingUses } = useDebugStats();
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [log, setLog] = useState<UsesLogData>({});
   const [loading, setLoading] = useState(true);
@@ -242,7 +246,14 @@ export default function DailyUsesScreen() {
   const contentHeight = screenH - topBarHeight - bottomBarHeight;
 
   const usedToday = log[today] ?? 0;
-  const remaining = Math.max(DAILY_LIMIT - usedToday, 0);
+  const realRemaining = Math.max(DAILY_LIMIT - usedToday, 0);
+  // Push real value into shared context whenever it changes so the top bar
+  // can reflect it in production mode.
+  useEffect(() => {
+    setRealRemainingUses(realRemaining);
+  }, [realRemaining, setRealRemainingUses]);
+  // In debug mode show the simulated value; in prod show the real one.
+  const remaining = IS_DEBUG_STATS_MODE ? remainingUses : realRemaining;
 
   return (
     <View style={styles.container}>
