@@ -33,6 +33,7 @@ import {
   PERSONAL_POSTS_GRID_STATS_SCALE,
 } from '@evoconn/constants/personalProfileLayout';
 import { PersonalRecentPostCard } from '@evoconn/components/personalProfile/PersonalRecentPostCard';
+import { PersonalPostsTotalStats } from '@evoconn/components/personalProfile/PersonalPostsTotalStats';
 import { usePersonalProfile } from '@evoconn/hooks/PersonalProfileContext';
 import type { CommunityPost } from '@evoconn/types';
 
@@ -132,6 +133,8 @@ export default function PersonalPostsScreen() {
     [colWidth, openDetailFeed, handleMenuAction, isHidden],
   );
 
+  const ListHeader = <PersonalPostsTotalStats posts={posts} />;
+
   const ListEmpty = (
     <View style={styles.emptyWrap}>
       <Text style={styles.emptyText}>Sin publicaciones aún</Text>
@@ -154,6 +157,7 @@ export default function PersonalPostsScreen() {
             numColumns={2}
             columnWrapperStyle={{ gap: PERSONAL_POSTS_COLUMN_GAP }}
             ItemSeparatorComponent={() => <View style={{ height: PERSONAL_POSTS_ROW_GAP }} />}
+            ListHeaderComponent={ListHeader}
             ListEmptyComponent={ListEmpty}
             contentContainerStyle={[
               styles.listContent,

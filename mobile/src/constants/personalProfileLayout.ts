@@ -221,6 +221,38 @@ export const APP_ICON_STAR_OFFSET_X = 0;
 export const APP_ICON_STAR_OFFSET_Y = 10;
 export const APP_ICON_STAR_SCALE = 3.8;
 
+// ── Personal posts total-stats summary row ──────────────────────────
+
+/**
+ * X/Y translation of the total-stats block as a whole (relative to its
+ * natural position above the posts grid).
+ */
+export const PERSONAL_POSTS_TOTAL_STATS_OFFSET_X = 0;
+export const PERSONAL_POSTS_TOTAL_STATS_OFFSET_Y = 0;
+
+/**
+ * Uniform scale of the entire total-stats block.
+ * 1 = natural size. Increase to make icons + numbers larger.
+ */
+export const PERSONAL_POSTS_TOTAL_STATS_SCALE = 1;
+
+/**
+ * Horizontal gap between each stat item (icon+number pair).
+ */
+export const PERSONAL_POSTS_TOTAL_STATS_ITEM_GAP = 32;
+
+/**
+ * Base size (px) of each stat icon in the summary row.
+ * Uses the same SVGs as the post card stats.
+ */
+export const PERSONAL_POSTS_TOTAL_STATS_ICON_SIZE = 22;
+
+/**
+ * Fine-tune vertical offset of the text label relative to its icon sibling.
+ * 0 = perfectly centred; negative = nudge up; positive = nudge down.
+ */
+export const PERSONAL_POSTS_TOTAL_STATS_TEXT_OFFSET_Y = 1;
+
 // Block 2 — Friends display
 export const FRIENDS_BLOCK_OFFSET_X = 0;
 export const FRIENDS_BLOCK_OFFSET_Y = 0;
