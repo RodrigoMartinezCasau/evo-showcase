@@ -15,7 +15,7 @@ import DownvoteIcon from '../../assets/detailActions/30.svg'; // red    #ff4a31
 import SavedIcon from '../../assets/detailActions/34.svg';    // yellow #ffde59
 import FlechaIcon from '../../assets/detailActions/flecha.svg'; // currentColor → computed from %
 
-type MenuAction = 'hide' | 'delete';
+type MenuAction = 'hide' | 'delete' | 'unsave';
 
 type Props = {
   post: CommunityPost;
@@ -34,6 +34,12 @@ type Props = {
    * Defaults to 1 (no change). Only pass this from the grid screen.
    */
   gridStatsScale?: number;
+  /**
+   * Controls which menu items appear when the three-dots icon is tapped.
+   * - 'own'   (default): "Ocultar / Hacer público" + "Eliminar post"
+   * - 'saved': "Quitar de guardados" only
+   */
+  menuMode?: 'own' | 'saved';
 };
 
 function voteRatioPct(up: number, down: number): number {
@@ -84,6 +90,7 @@ export const PersonalRecentPostCard = React.memo(function PersonalRecentPostCard
   isHidden = false,
   noMarginRight = false,
   gridStatsScale = 1,
+  menuMode = 'own',
 }: Props) {
   const isPhrase = post.type === 'phrase';
   const typeLabel = isPhrase ? 'FRASE' : 'REFLEXIÓN';
@@ -118,6 +125,7 @@ export const PersonalRecentPostCard = React.memo(function PersonalRecentPostCard
           ],
         );
       } else {
+        // 'hide' and 'unsave' need no confirmation
         onMenuAction?.(action, post.id);
       }
     },
@@ -363,39 +371,59 @@ export const PersonalRecentPostCard = React.memo(function PersonalRecentPostCard
             onPress={() => setMenuVisible(false)}
           />
           <View style={menuStyles.sheet}>
-            <TouchableOpacity
-              style={menuStyles.action}
-              onPress={() => handleMenuSelect('hide')}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name={isHidden ? 'eye-outline' : 'eye-off-outline'}
-                size={18}
-                color="#FFFFFF"
-                style={menuStyles.actionIcon}
-              />
-              <Text style={menuStyles.actionText}>
-                {isHidden ? 'Hacer público' : 'Ocultar para el público'}
-              </Text>
-            </TouchableOpacity>
+            {menuMode === 'saved' ? (
+              /* ── Saved-post menu: only "Quitar de guardados" ── */
+              <TouchableOpacity
+                style={menuStyles.action}
+                onPress={() => handleMenuSelect('unsave')}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name="bookmark-outline"
+                  size={18}
+                  color="#FFFFFF"
+                  style={menuStyles.actionIcon}
+                />
+                <Text style={menuStyles.actionText}>Quitar de guardados</Text>
+              </TouchableOpacity>
+            ) : (
+              /* ── Own-post menu: hide + delete ── */
+              <>
+                <TouchableOpacity
+                  style={menuStyles.action}
+                  onPress={() => handleMenuSelect('hide')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={isHidden ? 'eye-outline' : 'eye-off-outline'}
+                    size={18}
+                    color="#FFFFFF"
+                    style={menuStyles.actionIcon}
+                  />
+                  <Text style={menuStyles.actionText}>
+                    {isHidden ? 'Hacer público' : 'Ocultar para el público'}
+                  </Text>
+                </TouchableOpacity>
 
-            <View style={menuStyles.divider} />
+                <View style={menuStyles.divider} />
 
-            <TouchableOpacity
-              style={menuStyles.action}
-              onPress={() => handleMenuSelect('delete')}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name="trash-outline"
-                size={18}
-                color="#ff4a31"
-                style={menuStyles.actionIcon}
-              />
-              <Text style={[menuStyles.actionText, menuStyles.destructive]}>
-                Eliminar post
-              </Text>
-            </TouchableOpacity>
+                <TouchableOpacity
+                  style={menuStyles.action}
+                  onPress={() => handleMenuSelect('delete')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name="trash-outline"
+                    size={18}
+                    color="#ff4a31"
+                    style={menuStyles.actionIcon}
+                  />
+                  <Text style={[menuStyles.actionText, menuStyles.destructive]}>
+                    Eliminar post
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
 
             <TouchableOpacity
               style={[menuStyles.action, menuStyles.cancelAction]}

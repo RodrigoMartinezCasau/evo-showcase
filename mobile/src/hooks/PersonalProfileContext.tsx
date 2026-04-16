@@ -44,6 +44,13 @@ type PersonalProfileContextValue = {
   // ── Following ──
   following: FollowingEntry[];
   unfollowUser: (id: string) => void;
+
+  // ── Mutual friends (following ∩ followers) ──
+  friends: FollowingEntry[];
+
+  // ── Saved posts ──
+  savedPosts: CommunityPost[];
+  unsavePost: (id: string) => void;
 };
 
 // ─── Context ─────────────────────────────────────────────────────────────────
@@ -60,6 +67,7 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
   const [followers] = useState<FollowerEntry[]>(profile.followers);
   const [following, setFollowing] = useState<FollowingEntry[]>(profile.following);
   const [followingBackIds, setFollowingBackIds] = useState<Set<string>>(new Set());
+  const [savedPosts, setSavedPosts] = useState<CommunityPost[]>(profile.savedPosts);
 
   // ── Post actions ──────────────────────────────────────────────────────────
 
@@ -110,6 +118,18 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
     setFollowing(prev => prev.filter(u => u.id !== id));
   }, []);
 
+  // ── Saved-posts actions ────────────────────────────────────────────────────
+
+  const unsavePost = useCallback((id: string) => {
+    setSavedPosts(prev => prev.filter(p => p.id !== id));
+  }, []);
+
+  // ── Computed mutual friends (following ∩ followers) ──────────────────────
+  const friends = useMemo<FollowingEntry[]>(() => {
+    const followerIdSet = new Set(followers.map(f => f.id));
+    return following.filter(u => followerIdSet.has(u.id));
+  }, [followers, following]);
+
   // ── Memoized value ────────────────────────────────────────────────────────
 
   const value = useMemo<PersonalProfileContextValue>(
@@ -126,11 +146,14 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
       isFollowingBack,
       following,
       unfollowUser,
+      friends,
+      savedPosts,
+      unsavePost,
     }),
     [
       posts, hiddenPostIds, deletePost, toggleHidePost, isHidden,
       followers, followingBackIds, followBack, unfollowBack, isFollowingBack,
-      following, unfollowUser,
+      following, unfollowUser, friends, savedPosts, unsavePost,
     ],
   );
 

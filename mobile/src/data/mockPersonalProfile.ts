@@ -189,9 +189,12 @@ export const MOCK_PERSONAL_PROFILE: PersonalProfile = {
     { id: '11', username: '@FERNANDOVEGA', clanId: 'nihilista', rank: 'maestro' },
   ],
   following: [
-    { id: '1', username: '@DIEGOLLUBERES', clanId: 'nihilista', rank: 'maestro' },
-    { id: '3', username: '@RODRIGOMARTINEZ', clanId: 'existencialista', rank: 'filosofo' },
-    { id: '9', username: '@LUCASNIETO', clanId: 'racionalista', rank: 'filosofo' },
+    { id: '1',  username: '@DIEGOLLUBERES',    clanId: 'nihilista',       rank: 'maestro'  },
+    { id: '2',  username: '@ALEJANDROSERRANO', clanId: 'estoico',         rank: 'filosofo' },
+    { id: '4',  username: '@HERNANCHACON',     clanId: 'realista',        rank: 'aprendiz' },
+    { id: '6',  username: '@MARIANALOPEZ',     clanId: 'humanista',       rank: 'aprendiz' },
+    { id: '7',  username: '@PABLOMORENO',      clanId: 'existencialista', rank: 'filosofo' },
+    { id: '9',  username: '@LUCASNIETO',       clanId: 'racionalista',    rank: 'filosofo' },
   ],
 };
 

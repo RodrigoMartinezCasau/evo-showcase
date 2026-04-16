@@ -51,7 +51,7 @@ export default function PersonalProfileScreen() {
   const profileWithClan = { ...profile, clanId: activeClan };
 
   // ─── Personal profile shared state ────────────────────────────────
-  const { posts, isHidden, toggleHidePost, deletePost } = usePersonalProfile();
+  const { posts, isHidden, toggleHidePost, deletePost, friends, savedPosts } = usePersonalProfile();
 
   // ─── Insignia phrase local state (ready for backend integration) ──
   const [insigniaPhrase, setInsigniaPhrase] = useState(profileWithClan.insigniaPhrase);
@@ -149,9 +149,9 @@ export default function PersonalProfileScreen() {
 
   const handleSavedPostPress = useCallback(
     (post: CommunityPost) => {
-      openDetailFeed(profile.savedPosts, post.id);
+      openDetailFeed(savedPosts, post.id);
     },
-    [openDetailFeed, profile.savedPosts],
+    [openDetailFeed, savedPosts],
   );
 
   const handleDetailAuthorPress = useCallback(
@@ -233,8 +233,8 @@ export default function PersonalProfileScreen() {
             <View style={styles.contentGap} />
             <PersonalBottomBlocks
               clanId={profileWithClan.clanId}
-              friends={profileWithClan.friends}
-              savedPosts={profileWithClan.savedPosts}
+              friends={friends}
+              savedPosts={savedPosts}
               onSavedPostPress={handleSavedPostPress}
             />
             <View style={styles.bottomSpacer} />
