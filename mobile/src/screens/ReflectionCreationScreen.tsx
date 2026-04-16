@@ -82,11 +82,8 @@ export default function ReflectionCreationScreen() {
         const post = createReflectionPost(mockCurrentUser, title, body);
         (post as any).id = sourceId;
         publishPost(post);
-        // eslint-disable-next-line no-console
-        console.log('[DEBUG STREAK] Reflection sent successfully → marking streak activated.');
-        markStreakActivated();
       },
-    [publishPost, markStreakActivated],
+    [publishPost],
   );
 
   const insets = useSafeAreaInsets();
@@ -182,6 +179,10 @@ export default function ReflectionCreationScreen() {
         scrollToEnd();
 
         const resp = await debateApi.sendMessage(id, text);
+        // Reflection sent successfully → activate streak (first send of the day only).
+        // eslint-disable-next-line no-console
+        console.log('[STREAK] Reflection created/sent → marking streak activated.');
+        markStreakActivated();
         const assistantText = resp.assistant_text;
 
         const assistantMsg: ChatBubble = {
@@ -220,7 +221,7 @@ export default function ReflectionCreationScreen() {
         setSending(false);
       }
     },
-    [sending, debateId, createThought, updateThought, messages.length, revealAssistantText, scrollToEnd, thoughts],
+    [sending, debateId, createThought, updateThought, messages.length, revealAssistantText, scrollToEnd, thoughts, markStreakActivated],
   );
 
   const conversationItems = useMemo(

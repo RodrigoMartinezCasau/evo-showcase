@@ -185,9 +185,6 @@ export default function PhraseCreationScreen() {
       const post = createPhrasePost(mockCurrentUser, phraseInner, authorName);
       (post as { id: string }).id = sourceId;
       publishPost(post);
-      // eslint-disable-next-line no-console
-      console.log('[DEBUG STREAK] Phrase sent successfully → marking streak activated.');
-      markStreakActivated();
 
       const nextMessages: DebateMessage[] = [
         { role: 'user', content: rawPhraseFromUser.trim() },
@@ -202,7 +199,7 @@ export default function PhraseCreationScreen() {
       publishAuthorRef.current = '';
       Keyboard.dismiss();
     },
-    [publishPost, updateThought, markStreakActivated],
+    [publishPost, updateThought],
   );
 
   const handleAssignPhraseToFolder = useCallback(
@@ -225,6 +222,10 @@ export default function PhraseCreationScreen() {
       Keyboard.dismiss();
       try {
         const id = await createPhraseThought(t);
+        // Phrase created/sent successfully → activate streak (first send of the day only).
+        // eslint-disable-next-line no-console
+        console.log('[STREAK] Phrase created/sent → marking streak activated.');
+        markStreakActivated();
         setMessages([
           { role: 'user', content: t },
           { role: 'assistant', content: '', phrasePublishUI: { status: 'pending' } },
@@ -243,6 +244,7 @@ export default function PhraseCreationScreen() {
       createPhraseThought,
       router,
       scrollToEnd,
+      markStreakActivated,
     ],
   );
 
