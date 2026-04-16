@@ -55,8 +55,8 @@ const PHRASES_DOMAIN_FONT    = 14;
 const PHRASES_PROGRESS_H     = 5;
 const PHRASES_PROGRESS_RADIUS = 999;
 
-/** Fallback bar color for users without a clan. */
-const NO_CLAN_BAR_COLOR = '#ff66c4';
+/** Sin-clan gradient end color: WHITE → #c7ff02 (neon green, same as app's no-clan accent). */
+const NO_CLAN_BAR_COLOR = '#c7ff02';
 
 // ─── Gradient progress bar (mirrors DailyUsesScreen GradBar) ─────────────────
 
@@ -75,7 +75,7 @@ function GradBar({
 
   return (
     <View
-      style={[styles.progressTrack, { marginTop: 10 }]}
+      style={styles.progressTrack}
       onLayout={(e) => setBarW(e.nativeEvent.layout.width)}
     >
       {barW > 0 && fillW > 0 && (
@@ -340,54 +340,54 @@ export default function PhrasesDomainsScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* ── Summary card ──────────────────────────────────────────────────── */}
-        <View style={[styles.summaryCard, styles.heroCard]}>
-          {/* ── Pencil icon — clan-based, same pattern as streak fire icon ── */}
-          <View
-            style={[
-              styles.pencilIconWrap,
-              {
-                width:  PHRASES_COUNT_FONT,
-                height: PHRASES_COUNT_FONT,
+        <View style={styles.summaryCard}>
+          {/* Top row: pencil icon (left) | count + label (right) */}
+          <View style={styles.qHeroRow}>
+            {/* Pencil icon */}
+            <View
+              style={{
                 transform: [
                   { translateX: QUOTES_PENCIL_ICON_OFFSET_X },
                   { translateY: QUOTES_PENCIL_ICON_OFFSET_Y },
                   { scale:      QUOTES_PENCIL_ICON_SCALE     },
                 ],
-              },
-            ]}
-          >
-            <LapizIcon width={PHRASES_COUNT_FONT} height={PHRASES_COUNT_FONT} />
+              }}
+            >
+              <LapizIcon width={PHRASES_COUNT_FONT} height={PHRASES_COUNT_FONT} />
+            </View>
+
+            {/* Number + label — grouped, offsets move them together */}
+            <View
+              style={[
+                styles.qRightBlock,
+                {
+                  transform: [
+                    { translateX: QUOTES_SUMMARY_TEXT_GROUP_OFFSET_X },
+                    { translateY: QUOTES_SUMMARY_TEXT_GROUP_OFFSET_Y },
+                  ],
+                },
+              ]}
+            >
+              <Text style={styles.summaryCount}>{computedUnlocked}</Text>
+              <Text style={styles.summaryLabel}>FRASES DESBLOQUEADAS</Text>
+            </View>
           </View>
 
-          {/* ── Text group + sub-content ── */}
-          <View
-            style={[
-              styles.summaryTextGroup,
-              {
-                transform: [
-                  { translateX: QUOTES_SUMMARY_TEXT_GROUP_OFFSET_X },
-                  { translateY: QUOTES_SUMMARY_TEXT_GROUP_OFFSET_Y },
-                ],
-              },
-            ]}
-          >
-            <Text style={styles.summaryCount}>{computedUnlocked}</Text>
-            <Text style={styles.summaryLabel}>FRASES DESBLOQUEADAS</Text>
-            <View style={styles.summaryDivider} />
-            <View style={styles.summarySubRow}>
-              <Text style={styles.summarySubLeft}>
-                de {TOTAL_QUOTES_IN_DB} en total
-              </Text>
-              <Text style={styles.summarySubRight}>
-                {Math.max(0, TOTAL_QUOTES_IN_DB - computedUnlocked)} por desbloquear
-              </Text>
-            </View>
-            {/* Overall progress bar — WHITE → clan primary gradient */}
-            <GradBar
-              unlocked={computedUnlocked}
-              total={TOTAL_QUOTES_IN_DB}
-              clanColor={barClanColor}
-            />
+          {/* Progress bar — full card width, below the row */}
+          <GradBar
+            unlocked={computedUnlocked}
+            total={TOTAL_QUOTES_IN_DB}
+            clanColor={barClanColor}
+          />
+
+          {/* Sub row — full width below the bar */}
+          <View style={styles.summarySubRow}>
+            <Text style={styles.summarySubLeft}>
+              de {TOTAL_QUOTES_IN_DB} en total
+            </Text>
+            <Text style={styles.summarySubRight}>
+              {Math.max(0, TOTAL_QUOTES_IN_DB - computedUnlocked)} por desbloquear
+            </Text>
           </View>
         </View>
 
@@ -456,23 +456,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: PHRASES_CARD_PADDING_H,
     paddingVertical: PHRASES_CARD_PADDING_V + 4,
     marginBottom: PHRASES_SECTION_GAP + 4,
+    gap: 10,
   },
-  // hero row mirrors StreakScreen heroCard: icon wrap + text group side by side
-  heroCard: {
+  // Main row: two flex columns side by side (mirrors DailyUsesScreen heroRow)
+  qHeroRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
   },
-  // pencilIconWrap: fixed-size container; transforms move only the icon, not text
-  pencilIconWrap: {
-    // size set inline via width/height props
-  },
-  // text group: column with number + label + divider + sub-row + progress bar
-  summaryTextGroup: {
+  // RIGHT block: big number + label
+  qRightBlock: {
     flex: 1,
     flexDirection: 'column',
     alignItems: 'flex-start',
-    gap: 2,
+    gap: 4,
   },
   summaryCount: {
     color: evoconnColors.text,
@@ -486,14 +483,8 @@ const styles = StyleSheet.create({
     fontSize: PHRASES_LABEL_FONT,
     fontWeight: '700',
     letterSpacing: 1.5,
-    marginTop: 2,
   },
-  summaryDivider: {
-    height: 1,
-    backgroundColor: evoconnColors.border,
-    width: '100%',
-    marginVertical: 10,
-  },
+  // Sub row below both columns
   summarySubRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

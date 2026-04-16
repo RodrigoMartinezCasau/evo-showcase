@@ -168,34 +168,34 @@ export const USAGE_SUMMARY_TEXT_GROUP_OFFSET_X = 110;
  */
 export const USAGE_SUMMARY_TEXT_GROUP_OFFSET_Y = 0;
 
-// ─── Quotes pencil icon (hero card in PhrasesDomainsScreen) ──────────────────
+// ─── Quotes pencil icon (left block of PhrasesDomainsScreen hero card) ───────
 
 /**
- * Scale of the clan-based pencil SVG shown in the top summary card of the
- * Frases/Quotes display. 1 = default size. Does not affect the card or text.
+ * Scale of the clan-based pencil SVG in the left block of the Frases summary card.
+ * 1 = native size (PHRASES_COUNT_FONT px). Does not affect layout — visual only.
  */
-export const QUOTES_PENCIL_ICON_SCALE = 2.2;
+export const QUOTES_PENCIL_ICON_SCALE = 1.6;
 
 /**
- * Horizontal offset (px) of the pencil icon inside the quotes hero card.
- * Positive = right, negative = left. Does not reflow the text group.
+ * Fine-tune horizontal offset (px) of the pencil icon inside the left block.
+ * Positive = right, negative = left. Does not reflow the progress bar or text.
  */
-export const QUOTES_PENCIL_ICON_OFFSET_X = 40;
+export const QUOTES_PENCIL_ICON_OFFSET_X = 70;
 
 /**
- * Vertical offset (px) of the pencil icon inside the quotes hero card.
- * Positive = down, negative = up. Does not reflow the text group.
+ * Fine-tune vertical offset (px) of the pencil icon inside the left block.
+ * Positive = down, negative = up.
  */
-export const QUOTES_PENCIL_ICON_OFFSET_Y = 0;
+export const QUOTES_PENCIL_ICON_OFFSET_Y = -5;
 
 /**
- * Horizontal offset (px) of the text group (count + label) inside the quotes hero card.
- * Positive = right, negative = left. Moves ALL texts together; pencil icon unchanged.
+ * Fine-tune horizontal offset (px) of the right-side text group (count + label).
+ * Positive = right, negative = left. Moves ALL texts together; left block unchanged.
  */
-export const QUOTES_SUMMARY_TEXT_GROUP_OFFSET_X = 0;
+export const QUOTES_SUMMARY_TEXT_GROUP_OFFSET_X = 80;
 
 /**
- * Vertical offset (px) of the text group inside the quotes hero card.
- * Positive = down, negative = up. Moves ALL texts together; pencil icon unchanged.
+ * Fine-tune vertical offset (px) of the right-side text group.
+ * Positive = down, negative = up.
  */
-export const QUOTES_SUMMARY_TEXT_GROUP_OFFSET_Y = 0;
+export const QUOTES_SUMMARY_TEXT_GROUP_OFFSET_Y = -5;
