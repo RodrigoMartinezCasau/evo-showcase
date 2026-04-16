@@ -142,7 +142,6 @@ export default function PersonalFollowersScreen() {
           <Ionicons name="chevron-back" size={22} color="rgba(255,255,255,0.7)" />
         </TouchableOpacity>
         <Text style={styles.screenTitle}>SEGUIDORES</Text>
-        <Text style={styles.screenCount}>{followers.length}</Text>
       </View>
 
       <FlatList

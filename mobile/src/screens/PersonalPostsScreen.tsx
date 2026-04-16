@@ -132,13 +132,6 @@ export default function PersonalPostsScreen() {
     [colWidth, openDetailFeed, handleMenuAction, isHidden],
   );
 
-  const ListHeader = (
-    <View style={styles.listHeader}>
-      <Text style={styles.listHeaderTitle}>PUBLICACIONES</Text>
-      <Text style={styles.listHeaderCount}>{posts.length}</Text>
-    </View>
-  );
-
   const ListEmpty = (
     <View style={styles.emptyWrap}>
       <Text style={styles.emptyText}>Sin publicaciones aún</Text>
@@ -161,7 +154,6 @@ export default function PersonalPostsScreen() {
             numColumns={2}
             columnWrapperStyle={{ gap: PERSONAL_POSTS_COLUMN_GAP }}
             ItemSeparatorComponent={() => <View style={{ height: PERSONAL_POSTS_ROW_GAP }} />}
-            ListHeaderComponent={ListHeader}
             ListEmptyComponent={ListEmpty}
             contentContainerStyle={[
               styles.listContent,
@@ -224,23 +216,6 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingTop: 16,
-  },
-  listHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 14,
-  },
-  listHeaderTitle: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.5,
-  },
-  listHeaderCount: {
-    color: 'rgba(255,255,255,0.35)',
-    fontSize: 12,
-    fontWeight: '600',
   },
   emptyWrap: {
     paddingTop: 60,

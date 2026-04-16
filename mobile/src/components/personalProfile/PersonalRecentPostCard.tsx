@@ -144,14 +144,6 @@ export const PersonalRecentPostCard = React.memo(function PersonalRecentPostCard
           isHidden && styles.cardHidden,
         ]}
       >
-        {/* ── Hidden badge ── */}
-        {isHidden && (
-          <View style={styles.hiddenBadge}>
-            <Ionicons name="eye-off-outline" size={10} color="rgba(255,255,255,0.5)" />
-            <Text style={styles.hiddenBadgeText}>PRIVADO</Text>
-          </View>
-        )}
-
         {/* ── Whole internal content wrapper ── */}
         <View
           style={[
@@ -199,7 +191,9 @@ export const PersonalRecentPostCard = React.memo(function PersonalRecentPostCard
                 </View>
               </View>
 
-              {/* Three-dots button — only shown when onMenuAction is provided */}
+              {/* Three-dots / padlock button — only shown when onMenuAction is provided.
+                  When the post is hidden (private), shows a closed padlock instead of dots.
+                  Both icons open the same action menu. */}
               {onMenuAction && (
                 <TouchableOpacity
                   onPress={handleDotsPress}
@@ -213,9 +207,9 @@ export const PersonalRecentPostCard = React.memo(function PersonalRecentPostCard
                   }}
                 >
                   <Ionicons
-                    name="ellipsis-horizontal"
+                    name={isHidden ? 'lock-closed' : 'ellipsis-horizontal'}
                     size={14}
-                    color="rgba(255,255,255,0.4)"
+                    color={isHidden ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.4)'}
                   />
                 </TouchableOpacity>
               )}
@@ -433,25 +427,6 @@ const styles = StyleSheet.create({
   cardHidden: {
     borderColor: 'rgba(255,255,255,0.05)',
     opacity: 0.65,
-  },
-  hiddenBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 6,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    zIndex: 10,
-  },
-  hiddenBadgeText: {
-    color: 'rgba(255,255,255,0.45)',
-    fontSize: 8,
-    fontWeight: '700',
-    letterSpacing: 0.8,
   },
   innerContent: {
     minHeight: 142,

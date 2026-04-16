@@ -112,7 +112,6 @@ export default function PersonalFollowingScreen() {
           <Ionicons name="chevron-back" size={22} color="rgba(255,255,255,0.7)" />
         </TouchableOpacity>
         <Text style={styles.screenTitle}>SEGUIDOS</Text>
-        <Text style={styles.screenCount}>{following.length}</Text>
       </View>
 
       <FlatList
