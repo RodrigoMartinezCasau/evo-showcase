@@ -508,6 +508,8 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: STREAK_CARD_BACKGROUND,
     borderRadius: STREAK_CARD_RADIUS,
+    borderWidth: 1,
+    borderColor: evoconnColors.border,
     paddingHorizontal: STREAK_CARD_PADDING_H,
     paddingVertical: STREAK_CARD_PADDING_V,
     gap: 12,

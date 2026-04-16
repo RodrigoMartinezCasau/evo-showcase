@@ -138,7 +138,7 @@ export const USES_CALENDAR_OFFSET_Y = 0;
  * Scale of the clan-based heart SVG shown in the top usage summary card.
  * 1 = default size. Increasing makes the icon larger; does not affect card or text.
  */
-export const USAGE_HEART_ICON_SCALE = 2.3;
+export const USAGE_HEART_ICON_SCALE = 2.1;
 
 /**
  * Horizontal offset (px) of the heart icon inside the usage hero card.
@@ -150,7 +150,7 @@ export const USAGE_HEART_ICON_OFFSET_X = 90;
  * Vertical offset (px) of the heart icon inside the usage hero card.
  * Positive = down, negative = up. Does not reflow the text group.
  */
-export const USAGE_HEART_ICON_OFFSET_Y = -10;
+export const USAGE_HEART_ICON_OFFSET_Y = -2;
 
 // ─── Usage summary text group (hero card) ────────────────────────────────────
 
