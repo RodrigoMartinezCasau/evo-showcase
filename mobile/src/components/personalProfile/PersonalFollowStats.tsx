@@ -1,10 +1,12 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { FOLLOW_STATS_SEGUIDORES_SEGUIDOS_GAP } from '@evoconn/constants/personalProfileLayout';
 
 type Props = {
   followersCount: number;
   followingCount: number;
+  onFollowersPress?: () => void;
+  onFollowingPress?: () => void;
 };
 
 function formatCount(n: number): string {
@@ -16,18 +18,30 @@ function formatCount(n: number): string {
 export const PersonalFollowStats = React.memo(function PersonalFollowStats({
   followersCount,
   followingCount,
+  onFollowersPress,
+  onFollowingPress,
 }: Props) {
   return (
     <View style={[styles.row, { gap: FOLLOW_STATS_SEGUIDORES_SEGUIDOS_GAP }]}>
-      <View style={styles.stat}>
+      <TouchableOpacity
+        style={styles.stat}
+        onPress={onFollowersPress}
+        activeOpacity={onFollowersPress ? 0.7 : 1}
+        disabled={!onFollowersPress}
+      >
         <Text style={styles.value}>{formatCount(followersCount)}</Text>
         <Text style={styles.label}>Seguidores</Text>
-      </View>
+      </TouchableOpacity>
       <View style={styles.divider} />
-      <View style={styles.stat}>
+      <TouchableOpacity
+        style={styles.stat}
+        onPress={onFollowingPress}
+        activeOpacity={onFollowingPress ? 0.7 : 1}
+        disabled={!onFollowingPress}
+      >
         <Text style={styles.value}>{formatCount(followingCount)}</Text>
         <Text style={styles.label}>Seguidos</Text>
-      </View>
+      </TouchableOpacity>
     </View>
   );
 });

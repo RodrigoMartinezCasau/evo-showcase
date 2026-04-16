@@ -167,6 +167,51 @@ export const BOTTOM_BLOCKS_MARGIN_TOP = 10;
  *  No afecta a ningún otro espaciado del perfil. */
 export const PERSONAL_BOTTOM_BLOCKS_SPACING_TOP = -5;
 
+// ── Personal posts full-grid screen (PersonalPostsScreen) ──────────
+
+/**
+ * Scale multiplier applied to each card's width in the full posts grid.
+ * 1 = fill the two columns evenly. Values < 1 make cards narrower.
+ */
+export const PERSONAL_POSTS_CARD_SCALE = 1;
+
+/**
+ * Horizontal gap (px) between the two card columns in the posts grid.
+ */
+export const PERSONAL_POSTS_COLUMN_GAP = 10;
+
+/**
+ * Vertical gap (px) between rows in the posts grid.
+ */
+export const PERSONAL_POSTS_ROW_GAP = 10;
+
+// ── Post three-dots menu icon ────────────────────────────────────────
+
+/**
+ * Horizontal fine-tune offset (px) for the ⋯ icon inside the card meta row.
+ * Positive = right, negative = left.
+ */
+export const PERSONAL_POST_MENU_DOTS_OFFSET_X = 0;
+
+/**
+ * Vertical fine-tune offset (px) for the ⋯ icon.
+ * Positive = down, negative = up.
+ */
+export const PERSONAL_POST_MENU_DOTS_OFFSET_Y = 0;
+
+/**
+ * Visual scale of the ⋯ icon. 1 = native Ionicons size.
+ */
+export const PERSONAL_POST_MENU_DOTS_SCALE = 1;
+
+/**
+ * Additional scale multiplier applied to the stats bar (icons + numbers)
+ * ONLY when the card is displayed in the full posts grid (PersonalPostsScreen).
+ * Does NOT affect the "Últimas publicaciones" horizontal slider.
+ * 1 = same size as the slider cards. >1 = larger stats.
+ */
+export const PERSONAL_POSTS_GRID_STATS_SCALE = 0.85;
+
 // Block 1 — App icon / Clan star  (container-level position)
 export const ICON_SWITCH_OFFSET_X = 0;
 export const ICON_SWITCH_OFFSET_Y = 0;

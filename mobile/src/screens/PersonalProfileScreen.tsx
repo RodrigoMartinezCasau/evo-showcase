@@ -34,6 +34,7 @@ import {
   PersonalBottomBlocks,
 } from '@evoconn/components/personalProfile';
 import { ProfileDetailPanel } from '@evoconn/components/ProfileDetailPanel';
+import { usePersonalProfile } from '@evoconn/hooks/PersonalProfileContext';
 import type { CommunityPost } from '@evoconn/types';
 
 const ANIM_DURATION = 200;
@@ -48,6 +49,9 @@ export default function PersonalProfileScreen() {
 
   const profile = getPersonalProfile();
   const profileWithClan = { ...profile, clanId: activeClan };
+
+  // ─── Personal profile shared state ────────────────────────────────
+  const { posts, isHidden, toggleHidePost, deletePost } = usePersonalProfile();
 
   // ─── Insignia phrase local state (ready for backend integration) ──
   const [insigniaPhrase, setInsigniaPhrase] = useState(profileWithClan.insigniaPhrase);
@@ -130,9 +134,17 @@ export default function PersonalProfileScreen() {
 
   const handleRecentPostPress = useCallback(
     (post: CommunityPost) => {
-      openDetailFeed(profile.recentPosts, post.id);
+      openDetailFeed(posts, post.id);
     },
-    [openDetailFeed, profile.recentPosts],
+    [openDetailFeed, posts],
+  );
+
+  const handlePostMenuAction = useCallback(
+    (action: 'hide' | 'delete', postId: string) => {
+      if (action === 'hide') toggleHidePost(postId);
+      else deletePost(postId);
+    },
+    [toggleHidePost, deletePost],
   );
 
   const handleSavedPostPress = useCallback(
@@ -191,6 +203,9 @@ export default function PersonalProfileScreen() {
               followingCount={profileWithClan.followingCount}
               totalReflections={profileWithClan.totalReflections}
               totalQuotes={profileWithClan.totalQuotes}
+              onPostsPress={() => router.push('/personal-posts')}
+              onFollowersPress={() => router.push('/personal-followers')}
+              onFollowingPress={() => router.push('/personal-following')}
             />
             <View style={styles.contentGap} />
             <PersonalIdentityHeader
@@ -209,7 +224,12 @@ export default function PersonalProfileScreen() {
               onPress={() => router.push('/philosophy-profile')}
             />
             <View style={styles.contentGap} />
-            <PersonalRecentPostsSlider posts={profileWithClan.recentPosts} onPostPress={handleRecentPostPress} />
+            <PersonalRecentPostsSlider
+              posts={posts}
+              onPostPress={handleRecentPostPress}
+              onMenuAction={handlePostMenuAction}
+              isHiddenFn={isHidden}
+            />
             <View style={styles.contentGap} />
             <PersonalBottomBlocks
               clanId={profileWithClan.clanId}

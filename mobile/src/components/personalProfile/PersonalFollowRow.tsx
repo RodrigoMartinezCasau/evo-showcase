@@ -26,6 +26,9 @@ type Props = {
   followingCount: number;
   totalReflections: number;
   totalQuotes: number;
+  onPostsPress?: () => void;
+  onFollowersPress?: () => void;
+  onFollowingPress?: () => void;
 };
 
 export const PersonalFollowRow = React.memo(function PersonalFollowRow({
@@ -33,6 +36,9 @@ export const PersonalFollowRow = React.memo(function PersonalFollowRow({
   followingCount,
   totalReflections,
   totalQuotes,
+  onPostsPress,
+  onFollowersPress,
+  onFollowingPress,
 }: Props) {
   return (
     <View
@@ -56,7 +62,11 @@ export const PersonalFollowRow = React.memo(function PersonalFollowRow({
           },
         ]}
       >
-        <PersonalPostsCounter totalReflections={totalReflections} totalQuotes={totalQuotes} />
+        <PersonalPostsCounter
+          totalReflections={totalReflections}
+          totalQuotes={totalQuotes}
+          onPress={onPostsPress}
+        />
       </View>
       <View
         style={[
@@ -73,7 +83,12 @@ export const PersonalFollowRow = React.memo(function PersonalFollowRow({
           },
         ]}
       >
-        <PersonalFollowStats followersCount={followersCount} followingCount={followingCount} />
+        <PersonalFollowStats
+          followersCount={followersCount}
+          followingCount={followingCount}
+          onFollowersPress={onFollowersPress}
+          onFollowingPress={onFollowingPress}
+        />
       </View>
       <View style={styles.settingsSlot}>
         <PersonalSettingsButton />

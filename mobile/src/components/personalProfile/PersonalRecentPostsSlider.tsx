@@ -7,23 +7,40 @@ import {
   PERSONAL_LATEST_POSTS_SPACING,
 } from '@evoconn/constants/personalProfileLayout';
 
+type MenuAction = 'hide' | 'delete';
+
 type Props = {
   posts: CommunityPost[];
   onPostPress: (post: CommunityPost) => void;
+  /** When provided, each card shows the three-dots menu. */
+  onMenuAction?: (action: MenuAction, postId: string) => void;
+  /** Function to determine if a given post id is currently hidden. */
+  isHiddenFn?: (id: string) => boolean;
 };
 
 const CARD_RATIO = 0.55;
 const MIN_CARD_WIDTH = 200;
 
-export const PersonalRecentPostsSlider = React.memo(function PersonalRecentPostsSlider({ posts, onPostPress }: Props) {
+export const PersonalRecentPostsSlider = React.memo(function PersonalRecentPostsSlider({
+  posts,
+  onPostPress,
+  onMenuAction,
+  isHiddenFn,
+}: Props) {
   const { width: screenW } = useWindowDimensions();
   const cardW = Math.max(MIN_CARD_WIDTH, screenW * CARD_RATIO);
 
   const renderItem = useCallback(
     ({ item }: { item: CommunityPost }) => (
-      <PersonalRecentPostCard post={item} cardWidth={cardW} onPress={onPostPress} />
+      <PersonalRecentPostCard
+        post={item}
+        cardWidth={cardW}
+        onPress={onPostPress}
+        onMenuAction={onMenuAction}
+        isHidden={isHiddenFn?.(item.id)}
+      />
     ),
-    [cardW, onPostPress],
+    [cardW, onPostPress, onMenuAction, isHiddenFn],
   );
 
   if (posts.length === 0) {
