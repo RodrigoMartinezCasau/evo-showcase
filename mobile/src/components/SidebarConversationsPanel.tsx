@@ -100,6 +100,8 @@ export function SidebarConversationsPanel({
     setFoldersBrowseId(null);
   }, []);
 
+  const handleFolderBack = useCallback(() => setFoldersBrowseId(null), []);
+
   const toggleFavorite = useCallback(
     (id: string) => {
       onConversationsChange(
@@ -337,11 +339,21 @@ export function SidebarConversationsPanel({
             }}
           >
             {!q ? (
-              <View style={{ paddingBottom: L.SIDEBAR_CONVERSATIONS_SECTIONS_TO_LIST_GAP_Y, zIndex: 10, position: 'relative' }}>
+              /*
+               * pointerEvents="box-none": the wrapper View itself never captures
+               * touches — only the actual tab buttons inside do. Without this, the
+               * View's layout area (including its paddingBottom and the stacking
+               * context created by zIndex:10 + position:'relative') was intercepting
+               * taps meant for the first row of the scroll view directly below it.
+               */
+              <View
+                pointerEvents="box-none"
+                style={{ paddingBottom: L.SIDEBAR_CONVERSATIONS_SECTIONS_TO_LIST_GAP_Y, zIndex: 10, position: 'relative' }}
+              >
                 {/* ── FAVORITOS ── */}
                 <TouchableOpacity
                   activeOpacity={0.7}
-                  hitSlop={6}
+                  hitSlop={{ top: 6, bottom: 0, left: 6, right: 6 }}
                   onPress={() => onTab('favorites')}
                   style={{
                     flexDirection: 'row',
@@ -391,7 +403,7 @@ export function SidebarConversationsPanel({
                 {/* ── CARPETAS ── */}
                 <TouchableOpacity
                   activeOpacity={0.7}
-                  hitSlop={6}
+                  hitSlop={{ top: 6, bottom: 0, left: 6, right: 6 }}
                   onPress={() => onTab('folders')}
                   style={{
                     flexDirection: 'row',
@@ -440,7 +452,7 @@ export function SidebarConversationsPanel({
 
                 {/* ── PENSAMIENTOS ── */}
                 <Pressable
-                  hitSlop={6}
+                  hitSlop={{ top: 6, bottom: 0, left: 6, right: 6 }}
                   onPress={() => onTab('thoughts')}
                   style={({ pressed }) => ({
                     flexDirection: 'row' as const,
@@ -448,7 +460,6 @@ export function SidebarConversationsPanel({
                     marginLeft: L.SIDEBAR_THOUGHTS_OFFSET_X,
                     marginTop: L.SIDEBAR_THOUGHTS_OFFSET_Y,
                     opacity: pressed ? 0.7 : 1,
-                    zIndex: 2,
                     transform: [{ scale: L.SIDEBAR_THOUGHTS_SCALE }],
                   })}
                 >
@@ -542,7 +553,7 @@ export function SidebarConversationsPanel({
                 <SidebarFolderViewHeader
                   folderName={browsedFolderName}
                   primaryColor={folderColors.primary}
-                  onBack={() => setFoldersBrowseId(null)}
+                  onBack={handleFolderBack}
                 />
               ) : null}
 

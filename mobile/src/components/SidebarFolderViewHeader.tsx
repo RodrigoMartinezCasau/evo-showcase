@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet } from 'react-native';
 
 export const SIDEBAR_FOLDER_VIEW_HEADER_LAYOUT = {
   arrowFontSize: 16,
@@ -27,15 +27,26 @@ export const SidebarFolderViewHeader = React.memo(function SidebarFolderViewHead
   primaryColor,
   onBack,
 }: Props) {
+  /*
+   * The entire header row is one TouchableOpacity so both the arrow and the
+   * folder title text are reliably tappable (previously the title was a plain
+   * Text with no touch handler, and the narrow arrow TouchableOpacity was the
+   * only hit target — making it easy to miss).
+   * hitSlop provides a comfortable invisible extension around the row.
+   */
   return (
-    <View style={[styles.container, { marginBottom: HL.marginBottom, paddingHorizontal: HL.paddingH, paddingVertical: HL.paddingV }]}>
-      <TouchableOpacity
-        onPress={onBack}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        activeOpacity={0.7}
+    <TouchableOpacity
+      onPress={onBack}
+      activeOpacity={0.7}
+      hitSlop={{ top: 4, bottom: 10, left: 8, right: 8 }}
+      style={[styles.container, { marginBottom: HL.marginBottom, paddingHorizontal: HL.paddingH, paddingVertical: HL.paddingV }]}
+    >
+      <Text
         style={[
-          styles.arrow,
+          styles.arrowText,
           {
+            color: primaryColor,
+            fontSize: HL.arrowFontSize,
             transform: [
               { translateX: HL.arrowOffsetX },
               { translateY: HL.arrowOffsetY },
@@ -43,9 +54,8 @@ export const SidebarFolderViewHeader = React.memo(function SidebarFolderViewHead
           },
         ]}
       >
-        <Text style={[styles.arrowText, { color: primaryColor, fontSize: HL.arrowFontSize }]}>←</Text>
-      </TouchableOpacity>
-      <View style={[styles.gap, { width: HL.gap }]} />
+        ←
+      </Text>
       <Text
         numberOfLines={1}
         style={[
@@ -53,6 +63,7 @@ export const SidebarFolderViewHeader = React.memo(function SidebarFolderViewHead
           {
             color: primaryColor,
             fontSize: HL.titleFontSize,
+            marginLeft: HL.gap,
             transform: [
               { translateX: HL.titleOffsetX },
               { translateY: HL.titleOffsetY },
@@ -62,7 +73,7 @@ export const SidebarFolderViewHeader = React.memo(function SidebarFolderViewHead
       >
         {folderName}
       </Text>
-    </View>
+    </TouchableOpacity>
   );
 });
 
@@ -71,11 +82,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  arrow: {},
   arrowText: {
     fontWeight: '800',
   },
-  gap: {},
   title: {
     fontWeight: '700',
     flex: 1,

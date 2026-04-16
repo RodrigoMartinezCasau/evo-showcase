@@ -31,7 +31,7 @@ export const SidebarFolderItem = React.memo(function SidebarFolderItem({
       <TouchableOpacity
         onPress={onPress}
         activeOpacity={0.7}
-        hitSlop={{ top: 6, bottom: 6, left: 8, right: 0 }}
+        hitSlop={{ top: 2, bottom: 6, left: 8, right: 0 }}
         style={styles.titleWrap}
       >
         <Text
@@ -55,20 +55,26 @@ export const SidebarFolderItem = React.memo(function SidebarFolderItem({
       </TouchableOpacity>
 
       {onPencilPress != null && (
+        /*
+         * The pencil is positioned ABSOLUTELY so its layout bounds = visual bounds.
+         * Using transform for the offset caused the layout slot to remain inside
+         * the title's flex:1 area, making titleWrap intercept the tap instead.
+         * right = -pencilOffsetX puts the pencil at the correct visual position.
+         * zIndex:2 ensures it is checked before the titleWrap in hit testing.
+         */
         <TouchableOpacity
           onPress={onPencilPress}
           activeOpacity={0.6}
-          hitSlop={{ top: 8, bottom: 8, left: 6, right: 10 }}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           style={[
             styles.pencilHit,
             {
-              marginLeft: IL.pencilGapLeft,
+              position: 'absolute',
+              right: -IL.pencilOffsetX,
               width: IL.pencilSize,
-              height: IL.pencilSize,
-              transform: [
-                { translateX: IL.pencilOffsetX },
-                { translateY: IL.pencilOffsetY },
-              ],
+              top: 0,
+              bottom: 0,
+              zIndex: 2,
             },
           ]}
         >
@@ -99,8 +105,6 @@ const styles = StyleSheet.create({
   pencilHit: {
     justifyContent: 'center',
     alignItems: 'center',
-    flexShrink: 0,
-    zIndex: 1,
   },
   pencilGlyph: {
     textAlign: 'center',
