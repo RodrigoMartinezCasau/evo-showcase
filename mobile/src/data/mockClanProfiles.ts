@@ -325,6 +325,39 @@ const CLAN_PROFILES: ClanProfile[] = [
       },
     ],
   },
+  {
+    id: 'indefinido',
+    name: 'Clan indefinido',
+    description: 'Tu identidad filosófica aún no ha tomado forma. El camino hacia el autoconocimiento comienza con la pregunta correcta — ¿quién eres y qué piensas del mundo?',
+    stats: { members: 0, publications: 0, interactionRatio: 0 },
+    philosophyDistribution: [
+      { clanId: 'nihilista', label: 'Nihilista', pct: 13 },
+      { clanId: 'estoico', label: 'Estoico', pct: 13 },
+      { clanId: 'existencialista', label: 'Existencialista', pct: 13 },
+      { clanId: 'racionalista', label: 'Racionalista', pct: 12 },
+      { clanId: 'humanista', label: 'Humanista', pct: 12 },
+      { clanId: 'realista', label: 'Realista', pct: 12 },
+      { clanId: 'cientista', label: 'Cientista', pct: 13 },
+      { clanId: 'trascendentalista', label: 'Trascendentalista', pct: 12 },
+    ],
+    topMembers: [],
+    recentPosts: [
+      {
+        id: 'ci1', type: 'reflection', author: AUTHOR_RODRIGO,
+        title: 'EL INICIO DEL CAMINO',
+        body: 'No saber a qué clan perteneces no es una debilidad — es el punto de partida honesto.',
+        voteStats: { up: 0, down: 0, save: 0 },
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: 'ci2', type: 'phrase', author: AUTHOR_RODRIGO,
+        body: 'El hombre que empieza a conocerse a sí mismo ya ha comenzado a filosofar.',
+        quoteAuthor: 'Sócrates',
+        voteStats: { up: 0, down: 0, save: 0 },
+        createdAt: new Date().toISOString(),
+      },
+    ],
+  },
 ];
 
 // ─── Lookup ───────────────────────────────────────────────────────────────

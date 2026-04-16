@@ -134,7 +134,7 @@ export function SidebarDrawer({
   const clanRouteSlug =
     user.clanId != null && String(user.clanId).trim() !== ''
       ? String(user.clanId).trim().toLowerCase()
-      : 'evocon';
+      : 'indefinido';
   const drawerTranslateX = drive.interpolate({
     inputRange: [0, 1],
     outputRange: [SIDEBAR_DRAWER_OFFSCREEN_TRANSLATE_X, 0],
