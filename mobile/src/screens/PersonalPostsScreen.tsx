@@ -98,7 +98,8 @@ export default function PersonalPostsScreen() {
   const handleTabChange = useCallback(
     (tab: TabId) => {
       setActiveTab(tab);
-      if (tab === 'feed') router.replace('/(tabs)');
+      // Navigate away — this unmounts the screen (and any open detail overlay).
+      router.replace({ pathname: '/(tabs)', params: { tab } });
     },
     [router],
   );

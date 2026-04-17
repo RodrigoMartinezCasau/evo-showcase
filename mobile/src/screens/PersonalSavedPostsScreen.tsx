@@ -99,7 +99,7 @@ export default function PersonalSavedPostsScreen() {
   const handleTabChange = useCallback(
     (tab: TabId) => {
       setActiveTab(tab);
-      if (tab === 'feed') router.replace('/(tabs)');
+      router.replace({ pathname: '/(tabs)', params: { tab } });
     },
     [router],
   );

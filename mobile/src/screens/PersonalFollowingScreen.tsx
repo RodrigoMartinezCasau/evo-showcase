@@ -85,7 +85,7 @@ export default function PersonalFollowingScreen() {
 
   const handleTabChange = useCallback(
     (tab: TabId) => {
-      if (tab === 'feed') router.replace('/(tabs)');
+      router.replace({ pathname: '/(tabs)', params: { tab } });
     },
     [router],
   );
