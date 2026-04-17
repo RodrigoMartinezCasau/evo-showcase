@@ -83,11 +83,6 @@ export const PersonalSavedPostsBlock = React.memo(function PersonalSavedPostsBlo
         ]}
       />
 
-      {savedPosts.length > 0 && (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{savedPosts.length}</Text>
-        </View>
-      )}
     </TouchableOpacity>
   );
 });
@@ -110,19 +105,5 @@ const styles = StyleSheet.create({
   },
   icon: {
     marginVertical: 4,
-  },
-  badge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(255,222,89,0.2)',
-    borderRadius: 8,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-  },
-  badgeText: {
-    color: '#ffde59',
-    fontSize: 9,
-    fontWeight: '700',
   },
 });

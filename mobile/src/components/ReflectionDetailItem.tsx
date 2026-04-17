@@ -28,6 +28,7 @@ import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { FollowButton } from './FollowButton';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
 import { useFeedStore } from '@evoconn/hooks/useFeedStore';
+import { usePersonalProfile } from '@evoconn/hooks/PersonalProfileContext';
 
 type ReflectionDetailItemProps = {
   post: CommunityPost;
@@ -48,13 +49,14 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   const clanColor = getClanColor(post.author.clanId);
   const actionColRef = useRef<DetailActionColumnHandle>(null);
   const { updatePostVote, updatePostSaveToggle, getPostById } = useFeedStore();
+  const { savePost, unsavePost, isSaved } = usePersonalProfile();
   /** Fuente de verdad para votos: el feed overlay guarda un snapshot en `post`; el store se actualiza al votar. */
   const livePost = getPostById(post.id) ?? post;
 
   const [voted, setVoted] = useState<'up' | 'down' | null>(null);
-  const [saved, setSaved] = useState(false);
   const votedRef = useRef<'up' | 'down' | null>(null);
-  const savedRef = useRef(false);
+  // Save state comes from shared context — no local state needed
+  const saved = isSaved(post.id);
   const [commentsReady, setCommentsReady] = useState(false);
   const [readingMode, setReadingMode] = useState(false);
   const readingModeRef = useRef(false);
@@ -68,9 +70,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
 
   useEffect(() => {
     setVoted(null);
-    setSaved(false);
     votedRef.current = null;
-    savedRef.current = false;
   }, [post.id]);
 
   const handleUpvote = useCallback(() => {
@@ -90,12 +90,11 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   }, [post.id, updatePostVote]);
 
   const handleSave = useCallback(() => {
-    const was = savedRef.current;
-    const now = !was;
-    savedRef.current = now;
-    updatePostSaveToggle(post.id, was, now);
-    setSaved(now);
-  }, [post.id, updatePostSaveToggle]);
+    const now = !isSaved(post.id);
+    updatePostSaveToggle(post.id, !now, now);
+    if (now) savePost(post);
+    else unsavePost(post.id);
+  }, [post, isSaved, updatePostSaveToggle, savePost, unsavePost]);
 
   const [commentVotes, setCommentVotes] = useState<Record<string, boolean>>({});
   const toggleCommentVote = useCallback((commentId: string) => {

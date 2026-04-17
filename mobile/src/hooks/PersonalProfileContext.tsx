@@ -50,7 +50,11 @@ type PersonalProfileContextValue = {
 
   // ── Saved posts ──
   savedPosts: CommunityPost[];
+  /** Reactive Set of saved post IDs — O(1) membership check. */
+  savedPostIds: Set<string>;
+  savePost: (post: CommunityPost) => void;
   unsavePost: (id: string) => void;
+  isSaved: (postId: string) => boolean;
 };
 
 // ─── Context ─────────────────────────────────────────────────────────────────
@@ -120,9 +124,26 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
 
   // ── Saved-posts actions ────────────────────────────────────────────────────
 
+  const savedPostIds = useMemo<Set<string>>(
+    () => new Set(savedPosts.map(p => p.id)),
+    [savedPosts],
+  );
+
+  const savePost = useCallback((post: CommunityPost) => {
+    setSavedPosts(prev => {
+      if (prev.some(p => p.id === post.id)) return prev;
+      return [post, ...prev];
+    });
+  }, []);
+
   const unsavePost = useCallback((id: string) => {
     setSavedPosts(prev => prev.filter(p => p.id !== id));
   }, []);
+
+  const isSaved = useCallback(
+    (postId: string) => savedPostIds.has(postId),
+    [savedPostIds],
+  );
 
   // ── Computed mutual friends (following ∩ followers) ──────────────────────
   const friends = useMemo<FollowingEntry[]>(() => {
@@ -148,12 +169,16 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
       unfollowUser,
       friends,
       savedPosts,
+      savedPostIds,
+      savePost,
       unsavePost,
+      isSaved,
     }),
     [
       posts, hiddenPostIds, deletePost, toggleHidePost, isHidden,
       followers, followingBackIds, followBack, unfollowBack, isFollowingBack,
-      following, unfollowUser, friends, savedPosts, unsavePost,
+      following, unfollowUser, friends,
+      savedPosts, savedPostIds, savePost, unsavePost, isSaved,
     ],
   );
 

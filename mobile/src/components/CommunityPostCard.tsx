@@ -18,6 +18,7 @@ import { getQuoteClanBannerAsset } from '@evoconn/assets/cards/quoteClanBanners'
 import { CARD_ASSET_LAYOUT } from '@evoconn/constants/cardAssetLayout';
 import { smallStatsIcons } from '@evoconn/assets/icons/smallStats';
 import { useFeedStore } from '@evoconn/hooks/useFeedStore';
+import { usePersonalProfile } from '@evoconn/hooks/PersonalProfileContext';
 import { formatPhraseBodyForDisplay } from '@evoconn/utils/phrasePublish';
 
 const S = CARD_LAYOUT_SHARED;
@@ -42,25 +43,22 @@ export function CommunityPostCard({
   showPhraseAuthor = false,
 }: CommunityPostCardProps) {
   const { updatePostVote, updatePostSaveToggle } = useFeedStore();
-  const [smallVote, setSmallVote] = useState<'up' | null>(null);
-  const [smallSaved, setSmallSaved] = useState(false);
-  const [listVote, setListVote] = useState<'up' | 'down' | null>(null);
-  const [listSaved, setListSaved] = useState(false);
+  const { savePost, unsavePost, isSaved } = usePersonalProfile();
 
+  // ── Vote state (stays local per component) ──
+  const [smallVote, setSmallVote] = useState<'up' | null>(null);
+  const [listVote, setListVote] = useState<'up' | 'down' | null>(null);
   const smallVoteRef = useRef<'up' | null>(null);
-  const smallSavedRef = useRef(false);
   const listVoteRef = useRef<'up' | 'down' | null>(null);
-  const listSavedRef = useRef(false);
+
+  // ── Save state comes from shared context ──
+  const isPostSaved = isSaved(post.id);
 
   useEffect(() => {
     setSmallVote(null);
-    setSmallSaved(false);
     setListVote(null);
-    setListSaved(false);
     smallVoteRef.current = null;
-    smallSavedRef.current = false;
     listVoteRef.current = null;
-    listSavedRef.current = false;
   }, [post.id]);
 
   const handleSmallUp = useCallback(() => {
@@ -74,12 +72,11 @@ export function CommunityPostCard({
   }, [post.id, updatePostVote]);
 
   const handleSmallSave = useCallback(() => {
-    const was = smallSavedRef.current;
-    const now = !was;
-    smallSavedRef.current = now;
-    updatePostSaveToggle(post.id, was, now);
-    setSmallSaved(now);
-  }, [post.id, updatePostSaveToggle]);
+    const now = !isSaved(post.id);
+    updatePostSaveToggle(post.id, !now, now);
+    if (now) savePost(post);
+    else unsavePost(post.id);
+  }, [post, isSaved, updatePostSaveToggle, savePost, unsavePost]);
 
   const handleListUp = useCallback(() => {
     const prev = listVoteRef.current;
@@ -98,12 +95,11 @@ export function CommunityPostCard({
   }, [post.id, updatePostVote]);
 
   const handleListSave = useCallback(() => {
-    const was = listSavedRef.current;
-    const now = !was;
-    listSavedRef.current = now;
-    updatePostSaveToggle(post.id, was, now);
-    setListSaved(now);
-  }, [post.id, updatePostSaveToggle]);
+    const now = !isSaved(post.id);
+    updatePostSaveToggle(post.id, !now, now);
+    if (now) savePost(post);
+    else unsavePost(post.id);
+  }, [post, isSaved, updatePostSaveToggle, savePost, unsavePost]);
 
   const smallUpvoted = smallVote === 'up';
   const [measuredBlackBoxContentHeight, setMeasuredBlackBoxContentHeight] = useState<number | null>(null);
@@ -183,7 +179,7 @@ export function CommunityPostCard({
     : QA.QUOTE_CARD_ASSET_OFFSET_Y;
 
   const feedUpvoteIcon = smallUpvoted ? smallStatsIcons.upvoteActive : smallStatsIcons.upvoteInactive;
-  const feedSaveIcon = smallSaved ? smallStatsIcons.saveActive : smallStatsIcons.saveInactive;
+  const feedSaveIcon = isPostSaved ? smallStatsIcons.saveActive : smallStatsIcons.saveInactive;
 
   const renderFeedStats = () => (
     <>
