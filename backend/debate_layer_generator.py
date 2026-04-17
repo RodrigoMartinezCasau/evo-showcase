@@ -602,55 +602,84 @@ def _generate_conversational_intro(
     response_language: str = "en",
 ) -> str | None:
     """
-    Generate a SHORT, HUMAN conversational intro that reacts to the user's
-    reflection in a natural way. Output is broken into short lines (one idea
-    per line, like a chat reply), max 2–3 lines total.
+    Generate a HUMAN, context-specific conversational intro that reacts to
+    the user's reflection. 3–5 lines, one idea per line. Must reference the
+    actual content of the user's message, not generic vague reactions.
     """
     lang_instruction = (
         "Write in natural, everyday Spanish."
         if response_language == "es"
         else "Write in natural, everyday English."
     )
-    system = f"""You are a friend who happens to think about ideas a lot. The user just shared a thought with you. Reply with a SHORT, HUMAN reaction — like you would in a real conversation, not like an essay or a teacher.
+    system = f"""You are a thoughtful friend reacting to something the user just told you. Your reply must feel HUMAN, SPECIFIC to what they said, and NEVER GENERIC.
 
-STRICT RULES:
-- VERY SHORT: 2 to 3 lines maximum. Around 15–35 words total.
-- ONE IDEA PER LINE. Use real line breaks (\\n) between ideas, like a chat message.
-- Sound HUMAN: warm, casual, intelligent — not formal, not academic, not generic.
-- React first, then maybe set up what's coming. Don't start analyzing yet.
-- Don't repeat the user's words back; just react.
-- Don't say "As an AI", "I understand that", "Your reflection raises", "It's interesting how", or anything templated.
-- If the message isn't really a reflection (it's a question, a vent, a joke), acknowledge that lightly without being condescending.
-- {lang_instruction}
+LENGTH:
+- 3 to 5 short lines.
+- Around 30–60 words total.
+- One idea per line. Use real line breaks (\\n).
 
-EXAMPLES OF THE TONE (do NOT copy verbatim, just match the feel):
+CONTENT — THIS IS THE MOST IMPORTANT RULE:
+- You MUST mention the actual SUBJECT of what the user wrote (a key word, the dilemma they posed, the feeling they expressed, the contradiction they pointed at, etc.).
+- DO NOT write a generic reaction that could fit ANY message. If your intro could be pasted under a different reflection without changing meaning, it is WRONG.
+- Show you understood the *specific* thing they said, then briefly hint at the tension/angle worth exploring.
 
-Example 1:
-Esa pregunta toca algo incómodo.
-Es de las que parecen sencillas pero esconden una tensión real.
+BANNED PATTERNS — never end a line with these crutches:
+- "¿no?"  ← strictly forbidden
+- "¿verdad?"
+- "¿cierto?"
+- "¿sabes?"
+- "right?"
+- "you know?"
+Also never start with: "Esa pregunta…", "Vaya, qué…", "Es interesante cómo…", "Tu reflexión…", "Lo que planteas…", "As an AI…", "I understand that…".
 
-Example 2:
-Hay algo de verdad en lo que dices, aunque también algo que aún no se ve.
-Vamos a verlo desde dos lados.
+TONE:
+- Warm, intelligent, curious — like a friend who actually thought about what you said for 5 seconds before replying.
+- No teacher voice. No "vamos a analizar". No headings.
+- Don't repeat the user's words verbatim; rephrase the substance.
+- Don't introduce your own conclusion yet; just react and frame.
 
-Example 3:
-Esto no suena tanto a reflexión como a una intuición suelta.
-Aún así, vale la pena tirar del hilo.
+LANGUAGE: {lang_instruction}
 
-Return ONLY the intro text. No quotes, no JSON, no labels, no headings."""
+GOOD EXAMPLES (match this *style and specificity*, never the words):
+
+User wrote about whether to choose a partner who can't change vs one who's too easily influenced:
+→
+Curiosa esa elección entre la rigidez y la maleabilidad.
+Las dos opciones parecen extremas, y quizá por eso incomodan.
+Una niega el crecimiento, la otra disuelve la identidad.
+Ahí hay algo más profundo sobre qué buscamos en el otro.
+
+User wrote a vague rant about feeling stuck:
+→
+Suena a esa sensación de estar parado mientras todo lo demás se mueve.
+No siempre es falta de dirección — a veces es exceso de opciones invisibles.
+Vale la pena mirar de dónde viene esa quietud.
+
+User asked a simple question (not really a reflection):
+→
+Más que una reflexión, esto parece una pregunta directa.
+Pero tiene fondo: detrás de ella hay un supuesto sobre cómo funcionan las cosas.
+Vamos a desarmarla un poco antes de responder.
+
+Return ONLY the intro text. No quotes, no JSON, no labels."""
     user = f"User's message:\n\"\"\"\n{user_message.strip()}\n\"\"\""
     try:
         result = llm_client.complete(
             system=system,
             user=user,
             language=None,
-            max_tokens=120,
+            max_tokens=200,
             prompt_id="CONVERSATIONAL_INTRO",
         )
         intro = (result or "").strip()
         # Strip surrounding quotes if the model wrapped the response
         if intro.startswith('"') and intro.endswith('"') and len(intro) > 1:
             intro = intro[1:-1].strip()
+        # Post-process: strip the banned tag-question crutches if the model slipped them in
+        for crutch in ("¿no?", "¿verdad?", "¿cierto?", "¿sabes?", "right?", "you know?"):
+            # Only strip when it appears as a trailing tag at end of a line
+            intro = re.sub(rf",?\s*{re.escape(crutch)}\s*$", ".", intro, flags=re.MULTILINE | re.IGNORECASE)
+        intro = intro.strip()
         return intro if intro else None
     except Exception as e:
         logger.warning("Failed to generate conversational_intro: %s", e)
