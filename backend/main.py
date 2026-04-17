@@ -778,6 +778,7 @@ def debate_chat_persisted(debate_id: str, payload: DebateChatPayload):
             for m in recent
             if m.get("content")
         ]
+    logger.info("debate_chat_persisted: chat_history turns=%d (window=%d)", len(chat_history), CONTEXT_WINDOW)
 
     # Append user message
     append_message(debate_id, "user", msg)
@@ -789,12 +790,53 @@ def debate_chat_persisted(debate_id: str, payload: DebateChatPayload):
     lang = detect_language(msg)
     intent = classify_intent(msg)
 
-    # Parse and run pipeline
-    parsed = parse_message(msg)
+    # ── Follow-up resolution ──────────────────────────────────────────────
+    # If the new message is short or looks like a follow-up ("¿qué opinas?",
+    # "desarrolla eso", "no estoy de acuerdo"...), the pipeline (topic
+    # detection, facts retrieval, debate generation) needs the *previous*
+    # user reflection as the real subject. We build an "effective" message
+    # that the pipeline sees, while the DB still stores the original `msg`.
+    def _looks_like_followup(text: str) -> bool:
+        t = (text or "").strip().lower()
+        if not t:
+            return False
+        if len(t) < 80:
+            return True
+        followup_starts = (
+            "qué opinas", "que opinas", "y si", "pero ", "entonces", "no estoy",
+            "no me ", "eso ", "desarrolla", "explica", "más sobre", "porque",
+            "porqué", "¿y ", "y por", "develop", "what do you think",
+            "explain", "i disagree", "go deeper", "elaborate",
+        )
+        return any(t.startswith(s) for s in followup_starts)
+
+    effective_msg = msg
+    if chat_history and _looks_like_followup(msg):
+        last_user = next(
+            (h["content"] for h in reversed(chat_history) if h.get("role") == "user" and h.get("content")),
+            None,
+        )
+        if last_user:
+            if lang == "es":
+                effective_msg = (
+                    f"[Mensaje de seguimiento del usuario sobre su reflexión previa]\n"
+                    f"Reflexión previa: {last_user}\n"
+                    f"Seguimiento actual: {msg}"
+                )
+            else:
+                effective_msg = (
+                    f"[User follow-up to their prior reflection]\n"
+                    f"Prior reflection: {last_user}\n"
+                    f"Current follow-up: {msg}"
+                )
+            logger.info("Detected follow-up; augmented effective_msg with prior reflection (len=%d).", len(effective_msg))
+
+    # Parse and run pipeline using the effective (possibly augmented) message
+    parsed = parse_message(effective_msg)
     topic = parsed["topic"]
     if intent != "debate":
         from debate_creator_generator import reframe_to_debate
-        topic = reframe_to_debate(msg, lang)
+        topic = reframe_to_debate(effective_msg, lang)
     debate_request = DebateRequest(
         topic=topic,
         user_message=parsed["user_message"],

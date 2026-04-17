@@ -346,6 +346,12 @@ def _build_structured_debate_prompts(
     has_facts = len(facts_list) > 0
     system_prompt = """You are a calm, respectful debate facilitator. You are generating a debate response. Output ONLY JSON that follows the schema below.
 
+CONTEXT HANDLING (CRITICAL):
+- If the prompt includes a [Recent conversation …] block, the user's CURRENT message may be a follow-up (e.g. "¿qué opinas?", "desarrolla eso", "no estoy de acuerdo", "y si lo miramos al revés", "explica más", "pero entonces…").
+- In that case, the real subject is whatever the previous user reflection was about, and the new message is asking you to extend, react to, or push back on it.
+- You MUST treat the previous user reflection as the actual topic and produce stance/counter/question that continue that thread.
+- Do NOT generate a generic debate about the literal short follow-up phrase.
+
 RULES:
 - Do NOT invent new arguments. Do NOT remove arguments. Only reorganize and articulate.
 - stance.points and counter.points: organize the content into NUMBERED THEMATIC POINTS. Each point is a distinct idea or angle within the argument.
@@ -552,6 +558,10 @@ def _build_debate_prompts(
     has_facts = len(facts_list) > 0
     system_prompt = """You are a calm, respectful debate facilitator. Output in English.
 
+CONTEXT HANDLING (CRITICAL):
+- If the prompt includes a [Recent conversation …] block, the user's CURRENT message may be a follow-up (e.g. "what do you think?", "develop that", "I disagree", "explain more", "but then…").
+- Treat the previous user reflection as the real subject and continue that thread; do NOT debate the literal short follow-up phrase as if it were a fresh standalone topic.
+
 MANDATORY STRUCTURE:
 1. steelman_of_user: Present the user's view in its strongest form. Minimum 2 distinct arguments with reasoning. Aim: ~200–350 words. One or two continuous paragraphs, not bullet points. Formal, reflective tone.
 2. contrarian_position: Adopt a contrarian position. Minimum 2 distinct counterarguments with reasoning. Aim: ~150–280 words. One or two continuous paragraphs, not bullet points.
@@ -626,6 +636,7 @@ def _generate_conversational_intro(
     user_message: str,
     llm_client: OpenAIClient,
     response_language: str = "en",
+    chat_history: list[dict] | None = None,
 ) -> str | None:
     """
     Generate a HUMAN, context-specific conversational intro that reacts to
@@ -687,8 +698,21 @@ Más que una reflexión, esto parece una pregunta directa.
 Pero tiene fondo: detrás de ella hay un supuesto sobre cómo funcionan las cosas.
 Vamos a desarmarla un poco antes de responder.
 
+FOLLOW-UPS (CRITICAL):
+- If the user's CURRENT message is short or refers to something already said (e.g. "¿qué opinas?", "desarrolla eso", "no estoy de acuerdo", "y si lo miramos al revés", "eso no me convence", "explica más"), it IS a follow-up to the prior conversation.
+- In that case you MUST treat the previous user reflection (from the recent chat history below) as the actual subject. Do NOT say "esto no parece una reflexión" — it IS a reflection that continues the previous one.
+- Mention or echo the SUBJECT of the previous reflection, not the literal short follow-up phrase.
+
 Return ONLY the intro text. No quotes, no JSON, no labels."""
-    user = f"User's message:\n\"\"\"\n{user_message.strip()}\n\"\"\""
+    history_block = _format_chat_history_block(chat_history)
+    if history_block:
+        user = (
+            f"{history_block}\n\n"
+            f"User's CURRENT message (may be a follow-up; resolve it using the history above):\n"
+            f"\"\"\"\n{user_message.strip()}\n\"\"\""
+        )
+    else:
+        user = f"User's message:\n\"\"\"\n{user_message.strip()}\n\"\"\""
     try:
         result = llm_client.complete(
             system=system,
@@ -759,7 +783,7 @@ def generate_debate_layer(
                     "What would change your view on this?",
                     "What assumptions are you making?",
                 ]
-                intro = _generate_conversational_intro(user_message, llm_client, response_language)
+                intro = _generate_conversational_intro(user_message, llm_client, response_language, chat_history=chat_history)
                 debate_layer = DebateLayer(
                     steelman_of_user=flat_steelman,
                     contrarian_position=flat_contrarian,
@@ -795,7 +819,7 @@ def generate_debate_layer(
             )
         debate_layer = _validate_and_build_debate_layer(debate_dict)
         if debate_layer:
-            intro = _generate_conversational_intro(user_message, llm_client, response_language)
+            intro = _generate_conversational_intro(user_message, llm_client, response_language, chat_history=chat_history)
             debate_layer.conversational_intro = intro
             if response_language == "es":
                 translated = _translate_and_validate_es(debate_layer, llm_client)

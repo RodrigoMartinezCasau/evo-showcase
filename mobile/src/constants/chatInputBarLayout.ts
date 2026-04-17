@@ -67,6 +67,26 @@ export const PUBLISH_JUMP_ISLAND_LAYOUT = {
   chevronSize: 16,
 };
 
+/**
+ * ── AI THINKING STAR ──────────────────────────────────────────────────────
+ * Pulsing "estrella comunidad" that appears while the AI is generating.
+ * Replaces the old spinner + "Pensando…" combo.
+ */
+export const AI_THINKING_STAR_LAYOUT = {
+  /** Horizontal offset (positive = right). */
+  thinkingStarOffsetX: 0,
+  /** Vertical offset (positive = down). */
+  thinkingStarOffsetY: 0,
+  /** Base size of the star (logical pixels). */
+  thinkingStarScale: 56,
+  /** Min scale of the breathing pulse (relative to base). */
+  thinkingStarMinScale: 0.85,
+  /** Max scale of the breathing pulse (relative to base). */
+  thinkingStarMaxScale: 1.15,
+  /** One full breath cycle in milliseconds. */
+  thinkingStarPulseDurationMs: 1100,
+};
+
 /** The send button (clan SVG replaces the old star icon). */
 export const CHAT_SEND_BUTTON_LAYOUT = {
   offsetX: -10,

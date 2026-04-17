@@ -42,7 +42,9 @@ import {
   CHAT_SEND_BUTTON_LAYOUT,
   CHAT_BOTTOM_AREA_LAYOUT as CHAT_BOTTOM_AREA,
   PUBLISH_JUMP_ISLAND_LAYOUT as ISLAND,
+  AI_THINKING_STAR_LAYOUT as THINK_STAR,
 } from '@evoconn/constants/chatInputBarLayout';
+import EstrellaComunidadSvg from '../assets/sidebar/estrellaComunidadSvg/estrellaComunidad.svg';
 import { REFLECTION_EMPTY_WELCOME_LAYOUT as EMPTY_WELCOME } from '@evoconn/constants/reflectionEmptyWelcomeLayout';
 import { EMPTY_WELCOME_TRIPLE_STARS_LAYOUT as EMPTY_WELCOME_TRIPLE_STARS } from '@evoconn/constants/reflectionEmptyWelcomeTripleStarsLayout';
 import { getReflectionTripleStarsByHouse } from '@evoconn/utils/getReflectionTripleStarsByHouse';
@@ -59,9 +61,6 @@ import { useDebugStreak } from '../debug/DebugStreakContext';
 import { useAISettings } from '@evoconn/hooks/AISettingsContext';
 import { COMMUNITY_DRAWER_EDGE_ZONE_WIDTH } from '@evoconn/constants/communityDrawerGesture';
 import { useSidebarGesture } from '@evoconn/hooks/useSidebarGesture';
-
-const TYPEWRITER_CHUNK = 3;
-const TYPEWRITER_MS = 15;
 
 type ChatBubble = DebateMessage & { revealed?: string };
 
@@ -114,7 +113,6 @@ export default function ReflectionCreationScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const scrollRef = useRef<ScrollView>(null);
-  const typewriterRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Publish jump island ──────────────────────────────────────────────────
   // `messageYOffsets` stores the measured Y offset (from scroll top) for each
@@ -189,36 +187,9 @@ export default function ReflectionCreationScreen() {
     return () => { cancelled = true; };
   }, [thoughtId, loadThread]);
 
-  useEffect(() => {
-    return () => {
-      if (typewriterRef.current) clearInterval(typewriterRef.current);
-    };
-  }, []);
-
   const scrollToEnd = useCallback(() => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
   }, []);
-
-  const revealAssistantText = useCallback(
-    (fullText: string, index: number) => {
-      let pos = 0;
-      typewriterRef.current = setInterval(() => {
-        pos += TYPEWRITER_CHUNK;
-        const revealed = fullText.slice(0, pos);
-        setMessages((prev) =>
-          prev.map((m, i) =>
-            i === index ? { ...m, revealed, streaming: pos < fullText.length } : m,
-          ),
-        );
-        scrollToEnd();
-        if (pos >= fullText.length) {
-          if (typewriterRef.current) clearInterval(typewriterRef.current);
-          typewriterRef.current = null;
-        }
-      }, TYPEWRITER_MS);
-    },
-    [scrollToEnd],
-  );
 
   const handleSend = useCallback(
     async (text: string) => {
@@ -265,8 +236,8 @@ export default function ReflectionCreationScreen() {
           nextQuestion: resp.next_question,
           topic: resp.topic,
           lang: resp.lang,
-          streaming: true,
-          revealed: '',
+          streaming: false,
+          revealed: assistantText,
         };
 
         setMessages((prev) => {
@@ -274,8 +245,7 @@ export default function ReflectionCreationScreen() {
           copy[copy.length - 1] = assistantMsg;
           return copy;
         });
-
-        revealAssistantText(assistantText, messages.length + 1);
+        scrollToEnd();
 
         updateThought(id, {
           title: resp.topic || thoughts.find((t) => t.id === id)?.title || 'Reflexión',
@@ -293,7 +263,7 @@ export default function ReflectionCreationScreen() {
         setSending(false);
       }
     },
-    [sending, debateId, createThought, updateThought, messages.length, revealAssistantText, scrollToEnd, thoughts, markStreakActivated, includeReflectiveQuestion, includePhilosophicalReferences],
+    [sending, debateId, createThought, updateThought, scrollToEnd, thoughts, markStreakActivated, includeReflectiveQuestion, includePhilosophicalReferences],
   );
 
   const conversationItems = useMemo(
@@ -625,39 +595,69 @@ const MessageBubble = React.memo(function MessageBubble({
 
   const assistantMsg = message as Extract<ChatBubble, { role: 'assistant' }>;
 
-  if (assistantMsg.streaming && !displayText) {
-    return (
-      <View style={[styles.bubble, styles.aiBubble]}>
-        <ActivityIndicator color={evoconnColors.neonGreen} size="small" />
-        <Text style={styles.thinkingText}>Pensando…</Text>
-      </View>
-    );
+  // While the AI is generating (no debate_response yet), show only the pulsing star.
+  if (assistantMsg.streaming || !assistantMsg.debateResponse) {
+    if (!assistantMsg.debateResponse && !displayText) {
+      return <ThinkingStar />;
+    }
+    // Edge case: streaming flag still on but content arrived without structure
+    if (!assistantMsg.debateResponse) {
+      return (
+        <View style={styles.assistantBlock}>
+          <Text style={styles.aiText}>{displayText}</Text>
+        </View>
+      );
+    }
   }
-
-  const isStreaming = !!assistantMsg.streaming;
-  const hasStructured = !isStreaming && !!assistantMsg.debateResponse;
 
   return (
     <View style={styles.assistantBlock}>
-      {/* Typewriter text while streaming */}
-      {isStreaming ? (
-        <View style={[styles.bubble, styles.aiBubble]}>
-          <Text style={styles.aiText}>{displayText}</Text>
-          <Text style={styles.typingIndicator}>▌</Text>
-        </View>
-      ) : null}
+      <DebateResponseDisplay
+        response={assistantMsg.debateResponse!}
+        clanId={clanId}
+      />
+    </View>
+  );
+});
 
-      {/* Structured card layout once streaming completes */}
-      {hasStructured ? (
-        <DebateResponseDisplay
-          response={assistantMsg.debateResponse!}
-          clanId={clanId}
+/** Pulsing star shown while the AI is generating. */
+const ThinkingStar = React.memo(function ThinkingStar() {
+  const pulse = useRef(new Animated.Value(THINK_STAR.thinkingStarMinScale)).current;
+  useEffect(() => {
+    const half = THINK_STAR.thinkingStarPulseDurationMs / 2;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: THINK_STAR.thinkingStarMaxScale,
+          duration: half,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: THINK_STAR.thinkingStarMinScale,
+          duration: half,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+  return (
+    <View style={styles.thinkingStarWrap}>
+      <Animated.View
+        style={{
+          transform: [
+            { translateX: THINK_STAR.thinkingStarOffsetX },
+            { translateY: THINK_STAR.thinkingStarOffsetY },
+            { scale: pulse },
+          ],
+        }}
+      >
+        <EstrellaComunidadSvg
+          width={THINK_STAR.thinkingStarScale}
+          height={THINK_STAR.thinkingStarScale}
         />
-      ) : !isStreaming ? (
-        <View style={[styles.bubble, styles.aiBubble]}>
-          <Text style={styles.aiText}>{displayText}</Text>
-        </View>
-      ) : null}
+      </Animated.View>
     </View>
   );
 });
@@ -734,17 +734,10 @@ const styles = StyleSheet.create({
   },
   userText: { color: evoconnColors.text, fontSize: 15, lineHeight: 22 },
   aiText: { color: evoconnColors.text, fontSize: 15, lineHeight: 22 },
-  thinkingText: {
-    color: evoconnColors.muted,
-    fontSize: 13,
-    marginLeft: 8,
-    fontStyle: 'italic',
-  },
-  typingIndicator: {
-    color: evoconnColors.neonGreen,
-    fontSize: 18,
-    fontWeight: '700',
-    marginTop: 2,
+  thinkingStarWrap: {
+    alignSelf: 'flex-start',
+    marginVertical: 12,
+    marginLeft: 4,
   },
 
   errorBox: {
