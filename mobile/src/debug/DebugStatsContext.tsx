@@ -1,10 +1,12 @@
 import React, {
   createContext,
   useContext,
+  useEffect,
   useState,
   useCallback,
   type ReactNode,
 } from 'react';
+import { useSimulation } from '@evoconn/hooks/SimulationContext';
 
 /**
  * Master switch — always false in production builds.
@@ -75,9 +77,22 @@ const Ctx = createContext<DebugStatsContextValue>({
 });
 
 export function DebugStatsProvider({ children }: { children: ReactNode }) {
+  const sim = useSimulation();
+
   const [simulatedStreakDays,      setSimulatedRaw]        = useState(DEFAULT_SIMULATED_STREAK_DAYS);
   const [simulatedRemainingUses,   setRemainingRaw]        = useState(DEFAULT_SIMULATED_REMAINING_USES);
   const [simulatedUnlockedPhrases, setUnlockedPhrasesRaw]  = useState(DEFAULT_SIMULATED_UNLOCKED_PHRASES);
+
+  // Reset simulated stats to the new user's seed values whenever the active user changes
+  useEffect(() => {
+    const user = sim.activeUser;
+    if (user) {
+      setSimulatedRaw(user.streakDays);
+      setRemainingRaw(Math.min(user.remainingUses, SIMULATED_TOTAL_DAILY_USES));
+      setUnlockedPhrasesRaw(user.unlockedPhrases);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sim.activeUserId]);
   const [realStreakDays,            setRealStreakRaw]       = useState(0);
   const [realRemainingUses,         setRealRemainingRaw]   = useState(0);
 

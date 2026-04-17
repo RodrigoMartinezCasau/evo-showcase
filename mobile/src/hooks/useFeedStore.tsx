@@ -1,25 +1,44 @@
+/**
+ * useFeedStore — seeds posts from SimulationContext and routes all vote/save
+ * mutations through it, ensuring a single source of truth.
+ *
+ * The `voteStats` on each CommunityPost is always computed from the voter-ID
+ * arrays in SimulationContext, so it automatically reflects every action.
+ */
 import React, {
   createContext,
-  useContext,
-  useState,
   useCallback,
+  useContext,
   useMemo,
+  useState,
 } from 'react';
 import type { CommunityPost, PhrasePost, User, VoteStats } from '../types';
-import { mockFeedPosts as SEED } from '../data/mockCommunity';
+import { useSimulation } from '@evoconn/hooks/SimulationContext';
+import { SIM_USERS_BY_ID, type SimPost } from '@evoconn/data/simulation/simulatedNetwork';
 
-function applyVoteTransition(
-  stats: VoteStats,
-  from: 'up' | 'down' | null,
-  to: 'up' | 'down' | null,
-): VoteStats {
-  let { up, down, save } = stats;
-  if (from === 'up') up = Math.max(0, up - 1);
-  if (from === 'down') down = Math.max(0, down - 1);
-  if (to === 'up') up += 1;
-  if (to === 'down') down += 1;
-  return { up, down, save };
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function simPostToCommunityPost(p: SimPost): CommunityPost {
+  const author = SIM_USERS_BY_ID[p.authorId];
+  return {
+    id: p.id,
+    type: p.type,
+    author: author
+      ? { id: author.id, username: author.username, clanId: author.clanId, rank: author.rank }
+      : { id: p.authorId, username: '?', clanId: null, rank: 'aprendiz' },
+    title: p.title,
+    body: p.body,
+    quoteAuthor: p.quoteAuthor,
+    voteStats: {
+      up:   p.upvoterIds.length,
+      down: p.downvoterIds.length,
+      save: p.saverIds.length,
+    },
+    createdAt: p.createdAt,
+  };
 }
+
+// ─── Context type ─────────────────────────────────────────────────────────────
 
 type FeedContextValue = {
   posts: CommunityPost[];
@@ -27,21 +46,45 @@ type FeedContextValue = {
   hasPublished: (sourceId: string) => boolean;
   getPostById: (id: string) => CommunityPost | undefined;
   updatePostVote: (postId: string, from: 'up' | 'down' | null, to: 'up' | 'down' | null) => void;
+  /** No-op — save count is maintained by SimulationContext.toggleSave. */
   updatePostSaveToggle: (postId: string, wasSaved: boolean, nowSaved: boolean) => void;
 };
 
 const FeedContext = createContext<FeedContextValue | null>(null);
 
+// ─── Provider ─────────────────────────────────────────────────────────────────
+
 export function FeedProvider({ children }: { children: React.ReactNode }) {
-  const [posts, setPosts] = useState<CommunityPost[]>(SEED);
+  const sim = useSimulation();
   const [publishedIds, setPublishedIds] = useState<Set<string>>(new Set());
 
-  const publishPost = useCallback((post: CommunityPost) => {
-    setPosts((prev) => [post, ...prev]);
-    if (post.id) {
-      setPublishedIds((prev) => new Set(prev).add(post.id));
-    }
-  }, []);
+  // All posts: derive CommunityPost[] from the live SimPost[] so vote/save
+  // counts always reflect the current simulation state.
+  const posts = useMemo<CommunityPost[]>(
+    () => sim.posts.map(simPostToCommunityPost),
+    [sim.posts],
+  );
+
+  const publishPost = useCallback(
+    (post: CommunityPost) => {
+      // Convert to SimPost shape and add to simulation
+      const simPost: SimPost = {
+        id: post.id,
+        authorId: post.author.id,
+        type: post.type,
+        title: post.title,
+        body: post.body,
+        quoteAuthor: post.quoteAuthor,
+        createdAt: post.createdAt,
+        upvoterIds: [],
+        downvoterIds: [],
+        saverIds: [],
+      };
+      sim.publishPost(simPost);
+      setPublishedIds(prev => new Set(prev).add(post.id));
+    },
+    [sim],
+  );
 
   const hasPublished = useCallback(
     (sourceId: string) => publishedIds.has(sourceId),
@@ -49,35 +92,30 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
   );
 
   const getById = useCallback(
-    (id: string) => posts.find((p) => p.id === id),
+    (id: string) => posts.find(p => p.id === id),
     [posts],
   );
 
+  // Routes vote through SimulationContext (the `from` param is ignored since
+  // SimulationContext tracks prior votes in voteMap).
   const updatePostVote = useCallback(
-    (postId: string, from: 'up' | 'down' | null, to: 'up' | 'down' | null) => {
-      setPosts((prev) =>
-        prev.map((p) =>
-          p.id === postId
-            ? { ...p, voteStats: applyVoteTransition(p.voteStats, from, to) }
-            : p,
-        ),
-      );
+    (postId: string, _from: 'up' | 'down' | null, to: 'up' | 'down' | null) => {
+      sim.castVote(sim.activeUserId, postId, to);
+    },
+    [sim],
+  );
+
+  // Save count on posts is always up-to-date via SimulationContext.toggleSave
+  // (called from PersonalProfileContext.savePost/unsavePost).
+  // This function is kept for API compatibility but is a no-op.
+  const updatePostSaveToggle = useCallback(
+    (_postId: string, _wasSaved: boolean, _nowSaved: boolean) => {
+      // no-op: SimulationContext.toggleSave already updates post.saverIds
     },
     [],
   );
 
-  const updatePostSaveToggle = useCallback((postId: string, wasSaved: boolean, nowSaved: boolean) => {
-    if (wasSaved === nowSaved) return;
-    setPosts((prev) =>
-      prev.map((p) => {
-        if (p.id !== postId) return p;
-        const save = p.voteStats.save + (nowSaved ? 1 : -1);
-        return { ...p, voteStats: { ...p.voteStats, save: Math.max(0, save) } };
-      }),
-    );
-  }, []);
-
-  const value = useMemo(
+  const value = useMemo<FeedContextValue>(
     () => ({
       posts,
       publishPost,
@@ -89,9 +127,7 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
     [posts, publishPost, hasPublished, getById, updatePostVote, updatePostSaveToggle],
   );
 
-  return (
-    <FeedContext.Provider value={value}>{children}</FeedContext.Provider>
-  );
+  return <FeedContext.Provider value={value}>{children}</FeedContext.Provider>;
 }
 
 export function useFeedStore(): FeedContextValue {
@@ -99,6 +135,8 @@ export function useFeedStore(): FeedContextValue {
   if (!ctx) throw new Error('useFeedStore must be used within FeedProvider');
   return ctx;
 }
+
+// ─── Post factory helpers (unchanged API) ─────────────────────────────────────
 
 let _nextId = 100;
 
@@ -118,9 +156,6 @@ export function createReflectionPost(
   };
 }
 
-/**
- * Frase en comunidad: `body` = texto interior normalizado (sin comillas); la UI añade las comillas al renderizar.
- */
 export function createPhrasePost(
   author: User,
   phraseInnerNormalized: string,

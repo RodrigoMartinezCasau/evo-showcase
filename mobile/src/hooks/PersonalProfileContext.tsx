@@ -1,28 +1,55 @@
 /**
  * PersonalProfileContext — shared reactive state for the personal profile ecosystem.
  *
+ * All data derives from SimulationContext — no local "init once" state.
+ * Switching the active user in SimulationContext automatically updates every
+ * consumer of this context.
+ *
  * Covers:
  *  - Posts: delete / hide-from-public
- *  - Followers: follow-back / unfollow-back
+ *  - Followers: follow-back / unfollow
  *  - Following: unfollow
- *
- * Wrap the app (in _layout.tsx) with <PersonalProfileProvider> so that
- * PersonalPostsScreen, PersonalFollowersScreen, PersonalFollowingScreen
- * and the PersonalProfileScreen slider all share the same live data.
+ *  - Saved posts: save / unsave
+ *  - Mutual friends (following ∩ followers)
  */
 import React, {
   createContext,
   useCallback,
   useContext,
   useMemo,
-  useState,
 } from 'react';
-import type { CommunityPost } from '@evoconn/types';
+import type { CommunityPost, User } from '@evoconn/types';
+import type { FollowerEntry, FollowingEntry } from '@evoconn/data/mockPersonalProfile';
+import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import {
-  getPersonalProfile,
-  type FollowerEntry,
-  type FollowingEntry,
-} from '@evoconn/data/mockPersonalProfile';
+  SIM_USERS_BY_ID,
+  type SimPost,
+  type SimUser,
+} from '@evoconn/data/simulation/simulatedNetwork';
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function simUserToUser(u: SimUser): User {
+  return { id: u.id, username: u.username, clanId: u.clanId, rank: u.rank };
+}
+
+function simPostToCommunityPost(p: SimPost, users: Record<string, SimUser>): CommunityPost {
+  const author = users[p.authorId];
+  return {
+    id: p.id,
+    type: p.type,
+    author: author ? simUserToUser(author) : { id: p.authorId, username: '?', clanId: null, rank: 'aprendiz' },
+    title: p.title,
+    body: p.body,
+    quoteAuthor: p.quoteAuthor,
+    voteStats: {
+      up:   p.upvoterIds.length,
+      down: p.downvoterIds.length,
+      save: p.saverIds.length,
+    },
+    createdAt: p.createdAt,
+  };
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -50,7 +77,6 @@ type PersonalProfileContextValue = {
 
   // ── Saved posts ──
   savedPosts: CommunityPost[];
-  /** Reactive Set of saved post IDs — O(1) membership check. */
   savedPostIds: Set<string>;
   savePost: (post: CommunityPost) => void;
   unsavePost: (id: string) => void;
@@ -64,95 +90,124 @@ const PersonalProfileCtx = createContext<PersonalProfileContextValue | null>(nul
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function PersonalProfileProvider({ children }: { children: React.ReactNode }) {
-  const profile = getPersonalProfile();
+  const sim = useSimulation();
+  const { activeUserId, users, posts: simPosts, followGraph, savedMap, hiddenMap } = sim;
 
-  const [posts, setPosts] = useState<CommunityPost[]>(profile.recentPosts);
-  const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(new Set());
-  const [followers] = useState<FollowerEntry[]>(profile.followers);
-  const [following, setFollowing] = useState<FollowingEntry[]>(profile.following);
-  const [followingBackIds, setFollowingBackIds] = useState<Set<string>>(new Set());
-  const [savedPosts, setSavedPosts] = useState<CommunityPost[]>(profile.savedPosts);
+  // ── Posts ──────────────────────────────────────────────────────────────────
+  const posts = useMemo<CommunityPost[]>(
+    () => simPosts
+      .filter(p => p.authorId === activeUserId)
+      .map(p => simPostToCommunityPost(p, users)),
+    [simPosts, activeUserId, users],
+  );
 
-  // ── Post actions ──────────────────────────────────────────────────────────
+  const hiddenPostIds = useMemo<Set<string>>(
+    () => hiddenMap[activeUserId] ?? new Set<string>(),
+    [hiddenMap, activeUserId],
+  );
 
-  const deletePost = useCallback((id: string) => {
-    setPosts(prev => prev.filter(p => p.id !== id));
-  }, []);
+  const deletePost = useCallback(
+    (id: string) => sim.deletePost(activeUserId, id),
+    [sim, activeUserId],
+  );
 
-  const toggleHidePost = useCallback((id: string) => {
-    setHiddenPostIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
+  const toggleHidePost = useCallback(
+    (id: string) => sim.toggleHidePost(activeUserId, id),
+    [sim, activeUserId],
+  );
 
   const isHidden = useCallback(
     (id: string) => hiddenPostIds.has(id),
     [hiddenPostIds],
   );
 
-  // ── Follower actions ──────────────────────────────────────────────────────
+  // ── Followers ──────────────────────────────────────────────────────────────
+  const followers = useMemo<FollowerEntry[]>(() => {
+    return Object.entries(followGraph)
+      .filter(([, followingSet]) => followingSet.has(activeUserId))
+      .map(([uid]) => {
+        const u = users[uid];
+        return u ? { id: u.id, username: u.username, clanId: u.clanId, rank: u.rank } : null;
+      })
+      .filter((f): f is FollowerEntry => f !== null);
+  }, [followGraph, activeUserId, users]);
 
-  const followBack = useCallback((id: string) => {
-    setFollowingBackIds(prev => {
-      const next = new Set(prev);
-      next.add(id);
-      return next;
-    });
-  }, []);
+  // ── Following ──────────────────────────────────────────────────────────────
+  const following = useMemo<FollowingEntry[]>(() => {
+    const myFollowing = followGraph[activeUserId] ?? new Set<string>();
+    return [...myFollowing]
+      .map(uid => {
+        const u = users[uid];
+        return u ? { id: u.id, username: u.username, clanId: u.clanId, rank: u.rank } : null;
+      })
+      .filter((f): f is FollowingEntry => f !== null);
+  }, [followGraph, activeUserId, users]);
 
-  const unfollowBack = useCallback((id: string) => {
-    setFollowingBackIds(prev => {
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-  }, []);
+  // followingBackIds = users I already follow back (who are in my followers list)
+  const followingBackIds = useMemo<Set<string>>(() => {
+    const myFollowingSet = followGraph[activeUserId] ?? new Set<string>();
+    return new Set(followers.filter(f => myFollowingSet.has(f.id)).map(f => f.id));
+  }, [followers, followGraph, activeUserId]);
+
+  const followBack = useCallback(
+    (id: string) => sim.follow(activeUserId, id),
+    [sim, activeUserId],
+  );
+
+  const unfollowBack = useCallback(
+    (id: string) => sim.unfollow(activeUserId, id),
+    [sim, activeUserId],
+  );
 
   const isFollowingBack = useCallback(
     (id: string) => followingBackIds.has(id),
     [followingBackIds],
   );
 
-  // ── Following actions ─────────────────────────────────────────────────────
-
-  const unfollowUser = useCallback((id: string) => {
-    setFollowing(prev => prev.filter(u => u.id !== id));
-  }, []);
-
-  // ── Saved-posts actions ────────────────────────────────────────────────────
-
-  const savedPostIds = useMemo<Set<string>>(
-    () => new Set(savedPosts.map(p => p.id)),
-    [savedPosts],
+  const unfollowUser = useCallback(
+    (id: string) => sim.unfollow(activeUserId, id),
+    [sim, activeUserId],
   );
 
-  const savePost = useCallback((post: CommunityPost) => {
-    setSavedPosts(prev => {
-      if (prev.some(p => p.id === post.id)) return prev;
-      return [post, ...prev];
-    });
-  }, []);
+  // ── Mutual friends ─────────────────────────────────────────────────────────
+  const friends = useMemo<FollowingEntry[]>(() => {
+    const followerIdSet = new Set(followers.map(f => f.id));
+    return following.filter(u => followerIdSet.has(u.id));
+  }, [followers, following]);
 
-  const unsavePost = useCallback((id: string) => {
-    setSavedPosts(prev => prev.filter(p => p.id !== id));
-  }, []);
+  // ── Saved posts ────────────────────────────────────────────────────────────
+  const savedPostIds = useMemo<Set<string>>(
+    () => savedMap[activeUserId] ?? new Set<string>(),
+    [savedMap, activeUserId],
+  );
+
+  const savedPosts = useMemo<CommunityPost[]>(
+    () => [...savedPostIds]
+      .map(postId => simPosts.find(p => p.id === postId))
+      .filter((p): p is SimPost => p !== undefined)
+      .map(p => simPostToCommunityPost(p, users)),
+    [savedPostIds, simPosts, users],
+  );
+
+  const savePost = useCallback(
+    (post: CommunityPost) => sim.toggleSave(activeUserId, post.id),
+    [sim, activeUserId],
+  );
+
+  const unsavePost = useCallback(
+    (id: string) => {
+      // Only toggle if currently saved (to avoid toggling to saved)
+      if (savedPostIds.has(id)) sim.toggleSave(activeUserId, id);
+    },
+    [sim, activeUserId, savedPostIds],
+  );
 
   const isSaved = useCallback(
     (postId: string) => savedPostIds.has(postId),
     [savedPostIds],
   );
 
-  // ── Computed mutual friends (following ∩ followers) ──────────────────────
-  const friends = useMemo<FollowingEntry[]>(() => {
-    const followerIdSet = new Set(followers.map(f => f.id));
-    return following.filter(u => followerIdSet.has(u.id));
-  }, [followers, following]);
-
-  // ── Memoized value ────────────────────────────────────────────────────────
-
+  // ─── Memoized value ────────────────────────────────────────────────────────
   const value = useMemo<PersonalProfileContextValue>(
     () => ({
       posts,

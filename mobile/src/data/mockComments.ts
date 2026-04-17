@@ -1,18 +1,23 @@
-import type { Comment, User } from '../types'
+/**
+ * mockComments.ts — comments authored by real simulated users.
+ */
+import type { Comment, User } from '../types';
+import { SIM_USERS_BY_ID } from './simulation/simulatedNetwork';
 
-const users: User[] = [
-  { id: 'u1', username: 'FILOSOFO1', clanId: 'humanista', rank: 'filosofo' },
-  { id: 'u2', username: 'APRENDIZ2', clanId: 'nihilista', rank: 'aprendiz' },
-  { id: 'u3', username: 'MAESTRO3', clanId: 'cientista', rank: 'maestro' },
-  { id: 'u4', username: 'REALISTA4', clanId: 'realista', rank: 'aprendiz' },
-  { id: 'u5', username: 'ESTOICO5', clanId: 'estoico', rank: 'maestro' },
-]
+function user(id: string): User {
+  const u = SIM_USERS_BY_ID[id];
+  return u
+    ? { id: u.id, username: u.username, clanId: u.clanId, rank: u.rank }
+    : { id, username: '?', clanId: null, rank: 'aprendiz' };
+}
+
+const now = new Date().toISOString();
 
 export const mockComments: Comment[] = [
-  { id: 'co1', author: users[0], body: 'Comentario sobre la reflexión.', upCount: 12, createdAt: new Date().toISOString() },
-  { id: 'co2', author: users[1], body: 'Muy de acuerdo con la frase.', upCount: 5, createdAt: new Date().toISOString() },
-  { id: 'co3', author: users[2], body: 'Interesante perspectiva.', upCount: 8, createdAt: new Date().toISOString() },
-  { id: 'co4', author: users[3], body: 'Esto me hizo pensar mucho.', upCount: 3, createdAt: new Date().toISOString() },
-  { id: 'co5', author: users[4], body: 'Gran reflexión, la comparto.', upCount: 7, createdAt: new Date().toISOString() },
-  { id: 'co6', author: users[0], body: 'Vuelvo a leerlo y encuentro más sentido cada vez que lo hago. Este tipo de reflexiones son las que marcan la diferencia en cómo vemos el mundo y nuestro lugar en él. Ojalá hubiera más contenido así.', upCount: 2, createdAt: new Date().toISOString() },
-]
+  { id: 'co1', author: user('u1'), body: 'Exactamente lo que sentí al leer a Sartre por primera vez.', upCount: 3, createdAt: now },
+  { id: 'co2', author: user('u4'), body: 'El libre albedrío como carga — tema inagotable.', upCount: 2, createdAt: now },
+  { id: 'co3', author: user('u5'), body: 'Marco Aurelio siempre en el momento justo.', upCount: 5, createdAt: now },
+  { id: 'co4', author: user('u1'), body: 'Nietzsche nunca decepciona.', upCount: 1, createdAt: now },
+  { id: 'co5', author: user('u5'), body: 'El viaje interior es el único que vale la pena.', upCount: 4, createdAt: now },
+  { id: 'co6', author: user('u3'), body: 'La base de todo pensamiento crítico moderno.', upCount: 2, createdAt: now },
+];

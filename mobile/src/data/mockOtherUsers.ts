@@ -1,4 +1,14 @@
+/**
+ * mockOtherUsers.ts — OtherUserProfile entries for all 9 simulated users.
+ * Used by ProfileScreen when viewing another user's profile.
+ */
 import type { CommunityPost, User, Rank } from '../types';
+import {
+  SIM_USERS,
+  SIM_USERS_BY_ID,
+  SIM_POSTS,
+  SIM_FOLLOW_GRAPH,
+} from './simulation/simulatedNetwork';
 
 export type OtherUserProfile = {
   id: string;
@@ -14,100 +24,48 @@ export type OtherUserProfile = {
   recentPosts: CommunityPost[];
 };
 
-const MOCK_AUTHORS: Record<string, User> = {
-  '1': { id: '1', username: '@DIEGOLLUBERES', clanId: 'nihilista', rank: 'maestro', followersCount: 1240, followingCount: 87 },
-  '2': { id: '2', username: '@ALEJANDROSERRANO', clanId: 'estoico', rank: 'filosofo', followersCount: 3580, followingCount: 214 },
-  '3': { id: '3', username: '@RODRIGOMARTINEZ', clanId: 'existencialista', rank: 'filosofo', followersCount: 8920, followingCount: 156 },
-  '4': { id: '4', username: '@HERNANCHACON', clanId: 'realista', rank: 'aprendiz', followersCount: 420, followingCount: 63 },
-};
+function followersCount(userId: string): number {
+  return Object.values(SIM_FOLLOW_GRAPH).filter(arr => arr.includes(userId)).length;
+}
 
-const MOCK_PROFILES: OtherUserProfile[] = [
-  {
-    id: '1',
-    username: '@DIEGOLLUBERES',
-    clanId: 'nihilista',
-    rank: 'maestro',
-    followersCount: 1240,
-    followingCount: 87,
-    insigniaPhrase: '"El vacío no es ausencia, es el lienzo donde todo comienza."',
-    philosophyPercentages: [
-      { clanId: 'nihilista', label: 'Nihilista', pct: 65 },
-      { clanId: 'existencialista', label: 'Existencialista', pct: 20 },
-      { clanId: 'estoico', label: 'Estoico', pct: 10 },
-      { clanId: 'racionalista', label: 'Racionalista', pct: 5 },
-    ],
-    totalReflections: 47,
-    totalQuotes: 23,
-    recentPosts: [
-      { id: 'p1', type: 'reflection', author: MOCK_AUTHORS['1'], title: 'AHORRAR TIEMPO SUCKS', body: 'Intentamos ganar minutos, pero la vida no se acelera.', voteStats: { up: 508, down: 347, save: 31 }, createdAt: new Date().toISOString() },
-      { id: 'p5', type: 'phrase', author: MOCK_AUTHORS['1'], body: 'La duda es el principio de la sabiduría.', quoteAuthor: 'Aristóteles', voteStats: { up: 2340, down: 45, save: 190 }, createdAt: new Date().toISOString() },
-    ],
-  },
-  {
-    id: '2',
-    username: '@ALEJANDROSERRANO',
-    clanId: 'estoico',
-    rank: 'filosofo',
-    followersCount: 3580,
-    followingCount: 214,
-    insigniaPhrase: '"La virtud no necesita aplausos, se sostiene sola."',
-    philosophyPercentages: [
-      { clanId: 'estoico', label: 'Estoico', pct: 70 },
-      { clanId: 'racionalista', label: 'Racionalista', pct: 15 },
-      { clanId: 'humanista', label: 'Humanista', pct: 10 },
-      { clanId: 'realista', label: 'Realista', pct: 5 },
-    ],
-    totalReflections: 112,
-    totalQuotes: 58,
-    recentPosts: [
-      { id: 'p2', type: 'reflection', author: MOCK_AUTHORS['2'], title: 'EL EXITO ES UNA MIERDA', body: 'El éxito prometido nunca coincide con la paz interior que buscabas.', voteStats: { up: 867, down: 12, save: 23 }, createdAt: new Date().toISOString() },
-      { id: 'p6', type: 'phrase', author: MOCK_AUTHORS['2'], body: 'No busques la felicidad fuera. Construye el camino desde dentro.', quoteAuthor: 'Nietzsche', voteStats: { up: 1870, down: 22, save: 145 }, createdAt: new Date().toISOString() },
-    ],
-  },
-  {
-    id: '3',
-    username: '@RODRIGOMARTINEZ',
-    clanId: 'existencialista',
-    rank: 'filosofo',
-    followersCount: 8920,
-    followingCount: 156,
-    insigniaPhrase: '"Existir es elegir, y elegir es crear sentido donde no lo hay."',
-    philosophyPercentages: [
-      { clanId: 'existencialista', label: 'Existencialista', pct: 55 },
-      { clanId: 'nihilista', label: 'Nihilista', pct: 25 },
-      { clanId: 'trascendentalista', label: 'Trascendentalista', pct: 12 },
-      { clanId: 'humanista', label: 'Humanista', pct: 8 },
-    ],
-    totalReflections: 203,
-    totalQuotes: 89,
-    recentPosts: [
-      { id: 'p3', type: 'phrase', author: MOCK_AUTHORS['3'], body: 'Hay personas que llegan a tu vida para quedarse. Y otras que llegan para enseñarte algo.', quoteAuthor: 'Napoleón', voteStats: { up: 127000, down: 987, save: 300 }, createdAt: new Date().toISOString() },
-    ],
-  },
-  {
-    id: '4',
-    username: '@HERNANCHACON',
-    clanId: 'realista',
-    rank: 'aprendiz',
-    followersCount: 420,
-    followingCount: 63,
-    insigniaPhrase: '"Lo que es, es. Lo demás es ruido."',
-    philosophyPercentages: [
-      { clanId: 'realista', label: 'Realista', pct: 60 },
-      { clanId: 'estoico', label: 'Estoico', pct: 20 },
-      { clanId: 'racionalista', label: 'Racionalista', pct: 15 },
-      { clanId: 'cientista', label: 'Cientista', pct: 5 },
-    ],
-    totalReflections: 18,
-    totalQuotes: 9,
-    recentPosts: [
-      { id: 'p4', type: 'reflection', author: MOCK_AUTHORS['4'], title: 'NO TENGAS MIEDO PRECIOSA', body: 'El miedo es la brújula que señala exactamente adonde necesitas ir.', voteStats: { up: 420, down: 12, save: 88 }, createdAt: new Date().toISOString() },
-    ],
-  },
-];
+function simAuthorToUser(id: string): User {
+  const u = SIM_USERS_BY_ID[id];
+  return u
+    ? { id: u.id, username: u.username, clanId: u.clanId, rank: u.rank }
+    : { id, username: '?', clanId: null, rank: 'aprendiz' };
+}
+
+const MOCK_PROFILES: OtherUserProfile[] = SIM_USERS.map(u => ({
+  id: u.id,
+  username: u.username,
+  clanId: u.clanId,
+  rank: u.rank,
+  followersCount: followersCount(u.id),
+  followingCount: (SIM_FOLLOW_GRAPH[u.id] ?? []).length,
+  insigniaPhrase: u.insigniaPhrase,
+  philosophyPercentages: u.philosophyPercentages,
+  totalReflections: u.totalReflections,
+  totalQuotes: u.totalQuotes,
+  recentPosts: SIM_POSTS
+    .filter(p => p.authorId === u.id)
+    .map(p => ({
+      id: p.id,
+      type: p.type,
+      author: simAuthorToUser(p.authorId),
+      title: p.title,
+      body: p.body,
+      quoteAuthor: p.quoteAuthor,
+      voteStats: {
+        up: p.upvoterIds.length,
+        down: p.downvoterIds.length,
+        save: p.saverIds.length,
+      },
+      createdAt: p.createdAt,
+    })),
+}));
 
 export function getOtherUserProfile(userId: string): OtherUserProfile | undefined {
-  return MOCK_PROFILES.find((p) => p.id === userId);
+  return MOCK_PROFILES.find(p => p.id === userId);
 }
 
 export function getOtherUserProfileOrFallback(userId: string): OtherUserProfile {

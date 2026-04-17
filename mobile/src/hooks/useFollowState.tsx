@@ -1,8 +1,13 @@
-import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
-import { MOCK_INITIAL_FOLLOWING } from '@evoconn/data/mockUser';
+/**
+ * useFollowState — delegates entirely to SimulationContext.
+ *
+ * `isFollowing(uid)` checks whether the active simulated user follows `uid`.
+ * `toggleFollow(uid)` adds/removes the edge in the simulation follow graph.
+ */
+import React, { createContext, useContext, useMemo } from 'react';
+import { useSimulation } from '@evoconn/hooks/SimulationContext';
 
 type FollowContextValue = {
-  /** Set of user IDs the current user follows. */
   followingSet: Set<string>;
   isFollowing: (userId: string) => boolean;
   toggleFollow: (userId: string) => void;
@@ -11,36 +16,25 @@ type FollowContextValue = {
 const FollowContext = createContext<FollowContextValue | null>(null);
 
 export function FollowProvider({ children }: { children: React.ReactNode }) {
-  const [followingSet, setFollowingSet] = useState<Set<string>>(
-    () => new Set(MOCK_INITIAL_FOLLOWING),
+  const sim = useSimulation();
+  const { activeUserId, followGraph, toggleFollow: simToggle } = sim;
+
+  const followingSet = useMemo(
+    () => followGraph[activeUserId] ?? new Set<string>(),
+    [followGraph, activeUserId],
   );
 
-  const isFollowing = useCallback(
-    (userId: string) => followingSet.has(userId),
-    [followingSet],
-  );
-
-  const toggleFollow = useCallback((userId: string) => {
-    setFollowingSet((prev) => {
-      const next = new Set(prev);
-      if (next.has(userId)) {
-        next.delete(userId);
-      } else {
-        next.add(userId);
-      }
-      return next;
-    });
-  }, []);
-
-  const value = useMemo(
-    () => ({ followingSet, isFollowing, toggleFollow }),
-    [followingSet, isFollowing, toggleFollow],
+  const value = useMemo<FollowContextValue>(
+    () => ({
+      followingSet,
+      isFollowing: (uid: string) => followingSet.has(uid),
+      toggleFollow: (uid: string) => simToggle(activeUserId, uid),
+    }),
+    [followingSet, simToggle, activeUserId],
   );
 
   return (
-    <FollowContext.Provider value={value}>
-      {children}
-    </FollowContext.Provider>
+    <FollowContext.Provider value={value}>{children}</FollowContext.Provider>
   );
 }
 
