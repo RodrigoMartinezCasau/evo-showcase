@@ -73,8 +73,9 @@ export default function ReflectionCreationScreen() {
   const { thoughts, createThought, updateThought, loadThread } = useThoughts();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const clanColor = getChatUserAccentColor(activeClan);
-  // Island uses true primary clan color, with a special soft purple for Sin clan
-  const islandBgColor = activeClan ? getClanColor(activeClan) : '#d8cdff';
+  // Island: each clan uses its primary color; Sin clan uses neon lime with dark text
+  const islandBgColor = activeClan ? getClanColor(activeClan) : '#c7ff02';
+  const islandFgColor = activeClan ? '#FFFFFF' : '#000000';
 
   const SendIcon = useMemo(() => getChatSendButtonByHouse(activeClan), [activeClan]);
   const sendButtonSize = CHAT_SEND_BUTTON_LAYOUT.size;
@@ -468,6 +469,7 @@ export default function ReflectionCreationScreen() {
               style={[
                 styles.islandChevron,
                 {
+                  color: islandFgColor,
                   transform: [
                     { rotate: '90deg' },
                     { scale: ISLAND.publishJumpIslandChevronScale },
@@ -482,6 +484,7 @@ export default function ReflectionCreationScreen() {
               style={[
                 styles.islandLabel,
                 {
+                  color: islandFgColor,
                   transform: [
                     { translateX: ISLAND.publishJumpIslandTextOffsetX },
                     { translateY: ISLAND.publishJumpIslandTextOffsetY },
@@ -495,6 +498,7 @@ export default function ReflectionCreationScreen() {
               style={[
                 styles.islandChevron,
                 {
+                  color: islandFgColor,
                   transform: [
                     { rotate: '90deg' },
                     { scale: ISLAND.publishJumpIslandChevronScale },
@@ -754,7 +758,7 @@ const styles = StyleSheet.create({
   // ── Publish jump island ──────────────────────────────────────────────────
   islandWrapper: {
     position: 'absolute',
-    bottom: 110,
+    bottom: ISLAND.publishJumpIslandBottom,
     left: 0,
     right: 0,
     alignItems: 'center',

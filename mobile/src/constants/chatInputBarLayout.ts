@@ -38,10 +38,16 @@ export const CHAT_INPUT_LAYOUT = {
  * scrolls above the visible area.  Tap → scroll back to that reflection.
  */
 export const PUBLISH_JUMP_ISLAND_LAYOUT = {
+  /**
+   * Distance from the bottom of the screen.
+   * Decrease to move the island closer to the bottom nav.
+   * Increase to push it further up.
+   */
+  publishJumpIslandBottom: 110,
   /** Horizontal offset from center (positive = right). */
   publishJumpIslandOffsetX: 0,
-  /** Vertical offset from its base position (positive = down). */
-  publishJumpIslandOffsetY: 0,
+  /** Fine vertical offset via transform (positive = down). */
+  publishJumpIslandOffsetY: 10,
   /** Uniform scale applied to the whole island. */
   publishJumpIslandScale: 1,
   /** Horizontal offset applied only to the label text. */
