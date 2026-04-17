@@ -10,10 +10,15 @@
  * ────────────────────────────────────────────── */
 
 export const AI_RESPONSE_BLOCK_GAPS = {
-  postureToCounterpoint: 0.5,
-  counterpointToQuestion: 0.5,
-  questionToQuote: 0.5,
-  quoteToPublish: 0.5,
+  /** Gap between Publicar block (now at top) and TU POSTURA. */
+  publishToStance: 16,
+  /** Gap between borderless ArgumentCards — increased because there are no card borders to provide visual separation. */
+  postureToCounterpoint: 20,
+  counterpointToQuestion: 20,
+  /** Pregunta and Cita are still boxed, so a tighter gap is fine. */
+  questionToQuote: 8,
+  /** Legacy — kept for backward compat, no longer used in DebateResponseDisplay. */
+  quoteToPublish: 0,
 } as const;
 
 /** Per-block border thickness (px). */

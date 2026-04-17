@@ -88,7 +88,7 @@ export const ArgumentCard = React.memo(function ArgumentCard({
   );
 
   return (
-    <View style={[styles.card, { borderColor, borderWidth, backgroundColor }]}>
+    <View style={styles.card}>
       <View style={[styles.header, { height: headerH }]}>
         {StarIcon ? (
           <View style={starBoxStyle}>
@@ -193,9 +193,9 @@ export const ArgumentCard = React.memo(function ArgumentCard({
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: CARD.borderRadius,
     paddingHorizontal: CARD.paddingHorizontal,
     paddingVertical: CARD.paddingVertical,
+    // No border, no background — content flows on the black screen background
   },
   header: {
     marginBottom: HDR.marginBottom,

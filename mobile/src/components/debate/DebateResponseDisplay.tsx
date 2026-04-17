@@ -136,6 +136,20 @@ export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
 
   return (
     <View>
+      {/* ── 0. PUBLICAR — attached directly below the user's reflection ── */}
+      <View style={{ marginBottom: GAPS.publishToStance }}>
+        <PublishBlock
+          borderColor={getBlockBorderColor('publish', clanId)}
+          borderWidth={BW.publish}
+          backgroundColor={getBlockBackgroundColor('publish', clanId)}
+          starIcon={PublishStar}
+          titleOutlineColor={getPublishTitleOutlineColor(clanId)}
+          actionBarColor={getPublishTitleOutlineColor(clanId)}
+          onTitleChange={canPublish ? handleTitleChange : undefined}
+          onPublish={canPublish ? handlePublish : undefined}
+        />
+      </View>
+
       {/* ── 1. TU POSTURA ── */}
       {hasStance ? (
         <ArgumentCard
@@ -200,20 +214,6 @@ export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
           />
         </View>
       ) : null}
-
-      {/* ── 5. PUBLICAR ── */}
-      <View style={{ marginTop: GAPS.quoteToPublish }}>
-        <PublishBlock
-          borderColor={getBlockBorderColor('publish', clanId)}
-          borderWidth={BW.publish}
-          backgroundColor={getBlockBackgroundColor('publish', clanId)}
-          starIcon={PublishStar}
-          titleOutlineColor={getPublishTitleOutlineColor(clanId)}
-          actionBarColor={getPublishTitleOutlineColor(clanId)}
-          onTitleChange={canPublish ? handleTitleChange : undefined}
-          onPublish={canPublish ? handlePublish : undefined}
-        />
-      </View>
     </View>
   );
 });
