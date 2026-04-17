@@ -42,8 +42,15 @@ import {
 import { REFLECTION_EMPTY_WELCOME_LAYOUT as EMPTY_WELCOME } from '@evoconn/constants/reflectionEmptyWelcomeLayout';
 import { EMPTY_WELCOME_TRIPLE_STARS_LAYOUT as EMPTY_WELCOME_TRIPLE_STARS } from '@evoconn/constants/reflectionEmptyWelcomeTripleStarsLayout';
 import { getReflectionTripleStarsByHouse } from '@evoconn/utils/getReflectionTripleStarsByHouse';
-import { DebateResponseDisplay } from '@evoconn/components/debate';
+import { DebateResponseDisplay, PublishBlock } from '@evoconn/components/debate';
 import { useFeedStore, createReflectionPost } from '@evoconn/hooks/useFeedStore';
+import {
+  AI_RESPONSE_BORDER_WIDTH as DEBATE_BW,
+  getBlockBorderColor,
+  getBlockBackgroundColor,
+  getPublishTitleOutlineColor,
+} from '@evoconn/constants/debateResponseLayout';
+import { getPublishStarByClan } from '@evoconn/utils/getDebateStarByClan';
 import { useDebugStreak } from '../debug/DebugStreakContext';
 import { useAISettings } from '@evoconn/hooks/AISettingsContext';
 import { COMMUNITY_DRAWER_EDGE_ZONE_WIDTH } from '@evoconn/constants/communityDrawerGesture';
@@ -320,21 +327,35 @@ export default function ReflectionCreationScreen() {
           onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
         >
           {messages.map((msg, i) => {
-            const userText =
-              msg.role === 'assistant' && i > 0 && messages[i - 1].role === 'user'
-                ? messages[i - 1].content
+            if (msg.role === 'user') {
+              // Check if the next assistant message has a completed structured response.
+              // If so, PublishBlock renders below this user bubble (same width container).
+              const nextMsg = messages[i + 1] as (ChatBubble & { debateResponse?: unknown }) | undefined;
+              const nextIsStructured =
+                !!nextMsg &&
+                nextMsg.role === 'assistant' &&
+                !nextMsg.streaming &&
+                !!(nextMsg as Extract<ChatBubble, { role: 'assistant' }>).debateResponse;
+              const publishHandlerBelow = nextIsStructured && nextMsg
+                ? doPublish(nextMsg.id, msg.content)
                 : undefined;
-            const publishHandler = userText
-              ? doPublish(msg.id, userText)
-              : undefined;
+              return (
+                <MessageBubble
+                  key={`${msg.id ?? i}-${msg.role}`}
+                  message={msg}
+                  clanColor={clanColor}
+                  clanId={activeClan}
+                  publishHandlerBelow={publishHandlerBelow}
+                />
+              );
+            }
+            // Assistant message — PublishBlock is now with the preceding user bubble
             return (
               <MessageBubble
                 key={`${msg.id ?? i}-${msg.role}`}
                 message={msg}
                 clanColor={clanColor}
                 clanId={activeClan}
-                userReflectionText={userText}
-                publishHandler={publishHandler}
               />
             );
           })}
@@ -386,27 +407,73 @@ export default function ReflectionCreationScreen() {
   );
 }
 
+/**
+ * PublishBlockConnected — self-contained publish block that manages its own
+ * title state. Rendered below the user bubble, same width as the user bubble.
+ */
+const PublishBlockConnected = React.memo(function PublishBlockConnected({
+  clanId,
+  userReflectionText,
+  onPublish,
+}: {
+  clanId: string | null | undefined;
+  userReflectionText: string;
+  onPublish: (title: string, body: string) => Promise<void> | void;
+}) {
+  const PublishStar = useMemo(() => getPublishStarByClan(clanId), [clanId]);
+  const publishTitleRef = useRef('');
+  const handleTitleChange = useCallback((t: string) => { publishTitleRef.current = t; }, []);
+  const handlePublish = useCallback(async () => {
+    await onPublish(publishTitleRef.current, userReflectionText);
+  }, [onPublish, userReflectionText]);
+
+  return (
+    <PublishBlock
+      borderColor={getBlockBorderColor('publish', clanId)}
+      borderWidth={DEBATE_BW.publish}
+      backgroundColor={getBlockBackgroundColor('publish', clanId)}
+      starIcon={PublishStar}
+      titleOutlineColor={getPublishTitleOutlineColor(clanId)}
+      actionBarColor={getPublishTitleOutlineColor(clanId)}
+      onTitleChange={handleTitleChange}
+      onPublish={handlePublish}
+    />
+  );
+});
+
 /** Renders a single user or assistant message. */
 const MessageBubble = React.memo(function MessageBubble({
   message,
   clanColor,
   clanId,
-  userReflectionText,
-  publishHandler,
+  publishHandlerBelow,
 }: {
   message: ChatBubble;
   clanColor: string;
   clanId: string | null | undefined;
-  userReflectionText?: string;
-  publishHandler?: (title: string, body: string) => Promise<void> | void;
+  /** When set, a PublishBlock is rendered below the user bubble in the same container. */
+  publishHandlerBelow?: (title: string, body: string) => Promise<void> | void;
 }) {
   const isUser = message.role === 'user';
   const displayText = message.revealed ?? message.content;
 
   if (isUser) {
+    // Both user bubble and (optional) PublishBlock share a right-aligned maxWidth container
+    // so they are always the same width.
     return (
-      <View style={[styles.bubble, styles.userBubble, { borderColor: clanColor }]}>
-        <Text style={styles.userText}>{displayText}</Text>
+      <View style={styles.userMessageGroup}>
+        <View style={[styles.userBubbleInner, { borderColor: clanColor }]}>
+          <Text style={styles.userText}>{displayText}</Text>
+        </View>
+        {publishHandlerBelow ? (
+          <View style={styles.publishAttached}>
+            <PublishBlockConnected
+              clanId={clanId}
+              userReflectionText={displayText}
+              onPublish={publishHandlerBelow}
+            />
+          </View>
+        ) : null}
       </View>
     );
   }
@@ -427,7 +494,7 @@ const MessageBubble = React.memo(function MessageBubble({
 
   return (
     <View style={styles.assistantBlock}>
-      {/* Typewriter text while streaming, brief intro once done */}
+      {/* Typewriter text while streaming */}
       {isStreaming ? (
         <View style={[styles.bubble, styles.aiBubble]}>
           <Text style={styles.aiText}>{displayText}</Text>
@@ -440,8 +507,6 @@ const MessageBubble = React.memo(function MessageBubble({
         <DebateResponseDisplay
           response={assistantMsg.debateResponse!}
           clanId={clanId}
-          userReflectionText={userReflectionText}
-          onPublish={publishHandler}
         />
       ) : !isStreaming ? (
         <View style={[styles.bubble, styles.aiBubble]}>
@@ -488,17 +553,30 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
+  // ── User message group: user bubble + optional attached PublishBlock ──
+  userMessageGroup: {
+    alignSelf: 'flex-end' as const,
+    maxWidth: '92%' as any,
+    marginBottom: 16,
+  },
+  userBubbleInner: {
+    padding: 14,
+    borderRadius: 16,
+    borderBottomRightRadius: 4,
+    backgroundColor: '#262626',
+    borderLeftWidth: CHAT_USER_MESSAGE_LAYOUT.accentWidth,
+  },
+  publishAttached: {
+    // Zero top gap — looks like a direct extension of the user bubble
+    marginTop: 0,
+  },
+
+  // ── AI / generic bubbles (kept for assistant text/streaming states) ──
   bubble: {
     marginBottom: 16,
     padding: 14,
     borderRadius: 16,
     maxWidth: '92%',
-  },
-  userBubble: {
-    alignSelf: 'flex-end',
-    backgroundColor: '#262626',
-    borderLeftWidth: CHAT_USER_MESSAGE_LAYOUT.accentWidth,
-    borderBottomRightRadius: 4,
   },
   aiBubble: {
     alignSelf: 'flex-start',

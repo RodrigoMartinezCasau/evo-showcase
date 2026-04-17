@@ -8,23 +8,18 @@ import {
   AI_SPECIAL_BLOCK_LAYOUT as SB,
   getBlockBorderColor,
   getBlockBackgroundColor,
-  getPublishTitleOutlineColor,
 } from '@evoconn/constants/debateResponseLayout';
 import {
   getPostureStarByClan,
   getCounterpointStarByClan,
-  getPublishStarByClan,
 } from '@evoconn/utils/getDebateStarByClan';
 import { ArgumentCard, type ArgumentPointData } from './ArgumentCard';
 import { QuestionCard } from './QuestionCard';
 import { DebateQuoteCard } from './DebateQuoteCard';
-import { PublishBlock } from './PublishBlock';
 
 type Props = {
   response: DebateResponse;
   clanId: string | null | undefined;
-  userReflectionText?: string;
-  onPublish?: (title: string, body: string) => Promise<void> | void;
 };
 
 type SectionData = {
@@ -58,8 +53,6 @@ function extractSection(
 export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
   response,
   clanId,
-  userReflectionText,
-  onPublish,
 }: Props) {
   const dl = response.debate_layer;
 
@@ -75,7 +68,6 @@ export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
 
   const PostureStar = useMemo(() => getPostureStarByClan(clanId), [clanId]);
   const CounterpointStar = useMemo(() => getCounterpointStarByClan(clanId), [clanId]);
-  const PublishStar = useMemo(() => getPublishStarByClan(clanId), [clanId]);
 
   const questionText =
     dl.question_section?.socratic_question ??
@@ -89,7 +81,7 @@ export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
   const hasQuestion = !!questionText;
   const hasQuote = !!firstQuote;
 
-  /* ── Group 1: Pregunta + Cita share height ── */
+  /* ── Pregunta + Cita share height ── */
   const qaHeights = useRef({ question: 0, quote: 0 });
   const [qaSharedHeight, setQaSharedHeight] = useState<number | undefined>(undefined);
   const qaMeasured = useRef(0);
@@ -122,34 +114,8 @@ export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
     [recalcQA],
   );
 
-  const publishTitleRef = useRef('');
-  const handleTitleChange = useCallback((t: string) => {
-    publishTitleRef.current = t;
-  }, []);
-
-  const canPublish = !!onPublish && !!userReflectionText;
-
-  const handlePublish = useCallback(async () => {
-    if (!onPublish || !userReflectionText) return;
-    await onPublish(publishTitleRef.current, userReflectionText);
-  }, [onPublish, userReflectionText]);
-
   return (
     <View>
-      {/* ── 0. PUBLICAR — attached directly below the user's reflection ── */}
-      <View style={{ marginBottom: GAPS.publishToStance }}>
-        <PublishBlock
-          borderColor={getBlockBorderColor('publish', clanId)}
-          borderWidth={BW.publish}
-          backgroundColor={getBlockBackgroundColor('publish', clanId)}
-          starIcon={PublishStar}
-          titleOutlineColor={getPublishTitleOutlineColor(clanId)}
-          actionBarColor={getPublishTitleOutlineColor(clanId)}
-          onTitleChange={canPublish ? handleTitleChange : undefined}
-          onPublish={canPublish ? handlePublish : undefined}
-        />
-      </View>
-
       {/* ── 1. TU POSTURA ── */}
       {hasStance ? (
         <ArgumentCard
