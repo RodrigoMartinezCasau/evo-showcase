@@ -1,11 +1,11 @@
 /**
  * PersonalPostsTotalStats — aggregated stats header for the personal posts grid.
  *
- * Shows total upvotes, downvotes, saves, and overall vote-ratio percentage
- * calculated across all posts currently in the personal posts collection.
+ * Sits directly on the clan-colored background (no card/container).
+ * Each stat item (icon + number) can be individually positioned and scaled
+ * via constants in personalProfileLayout.ts.
  *
- * Reuses the SAME SVG icons and color helpers as PersonalRecentPostCard so
- * the visual language is perfectly consistent.
+ * Reuses the SAME SVG icons and color helpers as PersonalRecentPostCard.
  */
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
@@ -17,6 +17,18 @@ import {
   PERSONAL_POSTS_TOTAL_STATS_ITEM_GAP,
   PERSONAL_POSTS_TOTAL_STATS_ICON_SIZE,
   PERSONAL_POSTS_TOTAL_STATS_TEXT_OFFSET_Y,
+  TOTAL_STATS_UPVOTES_OFFSET_X,
+  TOTAL_STATS_UPVOTES_OFFSET_Y,
+  TOTAL_STATS_UPVOTES_SCALE,
+  TOTAL_STATS_DOWNVOTES_OFFSET_X,
+  TOTAL_STATS_DOWNVOTES_OFFSET_Y,
+  TOTAL_STATS_DOWNVOTES_SCALE,
+  TOTAL_STATS_SAVED_OFFSET_X,
+  TOTAL_STATS_SAVED_OFFSET_Y,
+  TOTAL_STATS_SAVED_SCALE,
+  TOTAL_STATS_PERCENTAGE_OFFSET_X,
+  TOTAL_STATS_PERCENTAGE_OFFSET_Y,
+  TOTAL_STATS_PERCENTAGE_SCALE,
 } from '@evoconn/constants/personalProfileLayout';
 
 // Same SVGs used in PersonalRecentPostCard
@@ -59,12 +71,12 @@ export function PersonalPostsTotalStats({ posts }: Props) {
     return { totalUp: up, totalDown: down, totalSave: save, totalPct: pct };
   }, [posts]);
 
-  const pctColor  = ratioColor(totalPct);
-  const iconSz    = PERSONAL_POSTS_TOTAL_STATS_ICON_SIZE;
-  const itemGap   = PERSONAL_POSTS_TOTAL_STATS_ITEM_GAP;
-  const textOffY  = PERSONAL_POSTS_TOTAL_STATS_TEXT_OFFSET_Y;
+  const pctColor = ratioColor(totalPct);
+  const iconSz   = PERSONAL_POSTS_TOTAL_STATS_ICON_SIZE;
+  const textOffY = PERSONAL_POSTS_TOTAL_STATS_TEXT_OFFSET_Y;
 
   return (
+    // ── Global wrapper: moves & scales the entire block ──────────────
     <View
       style={[
         styles.wrapper,
@@ -77,62 +89,85 @@ export function PersonalPostsTotalStats({ posts }: Props) {
         },
       ]}
     >
-      <View style={[styles.row, { gap: itemGap }]}>
+      <View style={[styles.row, { gap: PERSONAL_POSTS_TOTAL_STATS_ITEM_GAP }]}>
 
         {/* ── Upvotes ── */}
-        <View style={styles.item}>
+        <View
+          style={[
+            styles.item,
+            {
+              transform: [
+                { translateX: TOTAL_STATS_UPVOTES_OFFSET_X },
+                { translateY: TOTAL_STATS_UPVOTES_OFFSET_Y },
+                { scale: TOTAL_STATS_UPVOTES_SCALE },
+              ],
+            },
+          ]}
+        >
           <View style={{ width: iconSz, height: iconSz, overflow: 'hidden' }}>
             <UpvoteIcon width={iconSz} height={iconSz} />
           </View>
-          <Text
-            style={[
-              styles.count,
-              { transform: [{ translateY: textOffY }] },
-            ]}
-          >
+          <Text style={[styles.count, { transform: [{ translateY: textOffY }] }]}>
             {compactCount(totalUp)}
           </Text>
         </View>
 
         {/* ── Downvotes ── */}
-        <View style={styles.item}>
+        <View
+          style={[
+            styles.item,
+            {
+              transform: [
+                { translateX: TOTAL_STATS_DOWNVOTES_OFFSET_X },
+                { translateY: TOTAL_STATS_DOWNVOTES_OFFSET_Y },
+                { scale: TOTAL_STATS_DOWNVOTES_SCALE },
+              ],
+            },
+          ]}
+        >
           <View style={{ width: iconSz, height: iconSz, overflow: 'hidden' }}>
             <DownvoteIcon width={iconSz} height={iconSz} />
           </View>
-          <Text
-            style={[
-              styles.count,
-              { transform: [{ translateY: textOffY }] },
-            ]}
-          >
+          <Text style={[styles.count, { transform: [{ translateY: textOffY }] }]}>
             {compactCount(totalDown)}
           </Text>
         </View>
 
         {/* ── Saves ── */}
-        <View style={styles.item}>
+        <View
+          style={[
+            styles.item,
+            {
+              transform: [
+                { translateX: TOTAL_STATS_SAVED_OFFSET_X },
+                { translateY: TOTAL_STATS_SAVED_OFFSET_Y },
+                { scale: TOTAL_STATS_SAVED_SCALE },
+              ],
+            },
+          ]}
+        >
           <View style={{ width: iconSz, height: iconSz, overflow: 'hidden' }}>
             <SavedIcon width={iconSz} height={iconSz} />
           </View>
-          <Text
-            style={[
-              styles.count,
-              { transform: [{ translateY: textOffY }] },
-            ]}
-          >
+          <Text style={[styles.count, { transform: [{ translateY: textOffY }] }]}>
             {compactCount(totalSave)}
           </Text>
         </View>
 
         {/* ── Percentage ── */}
-        <View style={styles.item}>
-          <View
-            style={{
-              width: iconSz,
-              height: iconSz,
-              overflow: 'hidden',
-            }}
-          >
+        <View
+          style={[
+            styles.item,
+            {
+              transform: [
+                { translateX: TOTAL_STATS_PERCENTAGE_OFFSET_X },
+                { translateY: TOTAL_STATS_PERCENTAGE_OFFSET_Y },
+                { scale: TOTAL_STATS_PERCENTAGE_SCALE },
+              ],
+            },
+          ]}
+        >
+          <View style={{ width: iconSz, height: iconSz, overflow: 'hidden' }}>
             <FlechaIcon width={iconSz} height={iconSz} color={pctColor} />
           </View>
           <Text
@@ -152,14 +187,10 @@ export function PersonalPostsTotalStats({ posts }: Props) {
 }
 
 const styles = StyleSheet.create({
+  // No background, no border, no shadow — stats sit on the clan-colored bg
   wrapper: {
     marginBottom: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: '#000000',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
   row: {
     flexDirection: 'row',
