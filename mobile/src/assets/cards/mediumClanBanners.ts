@@ -11,7 +11,9 @@ export const MEDIUM_CLAN_BANNERS: Record<ClanId, number> = {
   nihilista: require('./medium/banners/nihilista.png'),
 };
 
+const SIN_CLAN_BANNER: number = require('./sinClan/297.png');
+
 export function getMediumClanBannerAsset(clanId: string | null | undefined): number | undefined {
-  if (!clanId) return undefined;
+  if (!clanId) return SIN_CLAN_BANNER;
   return (MEDIUM_CLAN_BANNERS as Record<string, number | undefined>)[clanId];
 }

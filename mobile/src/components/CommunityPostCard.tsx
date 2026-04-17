@@ -364,7 +364,7 @@ export function CommunityPostCard({
               context="community"
             />
           </View>
-          {isCanvaCard && authorClanId ? (
+          {isCanvaCard && canvaBannerAsset ? (
             <View
               pointerEvents="none"
               style={{

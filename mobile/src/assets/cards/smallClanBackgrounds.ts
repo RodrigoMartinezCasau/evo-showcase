@@ -11,7 +11,9 @@ export const SMALL_CLAN_BACKGROUNDS: Record<ClanId, number> = {
   realista: require('./small/realista.png'),
 };
 
+const SIN_CLAN_SMALL_BG: number = require('./sinClan/243.png');
+
 export function getSmallClanBackgroundAsset(clanId: string | null | undefined): number | undefined {
-  if (!clanId) return undefined;
+  if (!clanId) return SIN_CLAN_SMALL_BG;
   return (SMALL_CLAN_BACKGROUNDS as Record<string, number | undefined>)[clanId];
 }

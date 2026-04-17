@@ -11,7 +11,9 @@ export const MEDIUM_CLAN_BACKGROUNDS: Record<ClanId, number> = {
   realista: require('./medium/realista.png'),
 };
 
+const SIN_CLAN_MEDIUM_BG: number = require('./sinClan/234.png');
+
 export function getMediumClanBackgroundAsset(clanId: string | null | undefined): number | undefined {
-  if (!clanId) return undefined;
+  if (!clanId) return SIN_CLAN_MEDIUM_BG;
   return (MEDIUM_CLAN_BACKGROUNDS as Record<string, number | undefined>)[clanId];
 }

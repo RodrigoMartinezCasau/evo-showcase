@@ -11,8 +11,10 @@ export const SMALL_CLAN_BANNERS: Record<ClanId, number> = {
   nihilista: require('./small/banners/nihilista.png'),
 };
 
+const SIN_CLAN_BANNER: number = require('./sinClan/297.png');
+
 export function getSmallClanBannerAsset(clanId: string | null | undefined): number | undefined {
-  if (!clanId) return undefined;
+  if (!clanId) return SIN_CLAN_BANNER;
   return (SMALL_CLAN_BANNERS as Record<string, number | undefined>)[clanId];
 }
 
