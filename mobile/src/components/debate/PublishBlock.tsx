@@ -1,28 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, LayoutChangeEvent } from 'react-native';
+import { View, TextInput, StyleSheet, LayoutChangeEvent } from 'react-native';
 import type { FC } from 'react';
 import type { SvgProps } from 'react-native-svg';
 import {
-  AI_RESPONSE_LAYOUT as L,
   AI_SPECIAL_BLOCK_LAYOUT as SB,
   DEBATE_CARD_LAYOUT as CARD,
 } from '@evoconn/constants/debateResponseLayout';
 import { PublishActionBar } from './PublishActionBar';
 
-const PT = SB.publishTitle;
 const PI = SB.publishInput;
-const STAR = L.stars.publish;
-const STAR_SZ = STAR.size * STAR.scale;
 const PUBLISH_TITLE_MAX_LEN = 21;
-
-const titleBaseStyle = {
-  fontWeight: '800' as const,
-  letterSpacing: 1.5,
-  textTransform: 'uppercase' as const,
-  fontSize: PT.fontSize,
-  ...(PT.lineHeight > 0 ? { lineHeight: PT.lineHeight } : {}),
-  transform: [{ scale: PT.scale }],
-};
 
 type Props = {
   borderColor: string;
@@ -84,18 +71,11 @@ export const PublishBlock = React.memo(function PublishBlock({
           borderLeftColor: borderColor,
           borderLeftWidth: borderWidth,
           backgroundColor,
-          minHeight: unifiedHeight ?? SB.baseMinHeight,
           paddingHorizontal: SB.outerPaddingH,
           paddingVertical: SB.outerPaddingV,
         },
       ]}
     >
-      <View style={[styles.titleContainer, { marginBottom: SB.publishTitleMarginBottom, marginTop: PT.offsetY }]}>
-        <Text style={[titleBaseStyle, { color: PT.color }]}>
-          ¡PUBLICAR!
-        </Text>
-      </View>
-
       <TextInput
         style={[
           styles.input,
@@ -134,18 +114,6 @@ const styles = StyleSheet.create({
     borderRadius: CARD.borderRadius,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  starBox: {
-    position: 'absolute',
-    left: SB.outerPaddingH + STAR.offsetX,
-    top: SB.outerPaddingV + STAR.offsetY,
-    width: STAR_SZ,
-    height: STAR_SZ,
-  },
-  titleContainer: {
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   input: {
     width: '100%',

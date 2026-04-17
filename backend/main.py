@@ -315,6 +315,7 @@ def _run_debate_pipeline(
     payload: DebateRequest,
     debate_memory: dict | None = None,
     response_language: str = "en",
+    chat_history: list[dict] | None = None,
 ) -> DebateResponse:
     """Shared debate pipeline: retrieval + facts + author + debate layers + personality validation."""
     logger.info("_run_debate_pipeline: response_language=%s topic=%s", response_language, (payload.topic or "")[:60])
@@ -407,6 +408,7 @@ def _run_debate_pipeline(
             llm_client=llm_client,
             debate_memory=debate_memory,
             response_language=response_language,
+            chat_history=chat_history,
         )
 
         takeaways = []
@@ -765,6 +767,18 @@ def debate_chat_persisted(debate_id: str, payload: DebateChatPayload):
         from short_title import generate_short_title
         update_debate_title(debate_id, generate_short_title(msg))
 
+    # Build short-term chat history BEFORE appending the current message
+    # (full was fetched above and does not yet include the new user message).
+    CONTEXT_WINDOW = 10
+    chat_history: list[dict] = []
+    if full and full.get("messages"):
+        recent = full["messages"][-(CONTEXT_WINDOW - 1):]  # leave room for current turn
+        chat_history = [
+            {"role": m.get("role", "user"), "content": (m.get("content") or "").strip()}
+            for m in recent
+            if m.get("content")
+        ]
+
     # Append user message
     append_message(debate_id, "user", msg)
 
@@ -787,7 +801,8 @@ def debate_chat_persisted(debate_id: str, payload: DebateChatPayload):
         user_stance=parsed.get("user_stance"),
     )
     response = _run_debate_pipeline(
-        debate_request, debate_memory=memory, response_language=lang
+        debate_request, debate_memory=memory, response_language=lang,
+        chat_history=chat_history if chat_history else None,
     )
 
     steelman = (response.debate_layer.steelman_of_user or "").strip()

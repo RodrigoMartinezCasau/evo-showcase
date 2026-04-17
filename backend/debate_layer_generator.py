@@ -340,6 +340,7 @@ def _build_structured_debate_prompts(
     facts_summary: str,
     facts_list: list[dict],
     debate_memory: dict | None,
+    chat_history: list[dict] | None = None,
 ) -> tuple[str, str]:
     """Build (system_prompt, user_prompt) for StructuredDebateOutput (stance/counter/question with points and bullets)."""
     has_facts = len(facts_list) > 0
@@ -404,12 +405,14 @@ Return ONLY valid JSON, no markdown."""
                 memory_block += f"- Key terms: {', '.join(terms[:8])}\n"
             if assumptions:
                 memory_block += f"- Assumptions: {'; '.join(assumptions[:5])}\n"
+    history_block = _format_chat_history_block(chat_history)
     facts_block = _format_scientific_facts_block(facts_list)
     user_prompt = f"""topic: {topic}
 user_message: {user_message}
 Detected stance: {stance}
 Facts summary: {facts_summary}
 {memory_block}
+{history_block}
 {facts_block + chr(10) + chr(10) if facts_block else ""}
 {contrarian_instruction}
 
@@ -497,6 +500,26 @@ def _validate_structured_debate(debate_dict: dict) -> tuple[StructuredSection, S
         return None
 
 
+def _format_chat_history_block(chat_history: list[dict] | None) -> str:
+    """
+    Format the recent chat turns as a compact context block for the LLM prompt.
+    Keeps the last N messages; each message is truncated to avoid prompt bloat.
+    Returns an empty string when history is empty or None.
+    """
+    if not chat_history:
+        return ""
+    MAX_CHARS_PER_MSG = 300
+    lines = ["[Recent conversation — use for continuity; latest user message takes priority]"]
+    for m in chat_history:
+        role = (m.get("role") or "unknown").capitalize()
+        content = (m.get("content") or "").strip()
+        if len(content) > MAX_CHARS_PER_MSG:
+            content = content[:MAX_CHARS_PER_MSG] + "…"
+        lines.append(f"{role}: {content}")
+    lines.append("---")
+    return "\n".join(lines)
+
+
 def _format_scientific_facts_block(scientific_facts: list[dict]) -> str:
     """Format selected scientific facts as a structured list for the prompt."""
     if not scientific_facts:
@@ -523,6 +546,7 @@ def _build_debate_prompts(
     facts_summary: str,
     facts_list: list[dict],
     debate_memory: dict | None,
+    chat_history: list[dict] | None = None,
 ) -> tuple[str, str]:
     """Build (system_prompt, user_prompt) for debate layer. Shared by generate and stream."""
     has_facts = len(facts_list) > 0
@@ -566,6 +590,7 @@ GROUNDING (STRICT): No relevant scientific facts were provided for this question
                 memory_block += f"- Key terms already discussed: {', '.join(terms[:8])}\n"
             if assumptions:
                 memory_block += f"- Assumptions noted: {'; '.join(assumptions[:5])}\n"
+    history_block = _format_chat_history_block(chat_history)
     facts_block = _format_scientific_facts_block(facts_list)
     user_prompt = f"""USER QUESTION (respond to THIS specific question):
 "{user_message}"
@@ -574,6 +599,7 @@ Topic: {topic}
 Detected stance: {stance}
 Facts summary: {facts_summary}
 {memory_block}
+{history_block}
 {facts_block + chr(10) + chr(10) if facts_block else ""}
 {contrarian_instruction}
 
@@ -695,6 +721,7 @@ def generate_debate_layer(
     llm_client: OpenAIClient | None = None,
     debate_memory: dict | None = None,
     response_language: str = "en",
+    chat_history: list[dict] | None = None,
 ) -> DebateLayer:
     """
     Generate debate_layer using LLM. Always generates in English (canonical).
@@ -708,7 +735,7 @@ def generate_debate_layer(
 
     # 1) Try structured prompt first
     system_structured, user_structured = _build_structured_debate_prompts(
-        topic, user_message, stance, facts_summary, facts_list, debate_memory
+        topic, user_message, stance, facts_summary, facts_list, debate_memory, chat_history
     )
     full_structured = system_structured + "\n\n" + user_structured
     _assert_prompt_uses_user_text(full_structured, user_message)
@@ -753,7 +780,7 @@ def generate_debate_layer(
         # 2) Fallback: essay-style prompt and validation
         logger.info("Structured debate validation failed or missing; using essay prompt")
         system_prompt, user_prompt = _build_debate_prompts(
-            topic, user_message, stance, facts_summary, facts_list, debate_memory
+            topic, user_message, stance, facts_summary, facts_list, debate_memory, chat_history
         )
         full_prompt = system_prompt + "\n\n" + user_prompt
         _assert_prompt_uses_user_text(full_prompt, user_message)
