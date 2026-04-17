@@ -865,6 +865,7 @@ def debate_chat_persisted(debate_id: str, payload: DebateChatPayload):
         stance_section=response.debate_layer.stance_section,
         counter_section=response.debate_layer.counter_section,
         question_section=response.debate_layer.question_section,
+        conversational_intro=response.debate_layer.conversational_intro,
     )
     response_for_frontend = DebateResponse(
         facts_layer=response.facts_layer,

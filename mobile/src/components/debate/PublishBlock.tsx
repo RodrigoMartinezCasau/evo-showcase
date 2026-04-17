@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, LayoutChangeEvent } from 'react-native';
 import type { FC } from 'react';
 import type { SvgProps } from 'react-native-svg';
@@ -13,14 +13,7 @@ const PT = SB.publishTitle;
 const PI = SB.publishInput;
 const STAR = L.stars.publish;
 const STAR_SZ = STAR.size * STAR.scale;
-const OW = PT.outlineWidth;
 const PUBLISH_TITLE_MAX_LEN = 21;
-
-const OUTLINE_OFFSETS: [number, number][] = [
-  [-OW, -OW], [-OW, 0], [-OW, OW],
-  [0, -OW],              [0, OW],
-  [OW, -OW],  [OW, 0],  [OW, OW],
-];
 
 const titleBaseStyle = {
   fontWeight: '800' as const,
@@ -82,22 +75,6 @@ export const PublishBlock = React.memo(function PublishBlock({
     ? (e: LayoutChangeEvent) => onMeasure(e.nativeEvent.layout.height)
     : undefined;
 
-  const outlineElements = useMemo(() => {
-    if (!titleOutlineColor || OW <= 0) return null;
-    return OUTLINE_OFFSETS.map(([dx, dy], i) => (
-      <Text
-        key={i}
-        style={[
-          titleBaseStyle,
-          styles.outlineCopy,
-          { color: titleOutlineColor, left: dx, top: dy },
-        ]}
-      >
-        ¡PUBLICAR!
-      </Text>
-    ));
-  }, [titleOutlineColor]);
-
   return (
     <View
       onLayout={handleLayout}
@@ -114,13 +91,9 @@ export const PublishBlock = React.memo(function PublishBlock({
       ]}
     >
       <View style={[styles.titleContainer, { marginBottom: SB.publishTitleMarginBottom, marginTop: PT.offsetY }]}>
-        {/* Inner wrapper sizes to the text so outline copies offset from the text, not the container edge */}
-        <View style={styles.titleInner}>
-          {outlineElements}
-          <Text style={[titleBaseStyle, { color: PT.color }]}>
-            ¡PUBLICAR!
-          </Text>
-        </View>
+        <Text style={[titleBaseStyle, { color: PT.color }]}>
+          ¡PUBLICAR!
+        </Text>
       </View>
 
       <TextInput
@@ -173,12 +146,6 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  titleInner: {
-    // Shrink-wraps to the text so absolute outline copies offset from the text, not the full container
-  },
-  outlineCopy: {
-    position: 'absolute',
   },
   input: {
     width: '100%',

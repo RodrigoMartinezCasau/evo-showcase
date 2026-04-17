@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback, useRef } from 'react';
-import { View } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import type { DebateResponse } from '@evoconn/types/debate';
 import {
   AI_RESPONSE_LAYOUT as L,
@@ -114,8 +114,15 @@ export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
     [recalcQA],
   );
 
+  const conversationalIntro = dl.conversational_intro ?? null;
+
   return (
     <View>
+      {/* ── 0. INTRO CONVERSACIONAL ── */}
+      {conversationalIntro ? (
+        <Text style={styles.introText}>{conversationalIntro}</Text>
+      ) : null}
+
       {/* ── 1. TU POSTURA ── */}
       {hasStance ? (
         <ArgumentCard
@@ -175,4 +182,14 @@ export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
       ) : null}
     </View>
   );
+});
+
+const styles = StyleSheet.create({
+  introText: {
+    color: '#D8D8D8',
+    fontSize: 15,
+    lineHeight: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
 });

@@ -51,6 +51,8 @@ class DebateLayer(BaseModel):
     stance_section: StructuredSection | None = None
     counter_section: StructuredSection | None = None
     question_section: QuestionSection | None = None
+    # Short conversational intro rendered before the analysis sections
+    conversational_intro: str | None = None
 
 
 logger = logging.getLogger(__name__)
@@ -594,6 +596,67 @@ REQUIREMENTS:
     return system_prompt, user_prompt
 
 
+def _generate_conversational_intro(
+    user_message: str,
+    llm_client: OpenAIClient,
+    response_language: str = "en",
+) -> str | None:
+    """
+    Generate a SHORT, HUMAN conversational intro that reacts to the user's
+    reflection in a natural way. Output is broken into short lines (one idea
+    per line, like a chat reply), max 2–3 lines total.
+    """
+    lang_instruction = (
+        "Write in natural, everyday Spanish."
+        if response_language == "es"
+        else "Write in natural, everyday English."
+    )
+    system = f"""You are a friend who happens to think about ideas a lot. The user just shared a thought with you. Reply with a SHORT, HUMAN reaction — like you would in a real conversation, not like an essay or a teacher.
+
+STRICT RULES:
+- VERY SHORT: 2 to 3 lines maximum. Around 15–35 words total.
+- ONE IDEA PER LINE. Use real line breaks (\\n) between ideas, like a chat message.
+- Sound HUMAN: warm, casual, intelligent — not formal, not academic, not generic.
+- React first, then maybe set up what's coming. Don't start analyzing yet.
+- Don't repeat the user's words back; just react.
+- Don't say "As an AI", "I understand that", "Your reflection raises", "It's interesting how", or anything templated.
+- If the message isn't really a reflection (it's a question, a vent, a joke), acknowledge that lightly without being condescending.
+- {lang_instruction}
+
+EXAMPLES OF THE TONE (do NOT copy verbatim, just match the feel):
+
+Example 1:
+Esa pregunta toca algo incómodo.
+Es de las que parecen sencillas pero esconden una tensión real.
+
+Example 2:
+Hay algo de verdad en lo que dices, aunque también algo que aún no se ve.
+Vamos a verlo desde dos lados.
+
+Example 3:
+Esto no suena tanto a reflexión como a una intuición suelta.
+Aún así, vale la pena tirar del hilo.
+
+Return ONLY the intro text. No quotes, no JSON, no labels, no headings."""
+    user = f"User's message:\n\"\"\"\n{user_message.strip()}\n\"\"\""
+    try:
+        result = llm_client.complete(
+            system=system,
+            user=user,
+            language=None,
+            max_tokens=120,
+            prompt_id="CONVERSATIONAL_INTRO",
+        )
+        intro = (result or "").strip()
+        # Strip surrounding quotes if the model wrapped the response
+        if intro.startswith('"') and intro.endswith('"') and len(intro) > 1:
+            intro = intro[1:-1].strip()
+        return intro if intro else None
+    except Exception as e:
+        logger.warning("Failed to generate conversational_intro: %s", e)
+        return None
+
+
 def generate_debate_layer(
     topic: str,
     user_message: str,
@@ -640,6 +703,7 @@ def generate_debate_layer(
                     "What would change your view on this?",
                     "What assumptions are you making?",
                 ]
+                intro = _generate_conversational_intro(user_message, llm_client, response_language)
                 debate_layer = DebateLayer(
                     steelman_of_user=flat_steelman,
                     contrarian_position=flat_contrarian,
@@ -649,9 +713,13 @@ def generate_debate_layer(
                     stance_section=stance_sec,
                     counter_section=counter_sec,
                     question_section=question_sec,
+                    conversational_intro=intro,
                 )
                 if response_language == "es":
-                    return _translate_and_validate_es(debate_layer, llm_client)
+                    translated = _translate_and_validate_es(debate_layer, llm_client)
+                    # intro is already in the correct language (generated with response_language)
+                    translated.conversational_intro = intro
+                    return translated
                 return debate_layer
         # 2) Fallback: essay-style prompt and validation
         logger.info("Structured debate validation failed or missing; using essay prompt")
@@ -671,8 +739,12 @@ def generate_debate_layer(
             )
         debate_layer = _validate_and_build_debate_layer(debate_dict)
         if debate_layer:
+            intro = _generate_conversational_intro(user_message, llm_client, response_language)
+            debate_layer.conversational_intro = intro
             if response_language == "es":
-                return _translate_and_validate_es(debate_layer, llm_client)
+                translated = _translate_and_validate_es(debate_layer, llm_client)
+                translated.conversational_intro = intro
+                return translated
             return debate_layer
         logger.warning("DebateLayer validation failed, attempting repair")
         return _repair_debate_layer(

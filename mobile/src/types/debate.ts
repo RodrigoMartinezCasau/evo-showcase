@@ -77,6 +77,8 @@ export type DebateLayer = {
   stance_section?: StructuredSection;
   counter_section?: StructuredSection;
   question_section?: QuestionSection;
+  /** Short conversational intro generated before the analytical sections. */
+  conversational_intro?: string;
 };
 
 export type Closing = {
