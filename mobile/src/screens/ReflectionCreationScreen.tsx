@@ -19,6 +19,8 @@ import {
   StyleSheet,
   ActivityIndicator,
   Keyboard,
+  Animated,
+  TouchableOpacity,
 } from 'react-native';
 import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -38,6 +40,7 @@ import { getChatSendButtonByHouse } from '@evoconn/utils/getChatSendButtonByHous
 import {
   CHAT_SEND_BUTTON_LAYOUT,
   CHAT_BOTTOM_AREA_LAYOUT as CHAT_BOTTOM_AREA,
+  PUBLISH_JUMP_ISLAND_LAYOUT as ISLAND,
 } from '@evoconn/constants/chatInputBarLayout';
 import { REFLECTION_EMPTY_WELCOME_LAYOUT as EMPTY_WELCOME } from '@evoconn/constants/reflectionEmptyWelcomeLayout';
 import { EMPTY_WELCOME_TRIPLE_STARS_LAYOUT as EMPTY_WELCOME_TRIPLE_STARS } from '@evoconn/constants/reflectionEmptyWelcomeTripleStarsLayout';
@@ -108,6 +111,60 @@ export default function ReflectionCreationScreen() {
 
   const scrollRef = useRef<ScrollView>(null);
   const typewriterRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ── Publish jump island ──────────────────────────────────────────────────
+  // `messageYOffsets` stores the measured Y offset (from scroll top) for each
+  // message index so we can scroll directly to the latest user reflection.
+  const messageYOffsets = useRef<Record<number, number>>({});
+  const scrollOffsetY = useRef(0);
+  const scrollViewHeight = useRef(0);
+  const islandOpacity = useRef(new Animated.Value(0)).current;
+  const [islandVisible, setIslandVisible] = useState(false);
+
+  // Index of the latest user message that has a published-block attached
+  // (i.e. it has a completed AI response right after it).
+  const latestUserReflectionIndex = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        const next = messages[i + 1];
+        if (next && next.role === 'assistant' && !next.streaming && (next as Extract<ChatBubble, {role:'assistant'}>).debateResponse) {
+          return i;
+        }
+      }
+    }
+    return -1;
+  }, [messages]);
+
+  const checkIslandVisibility = useCallback(() => {
+    if (latestUserReflectionIndex < 0) {
+      if (islandVisible) {
+        setIslandVisible(false);
+        Animated.timing(islandOpacity, { toValue: 0, duration: 180, useNativeDriver: true }).start();
+      }
+      return;
+    }
+    const msgY = messageYOffsets.current[latestUserReflectionIndex];
+    if (msgY == null) return;
+    // The message is visible if its top is within the current viewport
+    const viewTop = scrollOffsetY.current;
+    const viewBottom = scrollOffsetY.current + scrollViewHeight.current;
+    const messageIsVisible = msgY >= viewTop && msgY < viewBottom;
+    const shouldShow = !messageIsVisible;
+    if (shouldShow && !islandVisible) {
+      setIslandVisible(true);
+      Animated.timing(islandOpacity, { toValue: 1, duration: 220, useNativeDriver: true }).start();
+    } else if (!shouldShow && islandVisible) {
+      Animated.timing(islandOpacity, { toValue: 0, duration: 180, useNativeDriver: true }).start(
+        () => setIslandVisible(false),
+      );
+    }
+  }, [latestUserReflectionIndex, islandVisible, islandOpacity]);
+
+  const handleScrollToReflection = useCallback(() => {
+    if (latestUserReflectionIndex < 0) return;
+    const targetY = messageYOffsets.current[latestUserReflectionIndex] ?? 0;
+    scrollRef.current?.scrollTo({ y: targetY, animated: true });
+  }, [latestUserReflectionIndex]);
 
   useEffect(() => {
     if (!thoughtId) return;
@@ -325,6 +382,14 @@ export default function ReflectionCreationScreen() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+          scrollEventThrottle={16}
+          onScroll={(e) => {
+            scrollOffsetY.current = e.nativeEvent.contentOffset.y;
+            checkIslandVisibility();
+          }}
+          onLayout={(e) => {
+            scrollViewHeight.current = e.nativeEvent.layout.height;
+          }}
         >
           {messages.map((msg, i) => {
             if (msg.role === 'user') {
@@ -340,13 +405,20 @@ export default function ReflectionCreationScreen() {
                 ? doPublish(nextMsg.id, msg.content)
                 : undefined;
               return (
-                <MessageBubble
+                <View
                   key={`${msg.id ?? i}-${msg.role}`}
-                  message={msg}
-                  clanColor={clanColor}
-                  clanId={activeClan}
-                  publishHandlerBelow={publishHandlerBelow}
-                />
+                  onLayout={(e) => {
+                    messageYOffsets.current[i] = e.nativeEvent.layout.y;
+                    checkIslandVisibility();
+                  }}
+                >
+                  <MessageBubble
+                    message={msg}
+                    clanColor={clanColor}
+                    clanId={activeClan}
+                    publishHandlerBelow={publishHandlerBelow}
+                  />
+                </View>
               );
             }
             // Assistant message — PublishBlock is now with the preceding user bubble
@@ -367,6 +439,66 @@ export default function ReflectionCreationScreen() {
           ) : null}
         </ScrollView>
       )}
+
+      {/* ── Publish jump island ──────────────────────────────────────────── */}
+      {islandVisible ? (
+        <Animated.View
+          pointerEvents="box-none"
+          style={[
+            styles.islandWrapper,
+            {
+              opacity: islandOpacity,
+              transform: [
+                { translateX: ISLAND.publishJumpIslandOffsetX },
+                { translateY: ISLAND.publishJumpIslandOffsetY },
+                { scale: ISLAND.publishJumpIslandScale },
+              ],
+            },
+          ]}
+        >
+          <TouchableOpacity
+            activeOpacity={0.82}
+            onPress={handleScrollToReflection}
+            style={[styles.islandPill, { backgroundColor: clanColor }]}
+          >
+            <Text
+              style={[
+                styles.islandChevron,
+                {
+                  transform: [{ scale: ISLAND.publishJumpIslandChevronScale }],
+                  marginRight: ISLAND.publishJumpIslandChevronGap,
+                },
+              ]}
+            >
+              {'«'}
+            </Text>
+            <Text
+              style={[
+                styles.islandLabel,
+                {
+                  transform: [
+                    { translateX: ISLAND.publishJumpIslandTextOffsetX },
+                    { translateY: ISLAND.publishJumpIslandTextOffsetY },
+                  ],
+                },
+              ]}
+            >
+              ¡Publica tu reflexión!
+            </Text>
+            <Text
+              style={[
+                styles.islandChevron,
+                {
+                  transform: [{ scale: ISLAND.publishJumpIslandChevronScale }],
+                  marginLeft: ISLAND.publishJumpIslandChevronGap,
+                },
+              ]}
+            >
+              {'»'}
+            </Text>
+          </TouchableOpacity>
+        </Animated.View>
+      ) : null}
 
       <ChatInputBar
         placeholder={
@@ -609,4 +741,39 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   errorText: { color: evoconnColors.danger, fontSize: 13 },
+
+  // ── Publish jump island ──────────────────────────────────────────────────
+  islandWrapper: {
+    position: 'absolute',
+    bottom: 110,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 300,
+    pointerEvents: 'box-none',
+  } as any,
+  islandPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: ISLAND.paddingHorizontal,
+    paddingVertical: ISLAND.paddingVertical,
+    borderRadius: ISLAND.borderRadius,
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  islandLabel: {
+    color: '#FFFFFF',
+    fontSize: ISLAND.fontSize,
+    fontWeight: ISLAND.fontWeight,
+    letterSpacing: 0.2,
+  },
+  islandChevron: {
+    color: '#FFFFFF',
+    fontSize: ISLAND.chevronSize,
+    fontWeight: '700',
+    lineHeight: ISLAND.chevronSize + 2,
+  },
 });

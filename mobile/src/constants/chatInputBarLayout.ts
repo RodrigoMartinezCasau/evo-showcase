@@ -32,6 +32,35 @@ export const CHAT_INPUT_LAYOUT = {
   paddingVertical: 10,
 } as const;
 
+/**
+ * ── PUBLISH JUMP ISLAND ────────────────────────────────────────────────────
+ * Floating clan-colored island that appears when the user's latest reflection
+ * scrolls above the visible area.  Tap → scroll back to that reflection.
+ */
+export const PUBLISH_JUMP_ISLAND_LAYOUT = {
+  /** Horizontal offset from center (positive = right). */
+  publishJumpIslandOffsetX: 0,
+  /** Vertical offset from its base position (positive = down). */
+  publishJumpIslandOffsetY: 0,
+  /** Uniform scale applied to the whole island. */
+  publishJumpIslandScale: 1,
+  /** Horizontal offset applied only to the label text. */
+  publishJumpIslandTextOffsetX: 0,
+  /** Vertical offset applied only to the label text. */
+  publishJumpIslandTextOffsetY: 0,
+  /** Scale applied to both chevron icons. */
+  publishJumpIslandChevronScale: 1,
+  /** Horizontal gap between each chevron icon and the label. */
+  publishJumpIslandChevronGap: 8,
+  // ── fixed structural values ──
+  borderRadius: 24,
+  paddingHorizontal: 20,
+  paddingVertical: 10,
+  fontSize: 13,
+  fontWeight: '700' as const,
+  chevronSize: 16,
+};
+
 /** The send button (clan SVG replaces the old star icon). */
 export const CHAT_SEND_BUTTON_LAYOUT = {
   offsetX: -10,
