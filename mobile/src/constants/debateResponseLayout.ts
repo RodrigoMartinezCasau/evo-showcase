@@ -97,7 +97,7 @@ type ClanDisplayEntry = {
 
 export const CLAN_DISPLAY_COLORS: Record<keyof ClanColorMap, ClanDisplayEntry> = {
   noClan: {
-    publishBackground: '#c7ff02',
+    publishBackground: '#c7ff1a',
     borderPrimary: '#4f59fe',
     questionBackground: '#0f0f12',
     quoteBackground: '#0f0f12',

@@ -113,17 +113,14 @@ export const PublishBlock = React.memo(function PublishBlock({
         },
       ]}
     >
-      {StarIcon ? (
-        <View style={styles.starBox}>
-          <StarIcon width={STAR_SZ} height={STAR_SZ} />
+      <View style={[styles.titleContainer, { marginBottom: SB.publishTitleMarginBottom, marginTop: PT.offsetY }]}>
+        {/* Inner wrapper sizes to the text so outline copies offset from the text, not the container edge */}
+        <View style={styles.titleInner}>
+          {outlineElements}
+          <Text style={[titleBaseStyle, { color: PT.color }]}>
+            ¡PUBLICAR!
+          </Text>
         </View>
-      ) : null}
-
-      <View style={[styles.titleContainer, { marginBottom: SB.publishTitleMarginBottom, marginLeft: PT.offsetX, marginTop: PT.offsetY }]}>
-        {outlineElements}
-        <Text style={[titleBaseStyle, { color: PT.color }]}>
-          ¡PUBLICAR!
-        </Text>
       </View>
 
       <TextInput
@@ -173,8 +170,12 @@ const styles = StyleSheet.create({
     height: STAR_SZ,
   },
   titleContainer: {
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  titleInner: {
+    // Shrink-wraps to the text so absolute outline copies offset from the text, not the full container
   },
   outlineCopy: {
     position: 'absolute',
