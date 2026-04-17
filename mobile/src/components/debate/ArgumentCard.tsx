@@ -214,11 +214,11 @@ const styles = StyleSheet.create({
   pointTitle: {
     color: PT.titleColor,
     fontWeight: '700',
-    marginBottom: 4,
+    marginBottom: PT.titleToBulletGap,
   },
   bullet: {
     color: PT.bulletColor,
-    marginBottom: 2,
+    marginBottom: PT.bulletGap,
   },
   divider: {
     height: 1,

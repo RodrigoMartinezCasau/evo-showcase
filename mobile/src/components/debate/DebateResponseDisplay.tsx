@@ -155,9 +155,6 @@ export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
         <View style={{ marginTop: GAPS.counterpointToQuestion }}>
           <QuestionCard
             question={questionText}
-            borderColor={getBlockBorderColor('question', clanId)}
-            borderWidth={BW.question}
-            backgroundColor={getBlockBackgroundColor('question', clanId)}
             unifiedHeight={qaSharedHeight}
             onMeasure={onQuestionMeasure}
           />
@@ -171,10 +168,6 @@ export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
             quote={firstQuote.quote}
             author={firstQuote.author}
             work={firstQuote.work}
-            borderColor={getBlockBorderColor('quote', clanId)}
-            borderWidth={BW.quote}
-            backgroundColor={getBlockBackgroundColor('quote', clanId)}
-            innerBorderColor={getBlockBorderColor('quote', clanId)}
             unifiedHeight={qaSharedHeight}
             onMeasure={onQuoteMeasure}
           />

@@ -64,10 +64,6 @@ type Props = {
   quote: string;
   author?: string;
   work?: string;
-  borderColor: string;
-  borderWidth: number;
-  backgroundColor: string;
-  innerBorderColor?: string;
   unifiedHeight?: number;
   onMeasure?: (h: number) => void;
 };
@@ -76,15 +72,10 @@ export const DebateQuoteCard = React.memo(function DebateQuoteCard({
   quote,
   author,
   work,
-  borderColor,
-  borderWidth,
-  backgroundColor,
-  innerBorderColor,
   unifiedHeight,
   onMeasure,
 }: Props) {
   const attribution = [author, work].filter(Boolean).join(' — ');
-  const accentColor = innerBorderColor || IC.accentColorFallback;
 
   const handleLayout = onMeasure
     ? (e: LayoutChangeEvent) => onMeasure(e.nativeEvent.layout.height)
@@ -96,9 +87,6 @@ export const DebateQuoteCard = React.memo(function DebateQuoteCard({
       style={[
         styles.outerCard,
         {
-          borderColor,
-          borderWidth,
-          backgroundColor,
           minHeight: unifiedHeight ?? SB.baseMinHeight,
           paddingHorizontal: SB.outerPaddingH,
           paddingVertical: SB.outerPaddingV,
@@ -123,7 +111,7 @@ export const DebateQuoteCard = React.memo(function DebateQuoteCard({
             paddingVertical: IC.paddingVertical,
             backgroundColor: IC.backgroundColor,
             borderLeftWidth: IC.accentWidth,
-            borderLeftColor: accentColor,
+            borderLeftColor: IC.accentColorFallback,
             marginLeft: IC.offsetX,
             marginTop: IC.offsetY,
           },
@@ -144,7 +132,7 @@ export const DebateQuoteCard = React.memo(function DebateQuoteCard({
 
 const styles = StyleSheet.create({
   outerCard: {
-    borderRadius: CARD.borderRadius,
+    // No border, no background — flows on the black screen background
   },
   header: {
     height: HEADER_H,

@@ -104,8 +104,8 @@ export const PublishBlock = React.memo(function PublishBlock({
       style={[
         styles.card,
         {
-          borderColor,
-          borderWidth,
+          borderLeftColor: borderColor,
+          borderLeftWidth: borderWidth,
           backgroundColor,
           minHeight: unifiedHeight ?? SB.baseMinHeight,
           paddingHorizontal: SB.outerPaddingH,

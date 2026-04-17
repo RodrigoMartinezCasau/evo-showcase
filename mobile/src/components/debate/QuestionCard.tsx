@@ -53,18 +53,12 @@ const questionTextStyle = {
 
 type Props = {
   question: string;
-  borderColor: string;
-  borderWidth: number;
-  backgroundColor: string;
   unifiedHeight?: number;
   onMeasure?: (h: number) => void;
 };
 
 export const QuestionCard = React.memo(function QuestionCard({
   question,
-  borderColor,
-  borderWidth,
-  backgroundColor,
   unifiedHeight,
   onMeasure,
 }: Props) {
@@ -78,9 +72,6 @@ export const QuestionCard = React.memo(function QuestionCard({
       style={[
         styles.outerCard,
         {
-          borderColor,
-          borderWidth,
-          backgroundColor,
           minHeight: unifiedHeight ?? SB.baseMinHeight,
           paddingHorizontal: SB.outerPaddingH,
           paddingVertical: SB.outerPaddingV,
@@ -122,7 +113,7 @@ export const QuestionCard = React.memo(function QuestionCard({
 
 const styles = StyleSheet.create({
   outerCard: {
-    borderRadius: CARD.borderRadius,
+    // No border, no background — flows on the black screen background
   },
   header: {
     height: HEADER_H,

@@ -9,17 +9,23 @@
  * PART 1 — Individual gaps between blocks
  * ────────────────────────────────────────────── */
 
+/**
+ * ── INTER-BLOCK SPACING ──────────────────────────────
+ * Gap (px) between each pair of main sections in the AI response.
+ * Adjust freely — no rebuild needed.
+ */
 export const AI_RESPONSE_BLOCK_GAPS = {
-  /** Gap between Publicar block (now at top) and TU POSTURA. */
-  publishToStance: 16,
-  /** Gap between borderless ArgumentCards — increased because there are no card borders to provide visual separation. */
-  postureToCounterpoint: 20,
-  counterpointToQuestion: 20,
-  /** Pregunta and Cita are still boxed, so a tighter gap is fine. */
-  questionToQuote: 8,
-  /** Legacy — kept for backward compat, no longer used in DebateResponseDisplay. */
+  /** Gap from Publicar block to TU POSTURA. */
+  publishToStance: 0,
+  /** Gap from TU POSTURA to CONTRAPOSTURA. */
+  postureToCounterpoint: 0,
+  /** Gap from CONTRAPOSTURA to PREGUNTA REFLEXIVA. */
+  counterpointToQuestion: 0,
+  /** Gap from PREGUNTA REFLEXIVA to CITA TEXTUAL. */
+  questionToQuote: -10,
+  /** Legacy — kept for backward compat. */
   quoteToPublish: 0,
-} as const;
+};
 
 /** Per-block border thickness (px). */
 export const AI_RESPONSE_BORDER_WIDTH = {
@@ -306,19 +312,33 @@ export const DEBATE_CARD_LAYOUT = {
   paddingVertical: 16,
 } as const;
 
+/**
+ * ── INTRA-POINT SPACING ──────────────────────────────
+ * Spacing inside each numbered point block (title + bullets).
+ */
 export const DEBATE_POINT_LAYOUT = {
   titleColor: '#FFFFFF',
   bulletColor: '#A0A0A0',
-  pointGap: 14,
+  /** Vertical gap between consecutive numbered points (e.g. 1 → 2 → 3). */
+  pointGap: 18,
+  /** Gap between a point's bold title and its first bullet line. */
+  titleToBulletGap: 10,
+  /** Vertical gap between individual bullet lines within the same point. */
+  bulletGap: 10,
   bulletIndent: 16,
-} as const;
+};
 
+/**
+ * ── RESUMEN RÁPIDO SPACING ──────────────────────────────
+ * Controls the divider and text inside the quick-summary section.
+ */
 export const DEBATE_SUMMARY_LAYOUT = {
   dividerColor: '#3A3A3A',
+  /** Vertical space above and below the thin divider line before RESUMEN RÁPIDO. */
   dividerMarginVertical: 14,
   labelColor: '#808080',
   textColor: '#C0C0C0',
-} as const;
+};
 
 /* ──────────────────────────────────────────────
  * PART 6 — Unified special-block layout
@@ -375,7 +395,7 @@ export const AI_SPECIAL_BLOCK_LAYOUT = {
   widgetButtonPaddingV: 3,
 
   /* ── E) Text editors — ¡PUBLICAR! ── */
-  publishTitle: { offsetX: -120, offsetY: -5, fontSize: 24, lineHeight: 0, color: '#FFFFFF', scale: 1.2, outlineWidth: 1.5 },
+  publishTitle: { offsetX: -90, offsetY: -5, fontSize: 24, lineHeight: 0, color: '#FFFFFF', scale: 1.2, outlineWidth: 1.5 },
   publishInput: { offsetX: 0, offsetY: 0, fontSize: 13, lineHeight: 0, color: '#FFFFFF' },
   publishInputPlaceholderColor: '#606060',
   publishInputBackground: '#2A2A30',
