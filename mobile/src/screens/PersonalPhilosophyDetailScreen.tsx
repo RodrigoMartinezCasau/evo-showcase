@@ -44,14 +44,14 @@ import {
   fetchPhilosophyProfile,
   generateSummary,
   generatePhilosophers,
-  generateBooks,
   generateJobs,
   type PhilosopherEntry,
-  type BookEntry,
   type JobEntry,
   type PhilosophyContext,
 } from '@evoconn/services/philosophyProfileApi';
 import { recordUsesLog } from '@evoconn/services/streakApi';
+import { getBookRecommendations } from '@evoconn/logic/books/getBookRecommendations';
+import type { BookRecord } from '@evoconn/data/books/bookDatabase';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -108,9 +108,12 @@ export default function PersonalPhilosophyDetailScreen() {
   const [philosophersState, setPhilosophersState] = useState<AiBlockState>('idle');
   const [philosophersError, setPhilosophersError] = useState<string | undefined>();
 
-  const [books, setBooks] = useState<BookEntry[] | null>(null);
+  // ── Book recommendations: local engine, no backend call ────────────
+  const [books, setBooks] = useState<BookRecord[] | null>(null);
+  const [booksExhausted, setBooksExhausted] = useState(false);
   const [booksState, setBooksState] = useState<AiBlockState>('idle');
-  const [booksError, setBooksError] = useState<string | undefined>();
+  /** Ids of all books that have been shown in this session — prevents repeats. */
+  const [shownBookIds, setShownBookIds] = useState<string[]>([]);
 
   const [jobs, setJobs] = useState<JobEntry[] | null>(null);
   const [jobsState, setJobsState] = useState<AiBlockState>('idle');
@@ -123,7 +126,7 @@ export default function PersonalPhilosophyDetailScreen() {
         const data = await fetchPhilosophyProfile(profile.id);
         if (data.summary) { setSummaryText(data.summary); setSummaryState('success'); }
         if (data.philosophers) { setPhilosophers(data.philosophers); setPhilosophersState('success'); }
-        if (data.books) { setBooks(data.books); setBooksState('success'); }
+        // Books are now managed locally — do not restore from backend
         if (data.jobs) { setJobs(data.jobs); setJobsState('success'); }
       } catch {
         // Backend unreachable — show empty blocks, user can still try to generate
@@ -162,20 +165,28 @@ export default function PersonalPhilosophyDetailScreen() {
     }
   }, [profile.id, ctx]);
 
-  const handleBooksReload = useCallback(async () => {
-    setBooksState('loading');
-    setBooksError(undefined);
-    try {
-      const res = await generateBooks(profile.id, ctx);
-      setBooks(res.books);
+  const handleBooksReload = useCallback(() => {
+    // Local deterministic engine — instant, no network needed.
+    const result = getBookRecommendations(
+      profile.rank,
+      profile.philosophyPercentages,
+      shownBookIds,
+    );
+
+    if (result.status === 'exhausted') {
+      setBooksExhausted(true);
       setBooksState('success');
-      recordUsesLog(profile.id).catch(() => {});
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Error';
-      setBooksState(isNoUsesError(msg) ? 'no_uses' : 'error');
-      setBooksError(msg);
+      return;
     }
-  }, [profile.id, ctx]);
+
+    const newBooks = result.books;
+    setBooks(newBooks);
+    setBooksExhausted(false);
+    setBooksState('success');
+    // Add newly shown book ids to the history so they are never repeated
+    setShownBookIds((prev) => [...prev, ...newBooks.map((b) => b.id)]);
+    recordUsesLog(profile.id).catch(() => {});
+  }, [profile.id, profile.rank, profile.philosophyPercentages, shownBookIds]);
 
   const handleJobsReload = useCallback(async () => {
     setJobsState('loading');
@@ -261,8 +272,8 @@ export default function PersonalPhilosophyDetailScreen() {
               <View style={styles.halfCard}>
                 <BookRecommendationsCard
                   books={books}
+                  exhausted={booksExhausted}
                   state={booksState}
-                  errorMessage={booksError}
                   onReload={handleBooksReload}
                 />
               </View>

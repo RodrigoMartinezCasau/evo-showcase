@@ -253,6 +253,25 @@ export const PERSONAL_POSTS_TOTAL_STATS_ICON_SIZE = 22;
  */
 export const PERSONAL_POSTS_TOTAL_STATS_TEXT_OFFSET_Y = 1;
 
+// ── Recommended books block (inside BookRecommendationsCard) ────────
+
+/**
+ * X/Y translation of the whole 2-book content block inside the card.
+ * Does NOT move the card, the title, or the reload icon.
+ */
+export const RECOMMENDED_BOOKS_OFFSET_X = -65;
+export const RECOMMENDED_BOOKS_OFFSET_Y = 0;
+
+/**
+ * Uniform scale of the 2-book content block.
+ */
+export const RECOMMENDED_BOOKS_SCALE = 1;
+
+/**
+ * Vertical gap (px) between the two book entries.
+ */
+export const RECOMMENDED_BOOKS_ITEM_GAP = 12;
+
 // ── Per-stat individual editors (icon + number move/scale together) ──
 
 export const TOTAL_STATS_UPVOTES_OFFSET_X    = 0;
