@@ -11,16 +11,14 @@ export type ClanId =
   | 'racionalista';
 
 export const CLAN_TO_COLOR: Record<ClanId, string> = {
-  /** Acento legible sobre fondo oscuro (mismo token que `evoconnColors.accent` / cards nihilista). */
-  nihilista: evoconnColors.accent,
-  cientista: '#50D6D3',
-  // Estoicos = olive green (not gray)
-  estoico: '#7B8342',
-  existencialista: '#C93A3A',
-  trascendentalista: '#C56BEA',
-  humanista: '#FFC400',
-  realista: '#A7AAB0',
-  racionalista: '#3F63FF',
+  nihilista: '#bdb29c',
+  cientista: '#54d5cf',
+  estoico: '#818a41',
+  existencialista: '#c93a39',
+  trascendentalista: '#cb6ce6',
+  humanista: '#efb318',
+  realista: '#a2a3a8',
+  racionalista: '#395df2',
 };
 
 export const CLAN_TO_BG_ASSET: Partial<Record<ClanId, number>> = {
@@ -39,15 +37,35 @@ export const CLAN_TO_BG_ASSET: Partial<Record<ClanId, number>> = {
  * Default (no clan / Evoconn) uses the Evoconn purple.
  */
 export const CLAN_SECONDARY_COLOR: Record<ClanId, string> = {
-  nihilista: '#6E6A63',
-  racionalista: '#7DB7FF',
-  estoico: '#D9C27A',
-  humanista: '#B97A2B',
-  existencialista: '#C96A4A',
-  trascendentalista: '#D8CF72',
-  cientista: '#DFF7F7',
-  realista: '#E37B6F',
+  nihilista: '#535147',
+  cientista: '#fdfef0',
+  estoico: '#444827',
+  existencialista: '#f9bc4b',
+  racionalista: '#46b8f9',
+  humanista: '#d08733',
+  realista: '#f9a666',
+  trascendentalista: '#e4de5b',
 };
+
+export const CLAN_TERTIARY_COLOR: Record<ClanId, string> = {
+  nihilista: '#37343b',
+  cientista: '#298280',
+  estoico: '#868833',
+  existencialista: '#591c2d',
+  racionalista: '#defcef',
+  humanista: '#2d996a',
+  realista: '#696969',
+  trascendentalista: '#3f2247',
+};
+
+export const NO_CLAN_SECONDARY_COLOR = '#7000ff';
+export const NO_CLAN_TERTIARY_COLOR = '#4f59fe';
+
+export function getClanTertiaryColor(clanId: string | null | undefined): string {
+  if (!clanId || String(clanId).trim() === '') return NO_CLAN_TERTIARY_COLOR;
+  const key = clanId.trim().toLowerCase();
+  return (CLAN_TERTIARY_COLOR as Record<string, string>)[key] ?? NO_CLAN_TERTIARY_COLOR;
+}
 
 export const CLAN_SECONDARY_DEFAULT = '#7A3CFF';
 

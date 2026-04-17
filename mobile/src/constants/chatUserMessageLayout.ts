@@ -9,16 +9,16 @@
 export const CHAT_USER_MESSAGE_LAYOUT = {
   accentWidth: 4,
   accentColors: {
-    noClan: '#C7FF1A',
+    noClan: '#c7ff02',
 
-    nihilista: '#D8D2C4',
-    racionalista: '#4D7DFF',
-    estoico: '#8A9250',
-    humanista: '#E0B646',
-    existencialista: '#D6524A',
-    trascendentalista: '#B979FF',
-    cientista: '#7EE7E7',
-    realista: '#F3E8D2',
+    nihilista: '#bdb29c',
+    racionalista: '#395df2',
+    estoico: '#818a41',
+    humanista: '#efb318',
+    existencialista: '#c93a39',
+    trascendentalista: '#cb6ce6',
+    cientista: '#54d5cf',
+    realista: '#a2a3a8',
   },
 } as const;
 

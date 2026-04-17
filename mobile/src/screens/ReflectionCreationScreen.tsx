@@ -36,6 +36,7 @@ import {
 } from '@evoconn/constants/chatUserMessageLayout';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
+import { getClanColor } from '@evoconn/constants/clanColors';
 import { getChatSendButtonByHouse } from '@evoconn/utils/getChatSendButtonByHouse';
 import {
   CHAT_SEND_BUTTON_LAYOUT,
@@ -72,6 +73,8 @@ export default function ReflectionCreationScreen() {
   const { thoughts, createThought, updateThought, loadThread } = useThoughts();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const clanColor = getChatUserAccentColor(activeClan);
+  // Island uses true primary clan color, with a special soft purple for Sin clan
+  const islandBgColor = activeClan ? getClanColor(activeClan) : '#d8cdff';
 
   const SendIcon = useMemo(() => getChatSendButtonByHouse(activeClan), [activeClan]);
   const sendButtonSize = CHAT_SEND_BUTTON_LAYOUT.size;
@@ -145,11 +148,10 @@ export default function ReflectionCreationScreen() {
     }
     const msgY = messageYOffsets.current[latestUserReflectionIndex];
     if (msgY == null) return;
-    // The message is visible if its top is within the current viewport
+    // Only show the island when the reflection has scrolled ABOVE the viewport
+    // (user scrolled down past it). Never show it when the reflection is below.
     const viewTop = scrollOffsetY.current;
-    const viewBottom = scrollOffsetY.current + scrollViewHeight.current;
-    const messageIsVisible = msgY >= viewTop && msgY < viewBottom;
-    const shouldShow = !messageIsVisible;
+    const shouldShow = msgY < viewTop;
     if (shouldShow && !islandVisible) {
       setIslandVisible(true);
       Animated.timing(islandOpacity, { toValue: 1, duration: 220, useNativeDriver: true }).start();
@@ -459,13 +461,17 @@ export default function ReflectionCreationScreen() {
           <TouchableOpacity
             activeOpacity={0.82}
             onPress={handleScrollToReflection}
-            style={[styles.islandPill, { backgroundColor: clanColor }]}
+            style={[styles.islandPill, { backgroundColor: islandBgColor }]}
           >
+            {/* «» rotated 90° CW → both point upward */}
             <Text
               style={[
                 styles.islandChevron,
                 {
-                  transform: [{ scale: ISLAND.publishJumpIslandChevronScale }],
+                  transform: [
+                    { rotate: '90deg' },
+                    { scale: ISLAND.publishJumpIslandChevronScale },
+                  ],
                   marginRight: ISLAND.publishJumpIslandChevronGap,
                 },
               ]}
@@ -489,12 +495,15 @@ export default function ReflectionCreationScreen() {
               style={[
                 styles.islandChevron,
                 {
-                  transform: [{ scale: ISLAND.publishJumpIslandChevronScale }],
+                  transform: [
+                    { rotate: '90deg' },
+                    { scale: ISLAND.publishJumpIslandChevronScale },
+                  ],
                   marginLeft: ISLAND.publishJumpIslandChevronGap,
                 },
               ]}
             >
-              {'»'}
+              {'«'}
             </Text>
           </TouchableOpacity>
         </Animated.View>
@@ -749,7 +758,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
-    zIndex: 300,
+    zIndex: 150,
     pointerEvents: 'box-none',
   } as any,
   islandPill: {
