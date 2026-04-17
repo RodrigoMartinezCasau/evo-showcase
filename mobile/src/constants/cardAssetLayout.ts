@@ -1,3 +1,14 @@
+/**
+ * ── SIN CLAN BANNER POSITION OVERRIDE ──────────────────────────────────────
+ * Applies ONLY when the card's author has no clan (clanId = null / "Sin Clan").
+ * Overrides the per-tier BANNER_OFFSET_X / BANNER_OFFSET_Y from cardLayout.ts
+ * so the 297.png ribbon can be fine-tuned independently of other clan banners.
+ *
+ * Set to `null` to fall back to the normal per-tier offsets.
+ */
+export const SIN_CLAN_BANNER_OFFSET_X: number | null = -14;
+export const SIN_CLAN_BANNER_OFFSET_Y: number | null = 21;
+
 export const CARD_ASSET_LAYOUT = {
   SMALL: {
     /**

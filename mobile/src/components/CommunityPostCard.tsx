@@ -15,7 +15,7 @@ import { getMediumClanBackgroundAsset } from '@evoconn/assets/cards/mediumClanBa
 import { getMediumClanBannerAsset } from '@evoconn/assets/cards/mediumClanBanners';
 import { getQuoteClanBackgroundAsset } from '@evoconn/assets/cards/quoteClanBackgrounds';
 import { getQuoteClanBannerAsset } from '@evoconn/assets/cards/quoteClanBanners';
-import { CARD_ASSET_LAYOUT } from '@evoconn/constants/cardAssetLayout';
+import { CARD_ASSET_LAYOUT, SIN_CLAN_BANNER_OFFSET_X, SIN_CLAN_BANNER_OFFSET_Y } from '@evoconn/constants/cardAssetLayout';
 import { smallStatsIcons } from '@evoconn/assets/icons/smallStats';
 import { useFeedStore } from '@evoconn/hooks/useFeedStore';
 import { usePersonalProfile } from '@evoconn/hooks/PersonalProfileContext';
@@ -123,6 +123,16 @@ export function CommunityPostCard({
 
   const L = useMemo(() => cardLayoutBlockForTier(cardTier), [cardTier]);
   const collapsedBodyMaxLines = getCardMaxLinesForTier(cardTier);
+
+  // Sin-clan banner offset editor — overrides L.BANNER_OFFSET_X/Y only for
+  // cards with no clan. Other clans keep using their per-tier L values.
+  const isSinClan = !authorClanId;
+  const bannerOffsetX = isSinClan && SIN_CLAN_BANNER_OFFSET_X !== null
+    ? SIN_CLAN_BANNER_OFFSET_X
+    : L.BANNER_OFFSET_X;
+  const bannerOffsetY = isSinClan && SIN_CLAN_BANNER_OFFSET_Y !== null
+    ? SIN_CLAN_BANNER_OFFSET_Y
+    : L.BANNER_OFFSET_Y;
 
   const handleCardPress = () => {
     onPress();
@@ -368,7 +378,7 @@ export function CommunityPostCard({
             <View
               pointerEvents="none"
               style={{
-                transform: [{ translateX: L.BANNER_OFFSET_X }, { translateY: L.BANNER_OFFSET_Y }],
+                transform: [{ translateX: bannerOffsetX }, { translateY: bannerOffsetY }],
               }}
             >
               <Image
