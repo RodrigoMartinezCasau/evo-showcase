@@ -160,6 +160,39 @@ export default function ReflectionCreationScreen() {
 
   const scrollRef = useRef<ScrollView>(null);
 
+  /**
+   * Always-current ref of the local `messages` state.
+   * Used to persist the full conversation thread back to the per-user thought
+   * store after each turn without depending on stale closures.
+   */
+  const messagesRef = useRef<ChatBubble[]>(messages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  /**
+   * Strip transient/UI-only fields from a ChatBubble before persisting so that
+   * stored data round-trips cleanly:
+   *   - `revealed`    : redundant copy of `content` used for typewriter UX
+   *   - `introPhase`  : transient animation state, never replayed on reopen
+   *   - `streaming`   : transient — a persisted message is always finalised
+   */
+  const toPersistedMessage = useCallback((m: ChatBubble): DebateMessage => {
+    const { revealed: _r, introPhase: _i, ...rest } = m as ChatBubble & {
+      revealed?: string;
+      introPhase?: IntroPhase;
+    };
+    if (rest.role === 'assistant') {
+      // Drop transient streaming flag; persisted assistant messages are always done.
+      const { streaming: _s, ...assistantRest } = rest as Extract<
+        DebateMessage,
+        { role: 'assistant' }
+      >;
+      return assistantRest as DebateMessage;
+    }
+    return rest as DebateMessage;
+  }, []);
+
   // ── Publish jump island ──────────────────────────────────────────────────
   // `messageYOffsets` stores the measured Y offset (from scroll top) for each
   // message index so we can scroll directly to the latest user reflection.
@@ -336,8 +369,18 @@ export default function ReflectionCreationScreen() {
           }, introDuration);
         }
 
+        // ── Persist the full conversation thread to the per-user store ──
+        // This is what makes the conversation survive profile switches and
+        // app reloads.  We rebuild from the just-updated local state via the
+        // ref (the ref is updated by useLayoutEffect in the next microtask;
+        // here we explicitly compute the post-update array to avoid races).
+        const finalisedThread: ChatBubble[] = [
+          ...messagesRef.current.slice(0, -1), // everything except the placeholder
+          assistantMsg, // replace placeholder with the real assistant message
+        ];
         updateThought(id, {
           title: resp.topic || thoughts.find((t) => t.id === id)?.title || 'Reflexión',
+          messages: finalisedThread.map(toPersistedMessage),
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Error desconocido';
@@ -352,7 +395,7 @@ export default function ReflectionCreationScreen() {
         setSending(false);
       }
     },
-    [sending, debateId, createThought, updateThought, scrollToEnd, thoughts, markStreakActivated, includeReflectiveQuestion, includePhilosophicalReferences],
+    [sending, debateId, createThought, updateThought, scrollToEnd, thoughts, markStreakActivated, includeReflectiveQuestion, includePhilosophicalReferences, toPersistedMessage],
   );
 
   const conversationItems = useMemo(

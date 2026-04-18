@@ -1,28 +1,24 @@
 /**
- * thoughtsStorage.ts — unified, per-user persistent storage for ALL thoughts
- * (reflections AND phrases).
+ * thoughtsStorage.ts — single-database, multi-user persistent storage.
  *
- * Storage key scheme
- * ──────────────────
- * Each of the 9 simulated users gets their own AsyncStorage slot:
+ * Storage model (v3 — bulletproof)
+ * ────────────────────────────────
+ * ONE AsyncStorage key holds the ENTIRE database keyed by userId:
  *
- *   evoconn_thoughts_v2_{userId}   →  JSON array of PersistedThought[]
+ *   evoconn_thoughts_v3  →  { [userId]: PersistedThought[] }
  *
- * User isolation is therefore enforced at the storage key level, not by
- * filtering a global bucket.  Switching simulated users calls
- * loadThoughtsForUser with the new id and gets completely different data.
+ * Why a single key?
+ * - No race conditions during user switching (no "save before switch" needed).
+ * - No stale-async-load can ever overwrite a different user's data, because
+ *   every save is a snapshot of the WHOLE database.
+ * - One-time load on app start; rehydrates all 9 users at once.
+ * - Switching simulated users is a pure in-memory slice lookup (cost-free).
  *
- * Migration
- * ─────────
- * The old global key `evoconn_phrase_threads_v1` (no user separation) is
- * migrated once, on the first load for a user.  All legacy phrases are
- * assigned to the user that is active at migration time (typically 'u1',
- * the default).  After migration the old key is removed.
- *
- * Reflections were previously fetched from the backend API list; with this
- * module they are persisted locally too, so the list survives reloads and is
- * fully user-scoped.  The backend is still used for AI generation but the
- * client is now the source of truth for the thread list and message cache.
+ * Migration paths
+ * ───────────────
+ * Older versions stored data under per-user keys (`evoconn_thoughts_v2_{uid}`)
+ * or under a single global phrase key (`evoconn_phrase_threads_v1`).  Both are
+ * migrated into v3 on the first load, then their old keys are removed.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ConversationItem } from '@evoconn/types';
@@ -30,32 +26,24 @@ import type { DebateMessage } from '@evoconn/types/debate';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-/**
- * Serialised representation of a single thought (reflection or phrase).
- * Extends `ConversationItem` with the full message thread so it can be
- * displayed instantly on reopen without an extra network round-trip.
- */
 export type PersistedThought = ConversationItem & {
   type: 'reflection' | 'phrase';
-  /** Full thread — populated after the first AI response (reflections) or on
-   *  creation (phrases).  Optional because old persisted items may not have it. */
+  /** Full thread (assistant responses included) — populated after each AI turn
+   *  for reflections, and at creation time for phrases. */
   messages?: DebateMessage[];
   /** Private notes (phrase mode only). */
   phraseNotes?: string;
-  /**
-   * ID of the simulated user who owns this thought.  Required for correct
-   * user isolation; items created before this field was introduced may have it
-   * undefined, and are treated as belonging to the user on whose load they
-   * were first encountered (migration path).
-   */
+  /** ID of the simulated user who owns this thought. Always present. */
   ownerUserId: string;
 };
 
-// ─── Storage key helpers ──────────────────────────────────────────────────────
+export type ThoughtsDatabase = Record<string, PersistedThought[]>;
 
-const KEY_V2 = (userId: string) => `evoconn_thoughts_v2_${userId}`;
-/** Legacy global key written by the old phraseThreadsStorage module. */
-const LEGACY_PHRASE_KEY = 'evoconn_phrase_threads_v1';
+// ─── Storage keys ─────────────────────────────────────────────────────────────
+
+const KEY_V3 = 'evoconn_thoughts_v3';
+const KEY_V2_PREFIX = 'evoconn_thoughts_v2_';
+const KEY_LEGACY_PHRASES = 'evoconn_phrase_threads_v1';
 
 // ─── Validation guard ─────────────────────────────────────────────────────────
 
@@ -65,81 +53,114 @@ function isPersistedThought(x: unknown): x is PersistedThought {
   return (
     (o.type === 'phrase' || o.type === 'reflection') &&
     typeof o.id === 'string' &&
-    typeof o.title === 'string' &&
-    typeof o.ownerUserId === 'string'
+    typeof o.title === 'string'
   );
+}
+
+function sanitiseList(list: unknown, ownerUserId: string): PersistedThought[] {
+  if (!Array.isArray(list)) return [];
+  const out: PersistedThought[] = [];
+  for (const item of list) {
+    if (isPersistedThought(item)) {
+      // Force ownership to the slot's userId — defensive: never trust stored data.
+      out.push({ ...item, ownerUserId });
+    }
+  }
+  return out;
+}
+
+function sanitiseDatabase(db: unknown): ThoughtsDatabase {
+  if (!db || typeof db !== 'object') return {};
+  const out: ThoughtsDatabase = {};
+  for (const [userId, list] of Object.entries(db as Record<string, unknown>)) {
+    if (typeof userId !== 'string' || !userId) continue;
+    out[userId] = sanitiseList(list, userId);
+  }
+  return out;
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
- * Load all thoughts (reflections + phrases) for a specific simulated user.
- * Returns an empty array on any error so the UI always has a valid state.
+ * Load the complete multi-user thoughts database from disk, running any
+ * one-time migrations from older storage formats.  Always returns a valid
+ * (possibly empty) database object.
  */
-export async function loadThoughtsForUser(userId: string): Promise<PersistedThought[]> {
-  try {
-    const raw = await AsyncStorage.getItem(KEY_V2(userId));
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isPersistedThought);
-  } catch {
-    return [];
-  }
-}
+export async function loadAllThoughts(
+  knownUserIds: string[] = [],
+): Promise<ThoughtsDatabase> {
+  let db: ThoughtsDatabase = {};
 
-/**
- * Persist the current thought list for a specific simulated user.
- * Only saves thoughts whose `ownerUserId === userId` as a safety guard
- * against accidentally writing another user's data.
- */
-export async function saveThoughtsForUser(
-  userId: string,
-  thoughts: PersistedThought[],
-): Promise<void> {
+  // 1. Read the v3 root.
   try {
-    const owned = thoughts.filter((t) => t.ownerUserId === userId);
-    await AsyncStorage.setItem(KEY_V2(userId), JSON.stringify(owned));
-  } catch {
-    // Non-fatal — the in-memory state is still correct for this session.
-  }
-}
-
-/**
- * One-time migration from the old global phrase-threads key.
- *
- * Reads `evoconn_phrase_threads_v1`, stamps every found phrase with
- * `ownerUserId = migrateToUserId`, removes the old key, and returns the
- * migrated items (or [] if the key didn't exist or an error occurred).
- *
- * It is safe to call this on every app launch — it is a no-op once the old
- * key is gone.
- */
-export async function migrateFromLegacyPhraseStorage(
-  migrateToUserId: string,
-): Promise<PersistedThought[]> {
-  try {
-    const raw = await AsyncStorage.getItem(LEGACY_PHRASE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) {
-      await AsyncStorage.removeItem(LEGACY_PHRASE_KEY);
-      return [];
+    const raw = await AsyncStorage.getItem(KEY_V3);
+    if (raw) {
+      db = sanitiseDatabase(JSON.parse(raw) as unknown);
     }
-    const migrated: PersistedThought[] = [];
-    for (const item of parsed) {
-      if (
-        item &&
-        typeof item === 'object' &&
-        (item as Record<string, unknown>).type === 'phrase' &&
-        typeof (item as Record<string, unknown>).id === 'string'
-      ) {
-        migrated.push({ ...(item as PersistedThought), ownerUserId: migrateToUserId });
+  } catch {
+    db = {};
+  }
+
+  // 2. Migrate v2 per-user keys (if any) into v3.
+  let migratedAnything = false;
+  for (const userId of knownUserIds) {
+    const v2Key = `${KEY_V2_PREFIX}${userId}`;
+    try {
+      const raw = await AsyncStorage.getItem(v2Key);
+      if (raw == null) continue;
+      const parsed = JSON.parse(raw) as unknown;
+      const list = sanitiseList(parsed, userId);
+      // Merge — only add items not already in v3 to avoid duplicates.
+      const existing = db[userId] ?? [];
+      const existingIds = new Set(existing.map((t) => t.id));
+      const merged = [...existing, ...list.filter((t) => !existingIds.has(t.id))];
+      if (merged.length > 0) {
+        db[userId] = merged;
+        migratedAnything = true;
       }
+      await AsyncStorage.removeItem(v2Key);
+    } catch {
+      // Ignore — corrupt v2 slot is not worth retrying.
     }
-    await AsyncStorage.removeItem(LEGACY_PHRASE_KEY);
-    return migrated;
+  }
+
+  // 3. Migrate legacy global phrase storage into the first known user's slot.
+  try {
+    const raw = await AsyncStorage.getItem(KEY_LEGACY_PHRASES);
+    if (raw != null) {
+      const parsed = JSON.parse(raw) as unknown;
+      const fallbackUserId = knownUserIds[0] ?? 'u1';
+      const list = sanitiseList(parsed, fallbackUserId);
+      const existing = db[fallbackUserId] ?? [];
+      const existingIds = new Set(existing.map((t) => t.id));
+      const merged = [...existing, ...list.filter((t) => !existingIds.has(t.id))];
+      if (merged.length > 0) {
+        db[fallbackUserId] = merged;
+        migratedAnything = true;
+      }
+      await AsyncStorage.removeItem(KEY_LEGACY_PHRASES);
+    }
   } catch {
-    return [];
+    // Ignore.
+  }
+
+  // 4. If we migrated anything, persist the merged db back immediately.
+  if (migratedAnything) {
+    saveAllThoughts(db).catch(() => {});
+  }
+
+  return db;
+}
+
+/**
+ * Persist the COMPLETE multi-user database to disk in a single write.
+ * Every mutation goes through here, guaranteeing that no partial state
+ * can ever be left on disk.
+ */
+export async function saveAllThoughts(db: ThoughtsDatabase): Promise<void> {
+  try {
+    await AsyncStorage.setItem(KEY_V3, JSON.stringify(db));
+  } catch {
+    // Non-fatal — in-memory state is still the source of truth this session.
   }
 }
