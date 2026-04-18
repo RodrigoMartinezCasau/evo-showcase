@@ -21,6 +21,11 @@ type Props = {
   onPublish?: () => Promise<void> | void;
   /** Frases/reapertura: el padre marca publicado sin desmontar el bloque. */
   externallyPublished?: boolean;
+  /**
+   * Padding horizontal *dentro* del botón gris (▲ PUBLICAR).
+   * Reflexiones: omitir o 0. Frases: pasar valor desde `phrasePublishHintLayout`.
+   */
+  innerPaddingHorizontal?: number;
 };
 
 export const PublishActionBar = React.memo(function PublishActionBar({
@@ -28,6 +33,7 @@ export const PublishActionBar = React.memo(function PublishActionBar({
   disabled,
   onPublish,
   externallyPublished,
+  innerPaddingHorizontal = 0,
 }: Props) {
   const [state, setState] = useState<PublishState>(() =>
     externallyPublished ? 'published' : 'idle',
@@ -188,6 +194,7 @@ export const PublishActionBar = React.memo(function PublishActionBar({
           borderRadius: BAR.borderRadius,
           marginLeft: BAR.offsetX,
           marginTop: BAR.offsetY,
+          paddingHorizontal: innerPaddingHorizontal,
           width: BAR.widthScale < 1 ? `${BAR.widthScale * 100}%` as unknown as number : '100%',
           backgroundColor: state === 'published' ? barColor : '#2A2A30',
         },

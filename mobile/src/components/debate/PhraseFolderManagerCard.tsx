@@ -30,8 +30,10 @@ const starBoxStyle = {
 };
 
 type Props = {
-  borderColor: string;
-  borderWidth: number;
+  /** Kept for API compatibility — outer colored border is no longer rendered. */
+  borderColor?: string;
+  /** Kept for API compatibility — outer colored border is no longer rendered. */
+  borderWidth?: number;
   backgroundColor: string;
   /** Lateral izquierdo de cada carpeta: misma lógica que Cita textual (getBlockBorderColor('quote', clan)). */
   innerBorderColor: string;
@@ -126,8 +128,6 @@ function FolderItemBox({
 }
 
 export const PhraseFolderManagerCard = React.memo(function PhraseFolderManagerCard({
-  borderColor,
-  borderWidth,
   backgroundColor,
   innerBorderColor,
   folders,
@@ -156,8 +156,8 @@ export const PhraseFolderManagerCard = React.memo(function PhraseFolderManagerCa
       style={[
         styles.outerCard,
         {
-          borderColor,
-          borderWidth,
+          // NOTE: large colored outer border removed. The lateral colored
+          // stripe on each folder row (`borderLeftWidth`) is preserved.
           backgroundColor,
           paddingHorizontal: SB.outerPaddingH,
           paddingVertical: SB.outerPaddingV,

@@ -22,16 +22,16 @@ const starBoxStyle = {
 };
 
 type Props = {
-  borderColor: string;
-  borderWidth: number;
+  /** Kept for API compatibility — outer colored border is no longer rendered. */
+  borderColor?: string;
+  /** Kept for API compatibility — outer colored border is no longer rendered. */
+  borderWidth?: number;
   backgroundColor: string;
   value: string;
   onChangeText: (text: string) => void;
 };
 
 export const PhraseNotesCard = React.memo(function PhraseNotesCard({
-  borderColor,
-  borderWidth,
   backgroundColor,
   value,
   onChangeText,
@@ -41,8 +41,10 @@ export const PhraseNotesCard = React.memo(function PhraseNotesCard({
       style={[
         styles.outerCard,
         {
-          borderColor,
-          borderWidth,
+          // NOTE: large colored outer border removed for cleaner integration
+          // with the screen background. The lateral accent on the inner card
+          // (`borderLeftWidth` / `borderLeftColor`) is preserved below so the
+          // section still has a visible colored stripe.
           backgroundColor,
           minHeight: L.blockMinHeight,
           paddingHorizontal: SB.outerPaddingH,

@@ -18,6 +18,12 @@ import {
   CHAT_BOTTOM_AREA_LAYOUT as CHAT_BOTTOM_AREA,
 } from '@evoconn/constants/chatInputBarLayout';
 import {
+  ThinkingStar,
+  IntroTypewriter,
+  computeIntroDurationMs,
+} from '@evoconn/components/aiPhase/AiPhaseAnimations';
+import { generatePhraseIntro } from '@evoconn/services/phraseApi';
+import {
   getChatUserAccentColor,
   CHAT_USER_MESSAGE_LAYOUT,
 } from '@evoconn/constants/chatUserMessageLayout';
@@ -25,7 +31,6 @@ import { REFLECTION_EMPTY_WELCOME_LAYOUT as EMPTY_WELCOME } from '@evoconn/const
 import { EMPTY_PHRASE_WELCOME_TRIPLE_STARS_LAYOUT as PHRASE_TRIPLE_STARS } from '@evoconn/constants/phraseEmptyWelcomeTripleStarsLayout';
 import { getPhraseTripleStarsByHouse } from '@evoconn/utils/getPhraseTripleStarsByHouse';
 import {
-  AI_RESPONSE_BLOCK_GAPS as GAPS,
   AI_RESPONSE_BORDER_WIDTH as BW,
   getBlockBorderColor,
   getBlockBackgroundColor,
@@ -37,9 +42,37 @@ import { useFeedStore, createPhrasePost } from '@evoconn/hooks/useFeedStore';
 import { useDebugStreak } from '../debug/DebugStreakContext';
 import { normalizePhraseInnerForPublish } from '@evoconn/utils/phrasePublish';
 import type { SidebarFolder } from '@evoconn/types';
+import { PHRASE_CREATION_STACK_LAYOUT as PHRASE_STACK } from '@evoconn/constants/phraseCreationStackLayout';
+import { PHRASE_PUBLISH_HINT_LAYOUT as PHRASE_PUBLISH_LAYOUT } from '@evoconn/constants/phrasePublishHintLayout';
 
 const PUBLISH_AUTHOR_PLACEHOLDER = 'AÑADE EL AUTOR...';
 const PUBLISH_AUTHOR_MAX_LEN = 40;
+
+/**
+ * Tiny effect-only helper rendered next to `IntroTypewriter` to schedule a
+ * one-shot `onDone(threadId)` callback after the typewriter finishes revealing
+ * the intro. We use this instead of duplicating the duration math at the
+ * parent level — the duration formula stays inside the shared module.
+ */
+const PhraseIntroDoneTrigger = React.memo(function PhraseIntroDoneTrigger({
+  threadId,
+  introText,
+  onDone,
+}: {
+  threadId: string;
+  introText: string;
+  onDone: (threadId: string) => void;
+}) {
+  useEffect(() => {
+    const ms = computeIntroDurationMs(introText);
+    const handle = setTimeout(() => onDone(threadId), ms);
+    return () => clearTimeout(handle);
+    // We intentionally only re-run when threadId or introText changes; onDone
+    // is stable from useState's setter pattern in the parent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threadId, introText]);
+  return null;
+});
 
 /** Compat: hilos viejos con `phrasePublishPending` / `phrasePublishPublished`. */
 function getPhrasePublishUI(
@@ -98,6 +131,12 @@ export default function PhraseCreationScreen() {
   const publishAuthorRef = useRef('');
   const publishedRef = useRef<Set<string>>(new Set());
   const notesDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Tracks which threads have already had the intro fetch fired (prevents
+   *  duplicate calls when the screen re-renders or remounts). */
+  const introRequestedRef = useRef<Set<string>>(new Set());
+  /** Per-thread flag: once the typewriter finishes for that thread, we flip
+   *  this to true so the phrase tools (Apuntes, Folder) appear. */
+  const [introTypewriterDone, setIntroTypewriterDone] = useState<Record<string, boolean>>({});
 
   const [phraseNotesLocal, setPhraseNotesLocal] = useState('');
 
@@ -117,7 +156,19 @@ export default function PhraseCreationScreen() {
       try {
         const thread = await loadThread(phraseId);
         if (!cancelled && thread) {
-          setMessages(thread.messages);
+          // Defensive: if a previous session crashed mid-fetch, never resume
+          // a stale "loading intro" spinner — the request is no longer alive.
+          const hydrated = thread.messages.map((m) =>
+            m.role === 'assistant' && m.phraseIntroLoading
+              ? { ...m, phraseIntroLoading: false }
+              : m,
+          );
+          setMessages(hydrated);
+          // For reopened threads we never re-run the typewriter — surface the
+          // intro as already-revealed static text so the user sees it instantly.
+          setIntroTypewriterDone((prev) => ({ ...prev, [phraseId]: true }));
+          // Mark as already requested to prevent any background re-fetch.
+          introRequestedRef.current.add(phraseId);
         }
       } finally {
         if (!cancelled) setLoadingThread(false);
@@ -186,12 +237,20 @@ export default function PhraseCreationScreen() {
       (post as { id: string }).id = sourceId;
       publishPost(post);
 
+      // Preserve the AI intro (if it was generated for this thread) so the
+      // published view doesn't lose context on reopen. We grab the latest
+      // assistant message rather than constructing it blind.
+      const prevAssistant = messages.find((m) => m.role === 'assistant');
+      const carriedIntro =
+        prevAssistant && prevAssistant.role === 'assistant' ? prevAssistant.phraseIntro ?? null : null;
       const nextMessages: DebateMessage[] = [
         { role: 'user', content: rawPhraseFromUser.trim() },
         {
           role: 'assistant',
           content: '',
           phrasePublishUI: { status: 'published', author: authorName },
+          phraseIntro: carriedIntro,
+          phraseIntroLoading: false,
         },
       ];
       setMessages(nextMessages);
@@ -199,7 +258,7 @@ export default function PhraseCreationScreen() {
       publishAuthorRef.current = '';
       Keyboard.dismiss();
     },
-    [publishPost, updateThought],
+    [publishPost, updateThought, messages],
   );
 
   const handleAssignPhraseToFolder = useCallback(
@@ -209,6 +268,49 @@ export default function PhraseCreationScreen() {
       Alert.alert('Carpeta', `La frase se ha guardado en «${folder.name}».`);
     },
     [phraseId, updateThought],
+  );
+
+  /**
+   * Fires the /phrase/intro request, persists the result on the assistant
+   * message, and (when no intro is returned) immediately marks the typewriter
+   * as "done" so the phrase tools appear without waiting.
+   *
+   * Safe to call multiple times: deduped via `introRequestedRef`.
+   */
+  const requestPhraseIntro = useCallback(
+    async (threadId: string, phraseText: string, author?: string | null) => {
+      if (introRequestedRef.current.has(threadId)) return;
+      introRequestedRef.current.add(threadId);
+      const intro = await generatePhraseIntro({ phrase: phraseText, author: author ?? null });
+      let nextMessages: DebateMessage[] | null = null;
+      setMessages((prev) => {
+        if (prev.length === 0) return prev;
+        const copy = [...prev];
+        const lastIdx = copy.length - 1;
+        const last = copy[lastIdx];
+        if (last && last.role === 'assistant') {
+          copy[lastIdx] = {
+            ...last,
+            phraseIntro: intro,
+            phraseIntroLoading: false,
+          };
+          nextMessages = copy;
+        }
+        return copy;
+      });
+      // Persist the intro on the phrase thread so reopening it later still
+      // shows the AI intro without re-hitting the backend.
+      if (nextMessages) {
+        updateThought(threadId, { messages: nextMessages });
+      }
+      // No intro returned → skip the typewriter wait entirely.
+      if (!intro) {
+        setIntroTypewriterDone((prev) =>
+          prev[threadId] ? prev : { ...prev, [threadId]: true },
+        );
+      }
+    },
+    [updateThought],
   );
 
   const handleSend = useCallback(
@@ -228,10 +330,21 @@ export default function PhraseCreationScreen() {
         markStreakActivated();
         setMessages([
           { role: 'user', content: t },
-          { role: 'assistant', content: '', phrasePublishUI: { status: 'pending' } },
+          {
+            role: 'assistant',
+            content: '',
+            phrasePublishUI: { status: 'pending' },
+            // Mark intro as loading so the screen shows the pulsing thinking
+            // star until the /phrase/intro response (or its failure) arrives.
+            phraseIntroLoading: true,
+          },
         ]);
         router.setParams({ phraseId: id });
         scrollToEnd();
+        // Kick off the AI intro in the background. Author is unknown at this
+        // point (the user hasn't typed it yet), so we let the model assess the
+        // phrase content alone.
+        void requestPhraseIntro(id, t, null);
       } finally {
         setSending(false);
       }
@@ -245,6 +358,7 @@ export default function PhraseCreationScreen() {
       router,
       scrollToEnd,
       markStreakActivated,
+      requestPhraseIntro,
     ],
   );
 
@@ -323,7 +437,11 @@ export default function PhraseCreationScreen() {
         <ScrollView
           ref={scrollRef}
           style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={{
+            paddingHorizontal: PHRASE_STACK.scrollPaddingHorizontal,
+            paddingTop: PHRASE_STACK.scrollPaddingTop,
+            paddingBottom: PHRASE_STACK.scrollPaddingBottom,
+          }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
@@ -338,6 +456,7 @@ export default function PhraseCreationScreen() {
                     {
                       borderLeftColor: clanColor,
                       borderLeftWidth: CHAT_USER_MESSAGE_LAYOUT.accentWidth,
+                      marginBottom: PHRASE_STACK.userBubbleBottomGapPx,
                     },
                   ]}
                 >
@@ -346,31 +465,75 @@ export default function PhraseCreationScreen() {
               );
             }
             const pubUi = getPhrasePublishUI(msg);
-            if (pubUi && effectiveThreadId) {
-              const userPhrase =
-                messages[i - 1]?.role === 'user' ? messages[i - 1].content : '';
-              const published = pubUi.status === 'published';
-              return (
-                <View key={`pub-stack-${effectiveThreadId}`} style={{ marginTop: GAPS.quoteToPublish }}>
-                  <PhraseNotesCard
-                    borderColor={getBlockBorderColor('question', activeClan)}
-                    borderWidth={BW.question}
-                    backgroundColor={getBlockBackgroundColor('question', activeClan)}
-                    value={phraseNotesLocal}
-                    onChangeText={onPhraseNotesChange}
-                  />
-                  <View style={{ marginTop: GAPS.questionToQuote }}>
-                    <PhraseFolderManagerCard
-                      borderColor={getBlockBorderColor('quote', activeClan)}
-                      borderWidth={BW.quote}
-                      backgroundColor={getBlockBackgroundColor('quote', activeClan)}
-                      innerBorderColor={getBlockBorderColor('quote', activeClan)}
-                      folders={folders}
-                      selectedFolderId={phraseThought?.folderId ?? null}
-                      onSelectFolder={handleAssignPhraseToFolder}
+            if (!pubUi || !effectiveThreadId) return null;
+            const userPhrase =
+              messages[i - 1]?.role === 'user' ? messages[i - 1].content : '';
+            const published = pubUi.status === 'published';
+            const introText = (msg.phraseIntro ?? '').trim();
+            const introLoading = !!msg.phraseIntroLoading;
+            const typewriterDone = !!introTypewriterDone[effectiveThreadId];
+            // Section gate: don't show Apuntes / Carpetas until either the
+            // typewriter has finished revealing the intro OR there is no
+            // intro to show at all (e.g. backend returned null).
+            const showTools = published || typewriterDone || (!introLoading && !introText);
+            return (
+              <View key={`pub-stack-${effectiveThreadId}`}>
+                {/* 1. AI intro slot — same animation logic as reflections.
+                       While loading: pulsing white thinking star (no text).
+                       When intro arrives: typewriter reveals it once.
+                       When typewriter ends or there's no intro: nothing here. */}
+                {!published && introLoading && (
+                  <View style={{ marginTop: PHRASE_STACK.sectionGapPx }}>
+                    <ThinkingStar />
+                  </View>
+                )}
+                {!published && !introLoading && introText.length > 0 && !typewriterDone && (
+                  <View style={{ marginTop: PHRASE_STACK.sectionGapPx, paddingHorizontal: PHRASE_STACK.introHorizontalPaddingPx }}>
+                    <IntroTypewriter introText={introText} />
+                    <PhraseIntroDoneTrigger
+                      threadId={effectiveThreadId}
+                      introText={introText}
+                      onDone={(tid) =>
+                        setIntroTypewriterDone((prev) =>
+                          prev[tid] ? prev : { ...prev, [tid]: true },
+                        )
+                      }
                     />
                   </View>
-                  <View style={{ marginTop: GAPS.questionToQuote }}>
+                )}
+                {/* Once typewriter finished (or intro skipped), keep the intro text
+                    visible as a static block. */}
+                {!published && typewriterDone && introText.length > 0 && (
+                  <View style={{ marginTop: PHRASE_STACK.sectionGapPx, paddingHorizontal: PHRASE_STACK.introHorizontalPaddingPx }}>
+                    <Text style={styles.introStaticText}>{introText}</Text>
+                  </View>
+                )}
+
+                {/* 2 & 3. Phrase tools — appear ONLY after the intro phase ends. */}
+                {showTools && (
+                  <>
+                    <View style={{ marginTop: PHRASE_STACK.sectionGapPx }}>
+                      <PhraseNotesCard
+                        backgroundColor={getBlockBackgroundColor('question', activeClan)}
+                        value={phraseNotesLocal}
+                        onChangeText={onPhraseNotesChange}
+                      />
+                    </View>
+                    <View style={{ marginTop: PHRASE_STACK.sectionGapPx }}>
+                      <PhraseFolderManagerCard
+                        backgroundColor={getBlockBackgroundColor('quote', activeClan)}
+                        innerBorderColor={getBlockBorderColor('quote', activeClan)}
+                        folders={folders}
+                        selectedFolderId={phraseThought?.folderId ?? null}
+                        onSelectFolder={handleAssignPhraseToFolder}
+                      />
+                    </View>
+                  </>
+                )}
+
+                {/* 4. Publicar — at the very bottom, below all phrase tools. */}
+                {showTools && (
+                  <View style={{ marginTop: PHRASE_STACK.publishTopGapPx, marginBottom: PHRASE_STACK.publishBottomGapPx }}>
                     <PublishBlock
                       borderColor={getBlockBorderColor('publish', activeClan)}
                       borderWidth={BW.publish}
@@ -378,6 +541,10 @@ export default function PhraseCreationScreen() {
                       starIcon={PublishStar}
                       titleOutlineColor={getPublishTitleOutlineColor(activeClan)}
                       actionBarColor={getPublishTitleOutlineColor(activeClan)}
+                      showPhraseFormatHint
+                      actionBarInnerPaddingHorizontal={
+                        PHRASE_PUBLISH_LAYOUT.publishActionBarInnerPaddingH
+                      }
                       inputPlaceholder={PUBLISH_AUTHOR_PLACEHOLDER}
                       inputMaxLength={PUBLISH_AUTHOR_MAX_LEN}
                       published={published}
@@ -396,10 +563,9 @@ export default function PhraseCreationScreen() {
                       }
                     />
                   </View>
-                </View>
-              );
-            }
-            return null;
+                )}
+              </View>
+            );
           })}
         </ScrollView>
       )}
@@ -455,7 +621,6 @@ const styles = StyleSheet.create({
   edgeHitStrip: { position: 'absolute', left: 0, bottom: 0, zIndex: 250 },
   loadingText: { color: evoconnColors.muted, marginTop: 12, fontSize: 14 },
   scroll: { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 24 },
   phraseWelcomeAboveInput: {
     alignItems: 'center',
     backgroundColor: CHAT_BOTTOM_AREA.backgroundColor,
@@ -485,11 +650,16 @@ const styles = StyleSheet.create({
   userBubble: {
     alignSelf: 'flex-end',
     backgroundColor: '#262626',
-    marginBottom: 16,
     padding: 14,
     borderRadius: 16,
     maxWidth: '92%',
     borderBottomRightRadius: 4,
   },
   userText: { color: evoconnColors.text, fontSize: 15, lineHeight: 22 },
+  introStaticText: {
+    color: evoconnColors.text,
+    fontSize: 15,
+    lineHeight: 22,
+    opacity: 0.95,
+  },
 });

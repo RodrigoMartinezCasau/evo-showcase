@@ -1786,6 +1786,37 @@ def get_streak(user_id: str):
         }
 
 
+# ── Phrase intro ────────────────────────────────────────────────────────────
+class PhraseIntroRequest(BaseModel):
+    """Payload for POST /phrase/intro — the user-submitted phrase + optional author."""
+    phrase: str
+    author: str | None = None
+
+
+class PhraseIntroResponse(BaseModel):
+    """Short Spanish AI intro shown above the phrase tools (Apuntes, Folder, Publicar)."""
+    intro: str | None
+
+
+@app.post("/phrase/intro", response_model=PhraseIntroResponse)
+def phrase_intro(payload: PhraseIntroRequest):
+    """
+    Generate a short, conversational Spanish AI intro for a user-submitted
+    phrase. Comments on whether it really looks like a phrase/cita and gently
+    flags clearly suspicious author attributions. Returns {"intro": null} on
+    failure so the frontend can simply hide the intro block.
+    """
+    from phrase_intro_generator import generate_phrase_intro
+    from llm import OpenAIClient
+    try:
+        client = OpenAIClient()
+        intro = generate_phrase_intro(payload.phrase, payload.author, llm_client=client)
+        return PhraseIntroResponse(intro=intro)
+    except Exception as e:
+        logger.warning("phrase_intro endpoint error: %s", e)
+        return PhraseIntroResponse(intro=None)
+
+
 @app.post("/streak/{user_id}/activity")
 def record_streak_activity(user_id: str, payload: StreakActivityPayload):
     """Record that the user sent a frase or reflexion on the given day."""

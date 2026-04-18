@@ -1,11 +1,16 @@
 import React, { useState } from 'react';
-import { View, TextInput, StyleSheet, LayoutChangeEvent } from 'react-native';
+import { View, Text, TextInput, StyleSheet, LayoutChangeEvent } from 'react-native';
 import type { FC } from 'react';
 import type { SvgProps } from 'react-native-svg';
+import { Ionicons } from '@expo/vector-icons';
 import {
   AI_SPECIAL_BLOCK_LAYOUT as SB,
   DEBATE_CARD_LAYOUT as CARD,
 } from '@evoconn/constants/debateResponseLayout';
+import {
+  PHRASE_PUBLISH_FORMAT_HINT,
+  PHRASE_PUBLISH_HINT_LAYOUT as PHRASE_HINT,
+} from '@evoconn/constants/phrasePublishHintLayout';
 import { PublishActionBar } from './PublishActionBar';
 
 const PI = SB.publishInput;
@@ -29,6 +34,16 @@ type Props = {
   published?: boolean;
   /** Valor inicial del autor cuando `published` (reapertura de hilo). */
   initialAuthorValue?: string;
+  /**
+   * Solo modo frase: muestra aviso gris + icono de información encima del campo.
+   * El texto sale de `phrasePublishHintLayout` (no duplicar aquí).
+   */
+  showPhraseFormatHint?: boolean;
+  /**
+   * Padding horizontal dentro del botón PUBLICAR. Solo frases suelen pasar un valor > 0;
+   * reflexiones omiten y queda 0.
+   */
+  actionBarInnerPaddingHorizontal?: number;
 };
 
 export const PublishBlock = React.memo(function PublishBlock({
@@ -46,6 +61,8 @@ export const PublishBlock = React.memo(function PublishBlock({
   inputMaxLength = PUBLISH_TITLE_MAX_LEN,
   published = false,
   initialAuthorValue = '',
+  showPhraseFormatHint = false,
+  actionBarInnerPaddingHorizontal = 0,
 }: Props) {
   const [title, setTitle] = useState(() =>
     published && initialAuthorValue ? initialAuthorValue : '',
@@ -76,6 +93,36 @@ export const PublishBlock = React.memo(function PublishBlock({
         },
       ]}
     >
+      {showPhraseFormatHint ? (
+        <View
+          style={[
+            styles.phraseHintRow,
+            {
+              marginBottom: PHRASE_HINT.hintMarginBottom,
+            },
+          ]}
+        >
+          <Ionicons
+            name="information-circle-outline"
+            size={PHRASE_HINT.hintIconSize}
+            color={PHRASE_HINT.hintIconColor}
+            style={{ marginRight: PHRASE_HINT.hintIconMarginRight, marginTop: 1 }}
+          />
+          <Text
+            style={[
+              styles.phraseHintText,
+              {
+                fontSize: PHRASE_HINT.hintFontSize,
+                lineHeight: PHRASE_HINT.hintLineHeight,
+                color: PHRASE_HINT.hintTextColor,
+              },
+            ]}
+          >
+            {PHRASE_PUBLISH_FORMAT_HINT}
+          </Text>
+        </View>
+      ) : null}
+
       <TextInput
         style={[
           styles.input,
@@ -88,7 +135,7 @@ export const PublishBlock = React.memo(function PublishBlock({
             paddingHorizontal: SB.publishInputPaddingH,
             paddingVertical: SB.publishInputPaddingV,
             marginLeft: PI.offsetX,
-            marginTop: PI.offsetY,
+            marginTop: showPhraseFormatHint ? 0 : PI.offsetY,
           },
         ]}
         value={title}
@@ -104,6 +151,7 @@ export const PublishBlock = React.memo(function PublishBlock({
         disabled={published || !onPublish || title.trim().length === 0}
         onPublish={published ? undefined : onPublish}
         externallyPublished={published}
+        innerPaddingHorizontal={actionBarInnerPaddingHorizontal}
       />
     </View>
   );
@@ -117,5 +165,14 @@ const styles = StyleSheet.create({
   },
   input: {
     width: '100%',
+  },
+  phraseHintRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  phraseHintText: {
+    flex: 1,
+    fontWeight: '400',
   },
 });

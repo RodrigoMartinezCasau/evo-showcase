@@ -42,12 +42,14 @@ import {
   CHAT_SEND_BUTTON_LAYOUT,
   CHAT_BOTTOM_AREA_LAYOUT as CHAT_BOTTOM_AREA,
   PUBLISH_JUMP_ISLAND_LAYOUT as ISLAND,
-  AI_THINKING_STAR_LAYOUT as THINK_STAR,
-  AI_INTRO_TYPING_LAYOUT as INTRO_TYPING,
   REFLECTION_PUBLISH_MIN_CHARS,
 } from '@evoconn/constants/chatInputBarLayout';
 import Svg, { Polyline } from 'react-native-svg';
-import EstrellaComunidadSvg from '../assets/sidebar/estrellaComunidadSvg/estrellaComunidad.svg';
+import {
+  ThinkingStar,
+  IntroTypewriter,
+  computeIntroDurationMs,
+} from '@evoconn/components/aiPhase/AiPhaseAnimations';
 
 /**
  * Doble chevron apuntando hacia ARRIBA (estilo « original, pero rotado al cielo).
@@ -296,13 +298,7 @@ export default function ReflectionCreationScreen() {
 
         const introText = resp.debate_response?.debate_layer?.conversational_intro ?? '';
         const introLen = (introText || '').length;
-        // Duración del typing = ceil(chars / batch) × tickMs × multiplier (mín. 250ms).
-        const tickMs = Math.max(
-          8,
-          INTRO_TYPING.introTypingTickMs * INTRO_TYPING.introTypingDurationMultiplier,
-        );
-        const ticks = Math.ceil(introLen / Math.max(1, INTRO_TYPING.introTypingCharBatchSize));
-        const introDuration = Math.max(250, ticks * tickMs);
+        const introDuration = computeIntroDurationMs(introText);
 
         const assistantMsg: ChatBubble = {
           role: 'assistant',
@@ -720,86 +716,8 @@ const MessageBubble = React.memo(function MessageBubble({
   );
 });
 
-/**
- * Revela el texto del intro tipo "máquina de escribir", carácter por carácter,
- * sin ningún cursor/estrella visible. Sólo el texto que va apareciendo.
- */
-const IntroTypewriter = React.memo(function IntroTypewriter({
-  introText,
-}: {
-  introText: string;
-}) {
-  const [revealed, setRevealed] = useState('');
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    if (!introText) {
-      setRevealed('');
-      return;
-    }
-    let pos = 0;
-    const charsPerTick = Math.max(1, INTRO_TYPING.introTypingCharBatchSize);
-    const msPerTick = Math.max(
-      8,
-      INTRO_TYPING.introTypingTickMs * INTRO_TYPING.introTypingDurationMultiplier,
-    );
-    timerRef.current = setInterval(() => {
-      pos = Math.min(pos + charsPerTick, introText.length);
-      setRevealed(introText.slice(0, pos));
-      if (pos >= introText.length) {
-        if (timerRef.current) clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    }, msPerTick);
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [introText]);
-
-  return <Text style={styles.introTypewriterText}>{revealed}</Text>;
-});
-
-/** Pulsing star shown while the AI is generating. */
-const ThinkingStar = React.memo(function ThinkingStar() {
-  const pulse = useRef(new Animated.Value(THINK_STAR.thinkingStarMinScale)).current;
-  useEffect(() => {
-    const half = THINK_STAR.thinkingStarPulseDurationMs / 2;
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, {
-          toValue: THINK_STAR.thinkingStarMaxScale,
-          duration: half,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulse, {
-          toValue: THINK_STAR.thinkingStarMinScale,
-          duration: half,
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [pulse]);
-  return (
-    <View style={styles.thinkingStarWrap}>
-      <Animated.View
-        style={{
-          transform: [
-            { translateX: THINK_STAR.thinkingStarOffsetX },
-            { translateY: THINK_STAR.thinkingStarOffsetY },
-            { scale: pulse },
-          ],
-        }}
-      >
-        <EstrellaComunidadSvg
-          width={THINK_STAR.thinkingStarScale}
-          height={THINK_STAR.thinkingStarScale}
-        />
-      </Animated.View>
-    </View>
-  );
-});
+// `ThinkingStar` and `IntroTypewriter` now live in the shared AiPhaseAnimations
+// module so phrase mode can reuse the EXACT same components/timing.
 
 const styles = StyleSheet.create({
   gestureRoot: { flex: 1 },
@@ -873,17 +791,6 @@ const styles = StyleSheet.create({
   },
   userText: { color: evoconnColors.text, fontSize: 15, lineHeight: 22 },
   aiText: { color: evoconnColors.text, fontSize: 15, lineHeight: 22 },
-  introTypewriterText: {
-    color: evoconnColors.text,
-    fontSize: 15,
-    lineHeight: 22,
-    opacity: 0.95,
-  },
-  thinkingStarWrap: {
-    alignSelf: 'flex-start',
-    marginVertical: 12,
-    marginLeft: 4,
-  },
 
 
   errorBox: {
