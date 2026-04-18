@@ -22,7 +22,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ConversationItem } from '@evoconn/types';
-import type { DebateMessage } from '@evoconn/types/debate';
+import type { DebateMessage, DebateResponse } from '@evoconn/types/debate';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -57,14 +57,56 @@ function isPersistedThought(x: unknown): x is PersistedThought {
   );
 }
 
+/**
+ * Strip transient UI/runtime fields from a persisted message so they can't
+ * leave the screen stuck in a "loading" state after a reload.  Anything that
+ * was true only for the in-flight session (streaming/typing/loading) must NOT
+ * survive across reloads.
+ */
+function sanitiseMessage(m: unknown): DebateMessage | null {
+  if (!m || typeof m !== 'object') return null;
+  const o = m as Record<string, unknown>;
+  if (o.role !== 'user' && o.role !== 'assistant') return null;
+  if (typeof o.content !== 'string') return null;
+
+  if (o.role === 'user') {
+    return { role: 'user', content: o.content, id: typeof o.id === 'string' ? o.id : undefined };
+  }
+
+  // Assistant: copy over the persistable fields ONLY.  We deliberately do NOT
+  // copy `streaming` or `phraseIntroLoading`; those are session-only flags.
+  return {
+    role: 'assistant',
+    content: o.content,
+    id: typeof o.id === 'string' ? o.id : undefined,
+    streaming: false, // explicit: persisted messages are always finalised
+    debateResponse: (o.debateResponse as DebateResponse | undefined) ?? undefined,
+    nextQuestion: typeof o.nextQuestion === 'string' ? o.nextQuestion : undefined,
+    topic: typeof o.topic === 'string' ? o.topic : undefined,
+    lang: typeof o.lang === 'string' ? o.lang : undefined,
+    phrasePublishUI:
+      o.phrasePublishUI && typeof o.phrasePublishUI === 'object'
+        ? (o.phrasePublishUI as { status: 'pending' | 'published'; author?: string })
+        : undefined,
+    phraseIntro: typeof o.phraseIntro === 'string' ? o.phraseIntro : null,
+    phraseIntroLoading: false, // explicit: never resume a stale loading spinner
+  };
+}
+
 function sanitiseList(list: unknown, ownerUserId: string): PersistedThought[] {
   if (!Array.isArray(list)) return [];
   const out: PersistedThought[] = [];
   for (const item of list) {
-    if (isPersistedThought(item)) {
-      // Force ownership to the slot's userId — defensive: never trust stored data.
-      out.push({ ...item, ownerUserId });
-    }
+    if (!isPersistedThought(item)) continue;
+    // Sanitise the message thread defensively.
+    const cleanedMessages = Array.isArray(item.messages)
+      ? (item.messages.map(sanitiseMessage).filter(Boolean) as DebateMessage[])
+      : undefined;
+    out.push({
+      ...item,
+      ownerUserId, // force ownership to the slot's userId
+      messages: cleanedMessages,
+    });
   }
   return out;
 }

@@ -721,12 +721,14 @@ const MessageBubble = React.memo(function MessageBubble({
 
   const assistantMsg = message as Extract<ChatBubble, { role: 'assistant' }>;
 
-  // ── Phase A: Thinking — no response yet, show pulsing star ──────────────
-  if (assistantMsg.streaming || !assistantMsg.debateResponse) {
+  // ── Phase A: Thinking — pulsing star ONLY while the request is in-flight.
+  // Persisted/reopened messages always have `streaming: false` (the storage
+  // layer strips the flag on load), so this branch is reserved for the live
+  // generation phase and can never get stuck after a reload.
+  if (assistantMsg.streaming) {
     if (!assistantMsg.debateResponse && !displayText) {
       return <ThinkingStar />;
     }
-    // Edge case: content arrived without structure
     if (!assistantMsg.debateResponse) {
       return (
         <View style={styles.assistantBlock}>
@@ -734,6 +736,17 @@ const MessageBubble = React.memo(function MessageBubble({
         </View>
       );
     }
+  }
+
+  // Reopened message that — for whatever reason (legacy data, partial save) —
+  // has no `debateResponse`.  Render whatever raw text we have instead of
+  // leaving the screen stuck on a pulsing star forever.
+  if (!assistantMsg.debateResponse) {
+    return (
+      <View style={styles.assistantBlock}>
+        <Text style={styles.aiText}>{displayText || ''}</Text>
+      </View>
+    );
   }
 
   const phase = assistantMsg.introPhase ?? 'done';

@@ -281,7 +281,17 @@ export default function PhraseCreationScreen() {
     async (threadId: string, phraseText: string, author?: string | null) => {
       if (introRequestedRef.current.has(threadId)) return;
       introRequestedRef.current.add(threadId);
-      const intro = await generatePhraseIntro({ phrase: phraseText, author: author ?? null });
+      let intro: string | null = null;
+      try {
+        intro = await generatePhraseIntro({ phrase: phraseText, author: author ?? null });
+      } catch (err) {
+        // Network/backend failure — log it and continue.  We MUST still flip
+        // `phraseIntroLoading` off so the screen doesn't stay stuck on the
+        // pulsing star forever waiting for an intro that never arrives.
+        // eslint-disable-next-line no-console
+        console.warn('[PHRASE] generatePhraseIntro failed, skipping intro:', err);
+        intro = null;
+      }
       let nextMessages: DebateMessage[] | null = null;
       setMessages((prev) => {
         if (prev.length === 0) return prev;
@@ -303,7 +313,8 @@ export default function PhraseCreationScreen() {
       if (nextMessages) {
         updateThought(threadId, { messages: nextMessages });
       }
-      // No intro returned → skip the typewriter wait entirely.
+      // No intro returned (either backend gave us null or the request failed)
+      // → skip the typewriter wait entirely so phrase tools appear right away.
       if (!intro) {
         setIntroTypewriterDone((prev) =>
           prev[threadId] ? prev : { ...prev, [threadId]: true },
@@ -470,8 +481,13 @@ export default function PhraseCreationScreen() {
               messages[i - 1]?.role === 'user' ? messages[i - 1].content : '';
             const published = pubUi.status === 'published';
             const introText = (msg.phraseIntro ?? '').trim();
-            const introLoading = !!msg.phraseIntroLoading;
             const typewriterDone = !!introTypewriterDone[effectiveThreadId];
+            // `introLoading` reflects an active /phrase/intro request.  On
+            // reopen we ALWAYS mark `typewriterDone` to true (see the load
+            // useEffect), which forces `introLoading` off — so a previously
+            // crashed/stuck loading state can never leave the screen frozen
+            // on the pulsing star after reload.
+            const introLoading = !!msg.phraseIntroLoading && !typewriterDone;
             // Section gate: don't show Apuntes / Carpetas until either the
             // typewriter has finished revealing the intro OR there is no
             // intro to show at all (e.g. backend returned null).
