@@ -77,6 +77,7 @@ export const SHARE_BUTTON_OFFSET_X = -7;
 export const SHARE_BUTTON_OFFSET_Y = -5;
 export const SHARE_BUTTON_SIZE = 28;
 
-/** Espacio vertical ENTRE el panel de porcentajes filosóficos y la fila de tarjetas.
+/** Espacio vertical ENTRE los contadores totales (Reflexiones/Frases) y la fila de tarjetas.
+ *  El contenedor padre ya aporta un gap de 20 px. Un valor positivo suma a ese gap.
  *  Reducir → acerca las tarjetas al bloque de arriba. No afecta a otros espaciados. */
-export const OTHER_LATEST_POSTS_SPACING = -10;
+export const OTHER_LATEST_POSTS_SPACING = 10;

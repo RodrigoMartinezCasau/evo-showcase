@@ -31,9 +31,11 @@ const PROFILE_ICON_SCALE = 1.1;
 function FriendRow({
   user,
   onUnfollow,
+  onUserPress,
 }: {
   user: FollowingEntry;
   onUnfollow: (id: string) => void;
+  onUserPress: (id: string) => void;
 }) {
   const ProfileSvg = getClanProfileByHouse(user.clanId);
   const clanLabel = user.clanId
@@ -45,22 +47,24 @@ function FriendRow({
 
   return (
     <View style={styles.row}>
-      {/* Avatar */}
-      <View style={styles.avatarWrap}>
-        <View style={{ transform: [{ scale: PROFILE_ICON_SCALE }] }}>
-          <ProfileSvg width={AVATAR_SIZE} height={AVATAR_SIZE} />
+      {/* Avatar — tappable to open profile */}
+      <TouchableOpacity onPress={() => onUserPress(user.id)} activeOpacity={0.6} hitSlop={4}>
+        <View style={styles.avatarWrap}>
+          <View style={{ transform: [{ scale: PROFILE_ICON_SCALE }] }}>
+            <ProfileSvg width={AVATAR_SIZE} height={AVATAR_SIZE} />
+          </View>
         </View>
-      </View>
+      </TouchableOpacity>
 
-      {/* Info */}
-      <View style={styles.userInfo}>
+      {/* Info — tappable to open profile (separate hitbox from action button) */}
+      <TouchableOpacity style={styles.userInfo} onPress={() => onUserPress(user.id)} activeOpacity={0.6}>
         <Text style={styles.username} numberOfLines={1}>
           {user.username}
         </Text>
         <Text style={styles.meta} numberOfLines={1}>
           {[rankLabel, clanLabel].filter(Boolean).join(' · ')}
         </Text>
-      </View>
+      </TouchableOpacity>
 
       {/* Siguiendo button — tap to unfollow */}
       <TouchableOpacity
@@ -83,6 +87,13 @@ export default function PersonalFriendsScreen() {
 
   const { friends, unfollowUser } = usePersonalProfile();
 
+  const handleUserPress = useCallback(
+    (id: string) => {
+      router.push({ pathname: '/profile/[id]', params: { id } });
+    },
+    [router],
+  );
+
   const handleTabChange = useCallback(
     (tab: TabId) => {
       router.replace({ pathname: '/(tabs)', params: { tab } });
@@ -98,9 +109,9 @@ export default function PersonalFriendsScreen() {
 
   const renderItem = useCallback(
     ({ item }: { item: FollowingEntry }) => (
-      <FriendRow user={item} onUnfollow={unfollowUser} />
+      <FriendRow user={item} onUnfollow={unfollowUser} onUserPress={handleUserPress} />
     ),
-    [unfollowUser],
+    [unfollowUser, handleUserPress],
   );
 
   return (

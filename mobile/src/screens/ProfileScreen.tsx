@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useRef } from 'react';
+import React, { useCallback, useState, useRef, useMemo } from 'react';
 import { View, Text, ScrollView, StyleSheet, Animated, Easing, useWindowDimensions } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import { getOtherUserProfileOrFallback } from '@evoconn/data/mockOtherUsers';
 import { AppTopBar, RankBadge, ClanBanner, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
+import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { getClanCardColor } from '@evoconn/theme/theme';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
@@ -88,7 +89,50 @@ function OwnProfileView() {
 }
 
 function OtherUserProfileView({ userId, router }: { userId: string; router: ReturnType<typeof useRouter> }) {
+  // Static profile data (username, clan, rank, insignia, philosophy, etc.)
   const profile = getOtherUserProfileOrFallback(userId);
+
+  // Live posts from the simulation so "Últimas publicaciones" reflects any newly
+  // published reflections/phrases and never goes stale after a reload or user switch.
+  const { posts: allSimPosts, users: simUsers } = useSimulation();
+
+  const livePosts = useMemo<CommunityPost[]>(
+    () =>
+      allSimPosts
+        .filter((p) => p.authorId === userId)
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .map((p): CommunityPost => {
+          const author = simUsers[p.authorId];
+          return {
+            id: p.id,
+            type: p.type,
+            author: author
+              ? { id: author.id, username: author.username, clanId: author.clanId, rank: author.rank }
+              : { id: p.authorId, username: '?', clanId: null, rank: 'aprendiz' },
+            title: p.title,
+            body: p.body,
+            quoteAuthor: p.quoteAuthor,
+            voteStats: {
+              up: p.upvoterIds.length,
+              down: p.downvoterIds.length,
+              save: p.saverIds.length,
+            },
+            createdAt: p.createdAt,
+          };
+        }),
+    [allSimPosts, userId, simUsers],
+  );
+
+  // Live totals that always match the publications slider count.
+  const liveReflectionCount = useMemo(
+    () => livePosts.filter((p) => p.type === 'reflection').length,
+    [livePosts],
+  );
+  const liveQuoteCount = useMemo(
+    () => livePosts.filter((p) => p.type === 'phrase').length,
+    [livePosts],
+  );
+
   const insets = useSafeAreaInsets();
   const { width: screenW, height: screenH } = useWindowDimensions();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -139,9 +183,9 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
 
   const handlePostPress = useCallback(
     (post: CommunityPost) => {
-      openDetailFeed(profile.recentPosts, post.id);
+      openDetailFeed(livePosts, post.id);
     },
-    [openDetailFeed, profile.recentPosts],
+    [openDetailFeed, livePosts],
   );
 
   const handleDetailAuthorPress = useCallback(
@@ -203,10 +247,10 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
             <UserInsigniaPhrase phrase={profile.insigniaPhrase} />
             <PhilosophyPercentagesPanel percentages={profile.philosophyPercentages} />
             <UserTotalsStats
-              totalReflections={profile.totalReflections}
-              totalQuotes={profile.totalQuotes}
+              totalReflections={liveReflectionCount}
+              totalQuotes={liveQuoteCount}
             />
-            <RecentPostsSlider posts={profile.recentPosts} onPostPress={handlePostPress} />
+            <RecentPostsSlider posts={livePosts} onPostPress={handlePostPress} />
             <View style={styles.bottomSpacer} />
           </ScrollView>
         </ReflectionBackground>
