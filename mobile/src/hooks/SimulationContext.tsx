@@ -25,7 +25,10 @@ import {
   type SimPost,
   type FollowGraph,
 } from '@evoconn/data/simulation/simulatedNetwork';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setActiveSimUser } from '@evoconn/data/mockUser';
+
+const SIM_POSTS_STORAGE_KEY = '@physicscopilot/sim_posts_v1';
 
 // ─── State initialisers ───────────────────────────────────────────────────────
 
@@ -117,7 +120,34 @@ const SimCtx = createContext<SimulationContextValue | null>(null);
 
 export function SimulationProvider({ children }: { children: ReactNode }) {
   const [activeUserId, setActiveUserIdRaw] = useState('u1');
+
+  // Start with seed posts (now empty); persisted published posts are merged in the
+  // useEffect below after AsyncStorage loads.
   const [posts, setPosts] = useState<SimPost[]>(() => SIM_POSTS.map(p => ({ ...p })));
+
+  // Load persisted published posts on mount
+  useEffect(() => {
+    AsyncStorage.getItem(SIM_POSTS_STORAGE_KEY)
+      .then((raw) => {
+        if (!raw) return;
+        try {
+          const saved = JSON.parse(raw) as SimPost[];
+          if (Array.isArray(saved) && saved.length > 0) {
+            setPosts((prev) => {
+              // Merge: add any persisted post not already in state (de-duplicate by id)
+              const existingIds = new Set(prev.map((p) => p.id));
+              const newOnes = saved.filter((p) => !existingIds.has(p.id));
+              return newOnes.length > 0 ? [...newOnes, ...prev] : prev;
+            });
+          }
+        } catch {
+          // Ignore parse errors — treat as empty
+        }
+      })
+      .catch(console.error);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [followGraph, setFollowGraph] = useState<Record<string, string[]>>(
     () => copyFollowGraph(SIM_FOLLOW_GRAPH),
   );
@@ -277,7 +307,11 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
 
   // ── Delete / Hide post ────────────────────────────────────────────────────
   const deletePost = useCallback((authorId: string, postId: string) => {
-    setPosts(prev => prev.filter(p => !(p.id === postId && p.authorId === authorId)));
+    setPosts((prev) => {
+      const updated = prev.filter((p) => !(p.id === postId && p.authorId === authorId));
+      AsyncStorage.setItem(SIM_POSTS_STORAGE_KEY, JSON.stringify(updated)).catch(console.error);
+      return updated;
+    });
   }, []);
 
   const toggleHidePost = useCallback((userId: string, postId: string) => {
@@ -294,7 +328,11 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
 
   // ── Publish ───────────────────────────────────────────────────────────────
   const publishPost = useCallback((post: SimPost) => {
-    setPosts(prev => [post, ...prev]);
+    setPosts((prev) => {
+      const updated = [post, ...prev];
+      AsyncStorage.setItem(SIM_POSTS_STORAGE_KEY, JSON.stringify(updated)).catch(console.error);
+      return updated;
+    });
   }, []);
 
   // ─── Context value ─────────────────────────────────────────────────────────

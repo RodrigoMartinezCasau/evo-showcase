@@ -50,17 +50,17 @@ export const TOP_BAR_LAYOUT = {
   // Usa sólo ajustes pequeños para que el layout no cambie en cada reload.
   PER_ITEM_OFFSETS: {
     star:       { x: -8,  y: 0 },
-    menu:       { x: -22, y: -10 },
+    menu:       { x: -25, y: -10 },
 
-    shield:     { x: 0,   y: 0 },
-    clanLabel:  { x: -5, y: 3 },
-    pencilIcon: { x: 26,  y: -5 },
-    pencilText: { x: 18,  y: -13 },
+    shield:     { x: 1,   y: 0 },
+    clanLabel:  { x: -4, y: 3 },
+    pencilIcon: { x: 30,  y: -5 },
+    pencilText: { x: 22,  y: -13 },
 
-    fireIcon:   { x:  15,  y: -6 },
+    fireIcon:   { x:  15,  y: -5 },
     fireText:   { x:  5,  y: -13 },
 
-    heartIcon:  { x: -2, y: -3 },
+    heartIcon:  { x: -2, y: 1 },
     heartText:  { x: -12, y: -14 },
   } satisfies Record<TopBarItemKey, XY>,
 } as const;
@@ -111,7 +111,7 @@ export const TOP_BAR_ICON_EDITOR: Record<
 //   axis.  Numbers/labels remain at their original positions.
 //
 export const topBarIconsScaleMultiplier = 0.9;   // 1 = no change
-export const topBarIconsOffsetX        = 0;   // px, positive = right
+export const topBarIconsOffsetX        = 3;   // px, positive = right
 export const topBarIconsOffsetY        = 0;   // px, positive = down
 
 /** Keys that represent graphical icons (not text labels / counters). */

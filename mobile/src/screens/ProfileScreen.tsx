@@ -100,7 +100,7 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
     () =>
       allSimPosts
         .filter((p) => p.authorId === userId)
-        .sort((a, b) => b.createdAt - a.createdAt)
+        .sort((a, b) => (b.createdAt > a.createdAt ? 1 : b.createdAt < a.createdAt ? -1 : 0))
         .map((p): CommunityPost => {
           const author = simUsers[p.authorId];
           return {
