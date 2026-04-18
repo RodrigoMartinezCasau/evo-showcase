@@ -98,7 +98,7 @@ type ClanDisplayEntry = {
 export const CLAN_DISPLAY_COLORS: Record<keyof ClanColorMap, ClanDisplayEntry> = {
   noClan: {
     publishBackground: '#c7ff1a',
-    borderPrimary: '#4f59fe',
+    borderPrimary: '#7000ff',
     questionBackground: '#0f0f12',
     quoteBackground: '#0f0f12',
     titleOutlineColor: '#4f59fe',
@@ -112,14 +112,14 @@ export const CLAN_DISPLAY_COLORS: Record<keyof ClanColorMap, ClanDisplayEntry> =
   },
   racionalista: {
     publishBackground: '#395df2',
-    borderPrimary: '#defcef',
+    borderPrimary: '#46b8f9',
     questionBackground: '#0f0f12',
     quoteBackground: '#0f0f12',
     titleOutlineColor: '#008ad8',
   },
   estoico: {
-    publishBackground: '#444826',
-    borderPrimary: '#868883',
+    publishBackground: '#818a41',
+    borderPrimary: '#232323',
     questionBackground: '#0f0f12',
     quoteBackground: '#0f0f12',
     titleOutlineColor: '#2a2a30',

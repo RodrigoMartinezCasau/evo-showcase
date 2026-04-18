@@ -84,7 +84,7 @@ export const AI_THINKING_STAR_LAYOUT = {
   /** Max scale of the breathing pulse (relative to base). */
   thinkingStarMaxScale: 1.15,
   /** One full breath cycle in milliseconds. */
-  thinkingStarPulseDurationMs: 1100,
+  thinkingStarPulseDurationMs: 1500,
 };
 
 /** The send button (clan SVG replaces the old star icon). */
