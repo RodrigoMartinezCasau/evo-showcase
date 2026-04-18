@@ -487,14 +487,14 @@ export default function ReflectionCreationScreen() {
             onPress={handleScrollToReflection}
             style={[styles.islandPill, { backgroundColor: islandBgColor }]}
           >
-            {/* «» rotated 90° CW → both point upward */}
+            {/* «» rotated -90° (CCW) → both point UP, always, in every clan */}
             <Text
               style={[
                 styles.islandChevron,
                 {
                   color: islandFgColor,
                   transform: [
-                    { rotate: '90deg' },
+                    { rotate: '-90deg' },
                     { scale: ISLAND.publishJumpIslandChevronScale },
                   ],
                   marginRight: ISLAND.publishJumpIslandChevronGap,
@@ -523,7 +523,7 @@ export default function ReflectionCreationScreen() {
                 {
                   color: islandFgColor,
                   transform: [
-                    { rotate: '90deg' },
+                    { rotate: '-90deg' },
                     { scale: ISLAND.publishJumpIslandChevronScale },
                   ],
                   marginLeft: ISLAND.publishJumpIslandChevronGap,
@@ -726,7 +726,11 @@ const ThinkingStar = React.memo(function ThinkingStar() {
 
 /**
  * Phase B display: types the conversational intro character-by-character while
- * a small star moves line-by-line alongside the text.
+ * the star is anchored to the real end-of-text frontier (via onTextLayout).
+ *
+ * The star starts at the same scale as the thinking-star pulse min, so the
+ * transition from pulsing → typing feels continuous (same star, same family,
+ * just stops pulsing and begins riding the cursor frontier).
  */
 const IntroTypingDisplay = React.memo(function IntroTypingDisplay({
   introText,
@@ -734,29 +738,24 @@ const IntroTypingDisplay = React.memo(function IntroTypingDisplay({
   introText: string;
 }) {
   const [revealed, setRevealed] = useState('');
-  const starY = useRef(new Animated.Value(INTRO_STAR.introTypingStarOffsetY)).current;
+  // Cursor position is the {x,y} of the END of the last currently-rendered text line.
+  const cursorX = useRef(new Animated.Value(0)).current;
+  const cursorY = useRef(new Animated.Value(0)).current;
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sz = INTRO_STAR.introTypingStarScale;
 
   useEffect(() => {
     if (!introText) return;
     let pos = 0;
-    // How many chars per tick to keep it snappy
-    const charsPerTick = Math.max(1, Math.round(12 / INTRO_STAR.introTypingDurationMultiplier));
-    const msPerTick = INTRO_STAR.introTypingStarSpeed * INTRO_STAR.introTypingDurationMultiplier;
+    const charsPerTick = Math.max(1, INTRO_STAR.introTypingCharBatchSize);
+    const msPerTick = Math.max(
+      8,
+      INTRO_STAR.introTypingStarSpeed * INTRO_STAR.introTypingDurationMultiplier,
+    );
 
     timerRef.current = setInterval(() => {
       pos = Math.min(pos + charsPerTick, introText.length);
-      const slice = introText.slice(0, pos);
-      setRevealed(slice);
-
-      // Count newlines in revealed slice to derive star Y position
-      const lineCount = (slice.match(/\n/g) ?? []).length;
-      Animated.timing(starY, {
-        toValue: INTRO_STAR.introTypingStarOffsetY + lineCount * INTRO_STAR.introTypingStarLineStepY,
-        duration: msPerTick * 2,
-        useNativeDriver: true,
-      }).start();
-
+      setRevealed(introText.slice(0, pos));
       if (pos >= introText.length) {
         if (timerRef.current) clearInterval(timerRef.current);
         timerRef.current = null;
@@ -766,29 +765,58 @@ const IntroTypingDisplay = React.memo(function IntroTypingDisplay({
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [introText, starY]);
+  }, [introText]);
 
-  const sz = INTRO_STAR.introTypingStarScale;
+  // onTextLayout fires every time the rendered text re-lays out (each tick).
+  // We use the LAST line's end position as the cursor anchor for the star.
+  const handleTextLayout = useCallback(
+    (e: any) => {
+      const lines = e?.nativeEvent?.lines as
+        | { x: number; y: number; width: number; height: number }[]
+        | undefined;
+      if (!lines || lines.length === 0) return;
+      const last = lines[lines.length - 1];
+      const targetX = last.x + last.width + INTRO_STAR.introTypingStarBaselineOffsetX;
+      // Center the star vertically on the line: line top + half the line height
+      const targetY =
+        last.y + last.height / 2 - sz / 2 + INTRO_STAR.introTypingStarBaselineOffsetY;
+      Animated.timing(cursorX, {
+        toValue: targetX,
+        duration: INTRO_STAR.introTypingStarFollowTightness,
+        useNativeDriver: true,
+      }).start();
+      Animated.timing(cursorY, {
+        toValue: targetY,
+        duration: INTRO_STAR.introTypingStarFollowTightness,
+        useNativeDriver: true,
+      }).start();
+    },
+    [cursorX, cursorY, sz],
+  );
 
   return (
     <View style={styles.introTypingWrap}>
-      {/* Moving star marker */}
-      <Animated.View
-        style={[
-          styles.introTypingStar,
-          {
-            transform: [
-              { translateX: INTRO_STAR.introTypingStarOffsetX },
-              { translateY: starY },
-            ],
-          },
-        ]}
-      >
-        <EstrellaComunidadSvg width={sz} height={sz} />
-      </Animated.View>
-      {/* Progressively revealed intro text */}
       <View style={styles.introTypingTextArea}>
-        <Text style={styles.introTypingText}>{revealed}</Text>
+        <Text
+          style={styles.introTypingText}
+          onTextLayout={handleTextLayout}
+        >
+          {revealed || ' '}
+        </Text>
+        {/* Star riding the real text frontier */}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.introTypingCursorStar,
+            {
+              width: sz,
+              height: sz,
+              transform: [{ translateX: cursorX }, { translateY: cursorY }],
+            },
+          ]}
+        >
+          <EstrellaComunidadSvg width={sz} height={sz} />
+        </Animated.View>
       </View>
     </View>
   );
@@ -874,23 +902,23 @@ const styles = StyleSheet.create({
 
   // ── Intro typing phase ──────────────────────────────────────────────────
   introTypingWrap: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
     marginVertical: 12,
     width: '100%',
   },
-  introTypingStar: {
-    marginTop: 2,
-    marginRight: 10,
-  },
   introTypingTextArea: {
-    flex: 1,
+    width: '100%',
+    position: 'relative',
   },
   introTypingText: {
     color: evoconnColors.text,
     fontSize: 15,
     lineHeight: 22,
     opacity: 0.92,
+  },
+  introTypingCursorStar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
   },
 
   errorBox: {

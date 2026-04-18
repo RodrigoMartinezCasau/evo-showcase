@@ -720,7 +720,7 @@ Return ONLY the intro text. No quotes, no JSON, no labels."""
             system=system,
             user=user,
             language=None,
-            max_tokens=200,
+            max_tokens=120,  # intro is short (3-5 lines, ~30-60 words)
             prompt_id="CONVERSATIONAL_INTRO",
         )
         intro = (result or "").strip()
@@ -748,6 +748,7 @@ def generate_debate_layer(
     debate_memory: dict | None = None,
     response_language: str = "en",
     chat_history: list[dict] | None = None,
+    skip_intro: bool = False,
 ) -> DebateLayer:
     """
     Generate debate_layer using LLM. Always generates in English (canonical).
@@ -785,7 +786,11 @@ def generate_debate_layer(
                     "¿Qué cambiaría tu perspectiva sobre esto?",
                     "¿Qué suposiciones estás haciendo?",
                 ]
-                intro = _generate_conversational_intro(user_message, llm_client, response_language, chat_history=chat_history)
+                intro = (
+                    None
+                    if skip_intro
+                    else _generate_conversational_intro(user_message, llm_client, response_language, chat_history=chat_history)
+                )
                 debate_layer = DebateLayer(
                     steelman_of_user=flat_steelman,
                     contrarian_position=flat_contrarian,
@@ -821,7 +826,11 @@ def generate_debate_layer(
             )
         debate_layer = _validate_and_build_debate_layer(debate_dict)
         if debate_layer:
-            intro = _generate_conversational_intro(user_message, llm_client, response_language, chat_history=chat_history)
+            intro = (
+                None
+                if skip_intro
+                else _generate_conversational_intro(user_message, llm_client, response_language, chat_history=chat_history)
+            )
             debate_layer.conversational_intro = intro
             if response_language == "es":
                 translated = _translate_and_validate_es(debate_layer, llm_client)

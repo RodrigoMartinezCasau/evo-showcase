@@ -320,9 +320,11 @@ def _run_debate_pipeline(
     """Shared debate pipeline: retrieval + facts + author + debate layers + personality validation."""
     logger.info("_run_debate_pipeline: response_language=%s topic=%s", response_language, (payload.topic or "")[:60])
     try:
+        from concurrent.futures import ThreadPoolExecutor
         from debate_retriever import DebateRetriever
         from debate_facts_generator import generate_facts_layer, generate_science_context_block
         from debate_author_generator import generate_author_layer
+        from debate_layer_generator import _generate_conversational_intro
         from llm import OpenAIClient
 
         retriever = DebateRetriever()
@@ -400,16 +402,38 @@ def _run_debate_pipeline(
                 response_language=response_language,
             )
         stance = detect_stance(payload.user_stance, payload.user_message)
-        debate_layer = generate_debate_layer(
-            topic=payload.topic,
-            user_message=payload.user_message,
-            stance=stance,
-            facts_summary=facts_layer.summary,
-            llm_client=llm_client,
-            debate_memory=debate_memory,
-            response_language=response_language,
-            chat_history=chat_history,
-        )
+
+        # ── Parallelize structured-debate generation with conversational-intro ──
+        # The intro is a short LLM call that doesn't depend on the debate output,
+        # so running it concurrently shaves real wall-clock latency.
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            debate_future = pool.submit(
+                generate_debate_layer,
+                topic=payload.topic,
+                user_message=payload.user_message,
+                stance=stance,
+                facts_summary=facts_layer.summary,
+                llm_client=llm_client,
+                debate_memory=debate_memory,
+                response_language=response_language,
+                chat_history=chat_history,
+                skip_intro=True,
+            )
+            intro_future = pool.submit(
+                _generate_conversational_intro,
+                payload.user_message,
+                llm_client,
+                response_language,
+                chat_history,
+            )
+            debate_layer = debate_future.result()
+            try:
+                conv_intro = intro_future.result()
+            except Exception as _intro_err:
+                logger.warning("Parallel intro generation failed: %s", _intro_err)
+                conv_intro = None
+        if conv_intro:
+            debate_layer.conversational_intro = conv_intro
 
         takeaways = []
         next_questions: list[str]
