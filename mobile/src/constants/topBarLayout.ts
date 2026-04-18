@@ -103,16 +103,18 @@ export const TOP_BAR_ICON_EDITOR: Record<
 // pencilIcon, fireIcon, heartIcon).  They do NOT touch any text/number element
 // (clanLabel, pencilText, fireText, heartText).
 //
-// topBarIconsScaleMultiplier — multiplies each icon's INDIVIDUAL scale
-//   proportionally.  A value of 0.9 means: icon that was 2.0 → 1.8, icon that
-//   was 1.0 → 0.9.  It never normalises icons to the same absolute size.
-//
-// topBarIconsOffsetX / topBarIconsOffsetY — shift ALL icons together on that
-//   axis.  Numbers/labels remain at their original positions.
-//
 export const topBarIconsScaleMultiplier = 0.9;   // 1 = no change
-export const topBarIconsOffsetX        = 3;   // px, positive = right
-export const topBarIconsOffsetY        = 0;   // px, positive = down
+export const topBarIconsOffsetX        = 3;      // px, positive = right
+export const topBarIconsOffsetY        = 0;      // px, positive = down
+
+// ─── Global ALL-elements editor ────────────────────────────────────────────
+//
+// topBarAllOffsetX — shifts EVERY element in the top bar (icons + counters +
+//   text labels) together on the X axis.  Positive = right, negative = left.
+//   Use this to nudge the whole right cluster (lápiz, fuego, corazón + números)
+//   without touching any individual editor above.
+//
+export const topBarAllOffsetX = -4;   // px, positive = right
 
 /** Keys that represent graphical icons (not text labels / counters). */
 const ICON_KEYS = new Set<TopBarIconEditorKey>([
@@ -137,8 +139,12 @@ export function topBarIconEditorStyle(
   // Per-icon scale is multiplied by the global multiplier only for icon elements.
   const finalScale = isIcon ? ed.scale * topBarIconsScaleMultiplier : ed.scale;
 
-  // Global X/Y offsets are added only for icon elements; text positions are untouched.
-  const finalX = (n?.x ?? 0) + ed.offsetX + (isIcon ? topBarIconsOffsetX : 0);
+  // Icon-only X/Y offsets + the universal X offset that moves every element.
+  const finalX =
+    (n?.x ?? 0) +
+    ed.offsetX +
+    (isIcon ? topBarIconsOffsetX : 0) +
+    topBarAllOffsetX;
   const finalY = (n?.y ?? 0) + ed.offsetY + (isIcon ? topBarIconsOffsetY : 0);
 
   return {
