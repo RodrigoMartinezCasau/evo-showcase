@@ -364,7 +364,6 @@ RULES:
   * Bullets must be intellectually dense: each one should teach, reveal, or reframe something.
 - stance.quick_summary and counter.quick_summary: 1–2 sentences summarizing each section.
 - question.socratic_question: 1 sentence that invites reflection (Socratic question).
-- Maintain language: output in English.
 - Include counterarguments and where_contrarian_might_fail as arrays (same as before).
 - QUALITY: Do NOT produce empty or generic points. Every point must correspond to a real idea from the reflection. Every bullet must contribute something new.
 
@@ -802,11 +801,10 @@ def generate_debate_layer(
                     question_section=question_sec,
                     conversational_intro=intro,
                 )
-                if response_language == "es":
-                    translated = _translate_and_validate_es(debate_layer, llm_client)
-                    # intro is already in the correct language (generated with response_language)
-                    translated.conversational_intro = intro
-                    return translated
+                # NOTE: We used to do EN→ES via _translate_and_validate_es here, but
+                # the structured prompt now mandates Spanish output directly, so the
+                # translation pass was a redundant ~2000-token LLM round trip.
+                # Skipping it removes that latency without changing content quality.
                 return debate_layer
         # 2) Fallback: essay-style prompt and validation
         logger.info("Structured debate validation failed or missing; using essay prompt")
@@ -832,10 +830,7 @@ def generate_debate_layer(
                 else _generate_conversational_intro(user_message, llm_client, response_language, chat_history=chat_history)
             )
             debate_layer.conversational_intro = intro
-            if response_language == "es":
-                translated = _translate_and_validate_es(debate_layer, llm_client)
-                translated.conversational_intro = intro
-                return translated
+            # See note above: prompt mandates Spanish output, no translation needed.
             return debate_layer
         logger.warning("DebateLayer validation failed, attempting repair")
         return _repair_debate_layer(
@@ -900,8 +895,7 @@ def generate_debate_layer_stream(
                     counter_section=counter_sec,
                     question_section=question_sec,
                 )
-                if response_language == "es":
-                    debate_layer = _translate_and_validate_es(debate_layer, llm_client)
+                # Spanish is produced directly by the structured prompt; no translation pass.
                 yield {"type": "done", "layer": debate_layer}
                 return
         # Fallback: essay prompt

@@ -334,29 +334,7 @@ def _run_debate_pipeline(
         philosophy_quotes = [quote for quote, _ in philosophy_results]
 
         llm_client = OpenAIClient()
-        facts_layer = generate_facts_layer(
-            topic=payload.topic,
-            user_message=payload.user_message,
-            science_entries=science_entries,
-            llm_client=llm_client,
-            response_language=response_language,
-        )
-        # Generate LLM-based scientific context + verification bullets for the Hechos científicos UI block.
-        ctx_summary, verification_points = generate_science_context_block(
-            payload.topic or "",
-            payload.user_message or "",
-            llm_client=llm_client,
-            response_language=response_language,
-        )
-        facts_layer = FactsLayer(
-            summary=ctx_summary or facts_layer.summary,
-            claims=facts_layer.claims,
-            what_we_dont_know=facts_layer.what_we_dont_know,
-            common_misconceptions=facts_layer.common_misconceptions,
-            facts=None,
-            facts_domain="science",
-            verification_points=verification_points,
-        )
+
         # Verbatim Quotes KB: deterministic retrieval (max 3, max 1 per author); if any match, use them
         verbatim_results = retriever.retrieve_verbatim_quotes(
             payload.topic or "",
@@ -375,6 +353,70 @@ def _run_debate_pipeline(
                 )
         else:
             logger.info("Verbatim quotes retrieval returned 0 for topic=%s", (payload.topic or "")[:60])
+
+        stance = detect_stance(payload.user_stance, payload.user_message)
+
+        # ── Parallel wave 1: independent LLM calls ──────────────────────────────
+        # facts_layer, science_context_block, author_layer (when no verbatim hit),
+        # and conversational intro do NOT depend on each other. Running them
+        # serially used to add up to 4 sequential LLM round-trips. Running them
+        # concurrently collapses the wave into a single round-trip duration.
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            facts_future = pool.submit(
+                generate_facts_layer,
+                topic=payload.topic,
+                user_message=payload.user_message,
+                science_entries=science_entries,
+                llm_client=llm_client,
+                response_language=response_language,
+            )
+            ctx_future = pool.submit(
+                generate_science_context_block,
+                payload.topic or "",
+                payload.user_message or "",
+                llm_client=llm_client,
+                response_language=response_language,
+            )
+            intro_future = pool.submit(
+                _generate_conversational_intro,
+                payload.user_message,
+                llm_client,
+                response_language,
+                chat_history,
+            )
+            author_future = None
+            if not verbatim_quotes_for_layer:
+                author_future = pool.submit(
+                    generate_author_layer,
+                    topic=payload.topic,
+                    user_message=payload.user_message,
+                    philosophy_quotes=philosophy_quotes,
+                    llm_client=llm_client,
+                    response_language=response_language,
+                )
+
+            facts_layer = facts_future.result()
+            try:
+                ctx_summary, verification_points = ctx_future.result()
+            except Exception as _ctx_err:
+                logger.warning("Parallel science_context generation failed: %s", _ctx_err)
+                ctx_summary, verification_points = "", []
+            try:
+                conv_intro = intro_future.result()
+            except Exception as _intro_err:
+                logger.warning("Parallel intro generation failed: %s", _intro_err)
+                conv_intro = None
+
+        facts_layer = FactsLayer(
+            summary=ctx_summary or facts_layer.summary,
+            claims=facts_layer.claims,
+            what_we_dont_know=facts_layer.what_we_dont_know,
+            common_misconceptions=facts_layer.common_misconceptions,
+            facts=None,
+            facts_domain="science",
+            verification_points=verification_points,
+        )
+
         if verbatim_quotes_for_layer:
             policy_note_en = "Verbatim quotes from the knowledge base (tag-matched to this topic)."
             policy_note_es = "Citas textuales de la base de conocimiento (asociadas por etiquetas a este tema)."
@@ -394,44 +436,32 @@ def _run_debate_pipeline(
             )
             logger.info("Author layer from Verbatim Quotes KB (ids): %s", [vq.id for vq in verbatim_quotes_for_layer])
         else:
-            author_layer = generate_author_layer(
-                topic=payload.topic,
-                user_message=payload.user_message,
-                philosophy_quotes=philosophy_quotes,
-                llm_client=llm_client,
-                response_language=response_language,
-            )
-        stance = detect_stance(payload.user_stance, payload.user_message)
-
-        # ── Parallelize structured-debate generation with conversational-intro ──
-        # The intro is a short LLM call that doesn't depend on the debate output,
-        # so running it concurrently shaves real wall-clock latency.
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            debate_future = pool.submit(
-                generate_debate_layer,
-                topic=payload.topic,
-                user_message=payload.user_message,
-                stance=stance,
-                facts_summary=facts_layer.summary,
-                llm_client=llm_client,
-                debate_memory=debate_memory,
-                response_language=response_language,
-                chat_history=chat_history,
-                skip_intro=True,
-            )
-            intro_future = pool.submit(
-                _generate_conversational_intro,
-                payload.user_message,
-                llm_client,
-                response_language,
-                chat_history,
-            )
-            debate_layer = debate_future.result()
             try:
-                conv_intro = intro_future.result()
-            except Exception as _intro_err:
-                logger.warning("Parallel intro generation failed: %s", _intro_err)
-                conv_intro = None
+                author_layer = author_future.result() if author_future is not None else None
+            except Exception as _auth_err:
+                logger.warning("Parallel author generation failed: %s", _auth_err)
+                author_layer = None
+            if author_layer is None:
+                author_layer = generate_author_layer(
+                    topic=payload.topic,
+                    user_message=payload.user_message,
+                    philosophy_quotes=philosophy_quotes,
+                    llm_client=llm_client,
+                    response_language=response_language,
+                )
+
+        # ── Wave 2: structured debate (depends on facts_summary from wave 1) ────
+        debate_layer = generate_debate_layer(
+            topic=payload.topic,
+            user_message=payload.user_message,
+            stance=stance,
+            facts_summary=facts_layer.summary,
+            llm_client=llm_client,
+            debate_memory=debate_memory,
+            response_language=response_language,
+            chat_history=chat_history,
+            skip_intro=True,
+        )
         if conv_intro:
             debate_layer.conversational_intro = conv_intro
 

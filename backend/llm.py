@@ -30,18 +30,31 @@ class OpenAIClient(LLMClient):
         self._api_key = api_key or API_KEY
         self._base_url = base_url or BASE_URL
         self._model = model or MODEL
+        # Cache the underlying SDK client so multiple completions in one request
+        # reuse the same HTTP connection pool instead of paying setup cost
+        # on every call (4-5 LLM calls per reflection adds up).
+        self._sdk_client = None
+
+    def _get_client(self):
+        if self._sdk_client is None:
+            try:
+                from openai import OpenAI
+            except ImportError:
+                raise RuntimeError("Install openai: pip install openai")
+            self._sdk_client = (
+                OpenAI(api_key=self._api_key, base_url=self._base_url)
+                if self._base_url
+                else OpenAI(api_key=self._api_key)
+            )
+        return self._sdk_client
 
     def complete(self, system: str | None, user: str, language: str | None = None, max_tokens: int | None = None, prompt_id: str | None = None) -> str:
-        try:
-            from openai import OpenAI
-        except ImportError:
-            raise RuntimeError("Install openai: pip install openai")
         import logging
         _log = logging.getLogger(__name__)
         _log.debug("llm.complete: model=%s max_tokens=%s prompt_id=%s", self._model, max_tokens, prompt_id or "N/A")
         lang_prepend = _language_instruction(language)
         system_content = (lang_prepend + (system or "")) if lang_prepend else system
-        client = OpenAI(api_key=self._api_key, base_url=self._base_url) if self._base_url else OpenAI(api_key=self._api_key)
+        client = self._get_client()
         msgs = []
         if system_content:
             msgs.append({"role": "system", "content": system_content})
@@ -65,16 +78,12 @@ class OpenAIClient(LLMClient):
         Stream completion token-by-token. Yields content deltas (str) as they arrive.
         Does not yield a final empty string; caller should treat end of iteration as done.
         """
-        try:
-            from openai import OpenAI
-        except ImportError:
-            raise RuntimeError("Install openai: pip install openai")
         import logging
         _log = logging.getLogger(__name__)
         _log.debug("llm.complete_stream: model=%s max_tokens=%s", self._model, max_tokens)
         lang_prepend = _language_instruction(language)
         system_content = (lang_prepend + (system or "")) if lang_prepend else system
-        client = OpenAI(api_key=self._api_key, base_url=self._base_url) if self._base_url else OpenAI(api_key=self._api_key)
+        client = self._get_client()
         msgs = []
         if system_content:
             msgs.append({"role": "system", "content": system_content})

@@ -43,10 +43,40 @@ import {
   CHAT_BOTTOM_AREA_LAYOUT as CHAT_BOTTOM_AREA,
   PUBLISH_JUMP_ISLAND_LAYOUT as ISLAND,
   AI_THINKING_STAR_LAYOUT as THINK_STAR,
-  AI_INTRO_TYPING_LAYOUT as INTRO_STAR,
   REFLECTION_PUBLISH_MIN_CHARS,
 } from '@evoconn/constants/chatInputBarLayout';
+import Svg, { Polyline } from 'react-native-svg';
 import EstrellaComunidadSvg from '../assets/sidebar/estrellaComunidadSvg/estrellaComunidad.svg';
+
+/**
+ * Guaranteed-upward chevron rendered as an SVG path.
+ * Using a real vector shape avoids font/rotation glitches that can flip,
+ * mis-render, or sideways-render text glyphs like « on certain devices/clans.
+ * The "^" shape is hand-defined and CANNOT be visually flipped by font fallback.
+ */
+const UpChevron = React.memo(function UpChevron({
+  size,
+  color,
+  strokeWidth = 2.4,
+}: {
+  size: number;
+  color: string;
+  strokeWidth?: number;
+}) {
+  // 24x24 viewBox, classic up-chevron (V upside down)
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Polyline
+        points="5,15 12,8 19,15"
+        fill="none"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+});
 import { REFLECTION_EMPTY_WELCOME_LAYOUT as EMPTY_WELCOME } from '@evoconn/constants/reflectionEmptyWelcomeLayout';
 import { EMPTY_WELCOME_TRIPLE_STARS_LAYOUT as EMPTY_WELCOME_TRIPLE_STARS } from '@evoconn/constants/reflectionEmptyWelcomeTripleStarsLayout';
 import { getReflectionTripleStarsByHouse } from '@evoconn/utils/getReflectionTripleStarsByHouse';
@@ -64,8 +94,7 @@ import { useAISettings } from '@evoconn/hooks/AISettingsContext';
 import { COMMUNITY_DRAWER_EDGE_ZONE_WIDTH } from '@evoconn/constants/communityDrawerGesture';
 import { useSidebarGesture } from '@evoconn/hooks/useSidebarGesture';
 
-type IntroPhase = 'thinking' | 'intro' | 'done';
-type ChatBubble = DebateMessage & { revealed?: string; introPhase?: IntroPhase };
+type ChatBubble = DebateMessage & { revealed?: string };
 
 export default function ReflectionCreationScreen() {
   const router = useRouter();
@@ -253,14 +282,6 @@ export default function ReflectionCreationScreen() {
         markStreakActivated();
         const assistantText = resp.assistant_text;
 
-        const introText = resp.debate_response?.debate_layer?.conversational_intro ?? '';
-        const introLen = (introText || '').length;
-        // Duration = chars × speed × multiplier (min 300ms so it's always perceptible)
-        const introDuration = Math.max(
-          300,
-          introLen * INTRO_STAR.introTypingStarSpeed * INTRO_STAR.introTypingDurationMultiplier,
-        );
-
         const assistantMsg: ChatBubble = {
           role: 'assistant',
           content: assistantText,
@@ -271,8 +292,6 @@ export default function ReflectionCreationScreen() {
           lang: resp.lang,
           streaming: false,
           revealed: assistantText,
-          // Start in intro phase; flip to 'done' after intro animation finishes
-          introPhase: introLen > 0 ? 'intro' : 'done',
         };
 
         setMessages((prev) => {
@@ -281,22 +300,6 @@ export default function ReflectionCreationScreen() {
           return copy;
         });
         scrollToEnd();
-
-        // If there's an intro, schedule the transition to 'done' phase.
-        // We flip the last assistant message (the one we just set) to 'done'.
-        if (introLen > 0) {
-          setTimeout(() => {
-            setMessages((prev) => {
-              if (prev.length === 0) return prev;
-              const copy = [...prev];
-              const last = copy[copy.length - 1];
-              if (last.role === 'assistant' && last.introPhase === 'intro') {
-                copy[copy.length - 1] = { ...last, introPhase: 'done' };
-              }
-              return copy;
-            });
-          }, introDuration);
-        }
 
         updateThought(id, {
           title: resp.topic || thoughts.find((t) => t.id === id)?.title || 'Reflexión',
@@ -487,22 +490,21 @@ export default function ReflectionCreationScreen() {
             onPress={handleScrollToReflection}
             style={[styles.islandPill, { backgroundColor: islandBgColor }]}
           >
-            {/* «» rotated -90° (CCW) → both point UP, always, in every clan */}
-            <Text
-              style={[
-                styles.islandChevron,
-                {
-                  color: islandFgColor,
-                  transform: [
-                    { rotate: '-90deg' },
-                    { scale: ISLAND.publishJumpIslandChevronScale },
-                  ],
-                  marginRight: ISLAND.publishJumpIslandChevronGap,
-                },
-              ]}
+            {/*
+              UP chevrons rendered as guaranteed-direction SVG shapes.
+              We do NOT use rotated text glyphs (« / »), because text rotation
+              is unreliable across font fallbacks/clans/devices and was the
+              root cause of the chevrons sometimes appearing sideways/wrong.
+              An SVG polyline cannot be flipped by a font.
+            */}
+            <View
+              style={{
+                marginRight: ISLAND.publishJumpIslandChevronGap,
+                transform: [{ scale: ISLAND.publishJumpIslandChevronScale }],
+              }}
             >
-              {'«'}
-            </Text>
+              <UpChevron size={ISLAND.chevronSize} color={islandFgColor} />
+            </View>
             <Text
               style={[
                 styles.islandLabel,
@@ -517,21 +519,14 @@ export default function ReflectionCreationScreen() {
             >
               ¡Publica tu reflexión!
             </Text>
-            <Text
-              style={[
-                styles.islandChevron,
-                {
-                  color: islandFgColor,
-                  transform: [
-                    { rotate: '-90deg' },
-                    { scale: ISLAND.publishJumpIslandChevronScale },
-                  ],
-                  marginLeft: ISLAND.publishJumpIslandChevronGap,
-                },
-              ]}
+            <View
+              style={{
+                marginLeft: ISLAND.publishJumpIslandChevronGap,
+                transform: [{ scale: ISLAND.publishJumpIslandChevronScale }],
+              }}
             >
-              {'«'}
-            </Text>
+              <UpChevron size={ISLAND.chevronSize} color={islandFgColor} />
+            </View>
           </TouchableOpacity>
         </Animated.View>
       ) : null}
@@ -663,15 +658,10 @@ const MessageBubble = React.memo(function MessageBubble({
     }
   }
 
-  const phase = assistantMsg.introPhase ?? 'done';
-
-  // ── Phase B: Intro typing — response arrived, animate intro only ─────────
-  if (phase === 'intro') {
-    const introText = assistantMsg.debateResponse?.debate_layer?.conversational_intro ?? '';
-    return <IntroTypingDisplay introText={introText} />;
-  }
-
-  // ── Phase C: Done — show full structured output ───────────────────────────
+  // ── Final: response arrived → show the full structured output immediately.
+  // No intro typing-star phase — the thinking star simply disappears and the
+  // analytical response (intro + posture + contraposture + question + quote)
+  // renders normally as a single block.
   return (
     <View style={styles.assistantBlock}>
       <DebateResponseDisplay
@@ -720,104 +710,6 @@ const ThinkingStar = React.memo(function ThinkingStar() {
           height={THINK_STAR.thinkingStarScale}
         />
       </Animated.View>
-    </View>
-  );
-});
-
-/**
- * Phase B display: types the conversational intro character-by-character while
- * the star is anchored to the real end-of-text frontier (via onTextLayout).
- *
- * The star starts at the same scale as the thinking-star pulse min, so the
- * transition from pulsing → typing feels continuous (same star, same family,
- * just stops pulsing and begins riding the cursor frontier).
- */
-const IntroTypingDisplay = React.memo(function IntroTypingDisplay({
-  introText,
-}: {
-  introText: string;
-}) {
-  const [revealed, setRevealed] = useState('');
-  // Cursor position is the {x,y} of the END of the last currently-rendered text line.
-  const cursorX = useRef(new Animated.Value(0)).current;
-  const cursorY = useRef(new Animated.Value(0)).current;
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const sz = INTRO_STAR.introTypingStarScale;
-
-  useEffect(() => {
-    if (!introText) return;
-    let pos = 0;
-    const charsPerTick = Math.max(1, INTRO_STAR.introTypingCharBatchSize);
-    const msPerTick = Math.max(
-      8,
-      INTRO_STAR.introTypingStarSpeed * INTRO_STAR.introTypingDurationMultiplier,
-    );
-
-    timerRef.current = setInterval(() => {
-      pos = Math.min(pos + charsPerTick, introText.length);
-      setRevealed(introText.slice(0, pos));
-      if (pos >= introText.length) {
-        if (timerRef.current) clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    }, msPerTick);
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [introText]);
-
-  // onTextLayout fires every time the rendered text re-lays out (each tick).
-  // We use the LAST line's end position as the cursor anchor for the star.
-  const handleTextLayout = useCallback(
-    (e: any) => {
-      const lines = e?.nativeEvent?.lines as
-        | { x: number; y: number; width: number; height: number }[]
-        | undefined;
-      if (!lines || lines.length === 0) return;
-      const last = lines[lines.length - 1];
-      const targetX = last.x + last.width + INTRO_STAR.introTypingStarBaselineOffsetX;
-      // Center the star vertically on the line: line top + half the line height
-      const targetY =
-        last.y + last.height / 2 - sz / 2 + INTRO_STAR.introTypingStarBaselineOffsetY;
-      Animated.timing(cursorX, {
-        toValue: targetX,
-        duration: INTRO_STAR.introTypingStarFollowTightness,
-        useNativeDriver: true,
-      }).start();
-      Animated.timing(cursorY, {
-        toValue: targetY,
-        duration: INTRO_STAR.introTypingStarFollowTightness,
-        useNativeDriver: true,
-      }).start();
-    },
-    [cursorX, cursorY, sz],
-  );
-
-  return (
-    <View style={styles.introTypingWrap}>
-      <View style={styles.introTypingTextArea}>
-        <Text
-          style={styles.introTypingText}
-          onTextLayout={handleTextLayout}
-        >
-          {revealed || ' '}
-        </Text>
-        {/* Star riding the real text frontier */}
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.introTypingCursorStar,
-            {
-              width: sz,
-              height: sz,
-              transform: [{ translateX: cursorX }, { translateY: cursorY }],
-            },
-          ]}
-        >
-          <EstrellaComunidadSvg width={sz} height={sz} />
-        </Animated.View>
-      </View>
     </View>
   );
 });
@@ -900,26 +792,6 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
 
-  // ── Intro typing phase ──────────────────────────────────────────────────
-  introTypingWrap: {
-    marginVertical: 12,
-    width: '100%',
-  },
-  introTypingTextArea: {
-    width: '100%',
-    position: 'relative',
-  },
-  introTypingText: {
-    color: evoconnColors.text,
-    fontSize: 15,
-    lineHeight: 22,
-    opacity: 0.92,
-  },
-  introTypingCursorStar: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-  },
 
   errorBox: {
     backgroundColor: 'rgba(239,68,68,0.15)',
@@ -956,11 +828,5 @@ const styles = StyleSheet.create({
     fontSize: ISLAND.fontSize,
     fontWeight: ISLAND.fontWeight,
     letterSpacing: 0.2,
-  },
-  islandChevron: {
-    color: '#FFFFFF',
-    fontSize: ISLAND.chevronSize,
-    fontWeight: '700',
-    lineHeight: ISLAND.chevronSize + 2,
   },
 });

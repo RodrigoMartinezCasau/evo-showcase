@@ -94,48 +94,6 @@ export const AI_THINKING_STAR_LAYOUT = {
   thinkingStarPulseDurationMs: 1500,
 };
 
-/**
- * ── AI INTRO TYPING PHASE ─────────────────────────────────────────────────
- * After thinking completes the star transitions from static pulse to a moving
- * "typing" mode that reveals the conversational intro line-by-line before the
- * full structured output appears.
- */
-export const AI_INTRO_TYPING_LAYOUT = {
-  /** Scale of the star during the typing phase (independent of thinking scale). */
-  introTypingStarScale: 26,
-  /**
-   * Milliseconds per character for the typing reveal.
-   * Lower = faster typing. Recommended range: 12–30.
-   */
-  introTypingStarSpeed: 18,
-  /**
-   * How many characters reveal per tick.
-   * Higher = chunkier and faster, lower = smoother and slower.
-   */
-  introTypingCharBatchSize: 4,
-  /** Optional global speed multiplier (1 = normal, 0.5 = 2× faster). */
-  introTypingDurationMultiplier: 1,
-
-  // ── Star-tracking-cursor offsets (relative to the actual text frontier) ──
-  /**
-   * Horizontal offset of the star from the end-of-last-line cursor position.
-   * Positive = right (further past the last typed character).
-   */
-  introTypingStarBaselineOffsetX: 4,
-  /**
-   * Vertical offset of the star from the cursor baseline.
-   * Use this to align the star centerline with the text's baseline.
-   * Negative = move up.
-   */
-  introTypingStarBaselineOffsetY: -2,
-  /**
-   * Tightness of the star follow animation.
-   * Lower = snappier (less smoothing), higher = softer trailing.
-   * Range 30–200ms recommended.
-   */
-  introTypingStarFollowTightness: 60,
-};
-
 /** The send button (clan SVG replaces the old star icon). */
 export const CHAT_SEND_BUTTON_LAYOUT = {
   offsetX: -10,
