@@ -43,16 +43,17 @@ import {
   CHAT_BOTTOM_AREA_LAYOUT as CHAT_BOTTOM_AREA,
   PUBLISH_JUMP_ISLAND_LAYOUT as ISLAND,
   AI_THINKING_STAR_LAYOUT as THINK_STAR,
+  AI_INTRO_TYPING_LAYOUT as INTRO_TYPING,
   REFLECTION_PUBLISH_MIN_CHARS,
 } from '@evoconn/constants/chatInputBarLayout';
 import Svg, { Polyline } from 'react-native-svg';
 import EstrellaComunidadSvg from '../assets/sidebar/estrellaComunidadSvg/estrellaComunidad.svg';
 
 /**
- * Guaranteed-upward chevron rendered as an SVG path.
- * Using a real vector shape avoids font/rotation glitches that can flip,
- * mis-render, or sideways-render text glyphs like « on certain devices/clans.
- * The "^" shape is hand-defined and CANNOT be visually flipped by font fallback.
+ * Doble chevron apuntando hacia ARRIBA (estilo « original, pero rotado al cielo).
+ * Renderizado como SVG para evitar bugs de fuente/rotación con glifos de texto.
+ * Dos polilíneas apiladas: la inferior y la superior, ambas con forma "^".
+ * El SVG no puede ser volteado por una fuente, así que la dirección es definitiva.
  */
 const UpChevron = React.memo(function UpChevron({
   size,
@@ -63,11 +64,21 @@ const UpChevron = React.memo(function UpChevron({
   color: string;
   strokeWidth?: number;
 }) {
-  // 24x24 viewBox, classic up-chevron (V upside down)
+  // viewBox 24×24. Dos chevrons apilados verticalmente:
+  //   chevron superior:  vértice en y=4,  brazos a y=11
+  //   chevron inferior:  vértice en y=12, brazos a y=19
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">
       <Polyline
-        points="5,15 12,8 19,15"
+        points="5,11 12,4 19,11"
+        fill="none"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Polyline
+        points="5,19 12,12 19,19"
         fill="none"
         stroke={color}
         strokeWidth={strokeWidth}
@@ -94,7 +105,8 @@ import { useAISettings } from '@evoconn/hooks/AISettingsContext';
 import { COMMUNITY_DRAWER_EDGE_ZONE_WIDTH } from '@evoconn/constants/communityDrawerGesture';
 import { useSidebarGesture } from '@evoconn/hooks/useSidebarGesture';
 
-type ChatBubble = DebateMessage & { revealed?: string };
+type IntroPhase = 'thinking' | 'intro' | 'done';
+type ChatBubble = DebateMessage & { revealed?: string; introPhase?: IntroPhase };
 
 export default function ReflectionCreationScreen() {
   const router = useRouter();
@@ -282,6 +294,16 @@ export default function ReflectionCreationScreen() {
         markStreakActivated();
         const assistantText = resp.assistant_text;
 
+        const introText = resp.debate_response?.debate_layer?.conversational_intro ?? '';
+        const introLen = (introText || '').length;
+        // Duración del typing = ceil(chars / batch) × tickMs × multiplier (mín. 250ms).
+        const tickMs = Math.max(
+          8,
+          INTRO_TYPING.introTypingTickMs * INTRO_TYPING.introTypingDurationMultiplier,
+        );
+        const ticks = Math.ceil(introLen / Math.max(1, INTRO_TYPING.introTypingCharBatchSize));
+        const introDuration = Math.max(250, ticks * tickMs);
+
         const assistantMsg: ChatBubble = {
           role: 'assistant',
           content: assistantText,
@@ -292,6 +314,9 @@ export default function ReflectionCreationScreen() {
           lang: resp.lang,
           streaming: false,
           revealed: assistantText,
+          // Si hay intro, arrancamos en fase 'intro' (typewriter sin estrella),
+          // y luego aparece el resto. Si no hay intro, vamos directo a 'done'.
+          introPhase: introLen > 0 ? 'intro' : 'done',
         };
 
         setMessages((prev) => {
@@ -300,6 +325,20 @@ export default function ReflectionCreationScreen() {
           return copy;
         });
         scrollToEnd();
+
+        if (introLen > 0) {
+          setTimeout(() => {
+            setMessages((prev) => {
+              if (prev.length === 0) return prev;
+              const copy = [...prev];
+              const last = copy[copy.length - 1];
+              if (last.role === 'assistant' && last.introPhase === 'intro') {
+                copy[copy.length - 1] = { ...last, introPhase: 'done' };
+              }
+              return copy;
+            });
+          }, introDuration);
+        }
 
         updateThought(id, {
           title: resp.topic || thoughts.find((t) => t.id === id)?.title || 'Reflexión',
@@ -658,10 +697,19 @@ const MessageBubble = React.memo(function MessageBubble({
     }
   }
 
-  // ── Final: response arrived → show the full structured output immediately.
-  // No intro typing-star phase — the thinking star simply disappears and the
-  // analytical response (intro + posture + contraposture + question + quote)
-  // renders normally as a single block.
+  const phase = assistantMsg.introPhase ?? 'done';
+
+  // ── Phase B: typewriter del intro (SIN estrella encima) ────────────────
+  if (phase === 'intro') {
+    const introText = assistantMsg.debateResponse?.debate_layer?.conversational_intro ?? '';
+    return (
+      <View style={styles.assistantBlock}>
+        <IntroTypewriter introText={introText} />
+      </View>
+    );
+  }
+
+  // ── Phase C: respuesta completa ────────────────────────────────────────
   return (
     <View style={styles.assistantBlock}>
       <DebateResponseDisplay
@@ -670,6 +718,45 @@ const MessageBubble = React.memo(function MessageBubble({
       />
     </View>
   );
+});
+
+/**
+ * Revela el texto del intro tipo "máquina de escribir", carácter por carácter,
+ * sin ningún cursor/estrella visible. Sólo el texto que va apareciendo.
+ */
+const IntroTypewriter = React.memo(function IntroTypewriter({
+  introText,
+}: {
+  introText: string;
+}) {
+  const [revealed, setRevealed] = useState('');
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (!introText) {
+      setRevealed('');
+      return;
+    }
+    let pos = 0;
+    const charsPerTick = Math.max(1, INTRO_TYPING.introTypingCharBatchSize);
+    const msPerTick = Math.max(
+      8,
+      INTRO_TYPING.introTypingTickMs * INTRO_TYPING.introTypingDurationMultiplier,
+    );
+    timerRef.current = setInterval(() => {
+      pos = Math.min(pos + charsPerTick, introText.length);
+      setRevealed(introText.slice(0, pos));
+      if (pos >= introText.length) {
+        if (timerRef.current) clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }, msPerTick);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [introText]);
+
+  return <Text style={styles.introTypewriterText}>{revealed}</Text>;
 });
 
 /** Pulsing star shown while the AI is generating. */
@@ -786,6 +873,12 @@ const styles = StyleSheet.create({
   },
   userText: { color: evoconnColors.text, fontSize: 15, lineHeight: 22 },
   aiText: { color: evoconnColors.text, fontSize: 15, lineHeight: 22 },
+  introTypewriterText: {
+    color: evoconnColors.text,
+    fontSize: 15,
+    lineHeight: 22,
+    opacity: 0.95,
+  },
   thinkingStarWrap: {
     alignSelf: 'flex-start',
     marginVertical: 12,

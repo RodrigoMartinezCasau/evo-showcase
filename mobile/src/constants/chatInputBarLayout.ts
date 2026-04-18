@@ -94,6 +94,20 @@ export const AI_THINKING_STAR_LAYOUT = {
   thinkingStarPulseDurationMs: 1500,
 };
 
+/**
+ * ── INTRO TYPING (sin estrella) ───────────────────────────────────────────
+ * El intro se revela tipo "máquina de escribir" sin ningún cursor visible.
+ * Solo controla la velocidad y el tamaño del lote de caracteres por tick.
+ */
+export const AI_INTRO_TYPING_LAYOUT = {
+  /** Milisegundos por tick. Más bajo = más rápido. Recomendado 12–28. */
+  introTypingTickMs: 18,
+  /** Cuántos caracteres aparecen por tick. Más alto = revelado más grueso. */
+  introTypingCharBatchSize: 4,
+  /** Multiplicador global de velocidad (1 = normal, 0.5 = 2× más rápido). */
+  introTypingDurationMultiplier: 1,
+};
+
 /** The send button (clan SVG replaces the old star icon). */
 export const CHAT_SEND_BUTTON_LAYOUT = {
   offsetX: -10,
