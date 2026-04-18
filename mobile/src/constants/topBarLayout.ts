@@ -97,6 +97,33 @@ export const TOP_BAR_ICON_EDITOR: Record<
   heartText: { offsetX: 15, offsetY: 0, scale: 1.2 },
 };
 
+// ─── Global icon-only editors ──────────────────────────────────────────────
+//
+// These three values affect ONLY the graphic icon elements (star, menu, shield,
+// pencilIcon, fireIcon, heartIcon).  They do NOT touch any text/number element
+// (clanLabel, pencilText, fireText, heartText).
+//
+// topBarIconsScaleMultiplier — multiplies each icon's INDIVIDUAL scale
+//   proportionally.  A value of 0.9 means: icon that was 2.0 → 1.8, icon that
+//   was 1.0 → 0.9.  It never normalises icons to the same absolute size.
+//
+// topBarIconsOffsetX / topBarIconsOffsetY — shift ALL icons together on that
+//   axis.  Numbers/labels remain at their original positions.
+//
+export const topBarIconsScaleMultiplier = 0.9;   // 1 = no change
+export const topBarIconsOffsetX        = 0;   // px, positive = right
+export const topBarIconsOffsetY        = 0;   // px, positive = down
+
+/** Keys that represent graphical icons (not text labels / counters). */
+const ICON_KEYS = new Set<TopBarIconEditorKey>([
+  'star',
+  'menu',
+  'shield',
+  'pencilIcon',
+  'fireIcon',
+  'heartIcon',
+]);
+
 export function topBarIconEditorStyle(
   editorKey: TopBarIconEditorKey,
   nudgeKey: TopBarItemKey
@@ -105,11 +132,20 @@ export function topBarIconEditorStyle(
 } {
   const ed = TOP_BAR_ICON_EDITOR[editorKey];
   const n = TOP_BAR_LAYOUT.PER_ITEM_OFFSETS[nudgeKey];
+  const isIcon = ICON_KEYS.has(editorKey);
+
+  // Per-icon scale is multiplied by the global multiplier only for icon elements.
+  const finalScale = isIcon ? ed.scale * topBarIconsScaleMultiplier : ed.scale;
+
+  // Global X/Y offsets are added only for icon elements; text positions are untouched.
+  const finalX = (n?.x ?? 0) + ed.offsetX + (isIcon ? topBarIconsOffsetX : 0);
+  const finalY = (n?.y ?? 0) + ed.offsetY + (isIcon ? topBarIconsOffsetY : 0);
+
   return {
     transform: [
-      { translateX: (n?.x ?? 0) + ed.offsetX },
-      { translateY: (n?.y ?? 0) + ed.offsetY },
-      { scale: ed.scale },
+      { translateX: finalX },
+      { translateY: finalY },
+      { scale: finalScale },
     ],
   };
 }
