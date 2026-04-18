@@ -97,7 +97,9 @@ export async function loadAllThoughts(
     if (raw) {
       db = sanitiseDatabase(JSON.parse(raw) as unknown);
     }
-  } catch {
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[THOUGHTS] loadAllThoughts FAILED reading v3 key:', err);
     db = {};
   }
 
@@ -156,11 +158,15 @@ export async function loadAllThoughts(
  * Persist the COMPLETE multi-user database to disk in a single write.
  * Every mutation goes through here, guaranteeing that no partial state
  * can ever be left on disk.
+ *
+ * Errors are logged (not swallowed silently) — silently-eaten storage errors
+ * caused a hard-to-find data-loss bug previously.
  */
 export async function saveAllThoughts(db: ThoughtsDatabase): Promise<void> {
   try {
     await AsyncStorage.setItem(KEY_V3, JSON.stringify(db));
-  } catch {
-    // Non-fatal — in-memory state is still the source of truth this session.
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[THOUGHTS] saveAllThoughts FAILED — data will not persist:', err);
   }
 }
