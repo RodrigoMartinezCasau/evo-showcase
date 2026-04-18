@@ -94,6 +94,33 @@ export const AI_THINKING_STAR_LAYOUT = {
   thinkingStarPulseDurationMs: 1500,
 };
 
+/**
+ * ── AI INTRO TYPING PHASE ─────────────────────────────────────────────────
+ * After thinking completes the star transitions from static pulse to a moving
+ * "typing" mode that reveals the conversational intro line-by-line before the
+ * full structured output appears.
+ */
+export const AI_INTRO_TYPING_LAYOUT = {
+  /** Horizontal start position of the star during typing (relative to container). */
+  introTypingStarOffsetX: 0,
+  /** Vertical start position of the star during typing. */
+  introTypingStarOffsetY: 0,
+  /** Scale of the star during the typing phase (independent of thinking scale). */
+  introTypingStarScale: 32,
+  /**
+   * Milliseconds per character for the line-by-line reveal.
+   * Lower = faster typing. Recommended range: 18–40.
+   */
+  introTypingStarSpeed: 24,
+  /**
+   * Vertical step in dp that the star moves per line of intro text.
+   * Set to 0 to keep the star stationary during intro.
+   */
+  introTypingStarLineStepY: 22,
+  /** Optional global speed multiplier (1 = normal). */
+  introTypingDurationMultiplier: 1,
+};
+
 /** The send button (clan SVG replaces the old star icon). */
 export const CHAT_SEND_BUTTON_LAYOUT = {
   offsetX: -10,

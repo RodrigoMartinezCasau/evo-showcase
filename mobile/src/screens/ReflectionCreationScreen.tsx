@@ -43,6 +43,7 @@ import {
   CHAT_BOTTOM_AREA_LAYOUT as CHAT_BOTTOM_AREA,
   PUBLISH_JUMP_ISLAND_LAYOUT as ISLAND,
   AI_THINKING_STAR_LAYOUT as THINK_STAR,
+  AI_INTRO_TYPING_LAYOUT as INTRO_STAR,
   REFLECTION_PUBLISH_MIN_CHARS,
 } from '@evoconn/constants/chatInputBarLayout';
 import EstrellaComunidadSvg from '../assets/sidebar/estrellaComunidadSvg/estrellaComunidad.svg';
@@ -63,7 +64,8 @@ import { useAISettings } from '@evoconn/hooks/AISettingsContext';
 import { COMMUNITY_DRAWER_EDGE_ZONE_WIDTH } from '@evoconn/constants/communityDrawerGesture';
 import { useSidebarGesture } from '@evoconn/hooks/useSidebarGesture';
 
-type ChatBubble = DebateMessage & { revealed?: string };
+type IntroPhase = 'thinking' | 'intro' | 'done';
+type ChatBubble = DebateMessage & { revealed?: string; introPhase?: IntroPhase };
 
 export default function ReflectionCreationScreen() {
   const router = useRouter();
@@ -251,6 +253,14 @@ export default function ReflectionCreationScreen() {
         markStreakActivated();
         const assistantText = resp.assistant_text;
 
+        const introText = resp.debate_response?.debate_layer?.conversational_intro ?? '';
+        const introLen = (introText || '').length;
+        // Duration = chars × speed × multiplier (min 300ms so it's always perceptible)
+        const introDuration = Math.max(
+          300,
+          introLen * INTRO_STAR.introTypingStarSpeed * INTRO_STAR.introTypingDurationMultiplier,
+        );
+
         const assistantMsg: ChatBubble = {
           role: 'assistant',
           content: assistantText,
@@ -261,6 +271,8 @@ export default function ReflectionCreationScreen() {
           lang: resp.lang,
           streaming: false,
           revealed: assistantText,
+          // Start in intro phase; flip to 'done' after intro animation finishes
+          introPhase: introLen > 0 ? 'intro' : 'done',
         };
 
         setMessages((prev) => {
@@ -269,6 +281,22 @@ export default function ReflectionCreationScreen() {
           return copy;
         });
         scrollToEnd();
+
+        // If there's an intro, schedule the transition to 'done' phase.
+        // We flip the last assistant message (the one we just set) to 'done'.
+        if (introLen > 0) {
+          setTimeout(() => {
+            setMessages((prev) => {
+              if (prev.length === 0) return prev;
+              const copy = [...prev];
+              const last = copy[copy.length - 1];
+              if (last.role === 'assistant' && last.introPhase === 'intro') {
+                copy[copy.length - 1] = { ...last, introPhase: 'done' };
+              }
+              return copy;
+            });
+          }, introDuration);
+        }
 
         updateThought(id, {
           title: resp.topic || thoughts.find((t) => t.id === id)?.title || 'Reflexión',
@@ -620,12 +648,12 @@ const MessageBubble = React.memo(function MessageBubble({
 
   const assistantMsg = message as Extract<ChatBubble, { role: 'assistant' }>;
 
-  // While the AI is generating (no debate_response yet), show only the pulsing star.
+  // ── Phase A: Thinking — no response yet, show pulsing star ──────────────
   if (assistantMsg.streaming || !assistantMsg.debateResponse) {
     if (!assistantMsg.debateResponse && !displayText) {
       return <ThinkingStar />;
     }
-    // Edge case: streaming flag still on but content arrived without structure
+    // Edge case: content arrived without structure
     if (!assistantMsg.debateResponse) {
       return (
         <View style={styles.assistantBlock}>
@@ -635,6 +663,15 @@ const MessageBubble = React.memo(function MessageBubble({
     }
   }
 
+  const phase = assistantMsg.introPhase ?? 'done';
+
+  // ── Phase B: Intro typing — response arrived, animate intro only ─────────
+  if (phase === 'intro') {
+    const introText = assistantMsg.debateResponse?.debate_layer?.conversational_intro ?? '';
+    return <IntroTypingDisplay introText={introText} />;
+  }
+
+  // ── Phase C: Done — show full structured output ───────────────────────────
   return (
     <View style={styles.assistantBlock}>
       <DebateResponseDisplay
@@ -683,6 +720,76 @@ const ThinkingStar = React.memo(function ThinkingStar() {
           height={THINK_STAR.thinkingStarScale}
         />
       </Animated.View>
+    </View>
+  );
+});
+
+/**
+ * Phase B display: types the conversational intro character-by-character while
+ * a small star moves line-by-line alongside the text.
+ */
+const IntroTypingDisplay = React.memo(function IntroTypingDisplay({
+  introText,
+}: {
+  introText: string;
+}) {
+  const [revealed, setRevealed] = useState('');
+  const starY = useRef(new Animated.Value(INTRO_STAR.introTypingStarOffsetY)).current;
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (!introText) return;
+    let pos = 0;
+    // How many chars per tick to keep it snappy
+    const charsPerTick = Math.max(1, Math.round(12 / INTRO_STAR.introTypingDurationMultiplier));
+    const msPerTick = INTRO_STAR.introTypingStarSpeed * INTRO_STAR.introTypingDurationMultiplier;
+
+    timerRef.current = setInterval(() => {
+      pos = Math.min(pos + charsPerTick, introText.length);
+      const slice = introText.slice(0, pos);
+      setRevealed(slice);
+
+      // Count newlines in revealed slice to derive star Y position
+      const lineCount = (slice.match(/\n/g) ?? []).length;
+      Animated.timing(starY, {
+        toValue: INTRO_STAR.introTypingStarOffsetY + lineCount * INTRO_STAR.introTypingStarLineStepY,
+        duration: msPerTick * 2,
+        useNativeDriver: true,
+      }).start();
+
+      if (pos >= introText.length) {
+        if (timerRef.current) clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }, msPerTick);
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [introText, starY]);
+
+  const sz = INTRO_STAR.introTypingStarScale;
+
+  return (
+    <View style={styles.introTypingWrap}>
+      {/* Moving star marker */}
+      <Animated.View
+        style={[
+          styles.introTypingStar,
+          {
+            transform: [
+              { translateX: INTRO_STAR.introTypingStarOffsetX },
+              { translateY: starY },
+            ],
+          },
+        ]}
+      >
+        <EstrellaComunidadSvg width={sz} height={sz} />
+      </Animated.View>
+      {/* Progressively revealed intro text */}
+      <View style={styles.introTypingTextArea}>
+        <Text style={styles.introTypingText}>{revealed}</Text>
+      </View>
     </View>
   );
 });
@@ -763,6 +870,27 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     marginVertical: 12,
     marginLeft: 4,
+  },
+
+  // ── Intro typing phase ──────────────────────────────────────────────────
+  introTypingWrap: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginVertical: 12,
+    width: '100%',
+  },
+  introTypingStar: {
+    marginTop: 2,
+    marginRight: 10,
+  },
+  introTypingTextArea: {
+    flex: 1,
+  },
+  introTypingText: {
+    color: evoconnColors.text,
+    fontSize: 15,
+    lineHeight: 22,
+    opacity: 0.92,
   },
 
   errorBox: {
