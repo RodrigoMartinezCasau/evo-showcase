@@ -52,6 +52,19 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
   onShieldPress,
 }: Props) {
   const ShieldSvg = useMemo(() => getTopBarInsigniaByHouse(clanId), [clanId]);
+
+  // Render the SVG at its true display size so it is not GPU-upscaled from a
+  // small rasterisation. `SHIELD_SCALE` is a transform that would otherwise
+  // cause the GPU compositing layer (sized SHIELD_BASE_SIZE) to be scaled up,
+  // producing a blurry result. By rendering the SVG at the final pixel size
+  // directly and removing the scale transform, we get a crisp vector output.
+  const shieldDisplaySize = Math.round(SHIELD_BASE_SIZE * SHIELD_SCALE);
+  // Correct the container's natural position: because the container is now
+  // wider/taller (displaySize instead of SHIELD_BASE_SIZE), its left edge
+  // moves further left (right: 0 keeps right edge fixed). We compensate so
+  // the visual center of the badge stays exactly where the SHIELD_OFFSET_X/Y
+  // layout constants expect it.
+  const shieldPositionCorrection = (shieldDisplaySize - SHIELD_BASE_SIZE) / 2;
   const clanLabel = clanId
     ? `Clan ${clanId.charAt(0).toUpperCase() + clanId.slice(1)}`
     : 'Sin clan';
@@ -137,18 +150,17 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
         style={[
           styles.shieldWrap,
           {
-            width: SHIELD_BASE_SIZE,
-            height: SHIELD_BASE_SIZE,
-            marginTop: -SHIELD_BASE_SIZE / 2,
+            width: shieldDisplaySize,
+            height: shieldDisplaySize,
+            marginTop: -shieldDisplaySize / 2,
             transform: [
-              { translateX: SHIELD_OFFSET_X },
+              { translateX: SHIELD_OFFSET_X + shieldPositionCorrection },
               { translateY: SHIELD_OFFSET_Y },
-              { scale: SHIELD_SCALE },
             ],
           },
         ]}
       >
-        <ShieldSvg width={SHIELD_BASE_SIZE} height={SHIELD_BASE_SIZE} />
+        <ShieldSvg width={shieldDisplaySize} height={shieldDisplaySize} />
       </TouchableOpacity>
     </View>
   );

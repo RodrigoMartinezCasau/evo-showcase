@@ -24,8 +24,8 @@ type Props = {
   clanId: string | null | undefined;
   followersCount: number;
   followingCount: number;
-  totalReflections: number;
-  totalQuotes: number;
+  /** Live count derived from the user's actual published posts — must equal the posts display count. */
+  totalPosts: number;
   onPostsPress?: () => void;
   onFollowersPress?: () => void;
   onFollowingPress?: () => void;
@@ -34,8 +34,7 @@ type Props = {
 export const PersonalFollowRow = React.memo(function PersonalFollowRow({
   followersCount,
   followingCount,
-  totalReflections,
-  totalQuotes,
+  totalPosts,
   onPostsPress,
   onFollowersPress,
   onFollowingPress,
@@ -63,8 +62,7 @@ export const PersonalFollowRow = React.memo(function PersonalFollowRow({
         ]}
       >
         <PersonalPostsCounter
-          totalReflections={totalReflections}
-          totalQuotes={totalQuotes}
+          totalPosts={totalPosts}
           onPress={onPostsPress}
         />
       </View>

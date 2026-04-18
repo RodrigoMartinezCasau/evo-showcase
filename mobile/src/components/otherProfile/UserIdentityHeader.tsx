@@ -41,6 +41,11 @@ export const UserIdentityHeader = React.memo(function UserIdentityHeader({
   onShieldPress,
 }: Props) {
   const ShieldSvg = useMemo(() => getTopBarInsigniaByHouse(clanId), [clanId]);
+
+  // Render at true display size so the SVG is not GPU-upscaled from a small
+  // rasterisation layer. See PersonalIdentityHeader for full explanation.
+  const shieldDisplaySize = Math.round(SHIELD_BASE_SIZE * SHIELD_SCALE);
+  const shieldPositionCorrection = (shieldDisplaySize - SHIELD_BASE_SIZE) / 2;
   const clanLabel = clanId
     ? `Clan ${clanId.charAt(0).toUpperCase() + clanId.slice(1)}`
     : 'Sin clan';
@@ -115,18 +120,17 @@ export const UserIdentityHeader = React.memo(function UserIdentityHeader({
         style={[
           styles.shieldWrap,
           {
-            width: SHIELD_BASE_SIZE,
-            height: SHIELD_BASE_SIZE,
-            marginTop: -SHIELD_BASE_SIZE / 2,
+            width: shieldDisplaySize,
+            height: shieldDisplaySize,
+            marginTop: -shieldDisplaySize / 2,
             transform: [
-              { translateX: SHIELD_OFFSET_X },
+              { translateX: SHIELD_OFFSET_X + shieldPositionCorrection },
               { translateY: SHIELD_OFFSET_Y },
-              { scale: SHIELD_SCALE },
             ],
           },
         ]}
       >
-        <ShieldSvg width={SHIELD_BASE_SIZE} height={SHIELD_BASE_SIZE} />
+        <ShieldSvg width={shieldDisplaySize} height={shieldDisplaySize} />
       </TouchableOpacity>
     </View>
   );

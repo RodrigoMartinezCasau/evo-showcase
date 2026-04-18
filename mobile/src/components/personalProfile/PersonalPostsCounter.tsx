@@ -2,17 +2,15 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 
 type Props = {
-  totalReflections: number;
-  totalQuotes: number;
+  /** Live count derived from the user's actual post list. */
+  totalPosts: number;
   onPress?: () => void;
 };
 
 export const PersonalPostsCounter = React.memo(function PersonalPostsCounter({
-  totalReflections,
-  totalQuotes,
+  totalPosts,
   onPress,
 }: Props) {
-  const totalPosts = totalReflections + totalQuotes;
 
   return (
     <TouchableOpacity

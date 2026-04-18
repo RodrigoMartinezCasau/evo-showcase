@@ -199,8 +199,7 @@ export default function PersonalProfileScreen() {
               clanId={profileWithClan.clanId}
               followersCount={profileWithClan.followersCount}
               followingCount={profileWithClan.followingCount}
-              totalReflections={profileWithClan.totalReflections}
-              totalQuotes={profileWithClan.totalQuotes}
+              totalPosts={posts.length}
               onPostsPress={() => router.push('/personal-posts')}
               onFollowersPress={() => router.push('/personal-followers')}
               onFollowingPress={() => router.push('/personal-following')}
