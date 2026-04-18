@@ -68,6 +68,13 @@ export const PUBLISH_JUMP_ISLAND_LAYOUT = {
 };
 
 /**
+ * ── REFLECTION PUBLISH ELIGIBILITY ───────────────────────────────────────
+ * User messages shorter than this threshold are NOT considered publishable
+ * reflections. For them: no PublishBlock is shown, no jump-island appears.
+ */
+export const REFLECTION_PUBLISH_MIN_CHARS = 25;
+
+/**
  * ── AI THINKING STAR ──────────────────────────────────────────────────────
  * Pulsing "estrella comunidad" that appears while the AI is generating.
  * Replaces the old spinner + "Pensando…" combo.

@@ -612,8 +612,7 @@ def validate(payload: ValidateRequest):
 @app.post("/debate", response_model=DebateResponse)
 def debate(payload: DebateRequest):
     """Debate mode endpoint — full pipeline (KB + facts + author + debate + personality)."""
-    from language_detector import detect_language
-    lang = detect_language(payload.user_message or payload.topic or "")
+    lang = "es"  # forced Spanish for current app mode
     return _run_debate_pipeline(payload, response_language=lang)
 
 
@@ -632,7 +631,7 @@ def debate_chat(payload: DebateChatRequest):
     if not msg:
         raise HTTPException(status_code=400, detail="message is required and cannot be empty")
 
-    lang = detect_language(msg)
+    lang = "es"  # forced Spanish for current app mode
     intent = classify_intent(msg)
     parsed = parse_message(msg)
     topic = parsed["topic"]
@@ -786,8 +785,11 @@ def debate_chat_persisted(debate_id: str, payload: DebateChatPayload):
     # Load memory
     memory = get_debate_memory(debate_id)
 
-    # Detect language and intent
-    lang = detect_language(msg)
+    # Language: forced to Spanish for the current app mode.
+    # detect_language is kept for future multi-language support but the result
+    # is overridden to "es" until an English mode is designed and activated.
+    lang = "es"
+    _ = detect_language(msg)  # kept for future use; result ignored for now
     intent = classify_intent(msg)
 
     # ── Follow-up resolution ──────────────────────────────────────────────
@@ -1043,8 +1045,8 @@ def fetch_message_facts(message_id: str):
                 last_user_content = (m.get("content") or "").strip()
                 break
 
-    # Build language-aware scientific context + verification bullets (no KB facts).
-    lang = (meta.get("lang") or "").strip() or detect_language(last_user_content or topic or assistant_reply)
+    # Forced Spanish for current app mode.
+    lang = "es"
     llm_client = OpenAIClient()
     ctx_summary, verification_points = generate_science_context_block(
         topic or "",

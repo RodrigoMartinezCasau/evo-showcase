@@ -346,6 +346,8 @@ def _build_structured_debate_prompts(
     has_facts = len(facts_list) > 0
     system_prompt = """You are a calm, respectful debate facilitator. You are generating a debate response. Output ONLY JSON that follows the schema below.
 
+LANGUAGE (MANDATORY): All text values in the JSON — titles, bullets, quick_summary, socratic_question — MUST be written in Spanish. Do NOT use English anywhere, not even inside a single bullet.
+
 CONTEXT HANDLING (CRITICAL):
 - If the prompt includes a [Recent conversation …] block, the user's CURRENT message may be a follow-up (e.g. "¿qué opinas?", "desarrolla eso", "no estoy de acuerdo", "y si lo miramos al revés", "explica más", "pero entonces…").
 - In that case, the real subject is whatever the previous user reflection was about, and the new message is asking you to extend, react to, or push back on it.
@@ -556,7 +558,7 @@ def _build_debate_prompts(
 ) -> tuple[str, str]:
     """Build (system_prompt, user_prompt) for debate layer. Shared by generate and stream."""
     has_facts = len(facts_list) > 0
-    system_prompt = """You are a calm, respectful debate facilitator. Output in English.
+    system_prompt = """You are a calm, respectful debate facilitator. Output ONLY in Spanish. Every word of every field must be in Spanish — no English, not even partial.
 
 CONTEXT HANDLING (CRITICAL):
 - If the prompt includes a [Recent conversation …] block, the user's CURRENT message may be a follow-up (e.g. "what do you think?", "develop that", "I disagree", "explain more", "but then…").
@@ -780,8 +782,8 @@ def generate_debate_layer(
                 wcf = [str(x).strip() for x in debate_dict.get("where_contrarian_might_fail", [])]
                 sq_list = [
                     question_sec.socratic_question,
-                    "What would change your view on this?",
-                    "What assumptions are you making?",
+                    "¿Qué cambiaría tu perspectiva sobre esto?",
+                    "¿Qué suposiciones estás haciendo?",
                 ]
                 intro = _generate_conversational_intro(user_message, llm_client, response_language, chat_history=chat_history)
                 debate_layer = DebateLayer(
@@ -876,8 +878,8 @@ def generate_debate_layer_stream(
                 wcf = [str(x).strip() for x in debate_dict.get("where_contrarian_might_fail", [])]
                 sq_list = [
                     question_sec.socratic_question,
-                    "What would change your view on this?",
-                    "What assumptions are you making?",
+                    "¿Qué cambiaría tu perspectiva sobre esto?",
+                    "¿Qué suposiciones estás haciendo?",
                 ]
                 debate_layer = DebateLayer(
                     steelman_of_user=flat_steelman,

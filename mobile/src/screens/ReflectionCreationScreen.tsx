@@ -43,6 +43,7 @@ import {
   CHAT_BOTTOM_AREA_LAYOUT as CHAT_BOTTOM_AREA,
   PUBLISH_JUMP_ISLAND_LAYOUT as ISLAND,
   AI_THINKING_STAR_LAYOUT as THINK_STAR,
+  REFLECTION_PUBLISH_MIN_CHARS,
 } from '@evoconn/constants/chatInputBarLayout';
 import EstrellaComunidadSvg from '../assets/sidebar/estrellaComunidadSvg/estrellaComunidad.svg';
 import { REFLECTION_EMPTY_WELCOME_LAYOUT as EMPTY_WELCOME } from '@evoconn/constants/reflectionEmptyWelcomeLayout';
@@ -123,34 +124,55 @@ export default function ReflectionCreationScreen() {
   const islandOpacity = useRef(new Animated.Value(0)).current;
   const [islandVisible, setIslandVisible] = useState(false);
 
-  // Index of the latest user message that has a published-block attached
-  // (i.e. it has a completed AI response right after it).
-  const latestUserReflectionIndex = useMemo(() => {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === 'user') {
-        const next = messages[i + 1];
-        if (next && next.role === 'assistant' && !next.streaming && (next as Extract<ChatBubble, {role:'assistant'}>).debateResponse) {
-          return i;
-        }
+  // All publishable user-reflection indices: user message is long enough AND
+  // it has a completed AI structured response immediately after it.
+  const publishableReflectionIndices = useMemo(() => {
+    const indices: number[] = [];
+    for (let i = 0; i < messages.length; i++) {
+      const m = messages[i];
+      if (m.role !== 'user') continue;
+      if ((m.content ?? '').length < REFLECTION_PUBLISH_MIN_CHARS) continue;
+      const next = messages[i + 1];
+      if (
+        next &&
+        next.role === 'assistant' &&
+        !next.streaming &&
+        (next as Extract<ChatBubble, { role: 'assistant' }>).debateResponse
+      ) {
+        indices.push(i);
       }
     }
-    return -1;
+    return indices;
   }, [messages]);
 
+  // The "active" target for the jump island: the last publishable reflection
+  // whose top Y is above the current viewport (i.e. user has scrolled past it).
+  // We store the resolved index in a ref so checkIslandVisibility can read it
+  // without a stale closure.
+  const activeJumpTargetIndex = useRef(-1);
+
   const checkIslandVisibility = useCallback(() => {
-    if (latestUserReflectionIndex < 0) {
+    if (publishableReflectionIndices.length === 0) {
+      activeJumpTargetIndex.current = -1;
       if (islandVisible) {
         setIslandVisible(false);
         Animated.timing(islandOpacity, { toValue: 0, duration: 180, useNativeDriver: true }).start();
       }
       return;
     }
-    const msgY = messageYOffsets.current[latestUserReflectionIndex];
-    if (msgY == null) return;
-    // Only show the island when the reflection has scrolled ABOVE the viewport
-    // (user scrolled down past it). Never show it when the reflection is below.
     const viewTop = scrollOffsetY.current;
-    const shouldShow = msgY < viewTop;
+    // Find the last publishable reflection that has been scrolled above the viewport.
+    let targetIdx = -1;
+    for (let k = publishableReflectionIndices.length - 1; k >= 0; k--) {
+      const idx = publishableReflectionIndices[k];
+      const msgY = messageYOffsets.current[idx];
+      if (msgY != null && msgY < viewTop) {
+        targetIdx = idx;
+        break;
+      }
+    }
+    activeJumpTargetIndex.current = targetIdx;
+    const shouldShow = targetIdx >= 0;
     if (shouldShow && !islandVisible) {
       setIslandVisible(true);
       Animated.timing(islandOpacity, { toValue: 1, duration: 220, useNativeDriver: true }).start();
@@ -159,13 +181,14 @@ export default function ReflectionCreationScreen() {
         () => setIslandVisible(false),
       );
     }
-  }, [latestUserReflectionIndex, islandVisible, islandOpacity]);
+  }, [publishableReflectionIndices, islandVisible, islandOpacity]);
 
   const handleScrollToReflection = useCallback(() => {
-    if (latestUserReflectionIndex < 0) return;
-    const targetY = messageYOffsets.current[latestUserReflectionIndex] ?? 0;
+    const targetIdx = activeJumpTargetIndex.current;
+    if (targetIdx < 0) return;
+    const targetY = messageYOffsets.current[targetIdx] ?? 0;
     scrollRef.current?.scrollTo({ y: targetY, animated: true });
-  }, [latestUserReflectionIndex]);
+  }, []);
 
   useEffect(() => {
     if (!thoughtId) return;
@@ -366,15 +389,17 @@ export default function ReflectionCreationScreen() {
         >
           {messages.map((msg, i) => {
             if (msg.role === 'user') {
-              // Check if the next assistant message has a completed structured response.
-              // If so, PublishBlock renders below this user bubble (same width container).
+              // PublishBlock shows only when:
+              // 1. The next assistant message has a completed structured response, AND
+              // 2. This user message is long enough to be a publishable reflection.
               const nextMsg = messages[i + 1] as (ChatBubble & { debateResponse?: unknown }) | undefined;
               const nextIsStructured =
                 !!nextMsg &&
                 nextMsg.role === 'assistant' &&
                 !nextMsg.streaming &&
                 !!(nextMsg as Extract<ChatBubble, { role: 'assistant' }>).debateResponse;
-              const publishHandlerBelow = nextIsStructured && nextMsg
+              const isPublishable = (msg.content ?? '').length >= REFLECTION_PUBLISH_MIN_CHARS;
+              const publishHandlerBelow = nextIsStructured && isPublishable && nextMsg
                 ? doPublish(nextMsg.id, msg.content)
                 : undefined;
               return (
