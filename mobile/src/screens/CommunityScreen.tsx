@@ -94,11 +94,26 @@ export default function CommunityScreen() {
   const gestureCommittingRef = useRef(false);
   const [activeTab, setActiveTab] = useState<TabId>('siguiendo');
 
+  // Track which tabParam value we have already reacted to so we never
+  // re-trigger the same navigation when openDetailFeed's reference changes
+  // (it depends on allPosts / followingSet which can update after mount).
+  const consumedTabParamRef = useRef<string | undefined>(undefined);
+
   useEffect(() => {
-    if (tabParam && VALID_TAB_IDS.includes(tabParam as TabId)) {
-      setActiveTab(tabParam as TabId);
+    if (!tabParam || !VALID_TAB_IDS.includes(tabParam as TabId)) return;
+    if (consumedTabParamRef.current === tabParam) return;
+    consumedTabParamRef.current = tabParam;
+
+    const tab = tabParam as TabId;
+    if (tab === 'para-ti') {
+      // "Para Ti" must always open the full-screen swipeable detail feed,
+      // not just switch the card-list to foryou mode (which would look like
+      // "Siguiendo" / "Mas Votadas" layout). Mirror what handleTabChange does.
+      openDetailFeed('foryou');
+    } else {
+      setActiveTab(tab);
     }
-  }, [tabParam]);
+  }, [tabParam, openDetailFeed]);
   const [searchQuery, setSearchQuery] = useState('');
   const [feedScrollEnabled, setFeedScrollEnabled] = useState(true);
 
