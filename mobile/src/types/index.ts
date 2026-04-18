@@ -61,6 +61,13 @@ export type ConversationItem = {
   updatedAt: string
   isFavorite?: boolean
   folderId?: string | null
+  /**
+   * ID of the simulated user who created this item (e.g. 'u1'–'u9').
+   * Used to scope thoughts to the correct user and to prevent cross-user leakage
+   * when switching users in the simulator. Optional for backward compatibility
+   * with older persisted data (migrated items may not have it yet).
+   */
+  ownerUserId?: string
 }
 
 export type SidebarFolder = {
