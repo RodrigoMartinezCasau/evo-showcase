@@ -65,7 +65,7 @@ export const CLAN_OFFSET_Y = -3;
 export const CLAN_FONT_SIZE = 20;
 
 // ── Rank text ──────────────────────────────────────────────────────
-export const RANK_OFFSET_X = 3;
+export const RANK_OFFSET_X = -5;
 export const RANK_OFFSET_Y = -3;
 export const RANK_FONT_SIZE = 18;
 
