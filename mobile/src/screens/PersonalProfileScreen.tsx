@@ -21,6 +21,7 @@ import { getPersonalProfile } from '@evoconn/data/mockPersonalProfile';
 import { AppTopBar, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
+import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
 import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
@@ -46,9 +47,18 @@ export default function PersonalProfileScreen() {
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { thoughts } = useThoughts();
+  const classification = useClassification();
 
   const profile = getPersonalProfile();
-  const profileWithClan = { ...profile, clanId: activeClan };
+  // Real per-user philosophical percentages from the classification engine.
+  // Replaces the seed `simUser.philosophyPercentages`. Empty array = empty
+  // panel (FLOW A: brand-new user with zero reflections).
+  const realPercentages = classification.getPercentages(profile.id);
+  const profileWithClan = {
+    ...profile,
+    clanId: activeClan,
+    philosophyPercentages: realPercentages,
+  };
 
   // ─── Personal profile shared state ────────────────────────────────
   const { posts, isHidden, toggleHidePost, deletePost, friends, savedPosts } = usePersonalProfile();

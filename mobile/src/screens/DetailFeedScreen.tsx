@@ -65,10 +65,10 @@ export default function DetailFeedScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { height: screenH } = useWindowDimensions();
-  const params = useLocalSearchParams<{ mode?: string; initialIndex?: string }>();
+  const params = useLocalSearchParams<{ mode?: string; initialIndex?: string; postId?: string }>();
 
   const mode = (params.mode ?? 'foryou') as FeedMode;
-  const initialIndex = Math.max(0, parseInt(params.initialIndex ?? '0', 10) || 0);
+  const postId = typeof params.postId === 'string' ? params.postId : undefined;
 
   const { followingSet } = useFollowState();
   const { thoughts } = useThoughts();
@@ -78,7 +78,23 @@ export default function DetailFeedScreen() {
   const gestureCommittingRef = useRef(false);
   const activeTab = modeToTab(mode) as 'siguiendo' | 'mas-votadas' | 'para-ti' | 'search';
 
-  const data = useMemo(() => getDataForMode(mode, allPosts, followingSet), [mode, allPosts, followingSet]);
+  // When a specific postId is requested, put that post first so initialIndex=0 lands on it.
+  const data = useMemo(() => {
+    const base = getDataForMode(mode, allPosts, followingSet);
+    if (!postId) return base;
+    const targetIdx = base.findIndex((p) => p.id === postId);
+    if (targetIdx <= 0) return base;
+    const reordered = [...base];
+    const [target] = reordered.splice(targetIdx, 1);
+    reordered.unshift(target);
+    return reordered;
+  }, [mode, allPosts, followingSet, postId]);
+
+  // If postId was passed via params, always start at index 0 (target is first).
+  // Otherwise honour the explicit initialIndex param.
+  const initialIndex = postId
+    ? 0
+    : Math.max(0, parseInt(params.initialIndex ?? '0', 10) || 0);
 
   const [feedScrollEnabled, setFeedScrollEnabled] = React.useState(true);
   const handleReadingModeChange = React.useCallback((active: boolean) => {

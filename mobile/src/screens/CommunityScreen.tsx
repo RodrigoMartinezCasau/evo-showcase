@@ -83,7 +83,7 @@ const VALID_TAB_IDS: TabId[] = ['siguiendo', 'mas-votadas', 'para-ti', 'search']
 
 export default function CommunityScreen() {
   const router = useRouter();
-  const { tab: tabParam } = useLocalSearchParams<{ tab?: string }>();
+  const { tab: tabParam, postId: postIdParam } = useLocalSearchParams<{ tab?: string; postId?: string }>();
   const insets = useSafeAreaInsets();
   const { width: screenW, height: screenH } = useWindowDimensions();
   const { followingSet } = useFollowState();
@@ -106,14 +106,14 @@ export default function CommunityScreen() {
 
     const tab = tabParam as TabId;
     if (tab === 'para-ti') {
-      // "Para Ti" must always open the full-screen swipeable detail feed,
-      // not just switch the card-list to foryou mode (which would look like
-      // "Siguiendo" / "Mas Votadas" layout). Mirror what handleTabChange does.
-      openDetailFeed('foryou');
+      // "Para Ti" must always open the full-screen swipeable detail feed.
+      // If postIdParam is present (e.g. from a notification tap), open directly at that post.
+      const pid = typeof postIdParam === 'string' ? postIdParam : undefined;
+      openDetailFeed('foryou', pid);
     } else {
       setActiveTab(tab);
     }
-  }, [tabParam, openDetailFeed]);
+  }, [tabParam, postIdParam, openDetailFeed]);
   const [searchQuery, setSearchQuery] = useState('');
   const [feedScrollEnabled, setFeedScrollEnabled] = useState(true);
 

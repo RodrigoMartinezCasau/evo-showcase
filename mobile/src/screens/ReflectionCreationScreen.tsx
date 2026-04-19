@@ -28,6 +28,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppTopBar, ChatInputBar, SidebarDrawer } from '@evoconn/components';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
+import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import * as debateApi from '@evoconn/services/debateApi';
 import type { DebateMessage, DebateResponse } from '@evoconn/types/debate';
 import {
@@ -115,9 +116,10 @@ type ChatBubble = DebateMessage & { revealed?: string; introPhase?: IntroPhase }
 export default function ReflectionCreationScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ thoughtId?: string }>();
-  const thoughtId = params.thoughtId;
+  const thoughtId = Array.isArray(params.thoughtId) ? params.thoughtId[0] : params.thoughtId;
 
   const { thoughts, createThought, updateThought, loadThread } = useThoughts();
+  const { recordInput: recordClassificationInput } = useClassification();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const clanColor = getChatUserAccentColor(activeClan);
   // Island: each clan uses its primary color; Sin clan uses neon lime with dark text
@@ -156,6 +158,14 @@ export default function ReflectionCreationScreen() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { drawerOpenProgress, edgeOpenGesture } = useSidebarGesture(sidebarOpen, setSidebarOpen);
+
+  useEffect(() => {
+    if (!thoughtId) return;
+    const target = thoughts.find((t) => t.id === thoughtId);
+    if (target?.type === 'phrase') {
+      router.replace({ pathname: '/phrase', params: { phraseId: thoughtId } });
+    }
+  }, [thoughtId, thoughts, router]);
   const [messages, setMessages] = useState<ChatBubble[]>([]);
   const [debateId, setDebateId] = useState<string | null>(thoughtId ?? null);
   const [sending, setSending] = useState(false);
@@ -309,9 +319,18 @@ export default function ReflectionCreationScreen() {
 
       try {
         let id = debateId;
+        const isFirstSend = !id;
         if (!id) {
           id = await createThought(text);
           setDebateId(id);
+        }
+        // ── Real philosophical-clan classification ─────────────────────
+        // Every reflection sent to the AI counts as a reflection input
+        // for the clan classifier. We only record on the first send so
+        // continuing the same thread doesn't double-count, and we use
+        // `id` so each reflection has a stable inputId across reloads.
+        if (isFirstSend) {
+          void recordClassificationInput(text, 'reflection', id);
         }
 
         const placeholder: ChatBubble = {
@@ -401,7 +420,7 @@ export default function ReflectionCreationScreen() {
         setSending(false);
       }
     },
-    [sending, debateId, createThought, updateThought, scrollToEnd, thoughts, markStreakActivated, decrementUses, unlockNextPhrase, includeReflectiveQuestion, includePhilosophicalReferences, toPersistedMessage],
+    [sending, debateId, createThought, updateThought, scrollToEnd, thoughts, markStreakActivated, decrementUses, unlockNextPhrase, includeReflectiveQuestion, includePhilosophicalReferences, toPersistedMessage, recordClassificationInput],
   );
 
   const conversationItems = useMemo(

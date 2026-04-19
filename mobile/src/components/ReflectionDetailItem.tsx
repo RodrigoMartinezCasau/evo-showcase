@@ -23,12 +23,14 @@ import {
   DETAIL_QUOTE_LAYOUT as QL,
   DETAIL_QUOTE_AUTHOR_LAYOUT as QAL,
 } from '@evoconn/constants/detailQuoteLayout';
-import { mockComments } from '@evoconn/data/mockComments';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { FollowButton } from './FollowButton';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
 import { useFeedStore } from '@evoconn/hooks/useFeedStore';
 import { usePersonalProfile } from '@evoconn/hooks/PersonalProfileContext';
+import { useNotifications } from '@evoconn/hooks/NotificationsContext';
+import { useSimulation } from '@evoconn/hooks/SimulationContext';
+import type { SimComment } from '@evoconn/data/simulation/simulatedNetwork';
 
 type ReflectionDetailItemProps = {
   post: CommunityPost;
@@ -85,13 +87,29 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     else unsavePost(post.id);
   }, [post, isSaved, updatePostSaveToggle, savePost, unsavePost]);
 
+  const { commentsMap, addComment: addSimComment, users: simUsers } = useSimulation();
+
   const [commentVotes, setCommentVotes] = useState<Record<string, boolean>>({});
   const toggleCommentVote = useCallback((commentId: string) => {
     setCommentVotes((prev) => ({ ...prev, [commentId]: !prev[commentId] }));
   }, []);
 
-  const [localComments, setLocalComments] = useState<Comment[]>([]);
-  const commentIdCounter = useRef(0);
+  // Comments come from the shared persistent store — no local state needed.
+  const contextComments = useMemo<Comment[]>(() => {
+    const simComments = commentsMap[post.id] ?? [];
+    return simComments.map((sc): Comment => {
+      const su = simUsers[sc.authorId];
+      return {
+        id: sc.id,
+        author: su
+          ? { id: su.id, username: su.username, clanId: su.clanId, rank: su.rank }
+          : { id: sc.authorId, username: sc.authorId, clanId: null, rank: 'aprendiz' },
+        body: sc.body,
+        upCount: sc.upCount,
+        createdAt: sc.createdAt,
+      };
+    });
+  }, [commentsMap, post.id, simUsers]);
 
   const [blockedUsers, setBlockedUsers] = useState<Set<string>>(new Set());
 
@@ -99,17 +117,29 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     setBlockedUsers((prev) => new Set(prev).add(userId));
   }, []);
 
+  const { addNotification } = useNotifications();
+
   const handleAddComment = useCallback((text: string) => {
-    commentIdCounter.current += 1;
-    const newComment: Comment = {
-      id: `user-co-${commentIdCounter.current}`,
-      author: mockCurrentUser,
+    const newId = `co-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const simComment: SimComment = {
+      id: newId,
+      postId: post.id,
+      authorId: mockCurrentUser.id,
       body: text,
       upCount: 0,
       createdAt: new Date().toISOString(),
     };
-    setLocalComments((prev) => [...prev, newComment]);
-  }, []);
+    addSimComment(simComment);
+    addNotification({
+      recipientUserId: post.author.id,
+      type: 'comment',
+      fromUserId: mockCurrentUser.id,
+      fromUsername: mockCurrentUser.username,
+      targetPostId: post.id,
+      targetCommentId: newId,
+      textPreview: text.trim().slice(0, 80),
+    });
+  }, [addSimComment, addNotification, post.author.id, post.id]);
 
   const { isFollowing: checkFollowing, toggleFollow } = useFollowState();
 
@@ -292,8 +322,8 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   }, [checkOverflow]);
 
   const visibleComments = useMemo(
-    () => localComments.filter((c) => !blockedUsers.has(c.author.id)),
-    [localComments, blockedUsers],
+    () => contextComments.filter((c) => !blockedUsers.has(c.author.id)),
+    [contextComments, blockedUsers],
   );
 
   const actionColStyle = useMemo(() => ({

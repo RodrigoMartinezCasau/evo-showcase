@@ -6,7 +6,6 @@ import {
   INSIGNIA_BOX_OFFSET_X,
   INSIGNIA_BOX_OFFSET_Y,
   INSIGNIA_EDIT_ICON_OFFSET_X,
-  INSIGNIA_EDIT_ICON_OFFSET_Y,
   INSIGNIA_EDIT_ICON_SCALE,
   INSIGNIA_EDIT_ICON_SAFE_PADDING,
 } from '@evoconn/constants/personalProfileLayout';
@@ -20,14 +19,12 @@ import {
 // Fix: convert all offset/scale values to real layout properties so the
 // touch frame and visual frame are always identical.
 
-const PENCIL_BASE_TOP       = 8;   // default top inside container
 const PENCIL_BASE_RIGHT     = 8;   // default right inside container
 const PENCIL_BASE_FONT_SIZE = 16;  // base icon glyph size
 const PENCIL_BASE_SIZE      = 24;  // base TouchableOpacity box (padding 4×2 + font 16)
 const CONTAINER_PADDING_RIGHT = 14;
 
 // Derived layout values — these update automatically when editors change
-const PENCIL_TOP       = PENCIL_BASE_TOP + INSIGNIA_EDIT_ICON_OFFSET_Y;
 const PENCIL_RIGHT     = PENCIL_BASE_RIGHT - INSIGNIA_EDIT_ICON_OFFSET_X;
 const PENCIL_BOX_SIZE  = Math.max(24, PENCIL_BASE_SIZE  * INSIGNIA_EDIT_ICON_SCALE);
 const PENCIL_FONT_SIZE = PENCIL_BASE_FONT_SIZE * INSIGNIA_EDIT_ICON_SCALE;
@@ -69,22 +66,34 @@ export const PersonalInsigniaPhrase = React.memo(function PersonalInsigniaPhrase
       ]}
     >
       {onEdit !== undefined && (
-        <TouchableOpacity
-          onPress={onEdit}
-          activeOpacity={0.6}
-          hitSlop={8}
+        <View
           style={[
-            styles.editBtn,
+            styles.editRail,
             {
-              top: PENCIL_TOP,
+              // Vertical lock: the rail spans full card height and centers the
+              // button, so Y is tied to container height (not text metrics).
               right: PENCIL_RIGHT,
+              top: 0,
+              bottom: 0,
               width: PENCIL_BOX_SIZE,
-              height: PENCIL_BOX_SIZE,
             },
           ]}
         >
-          <Text style={[styles.editIcon, { fontSize: PENCIL_FONT_SIZE }]}>✎</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            onPress={onEdit}
+            activeOpacity={0.6}
+            hitSlop={8}
+            style={[
+              styles.editBtn,
+              {
+                width: PENCIL_BOX_SIZE,
+                height: PENCIL_BOX_SIZE,
+              },
+            ]}
+          >
+            <Text style={[styles.editIcon, { fontSize: PENCIL_FONT_SIZE }]}>✎</Text>
+          </TouchableOpacity>
+        </View>
       )}
 
       {/* Text wrapper reserves space where the pencil sits */}
@@ -111,10 +120,15 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   editBtn: {
-    position: 'absolute',
+    position: 'relative',
     zIndex: 2,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  editRail: {
+    position: 'absolute',
+    zIndex: 2,
+    justifyContent: 'center',
   },
   editIcon: {
     color: '#FFFFFF',

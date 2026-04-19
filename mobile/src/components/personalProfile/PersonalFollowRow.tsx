@@ -16,7 +16,7 @@ import {
 } from '@evoconn/constants/personalProfileLayout';
 import { PersonalPostsCounter } from './PersonalPostsCounter';
 import { PersonalFollowStats } from './PersonalFollowStats';
-import { PersonalSettingsButton } from './PersonalSettingsButton';
+import { PersonalNotificationsButton } from './PersonalNotificationsButton';
 
 type Props = {
   userId: string;
@@ -89,7 +89,7 @@ export const PersonalFollowRow = React.memo(function PersonalFollowRow({
         />
       </View>
       <View style={styles.settingsSlot}>
-        <PersonalSettingsButton />
+        <PersonalNotificationsButton />
       </View>
     </View>
   );

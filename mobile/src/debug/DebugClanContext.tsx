@@ -4,12 +4,23 @@
  * Thin wrapper that makes clan-switching delegate to SimulationContext so that
  * selecting a clan = switching to the full simulated user for that clan.
  *
+ * Visible clan resolution:
+ *   The seed `simUser.clanId` from `simulatedNetwork.ts` is no longer the
+ *   source of truth. Per the philosophical-classification spec, every user
+ *   must start visibly as "Sin clan" and only get a clan revealed once the
+ *   real classification engine (ClassificationContext) decides so.
+ *
+ *   `useActiveClan` therefore now reads from ClassificationContext first
+ *   and falls back to the simulation seed only if ClassificationContext
+ *   is unavailable (defensive — should always be available in this tree).
+ *
  * All existing hooks (useActiveClan, useDebugClan, useDebugClanSetter) continue
  * to work with the same signature — no call-site changes needed.
  */
 import React, { useCallback, type ReactNode } from 'react';
 import type { ClanId } from '@evoconn/constants/clanColors';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
+import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import { CLAN_TO_USER_ID } from '@evoconn/data/simulation/simulatedNetwork';
 
 // ─── Provider (kept as a transparent pass-through for backward compat) ────────
@@ -21,21 +32,29 @@ export function DebugClanProvider({ children }: { children: ReactNode }) {
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 
 /**
- * Returns the active simulated user's clanId.
- * The `realClan` parameter is accepted for backward compat but is superseded
- * by the simulation whenever SimulationContext is available.
+ * Returns the visible clanId for the active simulated user.
+ *
+ * Source of truth = ClassificationContext (real per-user clan engine).
+ * Returns `null` ("Sin clan") until the user has both ≥ 30 reflections
+ * and a clan above 30%.
+ *
+ * The `realClan` parameter is accepted for backward compat but is
+ * superseded by the classification result.
  */
-export function useActiveClan(realClan: string | null): string | null {
+export function useActiveClan(_realClan: string | null): string | null {
   const sim = useSimulation();
-  return sim.activeUser.clanId;
+  const classification = useClassification();
+  return classification.getVisibleClanId(sim.activeUserId);
 }
 
 /**
- * Returns the active simulated user's clanId cast to `ClanId | null`.
+ * Returns the active simulated user's visible clanId cast to `ClanId | null`.
+ * Reflects the real classification state — null until reveal conditions met.
  */
 export function useDebugClan(): ClanId | null {
   const sim = useSimulation();
-  return (sim.activeUser.clanId as ClanId) ?? null;
+  const classification = useClassification();
+  return (classification.getVisibleClanId(sim.activeUserId) as ClanId) ?? null;
 }
 
 /**

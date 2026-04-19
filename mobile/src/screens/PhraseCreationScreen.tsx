@@ -4,6 +4,7 @@ import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-ha
 import { AppTopBar, ChatInputBar, SidebarDrawer } from '@evoconn/components';
 import { PublishBlock, PhraseNotesCard, PhraseFolderManagerCard } from '@evoconn/components/debate';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
+import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import { useConversationFolders } from '@evoconn/hooks/ConversationFoldersContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -97,7 +98,7 @@ function getPhrasePublishUI(
 export default function PhraseCreationScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ phraseId?: string }>();
-  const phraseId = params.phraseId;
+  const phraseId = Array.isArray(params.phraseId) ? params.phraseId[0] : params.phraseId;
 
   const {
     thoughts,
@@ -105,6 +106,7 @@ export default function PhraseCreationScreen() {
     loadThread,
     updateThought,
   } = useThoughts();
+  const { recordInput: recordClassificationInput } = useClassification();
   const { folders } = useConversationFolders();
   const { publishPost } = useFeedStore();
   const { markStreakActivated } = useDebugStreak();
@@ -136,6 +138,15 @@ export default function PhraseCreationScreen() {
   /** Tracks which threads have already had the intro fetch fired (prevents
    *  duplicate calls when the screen re-renders or remounts). */
   const introRequestedRef = useRef<Set<string>>(new Set());
+  /** Threads that were JUST created in this screen instance — we already have
+   *  their full live message state in memory, so the load effect must NOT
+   *  rehydrate over it (which would wipe `phraseIntroLoading`, the in-flight
+   *  intro fetch progress, and any other live UI state). */
+  const justCreatedRef = useRef<Set<string>>(new Set());
+  /** Always-current snapshot of the messages state, so callbacks fired across
+   *  the lifecycle (intro fetch resolving after a remount, etc.) can read the
+   *  latest values without depending on stale closures. */
+  const messagesRef = useRef<DebateMessage[]>([]);
   /** Per-thread flag: once the typewriter finishes for that thread, we flip
    *  this to true so the phrase tools (Apuntes, Folder) appear. */
   const [introTypewriterDone, setIntroTypewriterDone] = useState<Record<string, boolean>>({});
@@ -146,9 +157,23 @@ export default function PhraseCreationScreen() {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
   }, []);
 
+  // Keep messagesRef in sync with the live state on every render so async
+  // callbacks (intro fetch, publish handler) can read the latest snapshot.
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
   useEffect(() => {
     if (!phraseId) {
       setMessages([]);
+      setLoadingThread(false);
+      return;
+    }
+    // Skip rehydration for a thread we just created in this same screen
+    // instance — the live state in memory is already authoritative and
+    // contains in-flight UI flags (e.g. phraseIntroLoading) that the
+    // persisted disk copy intentionally does not.
+    if (justCreatedRef.current.has(phraseId)) {
       setLoadingThread(false);
       return;
     }
@@ -157,15 +182,44 @@ export default function PhraseCreationScreen() {
       setLoadingThread(true);
       try {
         const thread = await loadThread(phraseId);
+        // eslint-disable-next-line no-console
+        console.log(
+          `[PHRASE-LOAD] phraseId=${phraseId} → thread=`,
+          thread ? `${thread.messages.length} messages, roles=[${thread.messages.map((m) => m.role).join(',')}]` : 'null',
+        );
         if (!cancelled && thread) {
-          // Defensive: if a previous session crashed mid-fetch, never resume
-          // a stale "loading intro" spinner — the request is no longer alive.
-          const hydrated = thread.messages.map((m) =>
+          // Defensive hydration:
+          //  1. Strip any stale phraseIntroLoading flag (a previous session
+          //     could have crashed mid-fetch — that request is gone).
+          //  2. Guarantee an assistant slot exists. Phrase threads created in
+          //     older versions (or threads whose assistant slot got lost via
+          //     sanitisation / persistence corruption) would otherwise render
+          //     as just the user bubble on a black screen, with no intro,
+          //     notes card, folder manager or publish button visible.
+          const cleaned = thread.messages.map((m) =>
             m.role === 'assistant' && m.phraseIntroLoading
               ? { ...m, phraseIntroLoading: false }
               : m,
           );
+          const hasAssistant = cleaned.some((m) => m.role === 'assistant');
+          const hydrated: DebateMessage[] = hasAssistant
+            ? cleaned
+            : [
+                ...cleaned,
+                {
+                  role: 'assistant',
+                  content: '',
+                  phrasePublishUI: { status: 'pending' },
+                  phraseIntro: null,
+                  phraseIntroLoading: false,
+                },
+              ];
           setMessages(hydrated);
+          // Persist the recovered assistant slot back to disk so this repair
+          // is one-shot — next reopen reads it cleanly without the patch path.
+          if (!hasAssistant) {
+            updateThought(phraseId, { messages: hydrated });
+          }
           // For reopened threads we never re-run the typewriter — surface the
           // intro as already-revealed static text so the user sees it instantly.
           setIntroTypewriterDone((prev) => ({ ...prev, [phraseId]: true }));
@@ -179,7 +233,7 @@ export default function PhraseCreationScreen() {
     return () => {
       cancelled = true;
     };
-  }, [phraseId, loadThread]);
+  }, [phraseId, loadThread, updateThought]);
 
   const phraseThought = useMemo(
     () => (phraseId ? thoughts.find((t) => t.id === phraseId) : undefined),
@@ -240,9 +294,11 @@ export default function PhraseCreationScreen() {
       publishPost(post);
 
       // Preserve the AI intro (if it was generated for this thread) so the
-      // published view doesn't lose context on reopen. We grab the latest
-      // assistant message rather than constructing it blind.
-      const prevAssistant = messages.find((m) => m.role === 'assistant');
+      // published view doesn't lose context on reopen. Read from the live ref
+      // (not the closure-captured `messages`) so a publish that happens right
+      // after intro arrival doesn't lose the intro it just received.
+      const liveMessages = messagesRef.current;
+      const prevAssistant = liveMessages.find((m) => m.role === 'assistant');
       const carriedIntro =
         prevAssistant && prevAssistant.role === 'assistant' ? prevAssistant.phraseIntro ?? null : null;
       const nextMessages: DebateMessage[] = [
@@ -260,7 +316,7 @@ export default function PhraseCreationScreen() {
       publishAuthorRef.current = '';
       Keyboard.dismiss();
     },
-    [publishPost, updateThought, messages],
+    [publishPost, updateThought],
   );
 
   const handleAssignPhraseToFolder = useCallback(
@@ -294,9 +350,13 @@ export default function PhraseCreationScreen() {
         console.warn('[PHRASE] generatePhraseIntro failed, skipping intro:', err);
         intro = null;
       }
+      // Apply the intro to the assistant slot. If — for any reason — the live
+      // state has no assistant slot (race with a load effect, hot reload,
+      // legacy thread shape), we INJECT one rather than silently dropping the
+      // result. This is what previously caused some phrase threads to lose
+      // their assistant message after reopening.
       let nextMessages: DebateMessage[] | null = null;
       setMessages((prev) => {
-        if (prev.length === 0) return prev;
         const copy = [...prev];
         const lastIdx = copy.length - 1;
         const last = copy[lastIdx];
@@ -306,8 +366,18 @@ export default function PhraseCreationScreen() {
             phraseIntro: intro,
             phraseIntroLoading: false,
           };
-          nextMessages = copy;
+        } else {
+          // No assistant slot present — append a fresh one in pending state
+          // carrying the intro we just fetched.
+          copy.push({
+            role: 'assistant',
+            content: '',
+            phrasePublishUI: { status: 'pending' },
+            phraseIntro: intro,
+            phraseIntroLoading: false,
+          });
         }
+        nextMessages = copy;
         return copy;
       });
       // Persist the intro on the phrase thread so reopening it later still
@@ -342,17 +412,35 @@ export default function PhraseCreationScreen() {
         console.log('[STREAK] Phrase created/sent → marking streak activated.');
         markStreakActivated();
         decrementUses();
-        setMessages([
+        // ── Real philosophical-clan classification ─────────────────────
+        // Phrases contribute to the user's clan score totals (but NOT
+        // to the 30-reflection reveal threshold — that is reflection-only).
+        void recordClassificationInput(t, 'phrase', id);
+        // Build the initial thread snapshot. We persist this to disk
+        // IMMEDIATELY (alongside setting it in memory) so that even if the
+        // user hard-reloads before /phrase/intro returns, the thread on disk
+        // already has both messages and renders correctly on reopen.
+        const initialMessages: DebateMessage[] = [
           { role: 'user', content: t },
           {
             role: 'assistant',
             content: '',
             phrasePublishUI: { status: 'pending' },
+            phraseIntro: null,
             // Mark intro as loading so the screen shows the pulsing thinking
             // star until the /phrase/intro response (or its failure) arrives.
             phraseIntroLoading: true,
           },
-        ]);
+        ];
+        setMessages(initialMessages);
+        // Persist the initial snapshot. Note: phraseIntroLoading is stripped
+        // by sanitiseMessage on next load (which is correct — a stuck spinner
+        // must never survive a reload), but the assistant slot itself does
+        // survive, guaranteeing the screen always has something to render.
+        updateThought(id, { messages: initialMessages });
+        // Mark this thread as just-created so the load effect that fires
+        // when phraseId changes does NOT overwrite our live state.
+        justCreatedRef.current.add(id);
         router.setParams({ phraseId: id });
         scrollToEnd();
         // Kick off the AI intro in the background. Author is unknown at this
@@ -369,11 +457,13 @@ export default function PhraseCreationScreen() {
       phraseId,
       messages.length,
       createPhraseThought,
+      updateThought,
       router,
       scrollToEnd,
       markStreakActivated,
       decrementUses,
       requestPhraseIntro,
+      recordClassificationInput,
     ],
   );
 
@@ -438,6 +528,39 @@ export default function PhraseCreationScreen() {
 
   const effectiveThreadId = phraseId;
 
+  /**
+   * Render-time guarantee: when we have a phrase thread loaded but the messages
+   * array doesn't include an assistant slot (legacy persisted threads, race
+   * conditions, sanitisation edge cases, hot-reload state mismatches, etc.),
+   * synthesise one in pending state for THIS RENDER ONLY.
+   *
+   * This is the bulletproof layer — it doesn't depend on any effect having
+   * run, any persistence having succeeded, or Metro having cleared its cache.
+   * If there's a user message and a phraseId, the assistant block (intro slot,
+   * notes card, folder manager, publish button) WILL render.
+   */
+  const displayMessages = useMemo<DebateMessage[]>(() => {
+    if (!effectiveThreadId) return messages;
+    if (messages.length === 0) return messages;
+    const hasAssistant = messages.some((m) => m.role === 'assistant');
+    if (hasAssistant) return messages;
+    // eslint-disable-next-line no-console
+    console.log(
+      `[PHRASE-RENDER] Synthesising missing assistant slot for thread ${effectiveThreadId}. Original messages:`,
+      messages.length,
+    );
+    return [
+      ...messages,
+      {
+        role: 'assistant',
+        content: '',
+        phrasePublishUI: { status: 'pending' },
+        phraseIntro: null,
+        phraseIntroLoading: false,
+      } as DebateMessage,
+    ];
+  }, [messages, effectiveThreadId]);
+
   return (
     <GestureHandlerRootView style={styles.gestureRoot}>
     <View style={styles.container}>
@@ -461,7 +584,7 @@ export default function PhraseCreationScreen() {
           keyboardDismissMode="on-drag"
           onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
         >
-          {messages.map((msg, i) => {
+          {displayMessages.map((msg, i) => {
             if (msg.role === 'user') {
               return (
                 <View
@@ -479,10 +602,15 @@ export default function PhraseCreationScreen() {
                 </View>
               );
             }
-            const pubUi = getPhrasePublishUI(msg);
-            if (!pubUi || !effectiveThreadId) return null;
+            // Defensive: legacy assistant messages persisted before the
+            // `phrasePublishUI` field existed (or with the field stripped by
+            // sanitisation) would otherwise render as a blank screen on reopen.
+            // Default them to a pending publish state so intro, notes, folder
+            // manager and publish button all become visible again.
+            const pubUi = getPhrasePublishUI(msg) ?? { status: 'pending' as const };
+            if (!effectiveThreadId) return null;
             const userPhrase =
-              messages[i - 1]?.role === 'user' ? messages[i - 1].content : '';
+              displayMessages[i - 1]?.role === 'user' ? displayMessages[i - 1].content : '';
             const published = pubUi.status === 'published';
             const introText = (msg.phraseIntro ?? '').trim();
             const typewriterDone = !!introTypewriterDone[effectiveThreadId];

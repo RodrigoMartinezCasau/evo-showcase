@@ -28,6 +28,7 @@ import { getPersonalProfile } from '@evoconn/data/mockPersonalProfile';
 import { AppTopBar, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
+import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
 import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
@@ -91,7 +92,11 @@ export default function PersonalPhilosophyDetailScreen() {
   const { thoughts } = useThoughts();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const profile = getPersonalProfile();
+  const baseProfile = getPersonalProfile();
+  // Use real philosophical-classification data instead of seed mock values.
+  const classification = useClassification();
+  const realPercentages = classification.getPercentages(baseProfile.id);
+  const profile = { ...baseProfile, philosophyPercentages: realPercentages };
   const clanId = activeClan;
 
   // Dominant clan (highest pct)

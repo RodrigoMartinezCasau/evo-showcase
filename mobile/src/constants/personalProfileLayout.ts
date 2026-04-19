@@ -29,11 +29,27 @@ export const SETTINGS_ICON_OFFSET_X = -20;
 export const SETTINGS_ICON_OFFSET_Y = -28;
 export const SETTINGS_ICON_SCALE = 1.5;
 
+// ── Icono notificaciones (perfil personal, esquina derecha del top row) ─
+/** Posición X del icono (px). Positivo = derecha, negativo = izquierda. */
+export const NOTIFICATIONS_ICON_OFFSET_X = -17;
+/** Posición Y del icono (px). Positivo = abajo, negativo = arriba. */
+export const NOTIFICATIONS_ICON_OFFSET_Y = -33;
+/** Escala del SVG respecto al tamaño base (28 px). */
+export const NOTIFICATIONS_ICON_SCALE = 1.7;
+
 // ── Clan shield position + scale ───────────────────────────────────
 export const SHIELD_OFFSET_X = -30;
 export const SHIELD_OFFSET_Y = 28;
 export const SHIELD_SCALE = 2.3;
 export const SHIELD_BASE_SIZE = 62;
+/**
+ * Extra horizontal / vertical nudge for the clan shield (profile header).
+ * X: summed with SHIELD_OFFSET_X before the edge clamp (see PersonalIdentityHeader).
+ * Y: summed with SHIELD_OFFSET_Y in marginTop (both are applied; SHIELD_OFFSET_Y
+ *    had previously been unused in code).
+ */
+export const SHIELD_RELATIVE_OFFSET_X = 40;
+export const SHIELD_RELATIVE_OFFSET_Y = 0;
 
 // ── Insignia phrase box dimensions ─────────────────────────────────
 export const INSIGNIA_BOX_MARGIN_HORIZONTAL = 70;

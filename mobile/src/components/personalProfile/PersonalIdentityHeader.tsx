@@ -1,10 +1,12 @@
 import React, { useMemo, useCallback } from 'react';
-import { View, Text, TouchableOpacity, Share, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Share, StyleSheet, useWindowDimensions } from 'react-native';
 import { getTopBarInsigniaByHouse } from '@evoconn/utils/getTopBarInsigniaByHouse';
 import type { Rank } from '@evoconn/types';
 import {
   SHIELD_OFFSET_X,
   SHIELD_OFFSET_Y,
+  SHIELD_RELATIVE_OFFSET_X,
+  SHIELD_RELATIVE_OFFSET_Y,
   SHIELD_SCALE,
   SHIELD_BASE_SIZE,
   USERNAME_OFFSET_X,
@@ -16,9 +18,6 @@ import {
   RANK_OFFSET_X,
   RANK_OFFSET_Y,
   RANK_FONT_SIZE,
-  SHARE_BUTTON_OFFSET_X,
-  SHARE_BUTTON_OFFSET_Y,
-  SHARE_BUTTON_SIZE,
 } from '@evoconn/constants/personalProfileLayout';
 
 const RANK_LABELS: Record<Rank, string> = {
@@ -37,6 +36,14 @@ const USERNAME_ROW_HEIGHT = USERNAME_LINE_HEIGHT;
 const USERNAME_ROW_MARGIN_BOTTOM = 4;
 const CLAN_ROW_HEIGHT = Math.max(CLAN_LINE_HEIGHT, RANK_LINE_HEIGHT + 6); // 6 = pill paddingV*2
 const CONTAINER_HEIGHT = USERNAME_ROW_HEIGHT + USERNAME_ROW_MARGIN_BOTTOM + CLAN_ROW_HEIGHT;
+const TEXT_BADGE_SAFE_GAP = 14;
+const TEXT_MIN_WIDTH = 165;
+const BADGE_MIN_SIZE = 86;
+const MIN_RESERVED_RIGHT_SPACE = 96;
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
 
 type Props = {
   username: string;
@@ -51,6 +58,7 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
   rank,
   onShieldPress,
 }: Props) {
+  const { width: screenW } = useWindowDimensions();
   const ShieldSvg = useMemo(() => getTopBarInsigniaByHouse(clanId), [clanId]);
 
   // Render the SVG at its true display size so it is not GPU-upscaled from a
@@ -58,13 +66,29 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
   // cause the GPU compositing layer (sized SHIELD_BASE_SIZE) to be scaled up,
   // producing a blurry result. By rendering the SVG at the final pixel size
   // directly and removing the scale transform, we get a crisp vector output.
-  const shieldDisplaySize = Math.round(SHIELD_BASE_SIZE * SHIELD_SCALE);
-  // Correct the container's natural position: because the container is now
-  // wider/taller (displaySize instead of SHIELD_BASE_SIZE), its left edge
-  // moves further left (right: 0 keeps right edge fixed). We compensate so
-  // the visual center of the badge stays exactly where the SHIELD_OFFSET_X/Y
-  // layout constants expect it.
-  const shieldPositionCorrection = (shieldDisplaySize - SHIELD_BASE_SIZE) / 2;
+  const preferredShieldSize = Math.round(SHIELD_BASE_SIZE * SHIELD_SCALE);
+  // Keep a guaranteed safe text column so the badge cannot invade username /
+  // clan / rank lines on narrow devices.
+  const maxShieldSizeByWidth = Math.max(
+    BADGE_MIN_SIZE,
+    screenW - 20 * 2 - TEXT_MIN_WIDTH - TEXT_BADGE_SAFE_GAP,
+  );
+  const shieldDisplaySize = Math.min(preferredShieldSize, maxShieldSizeByWidth);
+  const maxLeftShift = Math.max(0, screenW - 20 * 2 - TEXT_MIN_WIDTH - shieldDisplaySize);
+  // Clamp only to prevent the badge from going off-screen to the left.
+  // autoBadgePushRight is intentionally removed so the badge stays exactly
+  // where the editor constants place it across all renders and reloads.
+  // Base X (collision clamp) + relative X are summed before clamp so both editors work.
+  const combinedShieldOffsetX = SHIELD_OFFSET_X + SHIELD_RELATIVE_OFFSET_X;
+  const clampedShieldOffsetX = clamp(combinedShieldOffsetX, -maxLeftShift, 24);
+  const reservedRightSpace = Math.max(
+    MIN_RESERVED_RIGHT_SPACE,
+    shieldDisplaySize + TEXT_BADGE_SAFE_GAP + Math.max(0, -clampedShieldOffsetX),
+  );
+  // Container height is always TEXT-ONLY height. The badge is absolute and
+  // overflows visually without pushing sibling components down — so we must
+  // NOT expand containerHeight to accommodate the badge size.
+  const containerHeight = CONTAINER_HEIGHT;
   const clanLabel = clanId
     ? `Clan ${clanId.charAt(0).toUpperCase() + clanId.slice(1)}`
     : 'Sin clan';
@@ -77,41 +101,41 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
   }, [username]);
 
   return (
-    <View style={[styles.container, { height: CONTAINER_HEIGHT }]}>
-      <View style={styles.textBlock}>
-        {/* Username row */}
-        <View style={[styles.usernameRow, { height: USERNAME_ROW_HEIGHT, marginBottom: USERNAME_ROW_MARGIN_BOTTOM }]}>
+    <View style={[styles.container, { height: containerHeight }]}>
+      <View style={[styles.textBlock, { paddingRight: reservedRightSpace }]}>
+        {/* Username row — share icon is inline inside the Text so it always
+            appears right after the last character, even when font scales down. */}
+        <TouchableOpacity
+          onPress={handleShare}
+          hitSlop={8}
+          activeOpacity={0.6}
+          style={[
+            styles.usernameRow,
+            {
+              height: USERNAME_ROW_HEIGHT,
+              marginBottom: USERNAME_ROW_MARGIN_BOTTOM,
+              transform: [{ translateX: USERNAME_OFFSET_X }, { translateY: USERNAME_OFFSET_Y }],
+            },
+          ]}
+        >
           <Text
             style={[
               styles.username,
               {
                 fontSize: USERNAME_FONT_SIZE,
                 lineHeight: USERNAME_LINE_HEIGHT,
-                transform: [{ translateX: USERNAME_OFFSET_X }, { translateY: USERNAME_OFFSET_Y }],
               },
             ]}
             numberOfLines={1}
+            ellipsizeMode="clip"
+            adjustsFontSizeToFit
+            minimumFontScale={0.4}
           >
             {username}
+            {' '}
+            <Text style={styles.shareInline}>↗</Text>
           </Text>
-          <View style={{ width: 10 }} />
-          <TouchableOpacity
-            onPress={handleShare}
-            hitSlop={10}
-            activeOpacity={0.6}
-            style={[
-              styles.shareButton,
-              {
-                transform: [
-                  { translateX: SHARE_BUTTON_OFFSET_X },
-                  { translateY: SHARE_BUTTON_OFFSET_Y },
-                ],
-              },
-            ]}
-          >
-            <ShareIcon size={SHARE_BUTTON_SIZE} />
-          </TouchableOpacity>
-        </View>
+        </TouchableOpacity>
 
         {/* Clan + rank row */}
         <View style={[styles.clanRankRow, { height: CLAN_ROW_HEIGHT }]}>
@@ -141,7 +165,9 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
         </View>
       </View>
 
-      {/* Shield — absolute, does not affect layout height */}
+      {/* Shield — absolute, does not affect layout height.
+          Offsets live on an inner View: transforms on TouchableOpacity are unreliable
+          on some RN builds; SHIELD_OFFSET_Y was never applied before (now in marginTop). */}
       <TouchableOpacity
         activeOpacity={onShieldPress ? 0.7 : 1}
         onPress={onShieldPress}
@@ -152,11 +178,10 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
           {
             width: shieldDisplaySize,
             height: shieldDisplaySize,
-            marginTop: -shieldDisplaySize / 2,
-            transform: [
-              { translateX: SHIELD_OFFSET_X + shieldPositionCorrection },
-              { translateY: SHIELD_OFFSET_Y },
-            ],
+            right: -clampedShieldOffsetX,
+            top: '50%',
+            marginTop:
+              -shieldDisplaySize / 2 + SHIELD_OFFSET_Y + SHIELD_RELATIVE_OFFSET_Y,
           },
         ]}
       >
@@ -166,13 +191,6 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
   );
 });
 
-function ShareIcon({ size }: { size: number }) {
-  return (
-    <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
-      <Text style={{ fontSize: size * 0.85, lineHeight: Math.ceil(size * 0.85 * 1.3), color: '#FFFFFF', opacity: 0.85 }}>↗</Text>
-    </View>
-  );
-}
 
 const styles = StyleSheet.create({
   container: {
@@ -190,11 +208,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '800',
     letterSpacing: 0.6,
-    flexShrink: 1,
+    flex: 1,
   },
-  shareButton: {
-    justifyContent: 'center',
-    alignItems: 'center',
+  shareInline: {
+    fontSize: USERNAME_FONT_SIZE * 0.75,
+    color: 'rgba(255,255,255,0.85)',
+    fontWeight: '500',
   },
   clanRankRow: {
     flexDirection: 'row',

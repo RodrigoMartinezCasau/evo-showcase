@@ -23,12 +23,16 @@ import {
   SIM_FOLLOW_GRAPH,
   type SimUser,
   type SimPost,
+  type SimComment,
   type FollowGraph,
 } from '@evoconn/data/simulation/simulatedNetwork';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setActiveSimUser } from '@evoconn/data/mockUser';
 
-const SIM_POSTS_STORAGE_KEY = '@physicscopilot/sim_posts_v1';
+const SIM_POSTS_STORAGE_KEY    = '@physicscopilot/sim_posts_v1';
+const SIM_VOTES_STORAGE_KEY    = '@physicscopilot/sim_votes_v1';
+const SIM_FOLLOW_STORAGE_KEY   = '@physicscopilot/sim_follow_v1';
+const SIM_COMMENTS_STORAGE_KEY = '@physicscopilot/sim_comments_v1';
 
 // ─── State initialisers ───────────────────────────────────────────────────────
 
@@ -101,6 +105,9 @@ export type SimulationContextValue = {
   /** Number of users the active user follows. */
   activeFollowingCount: number;
 
+  /** postId → persisted comments for that post. */
+  commentsMap: Record<string, SimComment[]>;
+
   // ── Actions ──────────────────────────────────────────────────────────────
   follow: (fromId: string, toId: string) => void;
   unfollow: (fromId: string, toId: string) => void;
@@ -110,6 +117,7 @@ export type SimulationContextValue = {
   deletePost: (authorId: string, postId: string) => void;
   toggleHidePost: (userId: string, postId: string) => void;
   publishPost: (post: SimPost) => void;
+  addComment: (comment: SimComment) => void;
 };
 
 // ─── Context ─────────────────────────────────────────────────────────────────
@@ -121,49 +129,139 @@ const SimCtx = createContext<SimulationContextValue | null>(null);
 export function SimulationProvider({ children }: { children: ReactNode }) {
   const [activeUserId, setActiveUserIdRaw] = useState('u1');
 
-  // Start with seed posts (now empty); persisted published posts are merged in the
-  // useEffect below after AsyncStorage loads.
+  // ── Posts ─────────────────────────────────────────────────────────────────
   const [posts, setPosts] = useState<SimPost[]>(() => SIM_POSTS.map(p => ({ ...p })));
 
-  // Load persisted published posts on mount
+  // Hydration guards — prevent saves from overwriting storage before loading completes.
+  const postsHydrated  = useRef(false);
+  const votesHydrated  = useRef(false);
+  const followHydrated = useRef(false);
+  const commentsHydrated = useRef(false);
+
+  // Load persisted posts on mount (merge strategy: keep seed + add stored extras)
   useEffect(() => {
     AsyncStorage.getItem(SIM_POSTS_STORAGE_KEY)
       .then((raw) => {
-        if (!raw) return;
-        try {
-          const raw_parsed = JSON.parse(raw) as SimPost[];
-          if (Array.isArray(raw_parsed) && raw_parsed.length > 0) {
-            // Deduplicate within the persisted array itself (handles stale duplicates
-            // written before the publishPost guard was added).
-            const seenIds = new Set<string>();
-            const saved = raw_parsed.filter((p) => {
-              if (seenIds.has(p.id)) return false;
-              seenIds.add(p.id);
-              return true;
-            });
-            // If duplicates were found, re-save the cleaned list immediately.
-            if (saved.length !== raw_parsed.length) {
-              AsyncStorage.setItem(SIM_POSTS_STORAGE_KEY, JSON.stringify(saved)).catch(console.error);
+        if (raw) {
+          try {
+            const raw_parsed = JSON.parse(raw) as SimPost[];
+            if (Array.isArray(raw_parsed) && raw_parsed.length > 0) {
+              const seenIds = new Set<string>();
+              const saved = raw_parsed.filter((p) => {
+                if (seenIds.has(p.id)) return false;
+                seenIds.add(p.id);
+                return true;
+              });
+              if (saved.length !== raw_parsed.length) {
+                AsyncStorage.setItem(SIM_POSTS_STORAGE_KEY, JSON.stringify(saved)).catch(console.error);
+              }
+              setPosts((prev) => {
+                const existingIds = new Set(prev.map((p) => p.id));
+                const newOnes = saved.filter((p) => !existingIds.has(p.id));
+                return newOnes.length > 0 ? [...newOnes, ...prev] : prev;
+              });
             }
-            setPosts((prev) => {
-              // Merge: add any persisted post not already in current state.
-              const existingIds = new Set(prev.map((p) => p.id));
-              const newOnes = saved.filter((p) => !existingIds.has(p.id));
-              return newOnes.length > 0 ? [...newOnes, ...prev] : prev;
-            });
-          }
-        } catch {
-          // Ignore parse errors — treat as empty
+          } catch { /* ignore parse errors */ }
         }
+        postsHydrated.current = true;
       })
-      .catch(console.error);
+      .catch(() => { postsHydrated.current = true; });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── Follow graph ──────────────────────────────────────────────────────────
   const [followGraph, setFollowGraph] = useState<Record<string, string[]>>(
     () => copyFollowGraph(SIM_FOLLOW_GRAPH),
   );
-  // Convert to Set<string> internally for O(1) lookups, stored as arrays in state
+
+  useEffect(() => {
+    AsyncStorage.getItem(SIM_FOLLOW_STORAGE_KEY)
+      .then((raw) => {
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw) as Record<string, string[]>;
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+              setFollowGraph(parsed);
+            }
+          } catch { /* ignore */ }
+        }
+        followHydrated.current = true;
+      })
+      .catch(() => { followHydrated.current = true; });
+  }, []);
+
+  useEffect(() => {
+    if (!followHydrated.current) return;
+    AsyncStorage.setItem(SIM_FOLLOW_STORAGE_KEY, JSON.stringify(followGraph)).catch(console.error);
+  }, [followGraph]);
+
+  // ── Vote map ──────────────────────────────────────────────────────────────
+  const [voteMapRaw, setVoteMapRaw] = useState<Record<string, Record<string, 'up' | 'down'>>>(
+    () => buildInitialVoteMap(SIM_POSTS),
+  );
+
+  useEffect(() => {
+    AsyncStorage.getItem(SIM_VOTES_STORAGE_KEY)
+      .then((raw) => {
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw) as Record<string, Record<string, 'up' | 'down'>>;
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+              setVoteMapRaw(parsed);
+              // Rebuild posts' upvoterIds/downvoterIds from the persisted vote map
+              // so vote counts are correct even before any new votes are cast.
+              setPosts(prev => prev.map(p => {
+                const newUp: string[] = [];
+                const newDown: string[] = [];
+                for (const [uid, votes] of Object.entries(parsed)) {
+                  if (votes[p.id] === 'up') newUp.push(uid);
+                  else if (votes[p.id] === 'down') newDown.push(uid);
+                }
+                const changed =
+                  newUp.sort().join() !== [...p.upvoterIds].sort().join() ||
+                  newDown.sort().join() !== [...p.downvoterIds].sort().join();
+                return changed ? { ...p, upvoterIds: newUp, downvoterIds: newDown } : p;
+              }));
+            }
+          } catch { /* ignore */ }
+        }
+        votesHydrated.current = true;
+      })
+      .catch(() => { votesHydrated.current = true; });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!votesHydrated.current) return;
+    AsyncStorage.setItem(SIM_VOTES_STORAGE_KEY, JSON.stringify(voteMapRaw)).catch(console.error);
+  }, [voteMapRaw]);
+
+  // ── Comments ──────────────────────────────────────────────────────────────
+  /** postId → SimComment[] */
+  const [commentsMap, setCommentsMap] = useState<Record<string, SimComment[]>>({});
+
+  useEffect(() => {
+    AsyncStorage.getItem(SIM_COMMENTS_STORAGE_KEY)
+      .then((raw) => {
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw) as Record<string, SimComment[]>;
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+              setCommentsMap(parsed);
+            }
+          } catch { /* ignore */ }
+        }
+        commentsHydrated.current = true;
+      })
+      .catch(() => { commentsHydrated.current = true; });
+  }, []);
+
+  useEffect(() => {
+    if (!commentsHydrated.current) return;
+    AsyncStorage.setItem(SIM_COMMENTS_STORAGE_KEY, JSON.stringify(commentsMap)).catch(console.error);
+  }, [commentsMap]);
+
+  // ── Saved map ─────────────────────────────────────────────────────────────
   const [savedMapArr, setSavedMapArr] = useState<Record<string, string[]>>(() => {
     const m: Record<string, string[]> = {};
     for (const post of SIM_POSTS) {
@@ -174,9 +272,6 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     }
     return m;
   });
-  const [voteMapRaw, setVoteMapRaw] = useState<Record<string, Record<string, 'up' | 'down'>>>(
-    () => buildInitialVoteMap(SIM_POSTS),
-  );
   const [hiddenMapArr, setHiddenMapArr] = useState<Record<string, string[]>>({});
 
   // Convert array-based maps to Set-based maps (memoised) for O(1) lookups by consumers
@@ -276,9 +371,9 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
         return updated;
       });
 
-      // Update post's voter ID arrays
-      setPosts(prev =>
-        prev.map(p => {
+      // Update post's voter ID arrays and persist
+      setPosts(prev => {
+        const updated = prev.map(p => {
           if (p.id !== postId) return p;
           let { upvoterIds, downvoterIds } = p;
           if (previousVote === 'up') upvoterIds = upvoterIds.filter(id => id !== userId);
@@ -286,8 +381,12 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
           if (newVote === 'up') upvoterIds = [...upvoterIds, userId];
           if (newVote === 'down') downvoterIds = [...downvoterIds, userId];
           return { ...p, upvoterIds, downvoterIds };
-        }),
-      );
+        });
+        if (postsHydrated.current) {
+          AsyncStorage.setItem(SIM_POSTS_STORAGE_KEY, JSON.stringify(updated)).catch(console.error);
+        }
+        return updated;
+      });
     },
     [], // intentionally empty — uses voteMapRef for fresh reads
   );
@@ -338,6 +437,14 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  // ── Comments ─────────────────────────────────────────────────────────────
+  const addComment = useCallback((comment: SimComment) => {
+    setCommentsMap(prev => ({
+      ...prev,
+      [comment.postId]: [...(prev[comment.postId] ?? []), comment],
+    }));
+  }, []);
+
   // ── Publish ───────────────────────────────────────────────────────────────
   const publishPost = useCallback((post: SimPost) => {
     setPosts((prev) => {
@@ -360,6 +467,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       savedMap,
       voteMap: voteMapRaw,
       hiddenMap,
+      commentsMap,
       activeUser,
       activeFollowersCount,
       activeFollowingCount,
@@ -371,13 +479,15 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       deletePost,
       toggleHidePost,
       publishPost,
+      addComment,
     }),
     [
       activeUserId, setActiveUserId, users, posts,
       followGraph_sets, savedMap, voteMapRaw, hiddenMap,
+      commentsMap,
       activeUser, activeFollowersCount, activeFollowingCount,
       follow, unfollow, toggleFollow, castVote, toggleSave,
-      deletePost, toggleHidePost, publishPost,
+      deletePost, toggleHidePost, publishPost, addComment,
     ],
   );
 

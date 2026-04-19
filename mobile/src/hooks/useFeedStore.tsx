@@ -15,6 +15,7 @@ import React, {
 import type { CommunityPost, PhrasePost, User, VoteStats } from '../types';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { SIM_USERS_BY_ID, type SimPost } from '@evoconn/data/simulation/simulatedNetwork';
+import { useNotifications } from '@evoconn/hooks/NotificationsContext';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -58,6 +59,7 @@ const FeedContext = createContext<FeedContextValue | null>(null);
 
 export function FeedProvider({ children }: { children: React.ReactNode }) {
   const sim = useSimulation();
+  const { addNotification } = useNotifications();
   const [publishedIds, setPublishedIds] = useState<Set<string>>(new Set());
 
   // All posts: derive CommunityPost[] from the live SimPost[] so vote/save
@@ -104,9 +106,24 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
   // SimulationContext tracks prior votes in voteMap).
   const updatePostVote = useCallback(
     (postId: string, _from: 'up' | 'down' | null, to: 'up' | 'down' | null) => {
+      const previousVote = sim.voteMap[sim.activeUserId]?.[postId] ?? null;
       sim.castVote(sim.activeUserId, postId, to);
+      // Emit notification only when casting a NEW upvote (not removing or changing).
+      if (to === 'up' && previousVote !== 'up') {
+        const post = sim.posts.find((p) => p.id === postId);
+        if (post) {
+          const voter = sim.users[sim.activeUserId];
+          addNotification({
+            recipientUserId: post.authorId,
+            type: 'upvote_post',
+            fromUserId: sim.activeUserId,
+            fromUsername: voter?.username ?? sim.activeUserId,
+            targetPostId: postId,
+          });
+        }
+      }
     },
-    [sim],
+    [sim, addNotification],
   );
 
   // Save count on posts is always up-to-date via SimulationContext.toggleSave

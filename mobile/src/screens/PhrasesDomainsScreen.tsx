@@ -418,9 +418,14 @@ export default function PhrasesDomainsScreen() {
         visible={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         conversations={thoughts}
-        onConversationPress={(id) =>
-          router.push({ pathname: '/reflection', params: { thoughtId: id } })
-        }
+        onConversationPress={(id) => {
+          const target = thoughts.find((t) => t.id === id);
+          if (target?.type === 'phrase') {
+            router.push({ pathname: '/phrase', params: { phraseId: id } });
+            return;
+          }
+          router.push({ pathname: '/reflection', params: { thoughtId: id } });
+        }}
       />
 
       {/* Domain detail modal */}

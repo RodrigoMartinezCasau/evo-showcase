@@ -4,8 +4,9 @@
  * `isFollowing(uid)` checks whether the active simulated user follows `uid`.
  * `toggleFollow(uid)` adds/removes the edge in the simulation follow graph.
  */
-import React, { createContext, useContext, useMemo } from 'react';
+import React, { createContext, useCallback, useContext, useMemo } from 'react';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
+import { useNotifications } from '@evoconn/hooks/NotificationsContext';
 
 type FollowContextValue = {
   followingSet: Set<string>;
@@ -17,6 +18,7 @@ const FollowContext = createContext<FollowContextValue | null>(null);
 
 export function FollowProvider({ children }: { children: React.ReactNode }) {
   const sim = useSimulation();
+  const { addNotification } = useNotifications();
   const { activeUserId, followGraph, toggleFollow: simToggle } = sim;
 
   const followingSet = useMemo(
@@ -24,13 +26,31 @@ export function FollowProvider({ children }: { children: React.ReactNode }) {
     [followGraph, activeUserId],
   );
 
+  const toggleFollow = useCallback(
+    (uid: string) => {
+      const wasFollowing = followingSet.has(uid);
+      simToggle(activeUserId, uid);
+      // Emit notification only when a new follow occurs (not unfollow).
+      if (!wasFollowing) {
+        const follower = sim.users[activeUserId];
+        addNotification({
+          recipientUserId: uid,
+          type: 'follow',
+          fromUserId: activeUserId,
+          fromUsername: follower?.username ?? activeUserId,
+        });
+      }
+    },
+    [followingSet, simToggle, activeUserId, sim.users, addNotification],
+  );
+
   const value = useMemo<FollowContextValue>(
     () => ({
       followingSet,
       isFollowing: (uid: string) => followingSet.has(uid),
-      toggleFollow: (uid: string) => simToggle(activeUserId, uid),
+      toggleFollow,
     }),
-    [followingSet, simToggle, activeUserId],
+    [followingSet, toggleFollow],
   );
 
   return (

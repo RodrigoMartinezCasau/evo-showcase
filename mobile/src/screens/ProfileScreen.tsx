@@ -9,6 +9,7 @@ import { AppTopBar, RankBadge, ClanBanner, BottomCommunityTabs, SidebarDrawer } 
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
+import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import { getClanCardColor } from '@evoconn/theme/theme';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
@@ -89,12 +90,24 @@ function OwnProfileView() {
 }
 
 function OtherUserProfileView({ userId, router }: { userId: string; router: ReturnType<typeof useRouter> }) {
-  // Static profile data (username, clan, rank, insignia, philosophy, etc.)
-  const profile = getOtherUserProfileOrFallback(userId);
+  // Static profile data (username, rank, insignia, etc.)
+  const baseProfile = getOtherUserProfileOrFallback(userId);
 
   // Live posts from the simulation so "Últimas publicaciones" reflects any newly
   // published reflections/phrases and never goes stale after a reload or user switch.
   const { posts: allSimPosts, users: simUsers } = useSimulation();
+
+  // Per-user real philosophical classification — replaces seed clanId and
+  // seed philosophyPercentages so even other simulated users start as
+  // "Sin clan" and only get a clan when their own classification reveals it.
+  const classification = useClassification();
+  const realClanId = classification.getVisibleClanId(userId);
+  const realPercentages = classification.getPercentages(userId);
+  const profile = {
+    ...baseProfile,
+    clanId: realClanId,
+    philosophyPercentages: realPercentages,
+  };
 
   const livePosts = useMemo<CommunityPost[]>(
     () =>
