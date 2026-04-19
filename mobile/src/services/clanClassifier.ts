@@ -497,3 +497,49 @@ export function totalsToPercentages(totals: ClanScores): Record<ClanScoreId, num
   }
   return out;
 }
+
+// ─── Hybrid classifier (heuristic + semantic) ────────────────────────────────
+//
+// Blend ratio between the two signals. The heuristic gets the larger weight
+// because its keyword matches are highly precise (when they fire). The
+// semantic layer covers recall for cases the heuristic missed.
+
+const HEURISTIC_WEIGHT = 0.6;
+const SEMANTIC_WEIGHT = 0.4;
+
+/**
+ * Hybrid classifier that combines:
+ *   - the existing heuristic `classifyText` (precision, exact keywords)
+ *   - the local semantic `classifyTextSemantic` (recall, morphology, fuzzy)
+ *
+ * Final score for each clan:
+ *   final[clan] = heuristic[clan] * 0.6 + semantic[clan] * 0.4
+ *
+ * If the semantic layer fails for any reason, this gracefully degrades to
+ * pure heuristic output. The async signature lets a future remote-embedding
+ * implementation slot in without changing call sites.
+ */
+export async function classifyTextHybrid(
+  text: string,
+  type: InputType = 'reflection',
+): Promise<ClanScores> {
+  const heuristic = classifyText(text, type);
+
+  // Lazy import keeps `clanClassifier.ts` independent of the semantic module
+  // at type-check time and avoids any chance of a circular import surfacing
+  // during module initialisation.
+  let semantic: ClanScores;
+  try {
+    const mod = await import('./semanticClassifier');
+    semantic = await mod.classifyTextSemantic(text);
+  } catch {
+    // Semantic layer unavailable / threw → fall back to pure heuristic.
+    return heuristic;
+  }
+
+  const out = makeZeroScores();
+  for (const c of ALL_CLAN_IDS) {
+    out[c] = heuristic[c] * HEURISTIC_WEIGHT + semantic[c] * SEMANTIC_WEIGHT;
+  }
+  return out;
+}

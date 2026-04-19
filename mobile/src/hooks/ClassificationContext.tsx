@@ -39,6 +39,7 @@ import {
   ALL_CLAN_IDS,
   CLAN_LABELS,
   classifyText,
+  classifyTextHybrid,
   totalsToPercentages,
   type ClanScoreId,
   type ClanScores,
@@ -254,7 +255,17 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
       const userId = activeUserId;
       if (!text || !text.trim()) return;
 
-      const scores = classifyText(text, type);
+      // Hybrid (heuristic + semantic) scoring. Hybrid internally falls back
+      // to pure heuristic if the semantic layer fails — but we also wrap the
+      // call in try/catch as a defence-in-depth measure so a recordInput()
+      // call can NEVER throw and abort the user's reflection flow.
+      let scores: ClanScores;
+      try {
+        scores = await classifyTextHybrid(text, type);
+      } catch {
+        scores = classifyText(text, type);
+      }
+
       const nowIso = new Date().toISOString();
       const generatedId =
         inputId ?? `cls-${type}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
