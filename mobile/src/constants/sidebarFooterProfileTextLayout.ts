@@ -47,7 +47,7 @@ export const SIDEBAR_FOOTER_PROFILE_TEXT_LAYOUT = {
   // ── B) Línea 1 — nombre (sans, gris) ───────────────────────────────────────
   SIDEBAR_FOOTER_PROFILE_TEXT_LINE1_OFFSET_X: 0,
   SIDEBAR_FOOTER_PROFILE_TEXT_LINE1_OFFSET_Y: 0,
-  SIDEBAR_FOOTER_PROFILE_TEXT_LINE1_FONT_SIZE: 12,
+  SIDEBAR_FOOTER_PROFILE_TEXT_LINE1_FONT_SIZE: 10,
   SIDEBAR_FOOTER_PROFILE_TEXT_LINE1_COLOR: '#B8BCC6',
 
   // ── C) Línea 2 — clan (Inria Serif) ────────────────────────────────────────
