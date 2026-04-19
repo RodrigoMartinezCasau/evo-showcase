@@ -48,6 +48,8 @@ type FeedContextValue = {
   updatePostVote: (postId: string, from: 'up' | 'down' | null, to: 'up' | 'down' | null) => void;
   /** No-op — save count is maintained by SimulationContext.toggleSave. */
   updatePostSaveToggle: (postId: string, wasSaved: boolean, nowSaved: boolean) => void;
+  /** Returns the active user's current vote on a post from the live voteMap. */
+  getMyVote: (postId: string) => 'up' | 'down' | null;
 };
 
 const FeedContext = createContext<FeedContextValue | null>(null);
@@ -115,6 +117,14 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  // Reads the active user's current vote on a post directly from the live
+  // voteMap so all feed cards reflect vote state consistently.
+  const getMyVote = useCallback(
+    (postId: string): 'up' | 'down' | null =>
+      sim.voteMap[sim.activeUserId]?.[postId] ?? null,
+    [sim.voteMap, sim.activeUserId],
+  );
+
   const value = useMemo<FeedContextValue>(
     () => ({
       posts,
@@ -123,8 +133,9 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
       getPostById: getById,
       updatePostVote,
       updatePostSaveToggle,
+      getMyVote,
     }),
-    [posts, publishPost, hasPublished, getById, updatePostVote, updatePostSaveToggle],
+    [posts, publishPost, hasPublished, getById, updatePostVote, updatePostSaveToggle, getMyVote],
   );
 
   return <FeedContext.Provider value={value}>{children}</FeedContext.Provider>;

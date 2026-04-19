@@ -5,21 +5,23 @@ import { evoconnColors } from '@evoconn/theme/colors';
 
 type VoteWidgetProps = {
   stats: VoteStats;
+  /** Active user's current vote — drives the active/inactive icon color. */
+  voted?: 'up' | 'down' | null;
   onUp?: () => void;
   onDown?: () => void;
   onSave?: () => void;
   compact?: boolean;
 };
 
-export function VoteWidget({ stats, onUp, onDown, onSave, compact }: VoteWidgetProps) {
+export function VoteWidget({ stats, voted = null, onUp, onDown, onSave, compact }: VoteWidgetProps) {
   return (
     <View style={[styles.wrapper, compact && styles.compact]}>
       <TouchableOpacity onPress={onUp} style={styles.btn}>
-        <Text style={styles.arrow}>▲</Text>
+        <Text style={[styles.arrow, voted === 'up' && styles.arrowActive]}>▲</Text>
         <Text style={styles.count}>{stats.up}</Text>
       </TouchableOpacity>
       <TouchableOpacity onPress={onDown} style={styles.btn}>
-        <Text style={styles.arrowDown}>▼</Text>
+        <Text style={[styles.arrowDown, voted === 'down' && styles.arrowDownActive]}>▼</Text>
         <Text style={styles.count}>{stats.down}</Text>
       </TouchableOpacity>
       <TouchableOpacity onPress={onSave} style={styles.btn}>
@@ -34,8 +36,10 @@ const styles = StyleSheet.create({
   wrapper: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   compact: { gap: 4 },
   btn: { flexDirection: 'row', alignItems: 'center', padding: 4 },
-  arrow: { color: evoconnColors.neonGreen, fontSize: 14, marginRight: 2 },
+  arrow: { color: evoconnColors.muted, fontSize: 14, marginRight: 2 },
+  arrowActive: { color: evoconnColors.neonGreen },
   arrowDown: { color: evoconnColors.muted, fontSize: 14, marginRight: 2 },
+  arrowDownActive: { color: '#ff4d4d' },
   save: { color: evoconnColors.save, fontSize: 14, marginRight: 2 },
   count: { color: evoconnColors.muted, fontSize: 12 },
 });

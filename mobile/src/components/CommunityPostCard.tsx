@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ImageBackground, Image, useWindowDimensions } from 'react-native';
 import { FollowButton } from './FollowButton';
 import type { CommunityPost } from '@evoconn/types';
@@ -42,34 +42,19 @@ export function CommunityPostCard({
   onClanPress,
   showPhraseAuthor = false,
 }: CommunityPostCardProps) {
-  const { updatePostVote, updatePostSaveToggle } = useFeedStore();
+  const { updatePostVote, updatePostSaveToggle, getMyVote } = useFeedStore();
   const { savePost, unsavePost, isSaved } = usePersonalProfile();
 
-  // ── Vote state (stays local per component) ──
-  const [smallVote, setSmallVote] = useState<'up' | null>(null);
-  const [listVote, setListVote] = useState<'up' | 'down' | null>(null);
-  const smallVoteRef = useRef<'up' | null>(null);
-  const listVoteRef = useRef<'up' | 'down' | null>(null);
+  // ── Vote state: derived from the shared voteMap so all feeds stay in sync ──
+  const myVote = getMyVote(post.id);
 
   // ── Save state comes from shared context ──
   const isPostSaved = isSaved(post.id);
 
-  useEffect(() => {
-    setSmallVote(null);
-    setListVote(null);
-    smallVoteRef.current = null;
-    listVoteRef.current = null;
-  }, [post.id]);
-
   const handleSmallUp = useCallback(() => {
-    const prev = smallVoteRef.current;
-    const next = prev === 'up' ? null : 'up';
-    const from: 'up' | 'down' | null = prev === 'up' ? 'up' : null;
-    const to: 'up' | 'down' | null = next === 'up' ? 'up' : null;
-    smallVoteRef.current = next;
-    updatePostVote(post.id, from, to);
-    setSmallVote(next);
-  }, [post.id, updatePostVote]);
+    const next: 'up' | null = myVote === 'up' ? null : 'up';
+    updatePostVote(post.id, myVote, next);
+  }, [post.id, myVote, updatePostVote]);
 
   const handleSmallSave = useCallback(() => {
     const now = !isSaved(post.id);
@@ -79,20 +64,14 @@ export function CommunityPostCard({
   }, [post, isSaved, updatePostSaveToggle, savePost, unsavePost]);
 
   const handleListUp = useCallback(() => {
-    const prev = listVoteRef.current;
-    const next = prev === 'up' ? null : 'up';
-    listVoteRef.current = next;
-    updatePostVote(post.id, prev, next);
-    setListVote(next);
-  }, [post.id, updatePostVote]);
+    const next: 'up' | null = myVote === 'up' ? null : 'up';
+    updatePostVote(post.id, myVote, next);
+  }, [post.id, myVote, updatePostVote]);
 
   const handleListDown = useCallback(() => {
-    const prev = listVoteRef.current;
-    const next = prev === 'down' ? null : 'down';
-    listVoteRef.current = next;
-    updatePostVote(post.id, prev, next);
-    setListVote(next);
-  }, [post.id, updatePostVote]);
+    const next: 'down' | null = myVote === 'down' ? null : 'down';
+    updatePostVote(post.id, myVote, next);
+  }, [post.id, myVote, updatePostVote]);
 
   const handleListSave = useCallback(() => {
     const now = !isSaved(post.id);
@@ -101,7 +80,7 @@ export function CommunityPostCard({
     else unsavePost(post.id);
   }, [post, isSaved, updatePostSaveToggle, savePost, unsavePost]);
 
-  const smallUpvoted = smallVote === 'up';
+  const smallUpvoted = myVote === 'up';
   const [measuredBlackBoxContentHeight, setMeasuredBlackBoxContentHeight] = useState<number | null>(null);
   const [measuredColoredHeaderHeight, setMeasuredColoredHeaderHeight] = useState<number | null>(null);
   const isReflection = post.type === 'reflection';
@@ -503,6 +482,7 @@ export function CommunityPostCard({
               >
                 <VoteWidget
                   stats={post.voteStats}
+                  voted={myVote}
                   compact
                   onUp={handleListUp}
                   onDown={handleListDown}

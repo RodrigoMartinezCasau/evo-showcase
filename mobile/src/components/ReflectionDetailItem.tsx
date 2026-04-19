@@ -48,13 +48,13 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
 }: ReflectionDetailItemProps) {
   const clanColor = getClanColor(post.author.clanId);
   const actionColRef = useRef<DetailActionColumnHandle>(null);
-  const { updatePostVote, updatePostSaveToggle, getPostById } = useFeedStore();
+  const { updatePostVote, updatePostSaveToggle, getPostById, getMyVote } = useFeedStore();
   const { savePost, unsavePost, isSaved } = usePersonalProfile();
-  /** Fuente de verdad para votos: el feed overlay guarda un snapshot en `post`; el store se actualiza al votar. */
+  /** Fuente de verdad para votos y counts: usa el store en vivo, no el snapshot del overlay. */
   const livePost = getPostById(post.id) ?? post;
 
-  const [voted, setVoted] = useState<'up' | 'down' | null>(null);
-  const votedRef = useRef<'up' | 'down' | null>(null);
+  // Vote state derived from the shared voteMap — stays in sync across all feeds.
+  const voted = getMyVote(post.id);
   // Save state comes from shared context — no local state needed
   const saved = isSaved(post.id);
   const [commentsReady, setCommentsReady] = useState(false);
@@ -68,26 +68,15 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     return () => task.cancel();
   }, []);
 
-  useEffect(() => {
-    setVoted(null);
-    votedRef.current = null;
-  }, [post.id]);
-
   const handleUpvote = useCallback(() => {
-    const prev = votedRef.current;
-    const next = prev === 'up' ? null : 'up';
-    votedRef.current = next;
-    updatePostVote(post.id, prev, next);
-    setVoted(next);
-  }, [post.id, updatePostVote]);
+    const next: 'up' | null = voted === 'up' ? null : 'up';
+    updatePostVote(post.id, voted, next);
+  }, [post.id, voted, updatePostVote]);
 
   const handleDownvote = useCallback(() => {
-    const prev = votedRef.current;
-    const next = prev === 'down' ? null : 'down';
-    votedRef.current = next;
-    updatePostVote(post.id, prev, next);
-    setVoted(next);
-  }, [post.id, updatePostVote]);
+    const next: 'down' | null = voted === 'down' ? null : 'down';
+    updatePostVote(post.id, voted, next);
+  }, [post.id, voted, updatePostVote]);
 
   const handleSave = useCallback(() => {
     const now = !isSaved(post.id);
