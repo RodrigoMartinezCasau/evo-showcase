@@ -1,70 +1,130 @@
+/**
+ * QuotesContext — real per-user persisted unlocked phrases.
+ *
+ * Each simulated user starts with 0 unlocked phrases.
+ * Every time the user creates a new phrase (PhraseCreationScreen),
+ * `unlockNextPhrase()` is called, which picks and unlocks the next
+ * available quote from ALL_QUOTES in sequence, cycling across all domains.
+ *
+ * The per-domain progress bars in PhrasesDomainsScreen are driven by
+ * the specific quote IDs stored here, so they reflect only real activity.
+ *
+ * Data is persisted per-user in AsyncStorage and survives reloads and
+ * profile switches.
+ */
 import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from 'react';
-
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getDomainStats, type DomainStats } from '@evoconn/logic/quotes/getDomainStats';
+import { ALL_QUOTES } from '@evoconn/data/quotes';
+import { useSimulation } from '@evoconn/hooks/SimulationContext';
 
-// ─── Initial mock unlocked phrases ────────────────────────────────────────────
-// 30 phrases distributed across domains to match mockUserStats.unlockedPhrases.
-const INITIAL_UNLOCKED_IDS: string[] = [
-  // filosofia (5)
-  'filosofia-1', 'filosofia-2', 'filosofia-3', 'filosofia-4', 'filosofia-5',
-  // existencia (4)
-  'existencia-1', 'existencia-2', 'existencia-3', 'existencia-4',
-  // libertad (4)
-  'libertad-1', 'libertad-2', 'libertad-3', 'libertad-4',
-  // sabiduria (4)
-  'sabiduria-1', 'sabiduria-2', 'sabiduria-3', 'sabiduria-4',
-  // amor (4)
-  'amor-1', 'amor-2', 'amor-3', 'amor-4',
-  // politica (3)
-  'politica-1', 'politica-2', 'politica-3',
-  // poder (2)
-  'poder-1', 'poder-2',
-  // disciplina, muerte, dolor, ambicion (1 each)
-  'disciplina-1',
-  'muerte-1',
-  'dolor-1',
-  'ambicion-1',
-];
+const STORAGE_KEY = '@physicscopilot/quotes_v1';
 
-// ─── Context types ─────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+/** { [userId]: unlockedQuoteId[] } */
+type QuotesDB = Record<string, string[]>;
 
 interface QuotesContextValue {
-  /** IDs of phrases the user has unlocked. */
+  /** Sorted list of unlocked quote IDs for the active user. */
   unlockedPhraseIds: string[];
-  /** Total count of unlocked phrases. */
+  /** Count of unlocked quotes for the active user. */
   totalUnlocked: number;
-  /** Per-domain unlock statistics. */
+  /** Per-domain statistics derived from the real unlocked IDs. */
   domainStats: DomainStats[];
-  /** Unlock a phrase by id. No-op if already unlocked. */
+  /** Unlock a specific quote by ID. No-op if already unlocked. */
   unlockPhrase: (id: string) => void;
-  /** Check if a specific phrase is unlocked. */
+  /** Check whether a specific quote is unlocked for the active user. */
   isUnlocked: (id: string) => boolean;
+  /**
+   * Unlock the next available quote from ALL_QUOTES for the active user.
+   * If `preferDomain` is provided, tries to pick a quote from that domain first;
+   * falls back to the next quote globally if no domain match is available.
+   * No-op if all quotes are already unlocked.
+   */
+  unlockNextPhrase: (preferDomain?: string) => void;
 }
 
+// ─── Context defaults ─────────────────────────────────────────────────────────
+
 const QuotesContext = createContext<QuotesContextValue>({
-  unlockedPhraseIds: INITIAL_UNLOCKED_IDS,
-  totalUnlocked:     INITIAL_UNLOCKED_IDS.length,
+  unlockedPhraseIds: [],
+  totalUnlocked:     0,
   domainStats:       [],
   unlockPhrase:      () => {},
   isUnlocked:        () => false,
+  unlockNextPhrase:  () => {},
 });
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function QuotesProvider({ children }: { children: React.ReactNode }) {
-  const [unlockedPhraseIds, setUnlockedPhraseIds] = useState<string[]>(INITIAL_UNLOCKED_IDS);
+  const sim = useSimulation();
 
-  const unlockPhrase = useCallback((id: string) => {
-    setUnlockedPhraseIds(prev =>
-      prev.includes(id) ? prev : [...prev, id],
-    );
+  // Full DB loaded from AsyncStorage (all users).
+  const [db, setDb] = useState<QuotesDB>({});
+  const [loaded, setLoaded] = useState(false);
+
+  // Load once on mount.
+  useEffect(() => {
+    AsyncStorage.getItem(STORAGE_KEY)
+      .then((raw) => {
+        if (raw) {
+          try { setDb(JSON.parse(raw) as QuotesDB); } catch {}
+        }
+      })
+      .finally(() => setLoaded(true));
   }, []);
+
+  // Active user's unlocked IDs (empty array until loaded or if never unlocked).
+  const unlockedPhraseIds: string[] = useMemo(
+    () => (loaded ? (db[sim.activeUserId] ?? []) : []),
+    [db, sim.activeUserId, loaded],
+  );
+
+  // Persist updated ID list for a user and update local state atomically.
+  const persistForUser = useCallback(
+    (userId: string, ids: string[]) => {
+      setDb((prev) => {
+        const updated = { ...prev, [userId]: ids };
+        AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated)).catch(console.error);
+        return updated;
+      });
+    },
+    [],
+  );
+
+  const unlockPhrase = useCallback(
+    (id: string) => {
+      const current = db[sim.activeUserId] ?? [];
+      if (current.includes(id)) return;
+      persistForUser(sim.activeUserId, [...current, id]);
+    },
+    [db, sim.activeUserId, persistForUser],
+  );
+
+  const unlockNextPhrase = useCallback(
+    (preferDomain?: string) => {
+      const current = new Set(db[sim.activeUserId] ?? []);
+
+      // First try the preferred domain, then fall back to all quotes in order.
+      const next = preferDomain
+        ? (ALL_QUOTES.find((q) => q.domain === preferDomain && !current.has(q.id))
+            ?? ALL_QUOTES.find((q) => !current.has(q.id)))
+        : ALL_QUOTES.find((q) => !current.has(q.id));
+
+      if (!next) return; // all quotes already unlocked
+      persistForUser(sim.activeUserId, [...Array.from(current), next.id]);
+    },
+    [db, sim.activeUserId, persistForUser],
+  );
 
   const isUnlocked = useCallback(
     (id: string) => unlockedPhraseIds.includes(id),
@@ -83,15 +143,12 @@ export function QuotesProvider({ children }: { children: React.ReactNode }) {
       domainStats,
       unlockPhrase,
       isUnlocked,
+      unlockNextPhrase,
     }),
-    [unlockedPhraseIds, domainStats, unlockPhrase, isUnlocked],
+    [unlockedPhraseIds, domainStats, unlockPhrase, isUnlocked, unlockNextPhrase],
   );
 
-  return (
-    <QuotesContext.Provider value={value}>
-      {children}
-    </QuotesContext.Provider>
-  );
+  return <QuotesContext.Provider value={value}>{children}</QuotesContext.Provider>;
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────

@@ -60,7 +60,7 @@ export const TOP_BAR_LAYOUT = {
     fireIcon:   { x:  15,  y: -5 },
     fireText:   { x:  5,  y: -13 },
 
-    heartIcon:  { x: -2, y: 1 },
+    heartIcon:  { x: -2, y: -1 },
     heartText:  { x: -12, y: -14 },
   } satisfies Record<TopBarItemKey, XY>,
 } as const;

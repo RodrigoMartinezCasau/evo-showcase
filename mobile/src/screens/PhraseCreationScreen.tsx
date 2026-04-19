@@ -40,6 +40,8 @@ import { getPublishStarByClan } from '@evoconn/utils/getDebateStarByClan';
 import type { DebateMessage } from '@evoconn/types/debate';
 import { useFeedStore, createPhrasePost } from '@evoconn/hooks/useFeedStore';
 import { useDebugStreak } from '../debug/DebugStreakContext';
+import { useDebugStats } from '../debug/DebugStatsContext';
+import { useQuotes } from '@evoconn/hooks/QuotesContext';
 import { normalizePhraseInnerForPublish } from '@evoconn/utils/phrasePublish';
 import type { SidebarFolder } from '@evoconn/types';
 import { PHRASE_CREATION_STACK_LAYOUT as PHRASE_STACK } from '@evoconn/constants/phraseCreationStackLayout';
@@ -107,6 +109,8 @@ export default function PhraseCreationScreen() {
   const { folders } = useConversationFolders();
   const { publishPost } = useFeedStore();
   const { markStreakActivated } = useDebugStreak();
+  const { decrementUses } = useDebugStats();
+  const { unlockNextPhrase } = useQuotes();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const clanColor = getChatUserAccentColor(activeClan);
 
@@ -335,10 +339,12 @@ export default function PhraseCreationScreen() {
       Keyboard.dismiss();
       try {
         const id = await createPhraseThought(t);
-        // Phrase created/sent successfully → activate streak (first send of the day only).
+        // Phrase created/sent → activate streak, consume one daily use, unlock one domain quote.
         // eslint-disable-next-line no-console
         console.log('[STREAK] Phrase created/sent → marking streak activated.');
         markStreakActivated();
+        decrementUses();
+        unlockNextPhrase();
         setMessages([
           { role: 'user', content: t },
           {
@@ -369,6 +375,8 @@ export default function PhraseCreationScreen() {
       router,
       scrollToEnd,
       markStreakActivated,
+      decrementUses,
+      unlockNextPhrase,
       requestPhraseIntro,
     ],
   );

@@ -1,149 +1,198 @@
+/**
+ * DebugStatsContext — real per-user persistent stats for streak, daily uses,
+ * and unlocked phrase counts.
+ *
+ * All three values are now backed by real device-date-aware AsyncStorage per user.
+ * No manual fake overrides. No fake seed defaults.
+ *
+ * - streakDays: consecutive days this user has taken a qualifying action.
+ * - remainingUses: uses left today (resets to DAILY_USES_LIMIT each calendar day).
+ * - unlockedPhrases: count of phrase-type conversations owned by the active user.
+ * - hasSentToday: true if the user has already sent a reflection or phrase today.
+ *
+ * markStreakActivated() and decrementUses() persist changes immediately.
+ */
 import React, {
   createContext,
   useContext,
   useEffect,
   useState,
   useCallback,
+  useMemo,
   type ReactNode,
 } from 'react';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
+import { useThoughts } from '@evoconn/hooks/useThoughts';
+import {
+  loadUserStats,
+  saveUserStats,
+  decrementUsesForUser,
+  activateStreakForUser,
+  getLocalDayKey,
+  DAILY_USES_LIMIT,
+  type UserStats,
+} from '@evoconn/services/userStatsStorage';
 
-/**
- * Master switch — always false in production builds.
- * When true, the top bar and detail screens read from simulated values
- * instead of the real backend data.
- */
+// ─── Master switch ─────────────────────────────────────────────────────────────
+
+/** Always false in production builds. True in dev/simulation mode. */
 export const IS_DEBUG_STATS_MODE: boolean = __DEV__;
 
-/**
- * Default starting values for the debug simulation.
- * Adjust these constants to change the initial simulated state on each
- * simulator launch without opening the editor panel.
- */
-const DEFAULT_SIMULATED_STREAK_DAYS       = 7;
-const DEFAULT_SIMULATED_REMAINING_USES    = 28;
-const DEFAULT_SIMULATED_UNLOCKED_PHRASES  = 30;
+/** Daily uses limit — exported for display in UI. */
+export const SIMULATED_TOTAL_DAILY_USES = DAILY_USES_LIMIT;
 
-/** Total daily uses limit (used by the simulation editor max clamp). */
-export const SIMULATED_TOTAL_DAILY_USES = 30;
+// ─── Context type ─────────────────────────────────────────────────────────────
 
 type DebugStatsContextValue = {
-  // ── Simulated values — editable in debug mode ─────────────────────────────
+  // ── Resolved per-user values ──────────────────────────────────────────────
+  streakDays: number;
+  remainingUses: number;
+  unlockedPhrases: number;
+  /** True when the active user has completed their first qualifying action today. */
+  hasSentToday: boolean;
+
+  // ── Mutation helpers ──────────────────────────────────────────────────────
+  /** Call after a successful reflection or phrase send (not publish). */
+  markStreakActivated: () => void;
+  /** Call when a use is consumed. Decrements and persists immediately. */
+  decrementUses: () => void;
+
+  // ── Production compat (set by StreakScreen / DailyUsesScreen after API load) ──
+  realStreakDays: number;
+  setRealStreakDays: (n: number) => void;
+  realRemainingUses: number;
+  setRealRemainingUses: (n: number) => void;
+
+  // ── API compat shims (no longer functional — kept to avoid breaking callers) ──
   simulatedStreakDays: number;
   setSimulatedStreakDays: (n: number) => void;
   simulatedRemainingUses: number;
   setSimulatedRemainingUses: (n: number) => void;
   simulatedUnlockedPhrases: number;
   setSimulatedUnlockedPhrases: (n: number) => void;
-
-  // ── Real values — populated by detail screens after API load ─────────────
-  realStreakDays: number;
-  setRealStreakDays: (n: number) => void;
-  realRemainingUses: number;
-  setRealRemainingUses: (n: number) => void;
-
-  // ── Resolved values — use these everywhere ────────────────────────────────
-  /**
-   * In debug mode → simulatedStreakDays.
-   * In production → realStreakDays (set by StreakScreen after API load).
-   */
-  streakDays: number;
-  /**
-   * In debug mode → simulatedRemainingUses.
-   * In production → realRemainingUses (set by DailyUsesScreen after API load).
-   */
-  remainingUses: number;
-  /**
-   * In debug mode → simulatedUnlockedPhrases.
-   * In production → real unlocked phrases count from QuotesContext.
-   */
-  unlockedPhrases: number;
 };
 
 const Ctx = createContext<DebugStatsContextValue>({
-  simulatedStreakDays: DEFAULT_SIMULATED_STREAK_DAYS,
-  setSimulatedStreakDays: () => {},
-  simulatedRemainingUses: DEFAULT_SIMULATED_REMAINING_USES,
-  setSimulatedRemainingUses: () => {},
-  simulatedUnlockedPhrases: DEFAULT_SIMULATED_UNLOCKED_PHRASES,
-  setSimulatedUnlockedPhrases: () => {},
+  streakDays: 0,
+  remainingUses: DAILY_USES_LIMIT,
+  unlockedPhrases: 0,
+  hasSentToday: false,
+  markStreakActivated: () => {},
+  decrementUses: () => {},
   realStreakDays: 0,
   setRealStreakDays: () => {},
   realRemainingUses: 0,
   setRealRemainingUses: () => {},
-  streakDays:      IS_DEBUG_STATS_MODE ? DEFAULT_SIMULATED_STREAK_DAYS      : 0,
-  remainingUses:   IS_DEBUG_STATS_MODE ? DEFAULT_SIMULATED_REMAINING_USES   : 0,
-  unlockedPhrases: IS_DEBUG_STATS_MODE ? DEFAULT_SIMULATED_UNLOCKED_PHRASES : 0,
+  simulatedStreakDays: 0,
+  setSimulatedStreakDays: () => {},
+  simulatedRemainingUses: DAILY_USES_LIMIT,
+  setSimulatedRemainingUses: () => {},
+  simulatedUnlockedPhrases: 0,
+  setSimulatedUnlockedPhrases: () => {},
 });
+
+// ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function DebugStatsProvider({ children }: { children: ReactNode }) {
   const sim = useSimulation();
+  const { thoughts } = useThoughts();
 
-  const [simulatedStreakDays,      setSimulatedRaw]        = useState(DEFAULT_SIMULATED_STREAK_DAYS);
-  const [simulatedRemainingUses,   setRemainingRaw]        = useState(DEFAULT_SIMULATED_REMAINING_USES);
-  const [simulatedUnlockedPhrases, setUnlockedPhrasesRaw]  = useState(DEFAULT_SIMULATED_UNLOCKED_PHRASES);
+  // ── Per-user persisted stats ──────────────────────────────────────────────
+  const [stats, setStats] = useState<UserStats>({
+    currentStreak: 0,
+    hasSentTodayDate: null,
+    dailyUsesRemaining: DAILY_USES_LIMIT,
+    lastUsesResetDate: null,
+  });
 
-  // Reset simulated stats to the new user's seed values whenever the active user changes
+  // Load from AsyncStorage whenever the active user changes (or on first mount).
   useEffect(() => {
-    const user = sim.activeUser;
-    if (user) {
-      setSimulatedRaw(user.streakDays);
-      setRemainingRaw(Math.min(user.remainingUses, SIMULATED_TOTAL_DAILY_USES));
-      setUnlockedPhrasesRaw(user.unlockedPhrases);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    let cancelled = false;
+    loadUserStats(sim.activeUserId).then((s) => {
+      if (!cancelled) setStats(s);
+    });
+    return () => { cancelled = true; };
   }, [sim.activeUserId]);
-  const [realStreakDays,            setRealStreakRaw]       = useState(0);
-  const [realRemainingUses,         setRealRemainingRaw]   = useState(0);
 
-  const setSimulatedStreakDays = useCallback(
-    (n: number) => setSimulatedRaw(Math.max(0, Math.round(n))),
-    [],
-  );
-  const setSimulatedRemainingUses = useCallback(
-    (n: number) =>
-      setRemainingRaw(Math.max(0, Math.min(SIMULATED_TOTAL_DAILY_USES, Math.round(n)))),
-    [],
-  );
-  const setSimulatedUnlockedPhrases = useCallback(
-    (n: number) => setUnlockedPhrasesRaw(Math.max(0, Math.round(n))),
-    [],
-  );
-  const setRealStreakDays = useCallback(
-    (n: number) => setRealStreakRaw(Math.max(0, Math.round(n))),
-    [],
-  );
-  const setRealRemainingUses = useCallback(
-    (n: number) => setRealRemainingRaw(Math.max(0, Math.round(n))),
-    [],
+  // ── Day-rollover detection ────────────────────────────────────────────────
+  const [currentDay, setCurrentDay] = useState(() => getLocalDayKey());
+  useEffect(() => {
+    const id = setInterval(() => setCurrentDay(getLocalDayKey()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // When the calendar day changes, reset uses if they haven't been reset yet.
+  useEffect(() => {
+    if (stats.lastUsesResetDate !== null && stats.lastUsesResetDate !== currentDay) {
+      const reset: UserStats = {
+        ...stats,
+        dailyUsesRemaining: DAILY_USES_LIMIT,
+        lastUsesResetDate: currentDay,
+      };
+      setStats(reset);
+      saveUserStats(sim.activeUserId, reset);
+    }
+  }, [currentDay, stats, sim.activeUserId]);
+
+  // ── Derived values ────────────────────────────────────────────────────────
+  const hasSentToday = stats.hasSentTodayDate === currentDay;
+  const streakDays = stats.currentStreak;
+  const remainingUses = stats.dailyUsesRemaining;
+
+  // Phrase count = number of phrase-type conversations owned by the active user.
+  const unlockedPhrases = useMemo(
+    () => thoughts.filter((t) => t.type === 'phrase').length,
+    [thoughts],
   );
 
-  const streakDays      = IS_DEBUG_STATS_MODE ? simulatedStreakDays      : realStreakDays;
-  const remainingUses   = IS_DEBUG_STATS_MODE ? simulatedRemainingUses   : realRemainingUses;
-  const unlockedPhrases = IS_DEBUG_STATS_MODE ? simulatedUnlockedPhrases : 0;
+  // ── Mutations ─────────────────────────────────────────────────────────────
+  const markStreakActivated = useCallback(() => {
+    activateStreakForUser(sim.activeUserId).then((updated) => setStats(updated));
+  }, [sim.activeUserId]);
 
-  return (
-    <Ctx.Provider
-      value={{
-        simulatedStreakDays,
-        setSimulatedStreakDays,
-        simulatedRemainingUses,
-        setSimulatedRemainingUses,
-        simulatedUnlockedPhrases,
-        setSimulatedUnlockedPhrases,
-        realStreakDays,
-        setRealStreakDays,
-        realRemainingUses,
-        setRealRemainingUses,
-        streakDays,
-        remainingUses,
-        unlockedPhrases,
-      }}
-    >
-      {children}
-    </Ctx.Provider>
+  const decrementUses = useCallback(() => {
+    decrementUsesForUser(sim.activeUserId).then((remaining) =>
+      setStats((prev) => ({ ...prev, dailyUsesRemaining: remaining })),
+    );
+  }, [sim.activeUserId]);
+
+  // ── Production compat ─────────────────────────────────────────────────────
+  const [realStreakDays, setRealStreakRaw] = useState(0);
+  const [realRemainingUses, setRealRemainingRaw] = useState(0);
+  const setRealStreakDays = useCallback((n: number) => setRealStreakRaw(Math.max(0, n)), []);
+  const setRealRemainingUses = useCallback((n: number) => setRealRemainingRaw(Math.max(0, n)), []);
+
+  const value = useMemo<DebugStatsContextValue>(
+    () => ({
+      streakDays:      IS_DEBUG_STATS_MODE ? streakDays      : realStreakDays,
+      remainingUses:   IS_DEBUG_STATS_MODE ? remainingUses   : realRemainingUses,
+      unlockedPhrases,
+      hasSentToday,
+      markStreakActivated,
+      decrementUses,
+      realStreakDays,
+      setRealStreakDays,
+      realRemainingUses,
+      setRealRemainingUses,
+      // No-op shims — kept for API compatibility, no longer have any effect.
+      simulatedStreakDays:         streakDays,
+      setSimulatedStreakDays:      () => {},
+      simulatedRemainingUses:      remainingUses,
+      setSimulatedRemainingUses:   () => {},
+      simulatedUnlockedPhrases:    unlockedPhrases,
+      setSimulatedUnlockedPhrases: () => {},
+    }),
+    [
+      streakDays, remainingUses, unlockedPhrases, hasSentToday,
+      markStreakActivated, decrementUses,
+      realStreakDays, realRemainingUses, setRealStreakDays, setRealRemainingUses,
+    ],
   );
+
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
+
+// ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useDebugStats(): DebugStatsContextValue {
   return useContext(Ctx);
