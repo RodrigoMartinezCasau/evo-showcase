@@ -1,13 +1,23 @@
 /**
- * userStatsStorage.ts — real per-user persistent stats for the 9-user simulation.
+ * userStatsStorage.ts — single-database, multi-user persistent stats.
  *
- * Stores streak and daily-uses data in AsyncStorage under a single key.
- * All values start from zero and grow only through real in-app activity.
- * No fake defaults — new users begin at 0 streak and DAILY_USES_LIMIT uses.
+ * Storage model (v3 — bulletproof, mirrors thoughtsStorage.ts)
+ * ────────────────────────────────────────────────────────────
+ * ONE AsyncStorage key holds the ENTIRE stats database keyed by userId:
+ *
+ *   @physicscopilot/user_stats_v3  →  { [userId]: UserStats }
+ *
+ * Why single-key?
+ *  - No race conditions between user-switch and async load.
+ *  - No stale read can ever overwrite another user's slice.
+ *  - Every write is a snapshot of the WHOLE database.
+ *  - Identical pattern to the working thoughts/posts persistence.
+ *
+ * All values start from zero/baseline. New users get default stats.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const KEY = '@physicscopilot/user_stats_v2';
+const KEY = '@physicscopilot/user_stats_v3';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -26,11 +36,11 @@ export type UserStats = {
   hasSentTodayDate: string | null;
   /** Remaining uses for today. Resets to DAILY_USES_LIMIT on each new calendar day. */
   dailyUsesRemaining: number;
-  /** The device date on which uses were last reset. null = never (will reset on first access). */
+  /** The device date on which uses were last reset. */
   lastUsesResetDate: string | null;
 };
 
-type StatsDB = Record<string, UserStats>;
+export type StatsDatabase = Record<string, UserStats>;
 
 // ─── Day helper ───────────────────────────────────────────────────────────────
 
@@ -44,122 +54,99 @@ export function getLocalDayKey(): string {
   ].join('-');
 }
 
-// ─── In-memory write-through cache ───────────────────────────────────────────
+/** Returns yesterday's local calendar date as "YYYY-MM-DD". */
+function getYesterdayKey(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, '0'),
+    String(d.getDate()).padStart(2, '0'),
+  ].join('-');
+}
 
-let _cache: StatsDB | null = null;
+/** Default stats for a brand-new user. */
+export function defaultUserStats(): UserStats {
+  return {
+    currentStreak: 0,
+    hasSentTodayDate: null,
+    dailyUsesRemaining: DAILY_USES_LIMIT,
+    lastUsesResetDate: getLocalDayKey(),
+  };
+}
 
-async function loadDB(): Promise<StatsDB> {
-  if (_cache !== null) return _cache;
+// ─── Whole-DB load / save ─────────────────────────────────────────────────────
+
+/**
+ * Load the entire stats database from AsyncStorage.
+ * Returns {} on first run or read failure.
+ */
+export async function loadStatsDB(): Promise<StatsDatabase> {
   try {
     const raw = await AsyncStorage.getItem(KEY);
-    _cache = raw ? (JSON.parse(raw) as StatsDB) : {};
-  } catch {
-    _cache = {};
+    if (!raw) {
+      console.log('[USERSTATS] First run — empty DB.');
+      return {};
+    }
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      console.warn('[USERSTATS] Invalid stored DB shape, resetting.');
+      return {};
+    }
+    console.log('[USERSTATS] Loaded DB with users:', Object.keys(parsed));
+    return parsed as StatsDatabase;
+  } catch (e) {
+    console.error('[USERSTATS] Failed to load DB:', e);
+    return {};
   }
-  return _cache;
 }
 
-async function saveDB(db: StatsDB): Promise<void> {
-  _cache = db;
-  // Await the write so callers that chain .then() are guaranteed the data
-  // is persisted before the promise resolves (prevents data loss on quick reloads).
+/** Persist the entire database. Awaits to guarantee write completion. */
+export async function saveStatsDB(db: StatsDatabase): Promise<void> {
   try {
     await AsyncStorage.setItem(KEY, JSON.stringify(db));
+    console.log('[USERSTATS] Saved DB. Users:', Object.keys(db));
   } catch (e) {
-    console.error('[userStatsStorage] Failed to persist stats:', e);
+    console.error('[USERSTATS] Failed to save DB:', e);
   }
 }
 
-// ─── Public API ───────────────────────────────────────────────────────────────
+// ─── Pure stats transforms (no I/O) ───────────────────────────────────────────
 
 /**
- * Load the persisted stats for a specific user.
- * First-time users start at 0 streak and full uses.
- * Uses are automatically reset to DAILY_USES_LIMIT if the calendar day has changed.
+ * Apply daily-uses rollover to a stats slice if the calendar day has changed.
+ * Returns either the unchanged input or a new slice with reset uses.
  */
-export async function loadUserStats(userId: string): Promise<UserStats> {
-  const db = await loadDB();
-  const today = getLocalDayKey();
-  const stored = db[userId];
-
-  if (!stored) {
-    const defaults: UserStats = {
-      currentStreak: 0,
-      hasSentTodayDate: null,
-      dailyUsesRemaining: DAILY_USES_LIMIT,
-      lastUsesResetDate: today,
-    };
-    await saveDB({ ...db, [userId]: defaults });
-    return defaults;
-  }
-
-  // Auto-reset uses when the calendar day has changed since last access.
-  if (stored.lastUsesResetDate !== today) {
-    const reset: UserStats = {
-      ...stored,
-      dailyUsesRemaining: DAILY_USES_LIMIT,
-      lastUsesResetDate: today,
-    };
-    await saveDB({ ...db, [userId]: reset });
-    return reset;
-  }
-
-  return stored;
-}
-
-/** Overwrite the stored stats for a user. */
-export async function saveUserStats(userId: string, stats: UserStats): Promise<void> {
-  const db = await loadDB();
-  await saveDB({ ...db, [userId]: stats });
-}
-
-/**
- * Decrement remaining uses by 1 for a user. No-op if already 0.
- * Returns the new remaining count.
- */
-export async function decrementUsesForUser(userId: string): Promise<number> {
-  const stats = await loadUserStats(userId);
-  if (stats.dailyUsesRemaining <= 0) return 0;
-  const updated: UserStats = {
+export function applyDailyRollover(stats: UserStats, today: string): UserStats {
+  if (stats.lastUsesResetDate === today) return stats;
+  return {
     ...stats,
-    dailyUsesRemaining: stats.dailyUsesRemaining - 1,
+    dailyUsesRemaining: DAILY_USES_LIMIT,
+    lastUsesResetDate: today,
   };
-  await saveUserStats(userId, updated);
-  return updated.dailyUsesRemaining;
 }
 
 /**
- * Record the first qualifying streak action for a user on today's date.
- * Idempotent — calling multiple times on the same day is a no-op.
- * Handles consecutive-day continuation and non-consecutive reset.
- * Returns the updated stats.
+ * Pure activation logic: bumps streak according to consecutive-day rules.
+ * - Already activated today → no-op.
+ * - Last activation was yesterday → streak += 1.
+ * - Otherwise → streak = 1 (fresh start).
  */
-export async function activateStreakForUser(userId: string): Promise<UserStats> {
-  const stats = await loadUserStats(userId);
+export function applyStreakActivation(stats: UserStats): UserStats {
   const today = getLocalDayKey();
-
-  // Already activated today — no-op.
   if (stats.hasSentTodayDate === today) return stats;
-
-  // Was the previous activation yesterday? → streak continues.
-  const yesterday = (() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 1);
-    return [
-      d.getFullYear(),
-      String(d.getMonth() + 1).padStart(2, '0'),
-      String(d.getDate()).padStart(2, '0'),
-    ].join('-');
-  })();
-
+  const yesterday = getYesterdayKey();
   const newStreak =
     stats.hasSentTodayDate === yesterday ? stats.currentStreak + 1 : 1;
-
-  const updated: UserStats = {
+  return {
     ...stats,
     currentStreak: newStreak,
     hasSentTodayDate: today,
   };
-  await saveUserStats(userId, updated);
-  return updated;
+}
+
+/** Pure decrement: subtracts one use, floored at zero. */
+export function applyDecrementUses(stats: UserStats): UserStats {
+  if (stats.dailyUsesRemaining <= 0) return stats;
+  return { ...stats, dailyUsesRemaining: stats.dailyUsesRemaining - 1 };
 }

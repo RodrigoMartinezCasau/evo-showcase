@@ -2,15 +2,16 @@
  * DebugStatsContext — real per-user persistent stats for streak, daily uses,
  * and unlocked phrase counts.
  *
- * All three values are now backed by real device-date-aware AsyncStorage per user.
- * No manual fake overrides. No fake seed defaults.
+ * Architecture (mirrors the working ThoughtsDatabase model)
+ * ─────────────────────────────────────────────────────────
+ * - The provider holds the FULL multi-user stats database in memory.
+ * - Loaded once on app mount from a single AsyncStorage key.
+ * - Every mutation produces a new database snapshot, sets it in memory, and
+ *   persists the entire snapshot. No race conditions between user-switch
+ *   and async load — there is only one source of truth.
+ * - The active user's stats are a pure derived slice of the DB.
  *
- * - streakDays: consecutive days this user has taken a qualifying action.
- * - remainingUses: uses left today (resets to DAILY_USES_LIMIT each calendar day).
- * - unlockedPhrases: count of phrase-type conversations owned by the active user.
- * - hasSentToday: true if the user has already sent a reflection or phrase today.
- *
- * markStreakActivated() and decrementUses() persist changes immediately.
+ *   markStreakActivated() and decrementUses() are write-through atomic.
  */
 import React, {
   createContext,
@@ -24,13 +25,16 @@ import React, {
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { useQuotes } from '@evoconn/hooks/QuotesContext';
 import {
-  loadUserStats,
-  saveUserStats,
-  decrementUsesForUser,
-  activateStreakForUser,
+  loadStatsDB,
+  saveStatsDB,
+  defaultUserStats,
+  applyDailyRollover,
+  applyStreakActivation,
+  applyDecrementUses,
   getLocalDayKey,
   DAILY_USES_LIMIT,
   type UserStats,
+  type StatsDatabase,
 } from '@evoconn/services/userStatsStorage';
 
 // ─── Master switch ─────────────────────────────────────────────────────────────
@@ -50,7 +54,7 @@ type DebugStatsContextValue = {
   unlockedPhrases: number;
   /** True when the active user has completed their first qualifying action today. */
   hasSentToday: boolean;
-  /** True once the first AsyncStorage load for the active user has completed. */
+  /** True once the initial AsyncStorage DB load has completed. */
   statsLoaded: boolean;
 
   // ── Mutation helpers ──────────────────────────────────────────────────────
@@ -100,29 +104,23 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
   const sim = useSimulation();
   const { totalUnlocked: quotesTotalUnlocked } = useQuotes();
 
-  // ── Per-user persisted stats ──────────────────────────────────────────────
-  const [stats, setStats] = useState<UserStats>({
-    currentStreak: 0,
-    hasSentTodayDate: null,
-    dailyUsesRemaining: DAILY_USES_LIMIT,
-    lastUsesResetDate: null,
-  });
-  // True once the first AsyncStorage load for the current user completes.
-  // Prevents the fire icon from flashing grey before real data arrives.
+  // ── Whole multi-user DB held in memory ────────────────────────────────────
+  const [db, setDB] = useState<StatsDatabase>({});
   const [statsLoaded, setStatsLoaded] = useState(false);
 
-  // Load from AsyncStorage whenever the active user changes (or on first mount).
+  // Load the entire DB ONCE on app mount.
   useEffect(() => {
     let cancelled = false;
-    setStatsLoaded(false);
-    loadUserStats(sim.activeUserId).then((s) => {
-      if (!cancelled) {
-        setStats(s);
-        setStatsLoaded(true);
-      }
+    loadStatsDB().then((loaded) => {
+      if (cancelled) return;
+      console.log('[USERSTATS] Initial DB hydrated:', loaded);
+      setDB(loaded);
+      setStatsLoaded(true);
     });
-    return () => { cancelled = true; };
-  }, [sim.activeUserId]);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // ── Day-rollover detection ────────────────────────────────────────────────
   const [currentDay, setCurrentDay] = useState(() => getLocalDayKey());
@@ -131,48 +129,74 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(id);
   }, []);
 
-  // When the calendar day changes, reset uses if they haven't been reset yet.
-  useEffect(() => {
-    if (stats.lastUsesResetDate !== null && stats.lastUsesResetDate !== currentDay) {
-      const reset: UserStats = {
-        ...stats,
-        dailyUsesRemaining: DAILY_USES_LIMIT,
-        lastUsesResetDate: currentDay,
-      };
-      setStats(reset);
-      saveUserStats(sim.activeUserId, reset);
-    }
-  }, [currentDay, stats, sim.activeUserId]);
+  // ── Helper: mutate the active user's slice and persist atomically ────────
+  const mutateActiveSlice = useCallback(
+    (mutator: (slice: UserStats) => UserStats) => {
+      setDB((prev) => {
+        const userId = sim.activeUserId;
+        const current = prev[userId] ?? defaultUserStats();
+        // Always apply day-rollover before any other mutation.
+        const rolled = applyDailyRollover(current, getLocalDayKey());
+        const next = mutator(rolled);
+        if (next === current && rolled === current) return prev;
+        const nextDB: StatsDatabase = { ...prev, [userId]: next };
+        // Persist the entire snapshot (write-through).
+        saveStatsDB(nextDB);
+        return nextDB;
+      });
+    },
+    [sim.activeUserId],
+  );
 
-  // ── Derived values ────────────────────────────────────────────────────────
-  const hasSentToday = stats.hasSentTodayDate === currentDay;
-  const streakDays = stats.currentStreak;
-  const remainingUses = stats.dailyUsesRemaining;
+  // ── Auto-rollover for the active user when the calendar day changes ──────
+  useEffect(() => {
+    if (!statsLoaded) return;
+    const userId = sim.activeUserId;
+    const slice = db[userId];
+    if (!slice) return; // No record yet — nothing to roll over.
+    if (slice.lastUsesResetDate === currentDay) return; // Already up to date.
+    mutateActiveSlice((s) => s); // Forces rollover via mutateActiveSlice.
+  }, [currentDay, sim.activeUserId, statsLoaded, db, mutateActiveSlice]);
+
+  // ── Derived values for the ACTIVE user ────────────────────────────────────
+  const activeSlice: UserStats = useMemo(
+    () => db[sim.activeUserId] ?? defaultUserStats(),
+    [db, sim.activeUserId],
+  );
+  const hasSentToday = activeSlice.hasSentTodayDate === currentDay;
+  const streakDays = activeSlice.currentStreak;
+  const remainingUses = activeSlice.dailyUsesRemaining;
 
   // Phrase count = KB phrases unlocked by this user via reflections (QuotesContext).
   const unlockedPhrases = quotesTotalUnlocked;
 
   // ── Mutations ─────────────────────────────────────────────────────────────
   const markStreakActivated = useCallback(() => {
-    activateStreakForUser(sim.activeUserId).then((updated) => setStats(updated));
-  }, [sim.activeUserId]);
+    console.log('[USERSTATS] markStreakActivated() for user', sim.activeUserId);
+    mutateActiveSlice((s) => applyStreakActivation(s));
+  }, [mutateActiveSlice, sim.activeUserId]);
 
   const decrementUses = useCallback(() => {
-    decrementUsesForUser(sim.activeUserId).then((remaining) =>
-      setStats((prev) => ({ ...prev, dailyUsesRemaining: remaining })),
-    );
-  }, [sim.activeUserId]);
+    console.log('[USERSTATS] decrementUses() for user', sim.activeUserId);
+    mutateActiveSlice((s) => applyDecrementUses(s));
+  }, [mutateActiveSlice, sim.activeUserId]);
 
   // ── Production compat ─────────────────────────────────────────────────────
   const [realStreakDays, setRealStreakRaw] = useState(0);
   const [realRemainingUses, setRealRemainingRaw] = useState(0);
-  const setRealStreakDays = useCallback((n: number) => setRealStreakRaw(Math.max(0, n)), []);
-  const setRealRemainingUses = useCallback((n: number) => setRealRemainingRaw(Math.max(0, n)), []);
+  const setRealStreakDays = useCallback(
+    (n: number) => setRealStreakRaw(Math.max(0, n)),
+    [],
+  );
+  const setRealRemainingUses = useCallback(
+    (n: number) => setRealRemainingRaw(Math.max(0, n)),
+    [],
+  );
 
   const value = useMemo<DebugStatsContextValue>(
     () => ({
-      streakDays:      IS_DEBUG_STATS_MODE ? streakDays      : realStreakDays,
-      remainingUses:   IS_DEBUG_STATS_MODE ? remainingUses   : realRemainingUses,
+      streakDays: IS_DEBUG_STATS_MODE ? streakDays : realStreakDays,
+      remainingUses: IS_DEBUG_STATS_MODE ? remainingUses : realRemainingUses,
       unlockedPhrases,
       hasSentToday,
       statsLoaded,
@@ -183,17 +207,25 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
       realRemainingUses,
       setRealRemainingUses,
       // No-op shims — kept for API compatibility, no longer have any effect.
-      simulatedStreakDays:         streakDays,
-      setSimulatedStreakDays:      () => {},
-      simulatedRemainingUses:      remainingUses,
-      setSimulatedRemainingUses:   () => {},
-      simulatedUnlockedPhrases:    unlockedPhrases,
+      simulatedStreakDays: streakDays,
+      setSimulatedStreakDays: () => {},
+      simulatedRemainingUses: remainingUses,
+      setSimulatedRemainingUses: () => {},
+      simulatedUnlockedPhrases: unlockedPhrases,
       setSimulatedUnlockedPhrases: () => {},
     }),
     [
-      streakDays, remainingUses, unlockedPhrases, hasSentToday, statsLoaded,
-      markStreakActivated, decrementUses,
-      realStreakDays, realRemainingUses, setRealStreakDays, setRealRemainingUses,
+      streakDays,
+      remainingUses,
+      unlockedPhrases,
+      hasSentToday,
+      statsLoaded,
+      markStreakActivated,
+      decrementUses,
+      realStreakDays,
+      realRemainingUses,
+      setRealStreakDays,
+      setRealRemainingUses,
     ],
   );
 
