@@ -131,10 +131,22 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       .then((raw) => {
         if (!raw) return;
         try {
-          const saved = JSON.parse(raw) as SimPost[];
-          if (Array.isArray(saved) && saved.length > 0) {
+          const raw_parsed = JSON.parse(raw) as SimPost[];
+          if (Array.isArray(raw_parsed) && raw_parsed.length > 0) {
+            // Deduplicate within the persisted array itself (handles stale duplicates
+            // written before the publishPost guard was added).
+            const seenIds = new Set<string>();
+            const saved = raw_parsed.filter((p) => {
+              if (seenIds.has(p.id)) return false;
+              seenIds.add(p.id);
+              return true;
+            });
+            // If duplicates were found, re-save the cleaned list immediately.
+            if (saved.length !== raw_parsed.length) {
+              AsyncStorage.setItem(SIM_POSTS_STORAGE_KEY, JSON.stringify(saved)).catch(console.error);
+            }
             setPosts((prev) => {
-              // Merge: add any persisted post not already in state (de-duplicate by id)
+              // Merge: add any persisted post not already in current state.
               const existingIds = new Set(prev.map((p) => p.id));
               const newOnes = saved.filter((p) => !existingIds.has(p.id));
               return newOnes.length > 0 ? [...newOnes, ...prev] : prev;
@@ -329,6 +341,8 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   // ── Publish ───────────────────────────────────────────────────────────────
   const publishPost = useCallback((post: SimPost) => {
     setPosts((prev) => {
+      // Deduplicate: ignore if a post with the same id already exists.
+      if (prev.some((p) => p.id === post.id)) return prev;
       const updated = [post, ...prev];
       AsyncStorage.setItem(SIM_POSTS_STORAGE_KEY, JSON.stringify(updated)).catch(console.error);
       return updated;

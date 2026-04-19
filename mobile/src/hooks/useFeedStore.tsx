@@ -88,9 +88,11 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
     [sim],
   );
 
+  // Also check the live posts list so the result stays correct after remounts
+  // (in-memory publishedIds is cleared when the component tree unmounts).
   const hasPublished = useCallback(
-    (sourceId: string) => publishedIds.has(sourceId),
-    [publishedIds],
+    (sourceId: string) => publishedIds.has(sourceId) || posts.some((p) => p.id === sourceId),
+    [publishedIds, posts],
   );
 
   const getById = useCallback(
