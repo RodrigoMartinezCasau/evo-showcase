@@ -90,8 +90,8 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     setCommentVotes((prev) => ({ ...prev, [commentId]: !prev[commentId] }));
   }, []);
 
-  const [localComments, setLocalComments] = useState<Comment[]>(mockComments);
-  const commentIdCounter = useRef(mockComments.length);
+  const [localComments, setLocalComments] = useState<Comment[]>([]);
+  const commentIdCounter = useRef(0);
 
   const [blockedUsers, setBlockedUsers] = useState<Set<string>>(new Set());
 

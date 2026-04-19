@@ -57,9 +57,11 @@ export const CommentCard = React.memo(function CommentCard({
 
   const { isFollowing: checkFollowing, toggleFollow } = useFollowState();
 
+  const displayUsername = username.startsWith('@') ? username : `@${username}`;
+
   const handleLongPress = useCallback(() => {
     const following = checkFollowing(authorId);
-    Alert.alert(`@${username}`, undefined, [
+    Alert.alert(displayUsername, undefined, [
       {
         text: following ? 'Dejar de seguir' : 'Seguir usuario',
         onPress: () => {
@@ -79,7 +81,7 @@ export const CommentCard = React.memo(function CommentCard({
         onPress: () => {
           Alert.alert(
             'Bloquear usuario',
-            `¿Bloquear a @${username}?`,
+            `¿Bloquear a ${displayUsername}?`,
             [
               { text: 'Cancelar', style: 'cancel' },
               {
@@ -87,7 +89,7 @@ export const CommentCard = React.memo(function CommentCard({
                 style: 'destructive',
                 onPress: () => {
                   onBlockUser?.();
-                  Alert.alert('Usuario bloqueado', `@${username} ha sido bloqueado.`);
+                  Alert.alert('Usuario bloqueado', `${displayUsername} ha sido bloqueado.`);
                 },
               },
             ],
@@ -96,7 +98,7 @@ export const CommentCard = React.memo(function CommentCard({
       },
       { text: 'Cancelar', style: 'cancel' },
     ]);
-  }, [username, authorId, onReport, onBlockUser, checkFollowing, toggleFollow]);
+  }, [displayUsername, username, authorId, onReport, onBlockUser, checkFollowing, toggleFollow]);
 
   const lastTap = useRef(0);
   const singleTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -140,7 +142,7 @@ export const CommentCard = React.memo(function CommentCard({
         ]}
       >
         <Text style={[styles.username, { fontSize: CARD.usernameFontSize }]}>
-          @{username}
+          {displayUsername}
         </Text>
         <Text style={[styles.body, { fontSize: CARD.bodyFontSize }]}>
           {visibleText}

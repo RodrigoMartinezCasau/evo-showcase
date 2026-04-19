@@ -3,7 +3,6 @@ import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-nati
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getClanCardColor } from '@evoconn/theme/theme';
 import { evoconnColors } from '@evoconn/theme/colors';
-import { mockComments } from '@evoconn/data/mockComments';
 import {
   FeedbackWidget,
   VoteWidget,
@@ -112,13 +111,6 @@ export default function PostDetailScreen() {
         </View>
         <View style={styles.comments}>
           <Text style={styles.commentsTitle}>Comentarios</Text>
-          {mockComments.map((c) => (
-            <CommentItem
-              key={c.id}
-              comment={c}
-              onAuthorPress={() => router.push({ pathname: '/profile/[id]', params: { id: c.author.id } })}
-            />
-          ))}
         </View>
         <View style={[styles.clanBadge, { backgroundColor: clanColor }]}>
           <Text style={styles.clanBadgeText}>{clanLabel}</Text>
