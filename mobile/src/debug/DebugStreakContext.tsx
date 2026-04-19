@@ -30,6 +30,7 @@ export function getLocalDayKey(): string {
 
 type DebugStreakContextValue = {
   hasSentToday: boolean;
+  statsLoaded: boolean;
   markStreakActivated: () => void;
 };
 
@@ -43,6 +44,6 @@ export function DebugStreakProvider({ children }: { children: ReactNode }) {
  * Must be called inside DebugStatsProvider (always true in this app).
  */
 export function useDebugStreak(): DebugStreakContextValue {
-  const { hasSentToday, markStreakActivated } = useDebugStats();
-  return { hasSentToday, markStreakActivated };
+  const { hasSentToday, statsLoaded, markStreakActivated } = useDebugStats();
+  return { hasSentToday, statsLoaded, markStreakActivated };
 }

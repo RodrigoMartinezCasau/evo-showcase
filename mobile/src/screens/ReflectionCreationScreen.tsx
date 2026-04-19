@@ -104,6 +104,7 @@ import {
 import { getPublishStarByClan } from '@evoconn/utils/getDebateStarByClan';
 import { useDebugStreak } from '../debug/DebugStreakContext';
 import { useDebugStats } from '../debug/DebugStatsContext';
+import { useQuotes } from '@evoconn/hooks/QuotesContext';
 import { useAISettings } from '@evoconn/hooks/AISettingsContext';
 import { COMMUNITY_DRAWER_EDGE_ZONE_WIDTH } from '@evoconn/constants/communityDrawerGesture';
 import { useSidebarGesture } from '@evoconn/hooks/useSidebarGesture';
@@ -134,6 +135,7 @@ export default function ReflectionCreationScreen() {
   const publishedRef = useRef<Set<string>>(new Set());
   const { markStreakActivated } = useDebugStreak();
   const { decrementUses } = useDebugStats();
+  const { unlockNextPhrase } = useQuotes();
   const { includeReflectiveQuestion, includePhilosophicalReferences } = useAISettings();
 
   const doPublish = useCallback(
@@ -325,11 +327,12 @@ export default function ReflectionCreationScreen() {
           includeReflectiveQuestion,
           includePhilosophicalReferences,
         });
-        // Reflection sent → activate streak and consume one daily use.
+        // Reflection sent → activate streak, consume one daily use, unlock one KB phrase.
         // eslint-disable-next-line no-console
         console.log('[STREAK] Reflection created/sent → marking streak activated.');
         markStreakActivated();
         decrementUses();
+        unlockNextPhrase();
         const assistantText = resp.assistant_text;
 
         const introText = resp.debate_response?.debate_layer?.conversational_intro ?? '';
@@ -398,7 +401,7 @@ export default function ReflectionCreationScreen() {
         setSending(false);
       }
     },
-    [sending, debateId, createThought, updateThought, scrollToEnd, thoughts, markStreakActivated, decrementUses, includeReflectiveQuestion, includePhilosophicalReferences, toPersistedMessage],
+    [sending, debateId, createThought, updateThought, scrollToEnd, thoughts, markStreakActivated, decrementUses, unlockNextPhrase, includeReflectiveQuestion, includePhilosophicalReferences, toPersistedMessage],
   );
 
   const conversationItems = useMemo(

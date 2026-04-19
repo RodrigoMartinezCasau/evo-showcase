@@ -61,7 +61,13 @@ async function loadDB(): Promise<StatsDB> {
 
 async function saveDB(db: StatsDB): Promise<void> {
   _cache = db;
-  AsyncStorage.setItem(KEY, JSON.stringify(db)).catch(console.error);
+  // Await the write so callers that chain .then() are guaranteed the data
+  // is persisted before the promise resolves (prevents data loss on quick reloads).
+  try {
+    await AsyncStorage.setItem(KEY, JSON.stringify(db));
+  } catch (e) {
+    console.error('[userStatsStorage] Failed to persist stats:', e);
+  }
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────

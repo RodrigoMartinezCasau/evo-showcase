@@ -22,7 +22,7 @@ import React, {
   type ReactNode,
 } from 'react';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
-import { useThoughts } from '@evoconn/hooks/useThoughts';
+import { useQuotes } from '@evoconn/hooks/QuotesContext';
 import {
   loadUserStats,
   saveUserStats,
@@ -50,6 +50,8 @@ type DebugStatsContextValue = {
   unlockedPhrases: number;
   /** True when the active user has completed their first qualifying action today. */
   hasSentToday: boolean;
+  /** True once the first AsyncStorage load for the active user has completed. */
+  statsLoaded: boolean;
 
   // ── Mutation helpers ──────────────────────────────────────────────────────
   /** Call after a successful reflection or phrase send (not publish). */
@@ -77,6 +79,7 @@ const Ctx = createContext<DebugStatsContextValue>({
   remainingUses: DAILY_USES_LIMIT,
   unlockedPhrases: 0,
   hasSentToday: false,
+  statsLoaded: false,
   markStreakActivated: () => {},
   decrementUses: () => {},
   realStreakDays: 0,
@@ -95,7 +98,7 @@ const Ctx = createContext<DebugStatsContextValue>({
 
 export function DebugStatsProvider({ children }: { children: ReactNode }) {
   const sim = useSimulation();
-  const { thoughts } = useThoughts();
+  const { totalUnlocked: quotesTotalUnlocked } = useQuotes();
 
   // ── Per-user persisted stats ──────────────────────────────────────────────
   const [stats, setStats] = useState<UserStats>({
@@ -104,12 +107,19 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
     dailyUsesRemaining: DAILY_USES_LIMIT,
     lastUsesResetDate: null,
   });
+  // True once the first AsyncStorage load for the current user completes.
+  // Prevents the fire icon from flashing grey before real data arrives.
+  const [statsLoaded, setStatsLoaded] = useState(false);
 
   // Load from AsyncStorage whenever the active user changes (or on first mount).
   useEffect(() => {
     let cancelled = false;
+    setStatsLoaded(false);
     loadUserStats(sim.activeUserId).then((s) => {
-      if (!cancelled) setStats(s);
+      if (!cancelled) {
+        setStats(s);
+        setStatsLoaded(true);
+      }
     });
     return () => { cancelled = true; };
   }, [sim.activeUserId]);
@@ -139,11 +149,8 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
   const streakDays = stats.currentStreak;
   const remainingUses = stats.dailyUsesRemaining;
 
-  // Phrase count = number of phrase-type conversations owned by the active user.
-  const unlockedPhrases = useMemo(
-    () => thoughts.filter((t) => t.type === 'phrase').length,
-    [thoughts],
-  );
+  // Phrase count = KB phrases unlocked by this user via reflections (QuotesContext).
+  const unlockedPhrases = quotesTotalUnlocked;
 
   // ── Mutations ─────────────────────────────────────────────────────────────
   const markStreakActivated = useCallback(() => {
@@ -168,6 +175,7 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
       remainingUses:   IS_DEBUG_STATS_MODE ? remainingUses   : realRemainingUses,
       unlockedPhrases,
       hasSentToday,
+      statsLoaded,
       markStreakActivated,
       decrementUses,
       realStreakDays,
@@ -183,7 +191,7 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
       setSimulatedUnlockedPhrases: () => {},
     }),
     [
-      streakDays, remainingUses, unlockedPhrases, hasSentToday,
+      streakDays, remainingUses, unlockedPhrases, hasSentToday, statsLoaded,
       markStreakActivated, decrementUses,
       realStreakDays, realRemainingUses, setRealStreakDays, setRealRemainingUses,
     ],

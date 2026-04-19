@@ -15,7 +15,7 @@ import { getTopBarRachaTopByHouse } from '@evoconn/utils/getTopBarRachaTopByHous
 import { getTopBarInsigniaByHouse } from '@evoconn/utils/getTopBarInsigniaByHouse';
 import FuegoApagadoIcon from '../assets/topbar/fueguitoSvg/fuego-apagado.svg';
 import { useDebugStreak, IS_DEBUG_STREAK_MODE } from '../debug/DebugStreakContext';
-import { useDebugStats, IS_DEBUG_STATS_MODE } from '../debug/DebugStatsContext';
+import { useDebugStats } from '../debug/DebugStatsContext';
 import { useQuotes } from '../hooks/QuotesContext';
 
 type AppTopBarProps = {
@@ -72,10 +72,12 @@ export function AppTopBar({
     clanShortLabel ??
     (activeClan ? activeClan.slice(0, 2).toUpperCase() : '??');
 
-  const { streakDays, remainingUses, unlockedPhrases } = useDebugStats();
+  const { streakDays, remainingUses } = useDebugStats();
   const { totalUnlocked } = useQuotes();
 
-  const pencilCount = counts?.pencil ?? (IS_DEBUG_STATS_MODE ? unlockedPhrases : totalUnlocked);
+  // Pencil counter = KB phrases unlocked via reflections. Always reads from
+  // QuotesContext (persisted per-user) regardless of debug mode.
+  const pencilCount = counts?.pencil ?? totalUnlocked;
   const fireCount   = counts?.fire   ?? streakDays;
   const heartCount  = counts?.heart  ?? remainingUses;
 
@@ -87,15 +89,24 @@ export function AppTopBar({
   const InsigniaIcon = useMemo(() => getTopBarInsigniaByHouse(activeClan), [activeClan]);
 
   // ─── Top-bar fire icon animation (grey → clan on first send of the day) ────
-  const { hasSentToday } = useDebugStreak();
+  const { hasSentToday, statsLoaded } = useDebugStreak();
   const fireAnim    = useRef(new Animated.Value(0)).current;
   const prevFireRef = useRef<boolean | null>(null);
 
   useEffect(() => {
     if (!IS_DEBUG_STREAK_MODE) return;
 
+    // Don't commit to any state until the real persisted value has been loaded
+    // from AsyncStorage. This prevents a grey flash on app startup/node reload
+    // when hasSentToday is false only because the async read hasn't completed yet.
+    // Also reset the ref so each user switch triggers a fresh instant-set.
+    if (!statsLoaded) {
+      prevFireRef.current = null;
+      return;
+    }
+
     if (prevFireRef.current === null) {
-      // Initial render: set state instantly, no animation.
+      // First render after data loaded: set instantly without animation.
       prevFireRef.current = hasSentToday;
       fireAnim.setValue(hasSentToday ? 1 : 0);
       return;
@@ -116,7 +127,7 @@ export function AppTopBar({
     } else {
       fireAnim.setValue(hasSentToday ? 1 : 0);
     }
-  }, [hasSentToday, fireAnim]);
+  }, [hasSentToday, statsLoaded, fireAnim]);
 
   const starFrame = iconFrame(TOP_BAR_LAYOUT.STAR_SIZE, topBarIconFrameScale.evoStar);
   const shieldFrame = iconFrame(TOP_BAR_LAYOUT.SHIELD_SIZE, topBarIconFrameScale.shield);
