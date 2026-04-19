@@ -266,19 +266,20 @@ export function SidebarConversationsPanel({
       style={{
         flex: 1,
         minHeight: 0,
-        transform: [
-          { translateX: L.SIDEBAR_CONVERSATIONS_BLOCK_OFFSET_X },
-          { translateY: L.SIDEBAR_CONVERSATIONS_BLOCK_OFFSET_Y },
-          { scale: L.SIDEBAR_CONVERSATIONS_BLOCK_SCALE },
-        ],
+        // Use margin instead of transform so the layout/hit-test position matches
+        // the visual position. transform shifts only pixels on the GPU; margin
+        // shifts both the rendered position AND the touch-target bounds.
+        marginLeft: L.SIDEBAR_CONVERSATIONS_BLOCK_OFFSET_X,
+        marginTop: L.SIDEBAR_CONVERSATIONS_BLOCK_OFFSET_Y,
+        // SIDEBAR_CONVERSATIONS_BLOCK_SCALE is always 1 — no-op; omitted.
       }}
     >
       <View
         style={{
-          transform: [
-            { translateX: L.SIDEBAR_CONVERSATIONS_OFFSET_X },
-            { translateY: L.SIDEBAR_CONVERSATIONS_OFFSET_Y },
-          ],
+          // SIDEBAR_CONVERSATIONS_OFFSET_X/Y are 0 — no-op; kept as margin for
+          // future tweaking without reintroducing the transform hitbox bug.
+          marginLeft: L.SIDEBAR_CONVERSATIONS_OFFSET_X,
+          marginTop: L.SIDEBAR_CONVERSATIONS_OFFSET_Y,
         }}
       >
         <View style={{ position: 'relative', width: layoutW, height: visibleH, alignSelf: 'center' }}>
@@ -530,10 +531,8 @@ export function SidebarConversationsPanel({
                     alignSelf: 'stretch',
                     width: '100%',
                     paddingLeft: FIL.listPaddingLeft,
-                    transform: [
-                      { translateX: FIL.listOffsetX },
-                      { translateY: FIL.listOffsetY },
-                    ],
+                    marginLeft: FIL.listOffsetX,
+                    marginTop: FIL.listOffsetY,
                   }}
                 >
                   {folders.map((f) => (

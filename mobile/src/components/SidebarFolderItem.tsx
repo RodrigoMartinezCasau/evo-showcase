@@ -21,10 +21,10 @@ export const SidebarFolderItem = React.memo(function SidebarFolderItem({
         styles.container,
         {
           width: '100%',
-          transform: [
-            { translateX: IL.rowOffsetX },
-            { translateY: IL.rowOffsetY },
-          ],
+          // Use margin instead of transform to keep the touch hitbox aligned with
+          // the visual position (transform only moves rendered pixels, not hit areas).
+          marginLeft: IL.rowOffsetX,
+          marginTop: IL.rowOffsetY > 0 ? IL.rowOffsetY : undefined,
         },
       ]}
     >
