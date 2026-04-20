@@ -591,5 +591,16 @@ export async function classifyTextHybrid(
         semantic[c]  * WEIGHT_SEMANTIC_WITHOUT_ML;
     }
   }
+
+  // ── Top-3 cap ─────────────────────────────────────────────────────────────
+  // Keep only the 3 highest-scoring clans; zero the rest.
+  // Scores are NOT renormalized — preserves relative magnitudes and prevents
+  // artificial inflation of weaker signals.
+  const sorted = (Object.keys(out) as ClanScoreId[]).sort((a, b) => out[b] - out[a]);
+  const top3 = new Set(sorted.slice(0, 3));
+  for (const c of ALL_CLAN_IDS) {
+    if (!top3.has(c)) out[c] = 0;
+  }
+
   return out;
 }
