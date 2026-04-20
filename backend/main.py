@@ -52,12 +52,12 @@ app.add_middleware(
 
 # --- Minimal private beta protection: API key + rate limiting ---
 TESTER_API_KEY = os.environ.get("TESTER_API_KEY") or ""
-RATE_LIMIT_PER_MINUTE = 10
+RATE_LIMIT_PER_MINUTE = 30
 _RATE_WINDOW_SECONDS = 60
 _rate_counters: dict[tuple[str, str], dict[str, float | int]] = {}
 
 # --- Daily quota (per API key, per day) ---
-DAILY_LIMIT = 30  # <-- edit this to change daily quota
+DAILY_LIMIT = 60  # <-- edit this to change daily quota
 _daily_usage: dict[tuple[str, str], int] = {}
 # Idempotency: only count once per (api_key, date, request_id)
 _counted_request_ids: set[tuple[str, str, str]] = set()
@@ -128,9 +128,8 @@ async def beta_protection_middleware(request: Request, call_next):
         # Core LLM pipelines
         if p in {"/debate", "/debate/chat", "/creator"}:
             return True
-        # Create debate (initial message) — same logical "message" as first /chat, use X-Request-Id
-        if p == "/debates":
-            return True
+        # POST /debates only generates a short title (cheap LLM call) — does NOT
+        # count toward daily quota. The real generation cost is in /debates/{id}/chat.
         # Persisted debate chat — main reply per user message; use X-Request-Id for idempotency
         if p.startswith("/debates/") and p.endswith("/chat"):
             return True
