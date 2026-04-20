@@ -498,26 +498,52 @@ export function totalsToPercentages(totals: ClanScores): Record<ClanScoreId, num
   return out;
 }
 
-// ─── Hybrid classifier (heuristic + semantic) ────────────────────────────────
+// ─── Hybrid classifier (heuristic + semantic + ML) ──────────────────────────
 //
-// Blend ratio between the two signals. The heuristic gets the larger weight
-// because its keyword matches are highly precise (when they fire). The
-// semantic layer covers recall for cases the heuristic missed.
+// Three-signal blend:
+//
+//   Signal       | Weight (ML ready) | Weight (ML unavailable)
+//   -------------|-------------------|------------------------
+//   Heuristic    |       0.50        |   0.625  (renormalised)
+//   Semantic     |       0.30        |   0.375  (renormalised)
+//   ML model     |       0.20        |    N/A
+//
+// Rationale for weights:
+//   - Heuristic (50%): highest precision — when a keyword fires, it's almost
+//     always the right clan. Gets the majority share.
+//   - Semantic (30%): high recall — catches morphological variants, phrases
+//     without exact keywords, general philosophical "tone".
+//   - ML (20%): trained on the actual dataset — learns from example sentences
+//     the specific style of each clan as written by users. Acts as a tie-
+//     breaker when heuristic + semantic give a noisy signal.
+//
+// When the ML JSON is the placeholder (weights not yet generated):
+//   classifyTextML() returns all-zeros, which is detected and the two
+//   remaining signals are renormalised to 0.625/0.375.
 
-const HEURISTIC_WEIGHT = 0.6;
-const SEMANTIC_WEIGHT = 0.4;
+const WEIGHT_HEURISTIC_WITH_ML    = 0.50;
+const WEIGHT_SEMANTIC_WITH_ML     = 0.30;
+const WEIGHT_ML                   = 0.20;
+
+// Renormalised fallback weights when ML is unavailable (sum still = 1.0):
+const WEIGHT_HEURISTIC_WITHOUT_ML = WEIGHT_HEURISTIC_WITH_ML / (WEIGHT_HEURISTIC_WITH_ML + WEIGHT_SEMANTIC_WITH_ML);
+const WEIGHT_SEMANTIC_WITHOUT_ML  = WEIGHT_SEMANTIC_WITH_ML  / (WEIGHT_HEURISTIC_WITH_ML + WEIGHT_SEMANTIC_WITH_ML);
 
 /**
- * Hybrid classifier that combines:
- *   - the existing heuristic `classifyText` (precision, exact keywords)
- *   - the local semantic `classifyTextSemantic` (recall, morphology, fuzzy)
+ * Three-signal hybrid classifier.
  *
- * Final score for each clan:
- *   final[clan] = heuristic[clan] * 0.6 + semantic[clan] * 0.4
+ * Combines:
+ *   1. Heuristic (`classifyText`)          — deterministic, precise
+ *   2. Local semantic (`classifyTextSemantic`) — vector similarity, recall
+ *   3. Trained ML (`classifyTextML`)       — learnt from clan_dataset.json
  *
- * If the semantic layer fails for any reason, this gracefully degrades to
- * pure heuristic output. The async signature lets a future remote-embedding
- * implementation slot in without changing call sites.
+ * Async because the semantic layer is async (designed for future remote API
+ * swap). The ML layer is synchronous (bundled JSON) so adds no latency.
+ *
+ * Graceful degradation:
+ *   - Semantic fails → heuristic only.
+ *   - ML not trained yet (placeholder) → heuristic + semantic (0.625/0.375).
+ *   - ML fails → heuristic + semantic (0.625/0.375).
  */
 export async function classifyTextHybrid(
   text: string,
@@ -525,21 +551,43 @@ export async function classifyTextHybrid(
 ): Promise<ClanScores> {
   const heuristic = classifyText(text, type);
 
-  // Lazy import keeps `clanClassifier.ts` independent of the semantic module
-  // at type-check time and avoids any chance of a circular import surfacing
-  // during module initialisation.
-  let semantic: ClanScores;
+  // ── Semantic layer (async, dynamic import to avoid circular ref) ────────
+  let semantic: ClanScores | null = null;
   try {
     const mod = await import('./semanticClassifier');
     semantic = await mod.classifyTextSemantic(text);
   } catch {
-    // Semantic layer unavailable / threw → fall back to pure heuristic.
+    // Semantic unavailable → fall back to heuristic only.
     return heuristic;
   }
 
+  // ── ML layer (synchronous, bundled JSON) ────────────────────────────────
+  let ml: ClanScores | null = null;
+  try {
+    const mod = await import('./mlClassifier');
+    const raw = mod.classifyTextML(text);
+    // Zero-filled result = placeholder or failure = treat as unavailable.
+    const mlSum = ALL_CLAN_IDS.reduce((a, c) => a + raw[c], 0);
+    if (mlSum > 0) ml = raw;
+  } catch {
+    // ML module unavailable — continue without it.
+  }
+
+  // ── Blend ────────────────────────────────────────────────────────────────
   const out = makeZeroScores();
-  for (const c of ALL_CLAN_IDS) {
-    out[c] = heuristic[c] * HEURISTIC_WEIGHT + semantic[c] * SEMANTIC_WEIGHT;
+  if (ml) {
+    for (const c of ALL_CLAN_IDS) {
+      out[c] =
+        heuristic[c] * WEIGHT_HEURISTIC_WITH_ML +
+        semantic[c]  * WEIGHT_SEMANTIC_WITH_ML  +
+        ml[c]        * WEIGHT_ML;
+    }
+  } else {
+    for (const c of ALL_CLAN_IDS) {
+      out[c] =
+        heuristic[c] * WEIGHT_HEURISTIC_WITHOUT_ML +
+        semantic[c]  * WEIGHT_SEMANTIC_WITHOUT_ML;
+    }
   }
   return out;
 }
