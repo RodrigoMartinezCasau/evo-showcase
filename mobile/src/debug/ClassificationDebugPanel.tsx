@@ -199,8 +199,8 @@ export function ClassificationDebugPanel() {
                 {'  '}peso: <Text style={styles.inputMetaVal}>{lastInput.weight.toFixed(2)}</Text>
               </Text>
 
-              {/* Raw scores of last input */}
-              <Text style={styles.rawTitle}>Scores crudos (híbrido):</Text>
+              {/* Raw scores of last input — blend S+ML+Claude, top-3 cap applied */}
+              <Text style={styles.rawTitle}>Scores crudos (S + ML + Claude):</Text>
               {lastRawSorted.map(({ clan, score }) => (
                 <View key={clan} style={styles.rawRow}>
                   <View style={[styles.dot, { backgroundColor: CLAN_COLOURS[clan] }]} />
@@ -219,6 +219,34 @@ export function ClassificationDebugPanel() {
                   </View>
                 </View>
               ))}
+
+              {/* Claude layer scores */}
+              <Text style={[styles.rawTitle, styles.claudeTitle]}>
+                {lastInput.claudeScores ? 'Capa Claude:' : 'Capa Claude: — (sin conexión)'}
+              </Text>
+              {lastInput.claudeScores
+                ? ALL_CLAN_IDS
+                    .map((c) => ({ clan: c, score: lastInput.claudeScores![c] ?? 0 }))
+                    .sort((a, b) => b.score - a.score)
+                    .map(({ clan, score }) => (
+                      <View key={clan} style={styles.rawRow}>
+                        <View style={[styles.dot, { backgroundColor: CLAN_COLOURS[clan] }]} />
+                        <Text style={styles.rawRowLabel}>{CLAN_LABELS[clan]}</Text>
+                        <Text style={styles.rawRowScore}>{score.toFixed(3)}</Text>
+                        <View style={styles.rawTrack}>
+                          <View
+                            style={[
+                              styles.rawFill,
+                              {
+                                width: `${Math.min((score / 10) * 100, 100)}%` as `${number}%`,
+                                backgroundColor: '#B39DDB',
+                              },
+                            ]}
+                          />
+                        </View>
+                      </View>
+                    ))
+                : null}
             </>
           )}
 
@@ -416,6 +444,10 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.4)',
     fontSize: 10,
     marginBottom: 5,
+  },
+  claudeTitle: {
+    marginTop: 8,
+    color: '#B39DDB',
   },
   rawRow: {
     flexDirection: 'row',

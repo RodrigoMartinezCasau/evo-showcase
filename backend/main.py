@@ -1711,6 +1711,30 @@ def generate_job_recommendations(user_id: str, payload: PhilosophyContextPayload
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# CLAN CLASSIFICATION — Claude layer
+# ══════════════════════════════════════════════════════════════════════════════
+
+class ClassifyReflectionRequest(BaseModel):
+    texto: str
+
+
+@app.post("/classify/reflection")
+def classify_reflection(payload: ClassifyReflectionRequest):
+    """
+    Clasifica una reflexión filosófica usando Claude Haiku (capa IA del blend).
+
+    Retorna claude_scores: {clan: float 0-10} para los 8 clanes.
+    Nunca lanza 5xx — en caso de error devuelve zeros para que el cliente
+    use el fallback H+S+ML sin Claude.
+
+    No cuenta contra la cuota diaria (no es generación de contenido).
+    """
+    from claude_classifier import classify_with_claude
+    scores = classify_with_claude((payload.texto or "").strip())
+    return {"claude_scores": scores}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # STREAK ENDPOINTS
 # ══════════════════════════════════════════════════════════════════════════════
 

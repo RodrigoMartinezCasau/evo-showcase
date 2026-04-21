@@ -37,7 +37,10 @@ export type ClassifiedInputRecord = {
   /** Unique id (debate id for reflections, phrase id for phrases, or generated). */
   inputId: string;
   inputType: InputType;
+  /** Final hybrid blend score (H+S+ML+Claude, or fallback subset). */
   clanScores: ClanScores;
+  /** Raw scores from the Claude layer, if available (undefined when offline or API error). */
+  claudeScores?: ClanScores;
   weight: number;
   createdAt: string;
 };

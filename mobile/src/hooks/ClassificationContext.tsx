@@ -34,6 +34,7 @@ import React, {
   useState,
   type ReactNode,
 } from 'react';
+import { Platform } from 'react-native';
 import { useSimulation } from './SimulationContext';
 import {
   ALL_CLAN_IDS,
@@ -53,6 +54,49 @@ import {
   type ClassificationDatabase,
   type UserClassificationState,
 } from '@evoconn/services/classificationStorage';
+
+// ─── Backend URL helper ──────────────────────────────────────────────────────
+
+function _getApiBaseUrl(): string {
+  const fromEnv =
+    typeof process !== 'undefined' && process.env.EXPO_PUBLIC_API_URL
+      ? String(process.env.EXPO_PUBLIC_API_URL).trim()
+      : '';
+  if (fromEnv) return fromEnv.replace(/\/$/, '');
+  return (
+    Platform.select({ android: 'http://10.0.2.2:8000', default: 'http://127.0.0.1:8000' }) ??
+    'http://127.0.0.1:8000'
+  );
+}
+
+/**
+ * Fetch Claude-layer scores from the backend.
+ * Resolves to null on any error (network, timeout, bad response) so the caller
+ * can fall back to the H+S+ML blend transparently.
+ */
+async function _fetchClaudeScores(text: string): Promise<ClanScores | null> {
+  const controller = new AbortController();
+  const tid = setTimeout(() => controller.abort(), 5000);
+  try {
+    const res = await fetch(`${_getApiBaseUrl()}/classify/reflection`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ texto: text }),
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { claude_scores?: ClanScores };
+    const scores = data.claude_scores;
+    if (!scores) return null;
+    // Sanity-check: all 8 clans present with numeric values
+    const valid = ALL_CLAN_IDS.every((c) => typeof scores[c] === 'number');
+    return valid ? scores : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(tid);
+  }
+}
 
 // ─── Tunable rules ──────────────────────────────────────────────────────────
 
@@ -255,13 +299,19 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
       const userId = activeUserId;
       if (!text || !text.trim()) return;
 
-      // Hybrid (heuristic + semantic) scoring. Hybrid internally falls back
-      // to pure heuristic if the semantic layer fails — but we also wrap the
-      // call in try/catch as a defence-in-depth measure so a recordInput()
-      // call can NEVER throw and abort the user's reflection flow.
+      // ── Claude layer (backend call, non-blocking) ───────────────────────
+      // Fetched first so classifyTextHybrid can include it in the 4-signal blend.
+      // Returns null on offline / API error — the hybrid falls back to H+S+ML.
+      const claudeScores = await _fetchClaudeScores(text).catch(() => null);
+
+      // ── Hybrid scoring (heuristic + semantic + ML + Claude) ─────────────
+      // Hybrid internally falls back to pure heuristic if the semantic layer
+      // fails — but we also wrap the call in try/catch as a defence-in-depth
+      // measure so a recordInput() call can NEVER throw and abort the user's
+      // reflection flow.
       let scores: ClanScores;
       try {
-        scores = await classifyTextHybrid(text, type);
+        scores = await classifyTextHybrid(text, type, claudeScores ?? undefined);
       } catch {
         scores = classifyText(text, type);
       }
@@ -290,6 +340,7 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
           inputId: generatedId,
           inputType: type,
           clanScores: scores,
+          ...(claudeScores ? { claudeScores } : {}),
           weight,
           createdAt: nowIso,
         };

@@ -498,69 +498,78 @@ export function totalsToPercentages(totals: ClanScores): Record<ClanScoreId, num
   return out;
 }
 
-// ─── Hybrid classifier (heuristic + semantic + ML) ──────────────────────────
+// ─── Hybrid classifier (semantic + ML + Claude) ──────────────────────────────
 //
-// Three-signal blend:
+// Three-signal blend — heuristic layer removed. Four degradation cases:
 //
-//   Signal       | Weight (ML ready) | Weight (ML unavailable)
-//   -------------|-------------------|------------------------
-//   Heuristic    |       0.50        |   0.667  (renormalised)
-//   Semantic     |       0.25        |   0.333  (renormalised)
-//   ML model     |       0.25        |    N/A
+//   Signal   | S+ML+Claude | No ML  | No Claude | Semantic only
+//   ---------|-------------|--------|-----------|---------------
+//   Semantic |    0.20     |  0.30  |   0.35    |     1.00
+//   ML model |    0.35     |  N/A   |   0.65    |     N/A
+//   Claude   |    0.45     |  0.70  |   N/A     |     N/A
 //
-// Rationale for weights (v2 — after dataset expansion):
-//   - Heuristic (50%): highest precision — when a keyword fires, it's almost
-//     always the right clan. Keeps the majority share.
-//   - Semantic (25%): high recall — catches morphological variants, phrases
-//     without exact keywords, general philosophical "tone".
-//   - ML (25%): raised from 0.20 after validation on the expanded dataset
-//     (440 examples). The ML layer corrected 9 errors with 0 regressions and
-//     delivered a +10 pp accuracy gain over H+S alone. The nihilista/realista
-//     confusion also improved. A weight of 0.25 is justified; go to 0.30
-//     once each clan has ≥150 labelled examples.
+// Rationale:
+//   - Claude (45%): highest-quality signal — full LLM semantic understanding.
+//   - ML (35%): trained classifier, dataset-grounded.
+//   - Semantic (20%): fast local cosine-similarity anchor; only signal when
+//     both AI layers are offline.
 //
-// When the ML JSON is the placeholder (weights not yet generated):
-//   classifyTextML() returns all-zeros, which is detected and the two
-//   remaining signals are renormalised to 0.667/0.333.
+// Degradation order: S+ML+Claude → S+Claude → S+ML → S only.
 
-const WEIGHT_HEURISTIC_WITH_ML    = 0.50;
-const WEIGHT_SEMANTIC_WITH_ML     = 0.25;
-const WEIGHT_ML                   = 0.25;
+// S + ML + Claude (full blend)
+const WEIGHT_SEMANTIC_WITH_CLAUDE_ML = 0.20;
+const WEIGHT_ML_WITH_CLAUDE          = 0.35;
+const WEIGHT_CLAUDE                  = 0.45;
 
-// Renormalised fallback weights when ML is unavailable (sum still = 1.0):
-const WEIGHT_HEURISTIC_WITHOUT_ML = WEIGHT_HEURISTIC_WITH_ML / (WEIGHT_HEURISTIC_WITH_ML + WEIGHT_SEMANTIC_WITH_ML);
-const WEIGHT_SEMANTIC_WITHOUT_ML  = WEIGHT_SEMANTIC_WITH_ML  / (WEIGHT_HEURISTIC_WITH_ML + WEIGHT_SEMANTIC_WITH_ML);
+// Claude present, ML absent — S×0.30 + Claude×0.70
+const WEIGHT_SEMANTIC_CLAUDE_NO_ML   = 0.30;
+const WEIGHT_CLAUDE_NO_ML            = 0.70;
+
+// ML present, Claude absent — S×0.35 + ML×0.65
+const WEIGHT_SEMANTIC_WITH_ML        = 0.35;
+const WEIGHT_ML                      = 0.65;
+
+// Neither ML nor Claude — semantic only (S×1.00, no constants needed)
 
 /**
- * Three-signal hybrid classifier.
+ * Hybrid classifier — semantic + ML + Claude (heuristic removed).
  *
  * Combines:
- *   1. Heuristic (`classifyText`)          — deterministic, precise
- *   2. Local semantic (`classifyTextSemantic`) — vector similarity, recall
- *   3. Trained ML (`classifyTextML`)       — learnt from clan_dataset.json
+ *   1. Local semantic (`classifyTextSemantic`) — cosine-similarity, fast
+ *   2. Trained ML (`classifyTextML`)           — learnt from clan_dataset.json
+ *   3. Claude (`claudeScores`)                 — LLM layer, scored by backend
  *
  * Async because the semantic layer is async (designed for future remote API
  * swap). The ML layer is synchronous (bundled JSON) so adds no latency.
  *
+ * `claudeScores` is optional — provided by ClassificationContext after a call
+ * to the backend `/classify/reflection` endpoint. When absent the blend
+ * degrades gracefully without Claude.
+ *
  * Graceful degradation:
- *   - Semantic fails → heuristic only.
- *   - ML not trained yet (placeholder) → heuristic + semantic (0.667/0.333).
- *   - ML fails → heuristic + semantic (0.667/0.333).
+ *   - Semantic fails        → throws (ClassificationContext falls back externally).
+ *   - S + ML + Claude       → S×0.20 + ML×0.35 + Claude×0.45.
+ *   - S + Claude, no ML     → S×0.30 + Claude×0.70.
+ *   - S + ML, no Claude     → S×0.35 + ML×0.65.
+ *   - Semantic only         → S×1.00.
+ *
+ * Top-3 cap applied in ALL cases before returning: only the 3 highest-scoring
+ * clans are kept; the other 5 are zeroed. Scores are NOT renormalised so
+ * relative magnitudes are preserved for accumulation.
  */
 export async function classifyTextHybrid(
   text: string,
   type: InputType = 'reflection',
+  claudeScores?: ClanScores,
 ): Promise<ClanScores> {
-  const heuristic = classifyText(text, type);
-
   // ── Semantic layer (async, dynamic import to avoid circular ref) ────────
-  let semantic: ClanScores | null = null;
+  let semantic: ClanScores;
   try {
     const mod = await import('./semanticClassifier');
     semantic = await mod.classifyTextSemantic(text);
   } catch {
-    // Semantic unavailable → fall back to heuristic only.
-    return heuristic;
+    // Semantic unavailable — throw so ClassificationContext can fall back.
+    throw new Error('semantic layer unavailable');
   }
 
   // ── ML layer (synchronous, bundled JSON) ────────────────────────────────
@@ -575,20 +584,41 @@ export async function classifyTextHybrid(
     // ML module unavailable — continue without it.
   }
 
-  // ── Blend ────────────────────────────────────────────────────────────────
+  // ── Claude layer availability check ──────────────────────────────────────
+  const claudeSum = claudeScores
+    ? ALL_CLAN_IDS.reduce((a, c) => a + (claudeScores[c] ?? 0), 0)
+    : 0;
+  const hasClaude = claudeSum > 0;
+
+  // ── Blend (heuristic removed) ─────────────────────────────────────────────
   const out = makeZeroScores();
-  if (ml) {
+
+  if (hasClaude && ml) {
+    // S×0.20 + ML×0.35 + Claude×0.45
     for (const c of ALL_CLAN_IDS) {
       out[c] =
-        heuristic[c] * WEIGHT_HEURISTIC_WITH_ML +
-        semantic[c]  * WEIGHT_SEMANTIC_WITH_ML  +
-        ml[c]        * WEIGHT_ML;
+        semantic[c]      * WEIGHT_SEMANTIC_WITH_CLAUDE_ML +
+        ml[c]            * WEIGHT_ML_WITH_CLAUDE          +
+        claudeScores![c] * WEIGHT_CLAUDE;
+    }
+  } else if (hasClaude && !ml) {
+    // S×0.30 + Claude×0.70
+    for (const c of ALL_CLAN_IDS) {
+      out[c] =
+        semantic[c]      * WEIGHT_SEMANTIC_CLAUDE_NO_ML +
+        claudeScores![c] * WEIGHT_CLAUDE_NO_ML;
+    }
+  } else if (ml) {
+    // S×0.35 + ML×0.65
+    for (const c of ALL_CLAN_IDS) {
+      out[c] =
+        semantic[c] * WEIGHT_SEMANTIC_WITH_ML +
+        ml[c]       * WEIGHT_ML;
     }
   } else {
+    // Semantic only — S×1.00
     for (const c of ALL_CLAN_IDS) {
-      out[c] =
-        heuristic[c] * WEIGHT_HEURISTIC_WITHOUT_ML +
-        semantic[c]  * WEIGHT_SEMANTIC_WITHOUT_ML;
+      out[c] = semantic[c];
     }
   }
 
