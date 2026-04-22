@@ -13,6 +13,8 @@ import { getTopBarLapizByHouse } from '@evoconn/utils/getTopBarLapizByHouse';
 import { getTopBarUsosByHouse } from '@evoconn/utils/getTopBarUsosByHouse';
 import { getTopBarRachaTopByHouse } from '@evoconn/utils/getTopBarRachaTopByHouse';
 import { getTopBarInsigniaByHouse } from '@evoconn/utils/getTopBarInsigniaByHouse';
+import { getProgressionIcon } from '@evoconn/utils/getTopBarProgressionIcon';
+import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import FuegoApagadoIcon from '../assets/topbar/fueguitoSvg/fuego-apagado.svg';
 import { useDebugStreak, IS_DEBUG_STREAK_MODE } from '../debug/DebugStreakContext';
 import { useDebugStats } from '../debug/DebugStatsContext';
@@ -67,6 +69,9 @@ export function AppTopBar({
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
+  const { getVisibleClanId, getReflectionCount } = useClassification();
+  const visibleClanId     = getVisibleClanId();
+  const totalReflections  = getReflectionCount();
   const handleClanPress = () => (onClanPress ? onClanPress() : router.push('/my-profile'));
   const clanLabel =
     clanShortLabel ??
@@ -86,7 +91,12 @@ export function AppTopBar({
   const LapizIcon = useMemo(() => getTopBarLapizByHouse(activeClan), [activeClan]);
   const UsosIcon = useMemo(() => getTopBarUsosByHouse(activeClan), [activeClan]);
   const RachaIcon = useMemo(() => getTopBarRachaTopByHouse(activeClan), [activeClan]);
-  const InsigniaIcon = useMemo(() => getTopBarInsigniaByHouse(activeClan), [activeClan]);
+  const InsigniaIcon = useMemo(
+    () => visibleClanId
+      ? getTopBarInsigniaByHouse(activeClan)
+      : getProgressionIcon(totalReflections),
+    [activeClan, visibleClanId, totalReflections],
+  );
 
   // ─── Top-bar fire icon animation (grey → clan on first send of the day) ────
   const { hasSentToday, statsLoaded } = useDebugStreak();
