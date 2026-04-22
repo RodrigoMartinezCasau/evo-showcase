@@ -7,6 +7,7 @@ import { TOP_BAR_LAYOUT, topBarIconEditorStyle } from '@evoconn/constants/topBar
 import { mockCurrentUser, mockUserStats } from '@evoconn/data/mockUser';
 import { topBarIconFrameScale } from '@evoconn/assets/icons/topbar';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
+import { usePreviewMode } from '@evoconn/debug/PreviewModeContext';
 import { getTopBarStarColor } from '@evoconn/constants/clanColors';
 import { getTopBarEstrellaByHouse } from '@evoconn/utils/getTopBarEstrellaByHouse';
 import { getTopBarLapizByHouse } from '@evoconn/utils/getTopBarLapizByHouse';
@@ -69,13 +70,18 @@ export function AppTopBar({
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
+  const { isPreviewActive, previewClanId } = usePreviewMode();
   const { getVisibleClanId, getReflectionCount } = useClassification();
   const visibleClanId     = getVisibleClanId();
   const totalReflections  = getReflectionCount();
+
+  // activeClan ya incorpora previewClanId cuando el modo preview está activo
+  // (resuelto en useActiveClan → DebugClanContext). Se usa como alias claro.
+  const effectiveClan = activeClan;
   const handleClanPress = () => (onClanPress ? onClanPress() : router.push('/my-profile'));
   const clanLabel =
     clanShortLabel ??
-    (activeClan ? activeClan.slice(0, 2).toUpperCase() : '??');
+    (isPreviewActive ? 'MOD' : (effectiveClan ? effectiveClan.slice(0, 2).toUpperCase() : '??'));
 
   const { streakDays, remainingUses } = useDebugStats();
   const { totalUnlocked } = useQuotes();
@@ -86,16 +92,16 @@ export function AppTopBar({
   const fireCount   = counts?.fire   ?? streakDays;
   const heartCount  = counts?.heart  ?? remainingUses;
 
-  const EstrellaIcon = useMemo(() => getTopBarEstrellaByHouse(activeClan), [activeClan]);
-  const starTintColor = useMemo(() => getTopBarStarColor(activeClan), [activeClan]);
-  const LapizIcon = useMemo(() => getTopBarLapizByHouse(activeClan), [activeClan]);
-  const UsosIcon = useMemo(() => getTopBarUsosByHouse(activeClan), [activeClan]);
-  const RachaIcon = useMemo(() => getTopBarRachaTopByHouse(activeClan), [activeClan]);
+  const EstrellaIcon = useMemo(() => getTopBarEstrellaByHouse(effectiveClan), [effectiveClan]);
+  const starTintColor = useMemo(() => getTopBarStarColor(effectiveClan), [effectiveClan]);
+  const LapizIcon = useMemo(() => getTopBarLapizByHouse(effectiveClan), [effectiveClan]);
+  const UsosIcon = useMemo(() => getTopBarUsosByHouse(effectiveClan), [effectiveClan]);
+  const RachaIcon = useMemo(() => getTopBarRachaTopByHouse(effectiveClan), [effectiveClan]);
   const InsigniaIcon = useMemo(
-    () => visibleClanId
-      ? getTopBarInsigniaByHouse(activeClan)
+    () => (isPreviewActive || visibleClanId)
+      ? getTopBarInsigniaByHouse(effectiveClan)
       : getProgressionIcon(totalReflections),
-    [activeClan, visibleClanId, totalReflections],
+    [effectiveClan, isPreviewActive, visibleClanId, totalReflections],
   );
 
   // ─── Top-bar fire icon animation (grey → clan on first send of the day) ────
@@ -144,7 +150,12 @@ export function AppTopBar({
   const counterIconFrame = iconFrame(TOP_BAR_LAYOUT.COUNTER_ICON_SIZE, 1);
   const menuSize = TOP_BAR_LAYOUT.MENU_SIZE;
 
+  const previewClanLabel = isPreviewActive
+    ? (previewClanId ? previewClanId.toUpperCase() : 'SIN CLAN')
+    : null;
+
   return (
+    <>
     <View
       style={[
         styles.bar,
@@ -315,6 +326,16 @@ export function AppTopBar({
         </View>
       </View>
     </View>
+
+    {/* Banner de preview — solo visible cuando el modo diseño está activo */}
+    {isPreviewActive && previewClanLabel && (
+      <View style={styles.previewBanner} pointerEvents="none">
+        <Text style={styles.previewBannerText}>
+          MOD — {previewClanLabel}
+        </Text>
+      </View>
+    )}
+    </>
   );
 }
 
@@ -368,5 +389,19 @@ const styles = StyleSheet.create({
     minWidth: 22,
     textAlign: 'left',
     includeFontPadding: false,
+  },
+  previewBanner: {
+    backgroundColor: 'rgba(199,255,2,0.12)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(199,255,2,0.25)',
+    alignItems: 'center',
+    paddingVertical: 3,
+  },
+  previewBannerText: {
+    color: '#c7ff02',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
   },
 });
