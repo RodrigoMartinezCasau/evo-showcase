@@ -22,18 +22,37 @@ CLANS: list[str] = [
     "racionalista", "humanista", "realista", "trascendentalista",
 ]
 
-MODEL = "claude-haiku-4-5-20251001"
+MODEL = "claude-sonnet-4-6"
 
 _SYSTEM = (
-    "Eres un clasificador filosófico preciso. Solo devuelves JSON válido. "
+    "Eres un clasificador filosófico experto. Solo devuelves JSON válido con claves entre comillas. "
     "Nunca añades texto adicional ni explicaciones."
 )
 
 _PROMPT = (
-    "Analiza esta reflexión filosófica y puntúa del 0 al 10 cuánto expresa cada uno de estos "
-    "8 pensamientos. Devuelve SOLO un JSON sin texto adicional: "
-    '{"nihilista": X, "cientista": X, "estoico": X, "existencialista": X, '
-    '"racionalista": X, "humanista": X, "realista": X, "trascendentalista": X}. '
+    "Eres un experto en filosofía. Analiza esta reflexión y puntúa del 0 al 10 cuánto expresa cada "
+    "pensamiento filosófico. Sé muy preciso en las fronteras difíciles.\n\n"
+    "DEFINICIONES EXACTAS:\n"
+    "- nihilista: rechaza explícitamente que exista significado o propósito inherente. "
+    "Vacío, absurdo, nada importa. NO confundir con existencialista que SÍ construye significado.\n"
+    "- cientista: confía ÚNICAMENTE en evidencia empírica, experimentos, datos medibles, "
+    "método científico. NO confundir con racionalista que usa lógica pura sin necesitar evidencia.\n"
+    "- estoico: acepta lo incontrolable, controla solo lo interno, disciplina emocional, ecuanimidad. "
+    "NO confundir con realista.\n"
+    "- existencialista: construye su propio significado mediante decisiones y libertad radical. "
+    "NO confundir con nihilista.\n"
+    "- racionalista: razón y lógica pura sin necesitar evidencia empírica. "
+    "NO confundir con cientista.\n"
+    "- humanista: el ser humano y su bienestar son el centro. "
+    "Empatía, dignidad, relaciones, comunidad.\n"
+    "- realista: pragmatismo puro, hechos concretos, sin componente espiritual ni emocional profundo.\n"
+    "- trascendentalista: dimensión más allá de lo físico o racional, "
+    "intuición profunda, conexión con algo mayor.\n\n"
+    "REGLA CRÍTICA: Realista solo merece puntuación alta si el texto habla EXPLÍCITAMENTE "
+    "de pragmatismo y hechos concretos. No lo puntúes alto por lenguaje reflexivo general.\n\n"
+    'Devuelve SOLO este JSON sin texto adicional:\n'
+    '{{"nihilista": X, "cientista": X, "estoico": X, "existencialista": X, '
+    '"racionalista": X, "humanista": X, "realista": X, "trascendentalista": X}}\n\n'
     "Reflexión: {texto}"
 )
 
@@ -85,7 +104,7 @@ def _parse_scores(raw: str) -> dict[str, float] | None:
 
 def classify_with_claude(texto: str) -> dict[str, float]:
     """
-    Clasifica una reflexión filosófica usando claude-haiku-4-5-20251001.
+    Clasifica una reflexión filosófica usando claude-sonnet-4-6.
 
     Retorna un dict {clan: score} en escala [0, 10].
     Retorna zeros en cualquier error (API, red, parseo) para no romper el flujo.
