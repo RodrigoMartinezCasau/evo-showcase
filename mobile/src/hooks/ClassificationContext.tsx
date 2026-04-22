@@ -117,6 +117,24 @@ const POST_REVEAL_WEIGHT = 0.35;
  *  percentage points before we switch (PART 14: "should not happen too easily"). */
 const SWITCH_MARGIN = 5;
 
+// ── Momentum constants ────────────────────────────────────────────────────────
+
+/** Momentum activates from this input number onwards (1-indexed). */
+const MOMENTUM_START_INPUT = 15;
+/** Fraction of the relative trend applied as boost (0.3 = up to ±30%). */
+const MOMENTUM_STRENGTH = 0.3;
+/** Minimum and maximum boost multiplier to prevent runaway amplification. */
+const MOMENTUM_MIN = 0.7;
+const MOMENTUM_MAX = 1.5;
+
+// ── Post-reveal inertia multipliers (applied on top of POST_REVEAL_WEIGHT) ───
+/** Revealed clan is top-1 in current input → reinforce. */
+const INERTIA_TOP1  = 1.2;
+/** Revealed clan is top-2 or top-3 → neutral-positive. */
+const INERTIA_TOP23 = 0.8;
+/** Revealed clan not in top-3 → very hard to displace. */
+const INERTIA_OUT   = 0.3;
+
 // ─── Public types ───────────────────────────────────────────────────────────
 
 export type ClanPct = { clanId: string; label: string; pct: number };
@@ -151,6 +169,57 @@ function applyScoresToTotals(totals: ClanScores, scores: ClanScores, weight: num
     next[c] = totals[c] + scores[c] * weight;
   }
   return next;
+}
+
+/** Accumulate using a per-clan weight map (momentum + inertia path). */
+function applyScoresWithPerClanWeights(
+  totals: ClanScores,
+  scores: ClanScores,
+  weights: Record<ClanScoreId, number>,
+): ClanScores {
+  const next: ClanScores = { ...totals };
+  for (const c of ALL_CLAN_IDS) {
+    next[c] = totals[c] + scores[c] * weights[c];
+  }
+  return next;
+}
+
+/**
+ * Computes a per-clan momentum boost from recent vs historical score trends.
+ *
+ * Returns all 1.0 when there are fewer than MOMENTUM_START_INPUT − 1 historical
+ * inputs (i.e. we are processing inputs 1–14; boost activates at input 15).
+ *
+ * Formula per clan:
+ *   boost = clamp(
+ *     1 + (mean_last5 − mean_all) / (mean_all + 0.001) × MOMENTUM_STRENGTH,
+ *     MOMENTUM_MIN, MOMENTUM_MAX
+ *   )
+ *
+ * `clanScores` stored in each input record are the original (pre-boost)
+ * hybrid scores, so the mean calculation stays free of compounding.
+ */
+function computeMomentumBoosts(
+  inputs: UserClassificationState['inputs'],
+): Record<ClanScoreId, number> {
+  const boosts = {} as Record<ClanScoreId, number>;
+
+  if (inputs.length < MOMENTUM_START_INPUT - 1) {
+    for (const c of ALL_CLAN_IDS) boosts[c] = 1.0;
+    return boosts;
+  }
+
+  const last5 = inputs.slice(-5);
+  const n = inputs.length;
+
+  for (const c of ALL_CLAN_IDS) {
+    const histMean  = inputs.reduce((sum, inp) => sum + (inp.clanScores[c] ?? 0), 0) / n;
+    const recentMean = last5.reduce((sum, inp) => sum + (inp.clanScores[c] ?? 0), 0) / last5.length;
+    const raw = 1 + ((recentMean - histMean) / (histMean + 0.001)) * MOMENTUM_STRENGTH;
+    boosts[c] = Math.min(MOMENTUM_MAX, Math.max(MOMENTUM_MIN, raw));
+  }
+
+  return boosts;
 }
 
 function pickTopClan(pcts: Record<ClanScoreId, number>): { id: ClanScoreId; pct: number } {
@@ -323,11 +392,44 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
       setDb((prev) => {
         const prevState = prev[userId] ?? makeEmptyUserState();
 
-        // Inertia: pre-reveal full weight, post-reveal dampened.
-        const weight =
-          prevState.visibleClanId == null ? PRE_REVEAL_WEIGHT : POST_REVEAL_WEIGHT;
+        // ── Momentum boost (active from input MOMENTUM_START_INPUT onwards) ──
+        const momentumBoosts = computeMomentumBoosts(prevState.inputs);
+        const boostedScores: ClanScores = { ...scores };
+        for (const c of ALL_CLAN_IDS) {
+          boostedScores[c] = scores[c] * momentumBoosts[c];
+        }
 
-        const newTotals = applyScoresToTotals(prevState.totals, scores, weight);
+        // ── Per-clan accumulation weights (base inertia + revealed-clan inercia)
+        const baseWeight = prevState.visibleClanId == null ? PRE_REVEAL_WEIGHT : POST_REVEAL_WEIGHT;
+        let perClanWeights: Record<ClanScoreId, number>;
+
+        if (prevState.visibleClanId == null) {
+          // Pre-reveal: uniform full weight for all clans.
+          perClanWeights = {} as Record<ClanScoreId, number>;
+          for (const c of ALL_CLAN_IDS) perClanWeights[c] = PRE_REVEAL_WEIGHT;
+        } else {
+          // Post-reveal: revealed clan gets an inertia multiplier based on its
+          // rank in the current boosted scores; all others keep POST_REVEAL_WEIGHT.
+          const revealedClan = prevState.visibleClanId;
+          const sorted = ([...ALL_CLAN_IDS] as ClanScoreId[]).sort(
+            (a, b) => boostedScores[b] - boostedScores[a],
+          );
+          const revealedRank = sorted.indexOf(revealedClan);
+          const inertiaMultiplier =
+            revealedRank === 0 ? INERTIA_TOP1  :
+            revealedRank <= 2  ? INERTIA_TOP23 :
+                                 INERTIA_OUT;
+
+          perClanWeights = {} as Record<ClanScoreId, number>;
+          for (const c of ALL_CLAN_IDS) {
+            perClanWeights[c] =
+              c === revealedClan
+                ? POST_REVEAL_WEIGHT * inertiaMultiplier
+                : POST_REVEAL_WEIGHT;
+          }
+        }
+
+        const newTotals = applyScoresWithPerClanWeights(prevState.totals, boostedScores, perClanWeights);
 
         const totalReflectionsSent =
           prevState.totalReflectionsSent + (type === 'reflection' ? 1 : 0);
@@ -339,9 +441,9 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
         const nextRecord = {
           inputId: generatedId,
           inputType: type,
-          clanScores: scores,
+          clanScores: scores,         // original scores (pre-boost) for momentum history
           ...(claudeScores ? { claudeScores } : {}),
-          weight,
+          weight: baseWeight,         // base weight for debug display
           createdAt: nowIso,
         };
 
