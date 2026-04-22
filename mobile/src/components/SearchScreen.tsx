@@ -10,11 +10,10 @@ import {
   Keyboard,
 } from 'react-native';
 import { evoconnColors } from '../theme/colors';
-import { getClanColor } from '../constants/clanColors';
 import { SEARCH_LAYOUT as SL } from '../constants/searchScreenLayout';
-import { getClanProfileByHouse } from '../utils/getClanProfileByHouse';
 import { mockSearchableUsers } from '../data/mockSearchUsers';
 import { searchUsers, type ScoredUser } from '../utils/searchUsers';
+import { UserResultCard } from './UserResultCard';
 
 const MAX_RECENTS = 10;
 const DEBOUNCE_MS = 250;
@@ -94,42 +93,16 @@ export function SearchScreen({ onUserPress }: SearchScreenProps) {
 
   const showResults = debouncedQuery.trim().length > 0;
 
-  const renderResultItem = useCallback(({ item }: { item: ScoredUser }) => {
-    const clanColor  = getClanColor(item.clanId);
-    const ProfileSvg = getClanProfileByHouse(item.clanId);
-    return (
-      <TouchableOpacity
-        style={[styles.resultItem, { height: SL.resultItemHeight }]}
-        activeOpacity={0.7}
-        onPress={() => handleUserPress(item)}
-      >
-        <View style={styles.avatarWrap}>
-          <View
-            style={{
-              transform: [
-                { translateX: SEARCH_PROFILE_ICON_OFFSET_X },
-                { translateY: SEARCH_PROFILE_ICON_OFFSET_Y },
-                { scale: SEARCH_PROFILE_ICON_SCALE },
-              ],
-            }}
-          >
-            <ProfileSvg
-              width={SEARCH_PROFILE_ICON_BASE_SIZE}
-              height={SEARCH_PROFILE_ICON_BASE_SIZE}
-            />
-          </View>
-        </View>
-        <View style={styles.resultInfo}>
-          <Text style={[styles.resultUsername, { fontSize: SL.fontSize - 2 }]}>
-            {item.username}
-          </Text>
-          <Text style={styles.resultMeta}>
-            {item.rank} · {item.followersCount ?? 0} seguidores
-          </Text>
-        </View>
-      </TouchableOpacity>
-    );
-  }, [handleUserPress]);
+  const renderResultItem = useCallback(({ item }: { item: ScoredUser }) => (
+    <UserResultCard
+      id={item.id}
+      username={item.username}
+      clanId={item.clanId}
+      rank={item.rank}
+      followersCount={item.followersCount ?? 0}
+      onPress={() => handleUserPress(item)}
+    />
+  ), [handleUserPress]);
 
   const renderRecentItem = useCallback(({ item }: { item: string }) => (
     <View style={[styles.recentItem, { height: SL.resultItemHeight - 8 }]}>
