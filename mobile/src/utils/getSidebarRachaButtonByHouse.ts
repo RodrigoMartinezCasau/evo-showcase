@@ -3,15 +3,15 @@ import type { StyleProp, ViewStyle } from 'react-native';
 
 import type { ClanId } from '@evoconn/constants/clanColors';
 
-import Svg111 from '../assets/sidebar/iconoFueguitoSvg/111.svg';
-import Svg112 from '../assets/sidebar/iconoFueguitoSvg/112.svg';
-import Svg113 from '../assets/sidebar/iconoFueguitoSvg/113.svg';
-import Svg114 from '../assets/sidebar/iconoFueguitoSvg/114.svg';
-import Svg115 from '../assets/sidebar/iconoFueguitoSvg/115.svg';
-import Svg116 from '../assets/sidebar/iconoFueguitoSvg/116.svg';
-import Svg117 from '../assets/sidebar/iconoFueguitoSvg/117.svg';
-import Svg118 from '../assets/sidebar/iconoFueguitoSvg/118.svg';
-import Svg119 from '../assets/sidebar/iconoFueguitoSvg/119.svg';
+import Svg190 from '../assets/sidebar/iconoFueguitoSvg/190.svg';
+import Svg191 from '../assets/sidebar/iconoFueguitoSvg/191.svg';
+import Svg192 from '../assets/sidebar/iconoFueguitoSvg/192.svg';
+import Svg193 from '../assets/sidebar/iconoFueguitoSvg/193.svg';
+import Svg194 from '../assets/sidebar/iconoFueguitoSvg/194.svg';
+import Svg195 from '../assets/sidebar/iconoFueguitoSvg/195.svg';
+import Svg196 from '../assets/sidebar/iconoFueguitoSvg/196.svg';
+import Svg197 from '../assets/sidebar/iconoFueguitoSvg/197.svg';
+import Svg198 from '../assets/sidebar/iconoFueguitoSvg/198.svg';
 
 export type SidebarRachaSvgProps = {
   width?: number;
@@ -20,21 +20,21 @@ export type SidebarRachaSvgProps = {
 };
 
 /**
- * Botón RACHA (SVG 111–119, carpeta `iconoFueguitoSvg` / icono fueguito). Mismo orden de clanes que 129–137.
+ * Botón RACHA (SVG 190–198, carpeta `iconoFueguitoSvg` / icono fueguito). Mismo orden de clanes que 129–137.
  */
 const RACHA_BUTTON_BY_CLAN: Record<ClanId, FC<SidebarRachaSvgProps>> = {
-  racionalista: Svg112,
-  realista: Svg113,
-  humanista: Svg114,
-  existencialista: Svg115,
-  trascendentalista: Svg116,
-  cientista: Svg117,
-  nihilista: Svg118,
-  estoico: Svg119,
+  racionalista: Svg191,
+  realista: Svg192,
+  humanista: Svg193,
+  existencialista: Svg194,
+  trascendentalista: Svg195,
+  cientista: Svg196,
+  nihilista: Svg197,
+  estoico: Svg198,
 };
 
-/** Sin clan / Evocon → 111.svg */
-export const SIDEBAR_DEFAULT_RACHA_BUTTON: FC<SidebarRachaSvgProps> = Svg111;
+/** Sin clan / Evocon → 190.svg */
+export const SIDEBAR_DEFAULT_RACHA_BUTTON: FC<SidebarRachaSvgProps> = Svg190;
 
 export function getRachaButtonByHouse(house?: string | null): FC<SidebarRachaSvgProps> {
   if (house == null || house === '') {

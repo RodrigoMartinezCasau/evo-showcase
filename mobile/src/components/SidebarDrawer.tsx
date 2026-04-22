@@ -287,7 +287,7 @@ export function SidebarDrawer({
           clanId={user.clanId}
           onPress={() => {
             onClose();
-            router.push('/racha');
+            router.push('/notifications');
           }}
         />
         <SidebarClanInsignia
