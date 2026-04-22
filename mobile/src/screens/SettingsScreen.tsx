@@ -34,6 +34,8 @@ import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { getClanProfileByHouse } from '@evoconn/utils/getClanProfileByHouse';
 import { useAISettings } from '@evoconn/hooks/AISettingsContext';
+import { useClassification } from '@evoconn/hooks/ClassificationContext';
+import { CLAN_TO_COLOR } from '@evoconn/constants/clanColors';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -263,6 +265,9 @@ function SettingsSection({ section, toggleState, onToggleChange }: SectionProps)
 function ProfileHeader() {
   const activeClan  = useActiveClan(mockCurrentUser.clanId);
   const ProfileIcon = useMemo(() => getClanProfileByHouse(activeClan), [activeClan]);
+  const { visibleClanId } = useClassification();
+  const effectiveClan = visibleClanId ?? activeClan;
+  const clanColor     = effectiveClan ? CLAN_TO_COLOR[effectiveClan as keyof typeof CLAN_TO_COLOR] ?? null : null;
 
   const rank = mockCurrentUser.rank
     ? mockCurrentUser.rank.charAt(0).toUpperCase() + mockCurrentUser.rank.slice(1)
@@ -276,7 +281,10 @@ function ProfileHeader() {
     >
       {/* Avatar — clan SVG replaces the initial letter */}
       <View style={styles.avatarWrap}>
-        <View style={styles.avatar}>
+        <View style={[
+          styles.avatar,
+          clanColor ? { backgroundColor: `${clanColor}1F`, borderRadius: 30 } : undefined,
+        ]}>
           <View
             style={{
               transform: [
@@ -300,7 +308,11 @@ function ProfileHeader() {
       {/* Info */}
       <View style={styles.profileInfo}>
         <Text style={styles.profileName}>{mockCurrentUser.username}</Text>
-        <Text style={styles.profileHandle}>@{mockCurrentUser.username.toLowerCase()}</Text>
+        <Text style={styles.profileHandle}>
+          {mockCurrentUser.username.startsWith('@')
+            ? mockCurrentUser.username.toLowerCase()
+            : `@${mockCurrentUser.username.toLowerCase()}`}
+        </Text>
         <View style={styles.rankBadge}>
           <Text style={styles.rankText}>{rank}</Text>
         </View>
