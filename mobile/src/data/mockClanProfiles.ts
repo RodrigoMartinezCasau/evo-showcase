@@ -7,6 +7,7 @@ export type ClanMember = {
   username: string;
   clanId: string | null;
   rank: Rank;
+  followersCount?: number;
 };
 
 export type ClanStats = {
@@ -69,6 +70,12 @@ const AUTHOR_HERNAN     = simAuthor('u8');
 const AUTHOR_SOFIA      = simAuthor('u6');
 const AUTHOR_LUCAS      = simAuthor('u9');
 
+/** Construye un ClanMember con followersCount real del grafo de simulación. */
+function member(id: string, rank: Rank): ClanMember {
+  const a = simAuthor(id);
+  return { id: a.id, username: a.username, clanId: a.clanId, rank, followersCount: a.followersCount };
+}
+
 // ─── Clan profiles ────────────────────────────────────────────────────────
 
 const CLAN_PROFILES: ClanProfile[] = [
@@ -83,9 +90,7 @@ const CLAN_PROFILES: ClanProfile[] = [
       { clanId: 'estoico', label: 'Estoico', pct: 12 },
       { clanId: 'racionalista', label: 'Racionalista', pct: 6 },
     ],
-    topMembers: [
-      { id: 'u2', username: '@DIEGOLLUBERES', clanId: 'nihilista', rank: 'maestro' },
-    ],
+    topMembers: [member('u2', 'maestro')],
     recentPosts: postsBy('u2'),
   },
   {
@@ -99,9 +104,7 @@ const CLAN_PROFILES: ClanProfile[] = [
       { clanId: 'existencialista', label: 'Existencialista', pct: 15 },
       { clanId: 'nihilista', label: 'Nihilista', pct: 5 },
     ],
-    topMembers: [
-      { id: 'u4', username: '@ALEJANDROSERRANO', clanId: 'estoico', rank: 'filosofo' },
-    ],
+    topMembers: [member('u4', 'filosofo')],
     recentPosts: postsBy('u4'),
   },
   {
@@ -115,9 +118,7 @@ const CLAN_PROFILES: ClanProfile[] = [
       { clanId: 'trascendentalista', label: 'Trascendentalista', pct: 12 },
       { clanId: 'humanista', label: 'Humanista', pct: 8 },
     ],
-    topMembers: [
-      { id: 'u5', username: '@PABLOMORENO', clanId: 'existencialista', rank: 'maestro' },
-    ],
+    topMembers: [member('u5', 'maestro')],
     recentPosts: postsBy('u5'),
   },
   {
@@ -131,9 +132,7 @@ const CLAN_PROFILES: ClanProfile[] = [
       { clanId: 'estoico', label: 'Estoico', pct: 12 },
       { clanId: 'realista', label: 'Realista', pct: 5 },
     ],
-    topMembers: [
-      { id: 'u9', username: '@CARLOSDUARTE', clanId: 'racionalista', rank: 'filosofo' },
-    ],
+    topMembers: [member('u9', 'filosofo')],
     recentPosts: postsBy('u9'),
   },
   {
@@ -147,9 +146,7 @@ const CLAN_PROFILES: ClanProfile[] = [
       { clanId: 'trascendentalista', label: 'Trascendentalista', pct: 14 },
       { clanId: 'estoico', label: 'Estoico', pct: 6 },
     ],
-    topMembers: [
-      { id: 'u7', username: '@MARIANALOPEZ', clanId: 'humanista', rank: 'aprendiz' },
-    ],
+    topMembers: [member('u7', 'aprendiz')],
     recentPosts: postsBy('u7'),
   },
   {
@@ -163,9 +160,7 @@ const CLAN_PROFILES: ClanProfile[] = [
       { clanId: 'racionalista', label: 'Racionalista', pct: 15 },
       { clanId: 'cientista', label: 'Cientista', pct: 5 },
     ],
-    topMembers: [
-      { id: 'u8', username: '@HERNANCHACON', clanId: 'realista', rank: 'maestro' },
-    ],
+    topMembers: [member('u8', 'maestro')],
     recentPosts: postsBy('u8'),
   },
   {
@@ -179,9 +174,7 @@ const CLAN_PROFILES: ClanProfile[] = [
       { clanId: 'existencialista', label: 'Existencialista', pct: 14 },
       { clanId: 'nihilista', label: 'Nihilista', pct: 6 },
     ],
-    topMembers: [
-      { id: 'u6', username: '@SOFIAREYES', clanId: 'trascendentalista', rank: 'filosofo' },
-    ],
+    topMembers: [member('u6', 'filosofo')],
     recentPosts: postsBy('u6'),
   },
   {
@@ -195,9 +188,7 @@ const CLAN_PROFILES: ClanProfile[] = [
       { clanId: 'realista', label: 'Realista', pct: 10 },
       { clanId: 'estoico', label: 'Estoico', pct: 3 },
     ],
-    topMembers: [
-      { id: 'u3', username: '@VALENTINAORTIZ', clanId: 'cientista', rank: 'aprendiz' },
-    ],
+    topMembers: [member('u3', 'aprendiz')],
     recentPosts: postsBy('u3'),
   },
   {
@@ -215,9 +206,7 @@ const CLAN_PROFILES: ClanProfile[] = [
       { clanId: 'cientista', label: 'Cientista', pct: 13 },
       { clanId: 'trascendentalista', label: 'Trascendentalista', pct: 12 },
     ],
-    topMembers: [
-      { id: 'u1', username: '@RODRIGOMARTINEZ', clanId: null, rank: 'aprendiz' },
-    ],
+    topMembers: [member('u1', 'aprendiz')],
     recentPosts: postsBy('u1'),
   },
 ];

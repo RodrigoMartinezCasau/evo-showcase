@@ -92,12 +92,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   avatarWrap: {
-    width: ICON_SIZE,
-    height: ICON_SIZE,
+    width: ICON_SIZE * ICON_SCALE,
+    height: ICON_SIZE * ICON_SCALE,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
-    overflow: 'hidden',
+    overflow: 'visible',
   },
   info: {
     flex: 1,

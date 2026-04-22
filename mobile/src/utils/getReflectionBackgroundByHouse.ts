@@ -34,6 +34,6 @@ export function getReflectionBackgroundByHouse(
   if (house == null || String(house).trim() === '') return REFLECTION_BG_DEFAULT;
   const key = house.trim().toLowerCase() as ClanId;
   return (
-    (BG_BY_CLAN as Record<string, FC<SvgProps> | undefined>)[key] ?? Svg38
+    (BG_BY_CLAN as Record<string, FC<SvgProps> | undefined>)[key] ?? REFLECTION_BG_DEFAULT
   );
 }

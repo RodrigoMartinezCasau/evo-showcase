@@ -33,6 +33,8 @@ import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
 import { ProfileDetailPanel } from '@evoconn/components/ProfileDetailPanel';
 import { ClanPhilosopherSlot } from './ClanPhilosopherSlot';
 import { UserResultCard } from '@evoconn/components/UserResultCard';
+import { PersonalRecentPostCard } from '@evoconn/components/personalProfile/PersonalRecentPostCard';
+import { useFeedStore } from '@evoconn/hooks/useFeedStore';
 import type { CommunityPost } from '@evoconn/types';
 import type { ClanMember } from '@evoconn/data/mockClanProfiles';
 
@@ -64,6 +66,8 @@ type Props = {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
+const WINDOW_24H = 24 * 60 * 60 * 1000;
+
 export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
   const router     = useRouter();
   const { width: screenW } = useWindowDimensions();
@@ -72,6 +76,31 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
   const config     = getClanConfig(clanId);
   const clanColor  = getClanColor(clanId);
   const ShieldSvg  = useMemo(() => getTopBarInsigniaByHouse(clanId), [clanId]);
+
+  // ── Top posts en vivo — publicaciones del clan con ≥1 voto en las últimas 24h ──
+  // Para 'indefinido', los autores sin clan asignado tienen clanId: null.
+  const { posts: allPosts } = useFeedStore();
+  const livePosts = useMemo(() => {
+    const since = Date.now() - WINDOW_24H;
+    const matchClan = clanId === 'indefinido'
+      ? (authorClanId: string | null) => authorClanId == null
+      : (authorClanId: string | null) => authorClanId === clanId;
+
+    const inWindow = allPosts.filter((p) =>
+      matchClan(p.author.clanId) &&
+      new Date(p.createdAt).getTime() >= since &&
+      p.voteStats.up + p.voteStats.down >= 1,
+    );
+
+    // Si no hay posts en las últimas 24h, muestra los más votados sin límite de tiempo.
+    const source = inWindow.length > 0
+      ? inWindow
+      : allPosts.filter((p) =>
+          matchClan(p.author.clanId) && p.voteStats.up + p.voteStats.down >= 1,
+        );
+
+    return source.sort((a, b) => b.voteStats.up - a.voteStats.up);
+  }, [allPosts, clanId]);
 
   // ── Detail panel state ────────────────────────────────────────────────────
   const slideAnim        = useRef(new Animated.Value(0)).current;
@@ -136,37 +165,13 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
 
   // ── Render: post card (Section 6) ─────────────────────────────────────────
   const renderPostCard = useCallback(
-    ({ item }: { item: CommunityPost }) => {
-      const isPhrase = item.type === 'phrase';
-      return (
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => handlePostPress(item)}
-          style={[styles.postCard, { width: cardW }]}
-        >
-          {isPhrase ? (
-            <View style={styles.phraseWrap}>
-              <Text style={styles.quoteMarks}>"</Text>
-              <Text style={styles.phraseBody} numberOfLines={5}>{item.body}</Text>
-              {item.quoteAuthor ? (
-                <Text style={styles.quoteAuthor}>— {item.quoteAuthor}</Text>
-              ) : null}
-            </View>
-          ) : (
-            <View style={styles.reflectionWrap}>
-              {item.title ? (
-                <Text style={styles.reflectionTitle} numberOfLines={2}>{item.title}</Text>
-              ) : null}
-              <Text style={styles.reflectionBody} numberOfLines={4}>{item.body}</Text>
-            </View>
-          )}
-          <View style={styles.cardFooter}>
-            <Text style={styles.cardStat}>▲ {item.voteStats.up}</Text>
-            <Text style={styles.cardType}>{isPhrase ? 'Frase' : 'Reflexión'}</Text>
-          </View>
-        </TouchableOpacity>
-      );
-    },
+    ({ item }: { item: CommunityPost }) => (
+      <PersonalRecentPostCard
+        post={item}
+        cardWidth={cardW}
+        onPress={handlePostPress}
+      />
+    ),
     [cardW, handlePostPress],
   );
 
@@ -178,6 +183,7 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
         username={item.username}
         clanId={item.clanId}
         rank={item.rank}
+        followersCount={item.followersCount ?? 0}
         clanPct={mockClanPct(item.rank, index)}
         onPress={() => handleMemberPress(item)}
       />
@@ -208,12 +214,12 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
           </View>
 
           {/* ── SECCIÓN 2 — Frase del clan ────────────────────────────── */}
-          <View style={styles.phraseSection}>
+          <View style={[styles.phraseSection, { borderLeftWidth: 3, borderLeftColor: clanColor }]}>
             <Text style={styles.clanPhrase}>{config.phrase}</Text>
           </View>
 
           {/* ── SECCIÓN 3 — Miembros destacados ──────────────────────── */}
-          <View style={styles.panel}>
+          <View style={[styles.panel, { borderWidth: 1, borderColor: `${clanColor}22` }]}>
             <Text style={[styles.panelTitle, { color: clanColor }]}>Miembros destacados</Text>
             {clan.topMembers.length === 0 ? (
               <View style={styles.emptyState}>
@@ -233,7 +239,7 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
           </View>
 
           {/* ── SECCIÓN 4 — Filósofos representativos ────────────────── */}
-          <View style={styles.panelDark}>
+          <View style={[styles.panelDark, { borderWidth: 1, borderColor: `${clanColor}22` }]}>
             <Text style={[styles.panelTitle, { color: clanColor }]}>Referentes filosóficos</Text>
             <View style={styles.philosophersRow}>
               {config.philosophers.map((philosopher, idx) => (
@@ -247,7 +253,7 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
           </View>
 
           {/* ── SECCIÓN 5 — Descripción del clan ─────────────────────── */}
-          <View style={styles.panel}>
+          <View style={[styles.panel, { borderWidth: 1, borderColor: `${clanColor}22` }]}>
             <Text style={[styles.panelTitle, { color: clanColor }]}>¿Cómo piensa este clan?</Text>
             <Text style={styles.descText}>{config.description}</Text>
           </View>
@@ -257,14 +263,13 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
             <Text style={[styles.panelTitle, { marginHorizontal: 20, color: clanColor }]}>
               Top publicaciones del clan — últimas 24h
             </Text>
-            {clan.recentPosts.length === 0 ? (
+            {livePosts.length === 0 ? (
               <View style={[styles.emptyState, { marginHorizontal: 20 }]}>
-                <Text style={styles.emptyIcon}>📭</Text>
                 <Text style={styles.emptyText}>Sin publicaciones recientes</Text>
               </View>
             ) : (
               <FlatList
-                data={clan.recentPosts}
+                data={livePosts}
                 keyExtractor={(p) => p.id}
                 renderItem={renderPostCard}
                 horizontal
@@ -386,72 +391,9 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
 
-  // ── Section 6: Posts ─────────────────────────────────────────────────────
+  // ── Section 6: Posts — tarjeta delegada a PersonalRecentPostCard ─────────
   postsSection: {
     gap: 12,
-  },
-  postCard: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    overflow: 'hidden',
-    minHeight: 160,
-    justifyContent: 'space-between',
-  },
-  phraseWrap: {
-    padding: 16,
-    flex: 1,
-  },
-  quoteMarks: {
-    color: 'rgba(255,255,255,0.3)',
-    fontSize: 32,
-    lineHeight: 28,
-    fontWeight: '700',
-  },
-  phraseBody: {
-    color: '#ffffff',
-    fontSize: 14,
-    lineHeight: 21,
-    fontStyle: 'italic',
-  },
-  quoteAuthor: {
-    color: 'rgba(255,255,255,0.45)',
-    fontSize: 12,
-    marginTop: 6,
-  },
-  reflectionWrap: {
-    padding: 16,
-    flex: 1,
-  },
-  reflectionTitle: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  reflectionBody: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.06)',
-  },
-  cardStat: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 12,
-  },
-  cardType: {
-    color: 'rgba(255,255,255,0.35)',
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
 
   // ── Empty states ─────────────────────────────────────────────────────────
