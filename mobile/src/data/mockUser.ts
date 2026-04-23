@@ -14,7 +14,7 @@ const _activeUser: User = {
   id: 'u1',
   username: '@RODRIGOMARTINEZ',
   clanId: null,
-  rank: 'aprendiz',
+  rank: 'maestro',   // dominant 40% → maestro (40–50%)
   followersCount: 4,
   followingCount: 4,
 };

@@ -1,9 +1,9 @@
 /**
  * Detailed rank/progression display.
  * Rank thresholds (based on dominant clan %):
- *   0 – <50   → Aprendiz
- *   50 – <90  → Maestro
- *   90 – 100  → Filósofo
+ *   25 – <40  → Aprendiz
+ *   40 – <50  → Maestro
+ *   ≥  50     → Filósofo
  */
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
@@ -14,10 +14,22 @@ import {
   RANK_BAR_BACKGROUND_COLOR,
   RANK_BAR_RADIUS,
 } from '@evoconn/constants/personalProfileLayout';
+import {
+  getRankFromPct,
+  getRankBarFill,
+  getNextRankThreshold,
+  RANK_THRESHOLDS,
+} from '@evoconn/utils/getRankFromPct';
 
 type Props = {
   dominantClanLabel: string;
   dominantPct: number;
+};
+
+const RANK_LABELS: Record<string, string> = {
+  aprendiz: 'Aprendiz',
+  maestro:  'Maestro',
+  filosofo: 'Filósofo',
 };
 
 function getRankInfo(pct: number): {
@@ -26,20 +38,21 @@ function getRankInfo(pct: number): {
   threshold: number | null;
   remaining: number | null;
 } {
-  if (pct < 50) {
-    return { rank: 'Aprendiz', nextRank: 'Maestro', threshold: 50, remaining: 50 - pct };
-  }
-  if (pct < 90) {
-    return { rank: 'Maestro', nextRank: 'Filósofo', threshold: 90, remaining: 90 - pct };
-  }
-  return { rank: 'Filósofo', nextRank: null, threshold: null, remaining: null };
-}
+  const rankKey  = getRankFromPct(pct);
+  const rank     = RANK_LABELS[rankKey];
+  const next     = getNextRankThreshold(pct);
 
-/** Fill fraction (0–1) of the visible bar from current segment start to pct. */
-function getBarFill(pct: number): number {
-  if (pct < 50) return pct / 50;
-  if (pct < 90) return (pct - 50) / 40;
-  return 1;
+  if (next === null) {
+    return { rank, nextRank: null, threshold: null, remaining: null };
+  }
+
+  const nextRankKey = next === RANK_THRESHOLDS.FILOSOFO ? 'Filósofo' : 'Maestro';
+  return {
+    rank,
+    nextRank:  nextRankKey,
+    threshold: next,
+    remaining: Math.round((next - pct) * 10) / 10,
+  };
 }
 
 export const DetailedRankCard = React.memo(function DetailedRankCard({
@@ -47,7 +60,7 @@ export const DetailedRankCard = React.memo(function DetailedRankCard({
   dominantPct,
 }: Props) {
   const { rank, nextRank, remaining } = getRankInfo(dominantPct);
-  const fill = getBarFill(dominantPct);
+  const fill = getRankBarFill(dominantPct);
 
   const [trackW, setTrackW] = useState(0);
   const onTrackLayout = useCallback(
@@ -97,11 +110,11 @@ export const DetailedRankCard = React.memo(function DetailedRankCard({
       {/* Threshold labels */}
       <View style={styles.thresholdRow}>
         <Text style={styles.thresholdLabel}>
-          {rank === 'Aprendiz' ? '0%' : rank === 'Maestro' ? '50%' : '90%'}
+          {rank === 'Aprendiz' ? '25%' : rank === 'Maestro' ? '40%' : '50%'}
         </Text>
         {nextRank && (
           <Text style={styles.thresholdLabel}>
-            {rank === 'Aprendiz' ? '50%' : '90%'}
+            {rank === 'Aprendiz' ? '40%' : '50%'}
           </Text>
         )}
       </View>

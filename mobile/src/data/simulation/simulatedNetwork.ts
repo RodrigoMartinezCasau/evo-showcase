@@ -11,6 +11,7 @@
  *  - No post has more than 8 votes (upvoters + downvoters), author never votes own post
  */
 import type { Rank } from '@evoconn/types';
+import { getRankFromPct } from '@evoconn/utils/getRankFromPct';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,14 +65,21 @@ const H = 3_600_000;
 const D = 86_400_000;
 const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
 
-// ─── 9 Simulated Users ────────────────────────────────────────────────────────
+/** Derives rank from the dominant clan percentage (first entry in philosophyPercentages). */
+function rankFrom(pcts: ClanPct[]): Rank {
+  const dominant = pcts[0]?.pct ?? 0;
+  return getRankFromPct(dominant);
+}
 
-export const SIM_USERS: SimUser[] = [
+// ─── 9 Simulated Users ────────────────────────────────────────────────────────
+// Rank is derived automatically from philosophyPercentages[0].pct via rankFrom().
+// Do NOT set rank manually — it will be overwritten at the end of this array.
+
+const _SIM_USERS_RAW: Omit<SimUser, 'rank'>[] = [
   {
     id: 'u1',
     username: '@RODRIGOMARTINEZ',
     clanId: null,
-    rank: 'aprendiz',
     insigniaPhrase: '"El universo no tiene obligación de tener sentido para ti."',
     philosophyPercentages: [
       { clanId: 'existencialista', label: 'Existencialista', pct: 40 },
@@ -90,7 +98,6 @@ export const SIM_USERS: SimUser[] = [
     id: 'u2',
     username: '@DIEGOLLUBERES',
     clanId: null,
-    rank: 'maestro',
     insigniaPhrase: '"El vacío no es ausencia — es el lienzo donde todo comienza."',
     philosophyPercentages: [
       { clanId: 'nihilista',       label: 'Nihilista',       pct: 65 },
@@ -109,7 +116,6 @@ export const SIM_USERS: SimUser[] = [
     id: 'u3',
     username: '@VALENTINAORTIZ',
     clanId: null,
-    rank: 'aprendiz',
     insigniaPhrase: '"La realidad no se negocia — se comprende."',
     philosophyPercentages: [
       { clanId: 'cientista',    label: 'Cientista',    pct: 55 },
@@ -128,7 +134,6 @@ export const SIM_USERS: SimUser[] = [
     id: 'u4',
     username: '@ALEJANDROSERRANO',
     clanId: null,
-    rank: 'filosofo',
     insigniaPhrase: '"La virtud no necesita aplausos. Se sostiene sola."',
     philosophyPercentages: [
       { clanId: 'estoico',      label: 'Estoico',      pct: 70 },
@@ -147,7 +152,6 @@ export const SIM_USERS: SimUser[] = [
     id: 'u5',
     username: '@PABLOMORENO',
     clanId: null,
-    rank: 'maestro',
     insigniaPhrase: '"Existir es elegir, y elegir es crear sentido donde no lo hay."',
     philosophyPercentages: [
       { clanId: 'existencialista',   label: 'Existencialista',   pct: 60 },
@@ -166,7 +170,6 @@ export const SIM_USERS: SimUser[] = [
     id: 'u6',
     username: '@SOFIAREYES',
     clanId: null,
-    rank: 'filosofo',
     insigniaPhrase: '"Lo visible es apenas el umbral de lo verdadero."',
     philosophyPercentages: [
       { clanId: 'trascendentalista', label: 'Trascendentalista', pct: 65 },
@@ -185,7 +188,6 @@ export const SIM_USERS: SimUser[] = [
     id: 'u7',
     username: '@MARIANALOPEZ',
     clanId: null,
-    rank: 'aprendiz',
     insigniaPhrase: '"La dignidad no se concede — se reconoce."',
     philosophyPercentages: [
       { clanId: 'humanista',         label: 'Humanista',         pct: 55 },
@@ -204,7 +206,6 @@ export const SIM_USERS: SimUser[] = [
     id: 'u8',
     username: '@HERNANCHACON',
     clanId: null,
-    rank: 'maestro',
     insigniaPhrase: '"Lo que es, es. Lo demás es ruido."',
     philosophyPercentages: [
       { clanId: 'realista',     label: 'Realista',     pct: 60 },
@@ -223,7 +224,6 @@ export const SIM_USERS: SimUser[] = [
     id: 'u9',
     username: '@CARLOSDUARTE',
     clanId: null,
-    rank: 'filosofo',
     insigniaPhrase: '"La razón es el único faro en la oscuridad."',
     philosophyPercentages: [
       { clanId: 'racionalista', label: 'Racionalista', pct: 70 },
@@ -239,6 +239,12 @@ export const SIM_USERS: SimUser[] = [
     recommendedBookIds: [],
   },
 ];
+
+/** Rank auto-computed from dominant clan percentage — never stale. */
+export const SIM_USERS: SimUser[] = _SIM_USERS_RAW.map(u => ({
+  ...u,
+  rank: rankFrom(u.philosophyPercentages),
+}));
 
 /** Quick lookup map — built once at module load. */
 export const SIM_USERS_BY_ID: Record<string, SimUser> = Object.fromEntries(
