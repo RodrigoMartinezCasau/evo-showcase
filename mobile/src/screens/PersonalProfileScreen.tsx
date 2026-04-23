@@ -228,6 +228,7 @@ export default function PersonalProfileScreen() {
             <View style={styles.contentGap} />
             <PersonalPhilosophyPanel
               percentages={profileWithClan.philosophyPercentages}
+              clanId={profileWithClan.clanId}
               onPress={() => router.push('/philosophy-profile')}
             />
             <View style={styles.contentGap} />

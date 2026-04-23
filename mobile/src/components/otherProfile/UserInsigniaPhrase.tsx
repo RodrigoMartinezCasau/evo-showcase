@@ -5,6 +5,7 @@ import {
   INSIGNIA_BOX_HEIGHT,
   INSIGNIA_BOX_OFFSET_X,
   INSIGNIA_BOX_OFFSET_Y,
+  OTHER_INSIGNIA_CARD_OPACITY,
 } from '@evoconn/constants/otherProfileLayout';
 
 type Props = {
@@ -32,7 +33,7 @@ const styles = StyleSheet.create({
   container: {
     paddingLeft: 14,
     paddingVertical: 14,
-    backgroundColor: '#000000',
+    backgroundColor: `rgba(0,0,0,${OTHER_INSIGNIA_CARD_OPACITY})`,
     borderRadius: 12,
     paddingRight: 14,
   },

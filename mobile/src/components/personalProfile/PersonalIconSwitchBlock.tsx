@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { getStarByHouse, SIDEBAR_DEFAULT_STAR } from '@evoconn/utils/getSidebarStar';
+import { getClanColor } from '@evoconn/constants/clanColors';
 import {
   BOTTOM_BLOCK_SIZE,
   BOTTOM_BLOCK_BORDER_RADIUS,
@@ -10,6 +11,7 @@ import {
   APP_ICON_STAR_OFFSET_X,
   APP_ICON_STAR_OFFSET_Y,
   APP_ICON_STAR_SCALE,
+  PERSONAL_BOTTOM_BLOCKS_OPACITY,
 } from '@evoconn/constants/personalProfileLayout';
 
 type Props = {
@@ -21,6 +23,7 @@ const STAR_BASE = 52;
 
 export const PersonalIconSwitchBlock = React.memo(function PersonalIconSwitchBlock({ clanId }: Props) {
   const starSource = clanId ? getStarByHouse(clanId) : SIDEBAR_DEFAULT_STAR;
+  const titleColor = getClanColor(clanId);
   const starW = STAR_BASE * APP_ICON_STAR_SCALE;
   const starH = STAR_BASE * APP_ICON_STAR_SCALE;
 
@@ -52,7 +55,7 @@ export const PersonalIconSwitchBlock = React.memo(function PersonalIconSwitchBlo
         },
       ]}
     >
-      <Text style={styles.label}>Icono de app</Text>
+      <Text style={[styles.label, { color: titleColor }]}>Icono de app</Text>
       <Image
         source={starSource}
         resizeMode="contain"
@@ -71,19 +74,17 @@ export const PersonalIconSwitchBlock = React.memo(function PersonalIconSwitchBlo
 
 const styles = StyleSheet.create({
   block: {
-    backgroundColor: '#000000',
+    backgroundColor: `rgba(0,0,0,${PERSONAL_BOTTOM_BLOCKS_OPACITY})`,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
     paddingTop: 8,
   },
   label: {
-    color: '#FFFFFF',
     fontSize: 10,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.6,
-    opacity: 0.65,
     zIndex: 1,
     position: 'absolute',
     top: 8,

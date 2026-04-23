@@ -183,6 +183,24 @@ export const BOTTOM_BLOCKS_MARGIN_TOP = 10;
  *  No afecta a ningún otro espaciado del perfil. */
 export const PERSONAL_BOTTOM_BLOCKS_SPACING_TOP = -5;
 
+// ── Card background opacities (0 = transparente, 1 = sólido) ───────────────
+/**
+ * Opacidad del fondo negro de la tarjeta "frase insignia" (perfil personal).
+ * 1.0 = negro sólido · 0.0 = completamente transparente.
+ */
+export const PERSONAL_INSIGNIA_CARD_OPACITY   = 0.5;
+
+/**
+ * Opacidad del fondo negro del panel "Pensamiento filosófico" (perfil personal).
+ */
+export const PERSONAL_PHILOSOPHY_CARD_OPACITY = 1;
+
+/**
+ * Opacidad del fondo negro de los 3 bloques inferiores:
+ * Icono de app · Amigos · Guardados (perfil personal).
+ */
+export const PERSONAL_BOTTOM_BLOCKS_OPACITY   = 1;
+
 // ── Personal posts full-grid screen (PersonalPostsScreen) ──────────
 
 /**
@@ -317,7 +335,7 @@ export const SAVED_BLOCK_OFFSET_Y = 0;
 export const SAVED_BLOCK_SCALE = 1;
 /** Texto "GUARDADOS" dentro del cuadrado — solo posición. */
 export const SAVED_LABEL_OFFSET_X = 0;
-export const SAVED_LABEL_OFFSET_Y = -2;
+export const SAVED_LABEL_OFFSET_Y = -4;
 /** Icono guardados DENTRO del cuadrado — posición y escala independientes del contenedor. */
 export const SAVED_ICON_OFFSET_X = 0;
 export const SAVED_ICON_OFFSET_Y = 0;

@@ -77,6 +77,24 @@ export const SHARE_BUTTON_OFFSET_X = -7;
 export const SHARE_BUTTON_OFFSET_Y = -5;
 export const SHARE_BUTTON_SIZE = 28;
 
+// ── Card background opacities (0 = transparente, 1 = sólido) ───────────────
+/**
+ * Opacidad del fondo negro de la tarjeta "frase insignia" (perfil ajeno).
+ * 1.0 = negro sólido · 0.0 = completamente transparente.
+ */
+export const OTHER_INSIGNIA_CARD_OPACITY   = 0.5;
+
+/**
+ * Opacidad del fondo negro del panel "Pensamiento filosófico" (perfil ajeno).
+ */
+export const OTHER_PHILOSOPHY_CARD_OPACITY = 1;
+
+/**
+ * Opacidad del fondo negro de las tarjetas "Reflexiones totales" y "Frases totales"
+ * (solo en perfiles ajenos).
+ */
+export const OTHER_TOTALS_CARD_OPACITY     = 0.5;
+
 /** Espacio vertical ENTRE los contadores totales (Reflexiones/Frases) y la fila de tarjetas.
  *  El contenedor padre ya aporta un gap de 20 px. Un valor positivo suma a ese gap.
  *  Reducir → acerca las tarjetas al bloque de arriba. No afecta a otros espaciados. */

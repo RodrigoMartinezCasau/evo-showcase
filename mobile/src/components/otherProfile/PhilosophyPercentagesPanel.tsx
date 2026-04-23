@@ -5,6 +5,7 @@ import {
   PHILOSOPHY_PERCENTAGES_PANEL_OFFSET_Y,
   PHILOSOPHY_PERCENTAGES_PANEL_WIDTH,
   PHILOSOPHY_PERCENTAGES_PANEL_HEIGHT,
+  OTHER_PHILOSOPHY_CARD_OPACITY,
 } from '@evoconn/constants/otherProfileLayout';
 import {
   PHILOSOPHY_BANNER_SCALE,
@@ -20,15 +21,18 @@ import {
 } from '@evoconn/constants/philosophyBannerLayout';
 import { PhilosophyClanBanner } from '@evoconn/components/shared/PhilosophyClanBanner';
 import { GradientBarFill } from '@evoconn/components/shared/GradientBarFill';
+import { getClanColor } from '@evoconn/constants/clanColors';
 
 type PctEntry = { clanId: string; label: string; pct: number };
 
 type Props = {
   percentages: PctEntry[];
+  clanId?: string | null;
 };
 
-export const PhilosophyPercentagesPanel = React.memo(function PhilosophyPercentagesPanel({ percentages }: Props) {
+export const PhilosophyPercentagesPanel = React.memo(function PhilosophyPercentagesPanel({ percentages, clanId }: Props) {
   const sorted = [...percentages].sort((a, b) => b.pct - a.pct);
+  const titleColor = getClanColor(clanId ?? null);
 
   return (
     <View
@@ -53,7 +57,7 @@ export const PhilosophyPercentagesPanel = React.memo(function PhilosophyPercenta
           PHILOSOPHY_PERCENTAGES_PANEL_HEIGHT !== undefined && { height: PHILOSOPHY_PERCENTAGES_PANEL_HEIGHT },
         ]}
       >
-      <Text style={styles.title}>Pensamiento filosófico</Text>
+      <Text style={[styles.title, { color: titleColor }]}>Pensamiento filosófico</Text>
       {sorted.map((entry, i) => (
         <View
           key={entry.clanId}
@@ -95,20 +99,18 @@ const styles = StyleSheet.create({
   },
   container: {
     marginHorizontal: 20,
-    backgroundColor: '#000000',
+    backgroundColor: `rgba(0,0,0,${OTHER_PHILOSOPHY_CARD_OPACITY})`,
     borderRadius: 14,
     paddingTop: PHILOSOPHY_CONTAINER_PADDING_TOP,
     paddingBottom: PHILOSOPHY_CONTAINER_PADDING_BOTTOM,
     paddingHorizontal: PHILOSOPHY_CONTAINER_PADDING_HORIZONTAL,
   },
   title: {
-    color: '#FFFFFF',
     fontSize: 11,
     fontWeight: '600',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
     marginBottom: 2,
-    opacity: 0.7,
   },
   row: {
     flexDirection: 'row',

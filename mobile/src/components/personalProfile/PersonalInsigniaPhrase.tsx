@@ -8,6 +8,7 @@ import {
   INSIGNIA_EDIT_ICON_OFFSET_X,
   INSIGNIA_EDIT_ICON_SCALE,
   INSIGNIA_EDIT_ICON_SAFE_PADDING,
+  PERSONAL_INSIGNIA_CARD_OPACITY,
 } from '@evoconn/constants/personalProfileLayout';
 
 // ─── Pencil layout (NO transforms on the TouchableOpacity) ───────────────
@@ -108,7 +109,7 @@ const styles = StyleSheet.create({
   container: {
     paddingLeft: 14,
     paddingVertical: 14,
-    backgroundColor: '#000000',
+    backgroundColor: `rgba(0,0,0,${PERSONAL_INSIGNIA_CARD_OPACITY})`,
     borderRadius: 12,
     paddingRight: 14,
   },

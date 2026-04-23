@@ -5,6 +5,7 @@ import {
   PHILOSOPHY_PERCENTAGES_PANEL_OFFSET_Y,
   PHILOSOPHY_PERCENTAGES_PANEL_WIDTH,
   PHILOSOPHY_PERCENTAGES_PANEL_HEIGHT,
+  PERSONAL_PHILOSOPHY_CARD_OPACITY,
 } from '@evoconn/constants/personalProfileLayout';
 import {
   PHILOSOPHY_BANNER_SCALE,
@@ -20,19 +21,23 @@ import {
 } from '@evoconn/constants/philosophyBannerLayout';
 import { PhilosophyClanBanner } from '@evoconn/components/shared/PhilosophyClanBanner';
 import { GradientBarFill } from '@evoconn/components/shared/GradientBarFill';
+import { getClanColor } from '@evoconn/constants/clanColors';
 
 type PctEntry = { clanId: string; label: string; pct: number };
 
 type Props = {
   percentages: PctEntry[];
+  clanId?: string | null;
   /** When provided, wraps the panel in a TouchableOpacity (personal profile only). */
   onPress?: () => void;
 };
 
 export const PersonalPhilosophyPanel = React.memo(function PersonalPhilosophyPanel({
   percentages,
+  clanId,
   onPress,
 }: Props) {
+  const titleColor = getClanColor(clanId ?? null);
   const sorted = [...percentages].sort((a, b) => b.pct - a.pct);
 
   const inner = (
@@ -48,7 +53,7 @@ export const PersonalPhilosophyPanel = React.memo(function PersonalPhilosophyPan
       ]}
     >
       <View style={styles.titleRow}>
-        <Text style={styles.title}>Pensamiento filosófico</Text>
+        <Text style={[styles.title, { color: titleColor }]}>Pensamiento filosófico</Text>
         {onPress && <Text style={styles.expandHint}>Ver detalle →</Text>}
       </View>
       {sorted.map((entry, i) => (
@@ -113,7 +118,7 @@ const styles = StyleSheet.create({
   },
   container: {
     marginHorizontal: 20,
-    backgroundColor: '#000000',
+    backgroundColor: `rgba(0,0,0,${PERSONAL_PHILOSOPHY_CARD_OPACITY})`,
     borderRadius: 14,
     paddingTop: PHILOSOPHY_CONTAINER_PADDING_TOP,
     paddingBottom: PHILOSOPHY_CONTAINER_PADDING_BOTTOM,
@@ -126,12 +131,10 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   title: {
-    color: '#FFFFFF',
     fontSize: 11,
     fontWeight: '600',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
-    opacity: 0.7,
   },
   expandHint: {
     color: 'rgba(255,255,255,0.40)',

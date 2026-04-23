@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { OTHER_TOTALS_CARD_OPACITY } from '@evoconn/constants/otherProfileLayout';
 
 type Props = {
   totalReflections: number;
@@ -32,7 +33,7 @@ const styles = StyleSheet.create({
   },
   card: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: `rgba(0,0,0,${OTHER_TOTALS_CARD_OPACITY})`,
     borderRadius: 14,
     paddingVertical: 18,
     paddingHorizontal: 14,

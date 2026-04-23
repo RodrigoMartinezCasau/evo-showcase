@@ -43,8 +43,8 @@ export const PersonalBottomBlocks = React.memo(function PersonalBottomBlocks({
       ]}
     >
       <PersonalIconSwitchBlock clanId={clanId} />
-      <PersonalFriendsBlock friends={friends} />
-      <PersonalSavedPostsBlock savedPosts={savedPosts} onPostPress={onSavedPostPress} />
+      <PersonalFriendsBlock friends={friends} clanId={clanId} />
+      <PersonalSavedPostsBlock savedPosts={savedPosts} clanId={clanId} onPostPress={onSavedPostPress} />
     </View>
   );
 });
