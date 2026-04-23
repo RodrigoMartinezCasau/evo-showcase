@@ -29,6 +29,28 @@ import { getClanColor } from '@evoconn/constants/clanColors';
 import { getClanConfig } from '@evoconn/constants/clanConfig';
 import { getClanProfileOrFallback } from '@evoconn/data/mockClanProfiles';
 import { getTopBarInsigniaByHouse } from '@evoconn/utils/getTopBarInsigniaByHouse';
+import { getClanEstandarte } from '@evoconn/utils/getClanEstandarte';
+import {
+  CLAN_DISPLAY_SHIELD_SIZE,
+  CLAN_DISPLAY_SHIELD_OFFSET_X,
+  CLAN_DISPLAY_SHIELD_OFFSET_Y,
+  CLAN_DISPLAY_SHIELD_SCALE,
+  CLAN_DISPLAY_SHIELD_MARGIN_BOTTOM,
+  CLAN_DISPLAY_ESTANDARTE_H_MARGIN,
+  CLAN_DISPLAY_ESTANDARTE_OFFSET_X,
+  CLAN_DISPLAY_ESTANDARTE_OFFSET_Y,
+  CLAN_DISPLAY_ESTANDARTE_SCALE,
+  CLAN_DISPLAY_ESTANDARTE_MARGIN_TOP,
+  CLAN_DISPLAY_ESTANDARTE_MARGIN_BOTTOM,
+  CLAN_DISPLAY_LOGO_PADDING_TOP,
+  CLAN_DISPLAY_SECTIONS_GAP,
+  CLAN_DISPLAY_PHRASE_PADDING_V,
+  CLAN_DISPLAY_PHRASE_PADDING_H,
+  CLAN_DISPLAY_PHRASE_FONT_SIZE,
+  CLAN_DISPLAY_PHRASE_LINE_HEIGHT,
+  CLAN_DISPLAY_POST_CARD_RATIO,
+  CLAN_DISPLAY_POST_CARD_MIN_W,
+} from '@evoconn/constants/clanDisplayLayout';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
 import { ProfileDetailPanel } from '@evoconn/components/ProfileDetailPanel';
 import { ClanPhilosopherSlot } from './ClanPhilosopherSlot';
@@ -40,8 +62,6 @@ import type { ClanMember } from '@evoconn/data/mockClanProfiles';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const CARD_RATIO    = 0.55;
-const MIN_CARD_W    = 200;
 const ANIM_DURATION = 200;
 
 /** Genera un % de clan simulado a partir del rank para el display de miembros */
@@ -71,11 +91,12 @@ const WINDOW_24H = 24 * 60 * 60 * 1000;
 export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
   const router     = useRouter();
   const { width: screenW } = useWindowDimensions();
-  const cardW      = Math.max(MIN_CARD_W, screenW * CARD_RATIO);
+  const cardW      = Math.max(CLAN_DISPLAY_POST_CARD_MIN_W, screenW * CLAN_DISPLAY_POST_CARD_RATIO);
   const clan       = getClanProfileOrFallback(clanId);
   const config     = getClanConfig(clanId);
   const clanColor  = getClanColor(clanId);
-  const ShieldSvg  = useMemo(() => getTopBarInsigniaByHouse(clanId), [clanId]);
+  const ShieldSvg      = useMemo(() => getTopBarInsigniaByHouse(clanId), [clanId]);
+  const EstandarteSvg  = useMemo(() => getClanEstandarte(clanId), [clanId]);
 
   // ── Top posts en vivo — publicaciones del clan con ≥1 voto en las últimas 24h ──
   // Para 'indefinido', los autores sin clan asignado tienen clanId: null.
@@ -203,18 +224,53 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
           contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomPadding }]}
           showsVerticalScrollIndicator={false}
         >
-          {/* ── SECCIÓN 1 — Logo ──────────────────────────────────────── */}
+          {/* ── SECCIÓN 1 — Logo + Estandarte ────────────────────────── */}
           <View style={styles.logoSection}>
-            <View style={styles.logoWrap}>
-              <ShieldSvg width={180} height={180} />
+            <View
+              style={[
+                styles.logoWrap,
+                { marginBottom: CLAN_DISPLAY_SHIELD_MARGIN_BOTTOM },
+                {
+                  transform: [
+                    { translateX: CLAN_DISPLAY_SHIELD_OFFSET_X },
+                    { translateY: CLAN_DISPLAY_SHIELD_OFFSET_Y },
+                    { scale: CLAN_DISPLAY_SHIELD_SCALE },
+                  ],
+                },
+              ]}
+            >
+              <ShieldSvg
+                width={CLAN_DISPLAY_SHIELD_SIZE}
+                height={CLAN_DISPLAY_SHIELD_SIZE}
+              />
             </View>
-            <Text style={[styles.clanName, { color: clanColor }]}>
-              {clan.name.replace('Clan ', '').toUpperCase()}
-            </Text>
+
+            {/* Estandarte del clan */}
+            <View
+              style={[
+                styles.estandarteWrap,
+                {
+                  marginTop: CLAN_DISPLAY_ESTANDARTE_MARGIN_TOP,
+                  marginBottom: CLAN_DISPLAY_ESTANDARTE_MARGIN_BOTTOM,
+                },
+                {
+                  transform: [
+                    { translateX: CLAN_DISPLAY_ESTANDARTE_OFFSET_X },
+                    { translateY: CLAN_DISPLAY_ESTANDARTE_OFFSET_Y },
+                    { scale: CLAN_DISPLAY_ESTANDARTE_SCALE },
+                  ],
+                },
+              ]}
+            >
+              <EstandarteSvg
+                width={screenW - CLAN_DISPLAY_ESTANDARTE_H_MARGIN}
+                height={screenW - CLAN_DISPLAY_ESTANDARTE_H_MARGIN}
+              />
+            </View>
           </View>
 
           {/* ── SECCIÓN 2 — Frase del clan ────────────────────────────── */}
-          <View style={[styles.phraseSection, { borderLeftWidth: 3, borderLeftColor: clanColor }]}>
+          <View style={styles.phraseSection}>
             <Text style={styles.clanPhrase}>{config.phrase}</Text>
           </View>
 
@@ -309,42 +365,37 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   scroll: { flex: 1 },
-  scrollContent: { gap: 16 },
+  scrollContent: { gap: CLAN_DISPLAY_SECTIONS_GAP },
 
   // ── Section 1: Logo ──────────────────────────────────────────────────────
   logoSection: {
     alignItems: 'center',
-    paddingTop: 24,
-    paddingBottom: 8,
-    gap: 12,
+    paddingTop: CLAN_DISPLAY_LOGO_PADDING_TOP,
   },
   logoWrap: {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  clanName: {
-    fontSize: 30,
-    fontWeight: '800',
-    letterSpacing: 2,
-    textShadowColor: 'rgba(0,0,0,0.6)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 6,
+  estandarteWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+
 
   // ── Section 2: Phrase ────────────────────────────────────────────────────
   phraseSection: {
     marginHorizontal: 20,
     backgroundColor: '#000000',
     borderRadius: 14,
-    paddingVertical: 20,
-    paddingHorizontal: 22,
+    paddingVertical: CLAN_DISPLAY_PHRASE_PADDING_V,
+    paddingHorizontal: CLAN_DISPLAY_PHRASE_PADDING_H,
   },
   clanPhrase: {
     color: '#ffffff',
-    fontSize: 17,
+    fontSize: CLAN_DISPLAY_PHRASE_FONT_SIZE,
     fontStyle: 'italic',
     fontWeight: '700',
-    lineHeight: 26,
+    lineHeight: CLAN_DISPLAY_PHRASE_LINE_HEIGHT,
     textAlign: 'center',
   },
 
