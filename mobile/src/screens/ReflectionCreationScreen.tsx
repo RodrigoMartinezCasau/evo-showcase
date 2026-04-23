@@ -645,6 +645,7 @@ export default function ReflectionCreationScreen() {
         onSend={handleSend}
         sendIcon={sendIconNode}
         contentAboveBar={emptyReflectionWelcome}
+        clanColor={clanColor}
       />
 
       {!sidebarOpen ? (

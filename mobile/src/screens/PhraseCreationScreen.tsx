@@ -729,6 +729,7 @@ export default function PhraseCreationScreen() {
         onSend={handleSend}
         sendIcon={sendIconNode}
         contentAboveBar={emptyPhraseWelcome}
+        clanColor={clanColor}
       />
 
       {!sidebarOpen ? (
