@@ -57,12 +57,93 @@ import { ClanPhilosopherSlot } from './ClanPhilosopherSlot';
 import { UserResultCard } from '@evoconn/components/UserResultCard';
 import { PersonalRecentPostCard } from '@evoconn/components/personalProfile/PersonalRecentPostCard';
 import { useFeedStore } from '@evoconn/hooks/useFeedStore';
+import { SIM_USERS } from '@evoconn/data/simulation/simulatedNetwork';
+import { ClanRankingCard } from './ClanRankingCard';
 import type { CommunityPost } from '@evoconn/types';
 import type { ClanMember } from '@evoconn/data/mockClanProfiles';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const ANIM_DURATION = 200;
+
+/** Los 8 clanes reales (sin contar 'indefinido'). */
+const REAL_CLANS = [
+  'nihilista', 'cientista', 'estoico', 'existencialista',
+  'trascendentalista', 'humanista', 'realista', 'racionalista',
+] as const;
+
+/** Duración del período de ranking: 30 días en ms. */
+const RANKING_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Fecha ancla para alinear los períodos de 30 días (1 enero 2025). */
+const RANKING_EPOCH = new Date('2025-01-01T00:00:00Z').getTime();
+
+/** Calcula el inicio del período de 30 días activo. */
+function getPeriodStart(): number {
+  const elapsed = Date.now() - RANKING_EPOCH;
+  const periods = Math.floor(elapsed / RANKING_PERIOD_MS);
+  return RANKING_EPOCH + periods * RANKING_PERIOD_MS;
+}
+
+/** Días restantes en el período activo. */
+function getDaysLeft(): number {
+  const periodStart = getPeriodStart();
+  const msLeft = RANKING_PERIOD_MS - (Date.now() - periodStart);
+  return Math.ceil(msLeft / (24 * 60 * 60 * 1000));
+}
+
+type ClanRankInfo = { rank: number; points: number; daysLeft: number };
+
+/** Calcula puntos y ranking para todos los clanes dado un array de posts. */
+function computeAllClanRankings(posts: CommunityPost[]): Record<string, ClanRankInfo> {
+  const periodStart = getPeriodStart();
+  const daysLeft = getDaysLeft();
+
+  // Filtrar posts del período actual
+  const periodPosts = posts.filter(
+    (p) => new Date(p.createdAt).getTime() >= periodStart,
+  );
+
+  // Acumular posts por clan
+  const clanPostCounts: Record<string, number> = {};
+  for (const clan of REAL_CLANS) { clanPostCounts[clan] = 0; }
+
+  for (const post of periodPosts) {
+    const authorClanId = post.author.clanId;
+    if (authorClanId && authorClanId in clanPostCounts) {
+      clanPostCounts[authorClanId]++;
+    }
+  }
+
+  // Contar miembros de cada clan desde SIM_USERS (mínimo 1 para evitar /0)
+  const clanMemberCounts: Record<string, number> = {};
+  for (const clan of REAL_CLANS) { clanMemberCounts[clan] = 0; }
+  for (const user of SIM_USERS) {
+    if (user.clanId && user.clanId in clanMemberCounts) {
+      clanMemberCounts[user.clanId]++;
+    }
+  }
+
+  // Calcular puntos = posts del período / max(miembros, 1)
+  const clanPoints = REAL_CLANS.map((clan) => ({
+    clanId: clan,
+    points: clanPostCounts[clan] / Math.max(clanMemberCounts[clan], 1),
+  })).sort((a, b) => b.points - a.points || REAL_CLANS.indexOf(a.clanId as typeof REAL_CLANS[number]) - REAL_CLANS.indexOf(b.clanId as typeof REAL_CLANS[number]));
+
+  // Asignar rangos (empates comparten rango)
+  const result: Record<string, ClanRankInfo> = {};
+  let currentRank = 1;
+  for (let i = 0; i < clanPoints.length; i++) {
+    if (i > 0 && clanPoints[i].points === clanPoints[i - 1].points) {
+      result[clanPoints[i].clanId] = { rank: result[clanPoints[i - 1].clanId].rank, points: clanPoints[i].points, daysLeft };
+    } else {
+      result[clanPoints[i].clanId] = { rank: currentRank, points: clanPoints[i].points, daysLeft };
+    }
+    currentRank++;
+  }
+
+  return result;
+}
 
 /** Genera un % de clan simulado a partir del rank para el display de miembros */
 function mockClanPct(rank: string, index: number): string {
@@ -122,6 +203,10 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
 
     return source.sort((a, b) => b.voteStats.up - a.voteStats.up);
   }, [allPosts, clanId]);
+
+  // ── Ranking del clan ──────────────────────────────────────────────────────
+  const allRankings = useMemo(() => computeAllClanRankings(allPosts), [allPosts]);
+  const clanRanking: ClanRankInfo = allRankings[clanId] ?? { rank: 1, points: 0, daysLeft: getDaysLeft() };
 
   // ── Detail panel state ────────────────────────────────────────────────────
   const slideAnim        = useRef(new Animated.Value(0)).current;
@@ -274,39 +359,52 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
             <Text style={styles.clanPhrase}>{config.phrase}</Text>
           </View>
 
-          {/* ── SECCIÓN 3 — Miembros destacados ──────────────────────── */}
-          <View style={[styles.panel, { borderWidth: 1, borderColor: `${clanColor}22` }]}>
-            <Text style={[styles.panelTitle, { color: clanColor }]}>Miembros destacados</Text>
-            {clan.topMembers.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyIcon}>🏛</Text>
-                <Text style={styles.emptyText}>Aún no hay miembros destacados</Text>
-                <Text style={styles.emptySubtext}>Sé el primero en llegar al top del clan</Text>
-              </View>
-            ) : (
-              <FlatList
-                data={clan.topMembers}
-                keyExtractor={(m) => m.id}
-                renderItem={renderMember}
-                scrollEnabled={false}
-                contentContainerStyle={styles.memberList}
+          {/* ── SECCIONES 2b, 3, 4 — Solo para clanes reales (no "sin clan") ── */}
+          {clanId !== 'indefinido' && (
+            <>
+              {/* Ranking del clan */}
+              <ClanRankingCard
+                clanId={clanId}
+                rank={clanRanking.rank}
+                points={clanRanking.points}
+                daysLeft={clanRanking.daysLeft}
               />
-            )}
-          </View>
 
-          {/* ── SECCIÓN 4 — Filósofos representativos ────────────────── */}
-          <View style={[styles.panelDark, { borderWidth: 1, borderColor: `${clanColor}22` }]}>
-            <Text style={[styles.panelTitle, { color: clanColor }]}>Referentes filosóficos</Text>
-            <View style={styles.philosophersRow}>
-              {config.philosophers.map((philosopher, idx) => (
-                <ClanPhilosopherSlot
-                  key={philosopher.name + idx}
-                  philosopher={philosopher}
-                  accentColor={clanColor}
-                />
-              ))}
-            </View>
-          </View>
+              {/* Miembros destacados */}
+              <View style={[styles.panel, { borderWidth: 1, borderColor: `${clanColor}22` }]}>
+                <Text style={[styles.panelTitle, { color: clanColor }]}>Miembros destacados</Text>
+                {clan.topMembers.length === 0 ? (
+                  <View style={styles.emptyState}>
+                    <Text style={styles.emptyIcon}>🏛</Text>
+                    <Text style={styles.emptyText}>Aún no hay miembros destacados</Text>
+                    <Text style={styles.emptySubtext}>Sé el primero en llegar al top del clan</Text>
+                  </View>
+                ) : (
+                  <FlatList
+                    data={clan.topMembers}
+                    keyExtractor={(m) => m.id}
+                    renderItem={renderMember}
+                    scrollEnabled={false}
+                    contentContainerStyle={styles.memberList}
+                  />
+                )}
+              </View>
+
+              {/* Referentes filosóficos */}
+              <View style={[styles.panelDark, { borderWidth: 1, borderColor: `${clanColor}22` }]}>
+                <Text style={[styles.panelTitle, { color: clanColor }]}>Referentes filosóficos</Text>
+                <View style={styles.philosophersRow}>
+                  {config.philosophers.map((philosopher, idx) => (
+                    <ClanPhilosopherSlot
+                      key={philosopher.name + idx}
+                      philosopher={philosopher}
+                      accentColor={clanColor}
+                    />
+                  ))}
+                </View>
+              </View>
+            </>
+          )}
 
           {/* ── SECCIÓN 5 — Descripción del clan ─────────────────────── */}
           <View style={[styles.panel, { borderWidth: 1, borderColor: `${clanColor}22` }]}>
@@ -316,9 +414,6 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
 
           {/* ── SECCIÓN 6 — Top publicaciones ────────────────────────── */}
           <View style={styles.postsSection}>
-            <Text style={[styles.panelTitle, { marginHorizontal: 20, color: clanColor }]}>
-              Top publicaciones del clan — últimas 24h
-            </Text>
             {livePosts.length === 0 ? (
               <View style={[styles.emptyState, { marginHorizontal: 20 }]}>
                 <Text style={styles.emptyText}>Sin publicaciones recientes</Text>
