@@ -13,7 +13,7 @@ import { COMMUNITY_DRAWER_EDGE_ZONE_WIDTH } from '@evoconn/constants/communityDr
 import { useSidebarGesture } from '@evoconn/hooks/useSidebarGesture';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
-import { getChatSendButtonByHouse } from '@evoconn/utils/getChatSendButtonByHouse';
+import { getPhraseSendButtonByHouse } from '@evoconn/utils/getPhraseSendButtonByHouse';
 import {
   CHAT_SEND_BUTTON_LAYOUT,
   CHAT_BOTTOM_AREA_LAYOUT as CHAT_BOTTOM_AREA,
@@ -114,7 +114,7 @@ export default function PhraseCreationScreen() {
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const clanColor = getChatUserAccentColor(activeClan);
 
-  const SendIcon = useMemo(() => getChatSendButtonByHouse(activeClan), [activeClan]);
+  const SendIcon = useMemo(() => getPhraseSendButtonByHouse(activeClan), [activeClan]);
   const sendBtnSize = CHAT_SEND_BUTTON_LAYOUT.size;
   const sendIconNode = useMemo(
     () => <SendIcon width={sendBtnSize} height={sendBtnSize} />,
