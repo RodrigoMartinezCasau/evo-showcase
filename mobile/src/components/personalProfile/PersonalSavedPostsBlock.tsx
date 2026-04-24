@@ -9,6 +9,7 @@ import {
   SAVED_BLOCK_SCALE,
   SAVED_LABEL_OFFSET_X,
   SAVED_LABEL_OFFSET_Y,
+  SAVED_LABEL_FONT_SIZE,
   SAVED_ICON_OFFSET_X,
   SAVED_ICON_OFFSET_Y,
   SAVED_ICON_SCALE,
@@ -59,11 +60,10 @@ export const PersonalSavedPostsBlock = React.memo(function PersonalSavedPostsBlo
         },
       ]}
     >
-      {/* Label at top */}
-      <Text
+      {/* "GUARDADOS" label */}
+      <View
         style={[
-          styles.label,
-          { color: titleColor },
+          styles.labelWrap,
           {
             transform: [
               { translateX: SAVED_LABEL_OFFSET_X },
@@ -72,10 +72,12 @@ export const PersonalSavedPostsBlock = React.memo(function PersonalSavedPostsBlo
           },
         ]}
       >
-        Guardados
-      </Text>
+        <Text style={[styles.label, { color: titleColor, fontSize: SAVED_LABEL_FONT_SIZE }]}>
+          GUARDADOS
+        </Text>
+      </View>
 
-      {/* Yellow saved icon — independently positioned */}
+      {/* Yellow saved icon */}
       <Image
         source={saveIconYellow}
         resizeMode="contain"
@@ -88,7 +90,6 @@ export const PersonalSavedPostsBlock = React.memo(function PersonalSavedPostsBlo
           },
         ]}
       />
-
     </TouchableOpacity>
   );
 });
@@ -98,11 +99,14 @@ const styles = StyleSheet.create({
     backgroundColor: `rgba(0,0,0,${PERSONAL_BOTTOM_BLOCKS_OPACITY})`,
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
-    paddingVertical: 8,
+    overflow: 'visible',
+  },
+  labelWrap: {
+    position: 'absolute',
+    top: 10,
+    alignSelf: 'center',
   },
   label: {
-    fontSize: 10,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.6,

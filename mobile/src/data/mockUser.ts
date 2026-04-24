@@ -14,7 +14,7 @@ const _activeUser: User = {
   id: 'u1',
   username: '@RODRIGOMARTINEZ',
   clanId: null,
-  rank: 'maestro',   // dominant 40% → maestro (40–50%)
+  rank: 'aprendiz',  // sin clan → always aprendiz regardless of pct
   followersCount: 4,
   followingCount: 4,
 };

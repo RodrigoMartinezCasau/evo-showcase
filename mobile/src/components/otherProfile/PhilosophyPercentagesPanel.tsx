@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import {
   PHILOSOPHY_PERCENTAGES_PANEL_OFFSET_X,
   PHILOSOPHY_PERCENTAGES_PANEL_OFFSET_Y,
@@ -33,6 +34,7 @@ type Props = {
 export const PhilosophyPercentagesPanel = React.memo(function PhilosophyPercentagesPanel({ percentages, clanId }: Props) {
   const sorted = [...percentages].sort((a, b) => b.pct - a.pct);
   const titleColor = getClanColor(clanId ?? null);
+  const isSinClan = clanId === null || clanId === undefined;
 
   return (
     <View
@@ -57,7 +59,18 @@ export const PhilosophyPercentagesPanel = React.memo(function PhilosophyPercenta
           PHILOSOPHY_PERCENTAGES_PANEL_HEIGHT !== undefined && { height: PHILOSOPHY_PERCENTAGES_PANEL_HEIGHT },
         ]}
       >
-      <Text style={[styles.title, { color: titleColor }]}>Pensamiento filosófico</Text>
+      <View style={styles.titleRow}>
+        <Text style={[styles.title, { color: titleColor }]}>Pensamiento filosófico</Text>
+        {isSinClan && (
+          <TouchableOpacity
+            onPress={() => Alert.alert('', 'Sigue reflexionando...')}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="lock-closed-outline" size={16} color="rgba(255,255,255,0.40)" />
+          </TouchableOpacity>
+        )}
+      </View>
       {sorted.map((entry, i) => (
         <View
           key={entry.clanId}
@@ -105,12 +118,17 @@ const styles = StyleSheet.create({
     paddingBottom: PHILOSOPHY_CONTAINER_PADDING_BOTTOM,
     paddingHorizontal: PHILOSOPHY_CONTAINER_PADDING_HORIZONTAL,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+  },
   title: {
     fontSize: 11,
     fontWeight: '600',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
-    marginBottom: 2,
   },
   row: {
     flexDirection: 'row',

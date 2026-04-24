@@ -2,13 +2,14 @@ import type { Rank } from '@evoconn/types';
 
 /**
  * Rank thresholds based on dominant clan percentage.
+ * ONLY applies to users WITH an assigned clan (clanId !== null).
  *
- *  < 25%   → 'aprendiz'  (pre-clan or no meaningful alignment)
  *  25–40%  → 'aprendiz'  (clan assigned, first stage)
  *  40–50%  → 'maestro'
  *  ≥ 50%   → 'filosofo'
  *
- * The entry point for clan assignment is 25%.
+ * Users without a clan (clanId === null) are always 'aprendiz'.
+ * Use getRankForUser() to get the correct rank including clanId check.
  */
 export const RANK_THRESHOLDS = {
   MAESTRO:   40,  // pct >= this → Maestro
@@ -45,3 +46,19 @@ export function getNextRankThreshold(pct: number): number | null {
   if (pct >= RANK_THRESHOLDS.MAESTRO)  return RANK_THRESHOLDS.FILOSOFO;
   return RANK_THRESHOLDS.MAESTRO;
 }
+
+/**
+ * Returns the correct rank considering clan assignment.
+ * Users with no clan (clanId === null) are always 'aprendiz',
+ * regardless of their philosophy percentages.
+ */
+export function getRankForUser(pct: number, clanId: string | null): Rank {
+  if (clanId === null) return 'aprendiz';
+  return getRankFromPct(pct);
+}
+
+/**
+ * Minimum total reflections required to trigger clan assignment reveal.
+ * Used to calculate sin-clan progress bar fill.
+ */
+export const CLAN_REVEAL_MIN_REFLECTIONS = 30;

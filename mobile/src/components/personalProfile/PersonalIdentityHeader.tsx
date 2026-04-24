@@ -18,6 +18,9 @@ import {
   RANK_OFFSET_X,
   RANK_OFFSET_Y,
   RANK_FONT_SIZE,
+  CLAN_ROW_SCALE,
+  CLAN_ROW_OFFSET_X,
+  CLAN_ROW_MARGIN_BOTTOM,
 } from '@evoconn/constants/personalProfileLayout';
 
 const RANK_LABELS: Record<Rank, string> = {
@@ -100,11 +103,12 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
     }).catch(() => {});
   }, [username]);
 
+
   return (
     <View style={[styles.container, { height: containerHeight }]}>
+      {/* Text column — username + clan+rank row */}
       <View style={[styles.textBlock, { paddingRight: reservedRightSpace }]}>
-        {/* Username row — share icon is inline inside the Text so it always
-            appears right after the last character, even when font scales down. */}
+        {/* Username row */}
         <TouchableOpacity
           onPress={handleShare}
           hitSlop={8}
@@ -119,13 +123,7 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
           ]}
         >
           <Text
-            style={[
-              styles.username,
-              {
-                fontSize: USERNAME_FONT_SIZE,
-                lineHeight: USERNAME_LINE_HEIGHT,
-              },
-            ]}
+            style={[styles.username, { fontSize: USERNAME_FONT_SIZE, lineHeight: USERNAME_LINE_HEIGHT }]}
             numberOfLines={1}
             ellipsizeMode="clip"
             adjustsFontSizeToFit
@@ -137,8 +135,16 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
           </Text>
         </TouchableOpacity>
 
-        {/* Clan + rank row */}
-        <View style={[styles.clanRankRow, { height: CLAN_ROW_HEIGHT }]}>
+        {/* Clan + rank row — inline, same baseline */}
+        <View
+          style={[
+            styles.clanRankRow,
+            {
+              marginBottom: CLAN_ROW_MARGIN_BOTTOM,
+              transform: [{ translateX: CLAN_ROW_OFFSET_X }, { scale: CLAN_ROW_SCALE }],
+            },
+          ]}
+        >
           <Text
             style={[
               styles.clanName,
@@ -148,26 +154,21 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
                 transform: [{ translateX: CLAN_OFFSET_X }, { translateY: CLAN_OFFSET_Y }],
               },
             ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}
           >
             {clanLabel}
-          </Text>
-          <View style={{ width: 8 }} />
-          <View
-            style={[
-              styles.rankPill,
-              { transform: [{ translateX: RANK_OFFSET_X }, { translateY: RANK_OFFSET_Y }] },
-            ]}
-          >
-            <Text style={[styles.rankText, { fontSize: RANK_FONT_SIZE, lineHeight: RANK_LINE_HEIGHT }]}>
+            {'  '}
+            <Text style={[styles.rankInline, { fontSize: RANK_FONT_SIZE, lineHeight: RANK_LINE_HEIGHT }]}>
+              {'— '}
               {RANK_LABELS[rank]}
             </Text>
-          </View>
+          </Text>
         </View>
       </View>
 
-      {/* Shield — absolute, does not affect layout height.
-          Offsets live on an inner View: transforms on TouchableOpacity are unreliable
-          on some RN builds; SHIELD_OFFSET_Y was never applied before (now in marginTop). */}
+      {/* Shield — absolute, does not affect layout height */}
       <TouchableOpacity
         activeOpacity={onShieldPress ? 0.7 : 1}
         onPress={onShieldPress}
@@ -180,8 +181,7 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
             height: shieldDisplaySize,
             right: -clampedShieldOffsetX,
             top: '50%',
-            marginTop:
-              -shieldDisplaySize / 2 + SHIELD_OFFSET_Y + SHIELD_RELATIVE_OFFSET_Y,
+            marginTop: -shieldDisplaySize / 2 + SHIELD_OFFSET_Y + SHIELD_RELATIVE_OFFSET_Y,
           },
         ]}
       >
@@ -224,17 +224,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
     color: '#FFFFFF',
   },
-  rankPill: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    marginLeft: 4,
-  },
-  rankText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    opacity: 0.7,
+  rankInline: {
+    color: 'rgba(255,255,255,0.75)',
+    fontWeight: '500',
   },
   shieldWrap: {
     position: 'absolute',

@@ -3,8 +3,9 @@ import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import IcoNotificacionesSvg from '../../assets/personalProfile/Nuevo icono notis.svg';
 import { useNotifications } from '@evoconn/hooks/NotificationsContext';
-import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { getClanSecondaryColor } from '@evoconn/constants/clanColors';
+import { useActiveClan } from '@evoconn/debug/DebugClanContext';
+import { mockCurrentUser } from '@evoconn/data/mockUser';
 import {
   NOTIFICATIONS_ICON_OFFSET_X,
   NOTIFICATIONS_ICON_OFFSET_Y,
@@ -16,8 +17,8 @@ const BASE_SIZE = 28;
 export const PersonalNotificationsButton = React.memo(function PersonalNotificationsButton() {
   const router = useRouter();
   const { unreadCount } = useNotifications();
-  const { activeUser } = useSimulation();
-  const badgeColor = getClanSecondaryColor(activeUser.clanId);
+  const activeClan = useActiveClan(mockCurrentUser.clanId);
+  const badgeColor = getClanSecondaryColor(activeClan);
 
   const size = BASE_SIZE * NOTIFICATIONS_ICON_SCALE;
   const hit = Math.max(44, size + 16);
@@ -45,7 +46,7 @@ export const PersonalNotificationsButton = React.memo(function PersonalNotificat
       {unreadCount > 0 && (
         <View style={[styles.badge, { backgroundColor: badgeColor }]}>
           <Text style={styles.badgeText}>
-            {unreadCount > 9 ? '9+' : String(unreadCount)}
+            {unreadCount > 99 ? '+99' : String(unreadCount)}
           </Text>
         </View>
       )}

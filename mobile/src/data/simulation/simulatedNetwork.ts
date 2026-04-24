@@ -11,7 +11,7 @@
  *  - No post has more than 8 votes (upvoters + downvoters), author never votes own post
  */
 import type { Rank } from '@evoconn/types';
-import { getRankFromPct } from '@evoconn/utils/getRankFromPct';
+import { getRankForUser } from '@evoconn/utils/getRankFromPct';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -65,10 +65,13 @@ const H = 3_600_000;
 const D = 86_400_000;
 const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
 
-/** Derives rank from the dominant clan percentage (first entry in philosophyPercentages). */
-function rankFrom(pcts: ClanPct[]): Rank {
+/**
+ * Derives rank considering both dominant clan percentage and whether
+ * a clan has been assigned. Users without a clan are always 'aprendiz'.
+ */
+function rankFrom(pcts: ClanPct[], clanId: string | null): Rank {
   const dominant = pcts[0]?.pct ?? 0;
-  return getRankFromPct(dominant);
+  return getRankForUser(dominant, clanId);
 }
 
 // ─── 9 Simulated Users ────────────────────────────────────────────────────────
@@ -240,10 +243,10 @@ const _SIM_USERS_RAW: Omit<SimUser, 'rank'>[] = [
   },
 ];
 
-/** Rank auto-computed from dominant clan percentage — never stale. */
+/** Rank auto-computed from dominant clan percentage and clanId — never stale. */
 export const SIM_USERS: SimUser[] = _SIM_USERS_RAW.map(u => ({
   ...u,
-  rank: rankFrom(u.philosophyPercentages),
+  rank: rankFrom(u.philosophyPercentages, u.clanId),
 }));
 
 /** Quick lookup map — built once at module load. */

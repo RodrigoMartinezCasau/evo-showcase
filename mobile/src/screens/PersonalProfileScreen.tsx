@@ -22,6 +22,7 @@ import { AppTopBar, BottomCommunityTabs, SidebarDrawer } from '@evoconn/componen
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
+import { getRankForUser } from '@evoconn/utils/getRankFromPct';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
 import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
@@ -54,10 +55,12 @@ export default function PersonalProfileScreen() {
   // Replaces the seed `simUser.philosophyPercentages`. Empty array = empty
   // panel (FLOW A: brand-new user with zero reflections).
   const realPercentages = classification.getPercentages(profile.id);
+  const dominantPct = realPercentages.length > 0 ? realPercentages[0].pct : 0;
   const profileWithClan = {
     ...profile,
     clanId: activeClan,
     philosophyPercentages: realPercentages,
+    rank: getRankForUser(dominantPct, activeClan),
   };
 
   // ─── Personal profile shared state ────────────────────────────────
@@ -224,7 +227,12 @@ export default function PersonalProfileScreen() {
             <View style={styles.contentGap} />
             <PersonalInsigniaPhrase phrase={insigniaPhrase} onEdit={handlePhraseEditOpen} />
             <View style={styles.contentGap} />
-            <PersonalRankProgression rank={profileWithClan.rank} onPress={() => router.push('/philosophy-profile')} />
+            <PersonalRankProgression
+              rank={profileWithClan.rank}
+              clanId={profileWithClan.clanId}
+              totalReflections={thoughts.length}
+              onPress={profileWithClan.clanId ? () => router.push('/philosophy-profile') : undefined}
+            />
             <View style={styles.contentGap} />
             <PersonalPhilosophyPanel
               percentages={profileWithClan.philosophyPercentages}

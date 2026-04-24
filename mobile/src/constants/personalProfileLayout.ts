@@ -75,6 +75,14 @@ export const USERNAME_OFFSET_X = 3;
 export const USERNAME_OFFSET_Y = -5;
 export const USERNAME_FONT_SIZE = 22;
 
+// ── Clan + rank row (whole line together) ──────────────────────────
+/** Scale of the entire clan+rank text line. */
+export const CLAN_ROW_SCALE = 0.9;
+/** Horizontal nudge of the clan+rank row (px). Positive = right, negative = left. */
+export const CLAN_ROW_OFFSET_X = -10;
+/** Margin below the clan+rank row — reduces gap with the element below. Negative = closer. */
+export const CLAN_ROW_MARGIN_BOTTOM = 10;
+
 // ── Clan name text ─────────────────────────────────────────────────
 export const CLAN_OFFSET_X = 3;
 export const CLAN_OFFSET_Y = -3;
@@ -119,7 +127,7 @@ export const RANK_CONTAINER_SCALE_Y = 0.85;
 // C. Progression bar (la línea/barra interna)
 export const RANK_BAR_HEIGHT = 28;
 export const RANK_BAR_OFFSET_Y = 0;
-export const RANK_BAR_BACKGROUND_COLOR = 'rgba(255,255,255,0.12)';
+export const RANK_BAR_BACKGROUND_COLOR = '#222222'; // no rgba — SVG fill crashes with rgba on RN 0.81 re-renders
 export const RANK_BAR_GRADIENT_START = '#E53935';
 export const RANK_BAR_GRADIENT_END = '#FF9800';
 export const RANK_BAR_RADIUS = 10;
@@ -333,10 +341,11 @@ export const FRIENDS_BLOCK_SCALE = 1;
 export const SAVED_BLOCK_OFFSET_X = 0;
 export const SAVED_BLOCK_OFFSET_Y = 0;
 export const SAVED_BLOCK_SCALE = 1;
-/** Texto "GUARDADOS" dentro del cuadrado — solo posición. */
+/** Texto "GUARDADOS" dentro del cuadrado — posición y tamaño fijo. */
 export const SAVED_LABEL_OFFSET_X = 0;
 export const SAVED_LABEL_OFFSET_Y = -4;
+export const SAVED_LABEL_FONT_SIZE = 10;
 /** Icono guardados DENTRO del cuadrado — posición y escala independientes del contenedor. */
 export const SAVED_ICON_OFFSET_X = 0;
-export const SAVED_ICON_OFFSET_Y = 0;
+export const SAVED_ICON_OFFSET_Y = 5;
 export const SAVED_ICON_SCALE = 2.8;

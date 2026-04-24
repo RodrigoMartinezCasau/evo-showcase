@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import {
   PHILOSOPHY_PERCENTAGES_PANEL_OFFSET_X,
   PHILOSOPHY_PERCENTAGES_PANEL_OFFSET_Y,
@@ -28,7 +29,7 @@ type PctEntry = { clanId: string; label: string; pct: number };
 type Props = {
   percentages: PctEntry[];
   clanId?: string | null;
-  /** When provided, wraps the panel in a TouchableOpacity (personal profile only). */
+  /** When provided AND user has a clan, wraps panel in a TouchableOpacity. */
   onPress?: () => void;
 };
 
@@ -39,6 +40,12 @@ export const PersonalPhilosophyPanel = React.memo(function PersonalPhilosophyPan
 }: Props) {
   const titleColor = getClanColor(clanId ?? null);
   const sorted = [...percentages].sort((a, b) => b.pct - a.pct);
+  const isSinClan = clanId === null || clanId === undefined;
+
+  // Sin clan: tapping anywhere on the card shows the alert instead of navigating
+  const effectivePress = isSinClan
+    ? () => Alert.alert('', 'Sigue reflexionando...')
+    : onPress;
 
   const inner = (
     <View
@@ -54,7 +61,11 @@ export const PersonalPhilosophyPanel = React.memo(function PersonalPhilosophyPan
     >
       <View style={styles.titleRow}>
         <Text style={[styles.title, { color: titleColor }]}>Pensamiento filosófico</Text>
-        {onPress && <Text style={styles.expandHint}>Ver detalle →</Text>}
+        {isSinClan ? (
+          <Ionicons name="lock-closed-outline" size={16} color="rgba(255,255,255,0.40)" />
+        ) : (
+          onPress && <Text style={styles.expandHint}>Ver detalle →</Text>
+        )}
       </View>
       {sorted.map((entry, i) => (
         <View
@@ -101,8 +112,8 @@ export const PersonalPhilosophyPanel = React.memo(function PersonalPhilosophyPan
         },
       ]}
     >
-      {onPress ? (
-        <TouchableOpacity onPress={onPress} activeOpacity={0.75}>
+      {effectivePress ? (
+        <TouchableOpacity onPress={effectivePress} activeOpacity={0.75}>
           {inner}
         </TouchableOpacity>
       ) : (

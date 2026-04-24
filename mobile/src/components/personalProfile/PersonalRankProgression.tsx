@@ -26,8 +26,7 @@ import {
   RANK_BAR_HEIGHT,
   RANK_BAR_OFFSET_Y,
   RANK_BAR_BACKGROUND_COLOR,
-  RANK_BAR_GRADIENT_START,
-  RANK_BAR_GRADIENT_END,
+
   RANK_BAR_RADIUS,
   RANK_BAR_THICKNESS,
   RANK_BAR_SCALE_Y,
@@ -39,11 +38,34 @@ import {
   RANK_NEXT_INSIDE_OFFSET_Y,
   RANK_NEXT_INSIDE_SCALE,
   RANK_NEXT_FONT_SIZE,
-  RANK_NEXT_GRADIENT_START,
-  RANK_NEXT_GRADIENT_END,
+
   RANK_TEXT_BLACK_COLOR,
   RANK_PROGRESS_VALUE,
 } from '@evoconn/constants/personalProfileLayout';
+import { CLAN_REVEAL_MIN_REFLECTIONS } from '@evoconn/utils/getRankFromPct';
+
+/**
+ * All gradient stop-colors are STATIC strings defined once at module load.
+ * Never computed dynamically — avoids react-native-svg color-reprocessing crash
+ * ("Property 'r' doesn't exist") when stopColor changes between renders.
+ *
+ * Direction key: clans listed here go primary→secondary; all others are reversed.
+ */
+const NORMAL_DIR = new Set(['humanista', 'estoico']);
+
+type GradPair = readonly [string, string]; // [start, end]
+
+const CLAN_GRAD: Record<string, GradPair> = {
+  'sin_clan':          ['#c7ff02', '#a8d600'],
+  'nihilista':         ['#535147', '#bdb29c'],
+  'cientista':         ['#54d5cf', '#fdfef0'],
+  'estoico':           ['#818a41', '#444827'],   // normal dir
+  'existencialista':   ['#f9bc4b', '#c93a39'],
+  'trascendentalista': ['#e4de5b', '#cb6ce6'],
+  'humanista':         ['#efb318', '#d08733'],   // normal dir
+  'realista':          ['#f9a666', '#a2a3a8'],
+  'racionalista':      ['#46b8f9', '#395df2'],
+};
 
 const RANK_ORDER: Rank[] = ['aprendiz', 'maestro', 'filosofo'];
 const RANK_LABELS: Record<Rank, string> = {
@@ -56,18 +78,34 @@ type Props = {
   rank: Rank;
   progress?: number;
   onPress?: () => void;
+  /** Pass the user's clanId. When null the bar shows sin-clan progression. */
+  clanId?: string | null;
+  /** Total reflections — used to compute sin-clan bar fill. */
+  totalReflections?: number;
 };
 
 /**
  * All dimensions are computed from constants — no useState, no onLayout,
  * no nested scaleY transforms. The layout footprint is 100 % deterministic.
+ *
+ * When `clanId === null` the bar switches to "Sin Clan → Nuevo Clan" mode:
+ * progress is calculated from totalReflections / CLAN_REVEAL_MIN_REFLECTIONS.
  */
 export const PersonalRankProgression = React.memo(function PersonalRankProgression({
   rank,
   progress = RANK_PROGRESS_VALUE,
   onPress,
+  clanId = undefined,
+  totalReflections = 0,
 }: Props) {
   const { width: screenW } = useWindowDimensions();
+
+  const isSinClan = clanId === null;
+
+  // Sin-clan mode: progress toward clan assignment (0 → 30 reflections)
+  const sinClanProgress = isSinClan
+    ? Math.min(1, totalReflections / CLAN_REVEAL_MIN_REFLECTIONS)
+    : null;
 
   const currentIndex = RANK_ORDER.indexOf(rank);
   const nextRank =
@@ -75,10 +113,26 @@ export const PersonalRankProgression = React.memo(function PersonalRankProgressi
       ? RANK_ORDER[currentIndex + 1]
       : RANK_ORDER[currentIndex];
   const isMaxRank = currentIndex === RANK_ORDER.length - 1;
-  const clampedProgress = isMaxRank ? 1 : Math.max(0, Math.min(1, progress));
+  const clampedProgress = isSinClan
+    ? sinClanProgress!
+    : isMaxRank ? 1 : Math.max(0, Math.min(1, progress));
 
-  const currentLabel = RANK_LABELS[rank].toUpperCase();
-  const nextLabel = RANK_LABELS[nextRank].toUpperCase();
+  const currentLabel = isSinClan ? 'SIN CLAN' : RANK_LABELS[rank].toUpperCase();
+  // At max rank (Filósofo) show the clan name on the right instead of repeating "FILÓSOFO"
+  const clanDisplayName = clanId ? clanId.charAt(0).toUpperCase() + clanId.slice(1).toLowerCase() : '';
+  const nextLabel = isSinClan
+    ? 'NUEVO CLAN'
+    : (isMaxRank && clanDisplayName)
+      ? clanDisplayName.toUpperCase()
+      : RANK_LABELS[nextRank].toUpperCase();
+
+  // Resolve the gradient key → look up static stop-color pair
+  const gradKey = isSinClan
+    ? 'sin_clan'
+    : (clanId && CLAN_GRAD[clanId] ? clanId : 'sin_clan');
+  const [gradStart, gradEnd] = CLAN_GRAD[gradKey] ?? CLAN_GRAD['sin_clan'];
+  const barFillId = `rpBarFill_${gradKey}`;
+  const txtGradId = `rpTxtGrad_${gradKey}`;
 
   // ── All pixel values computed once, no async measurement ──────────
   const dims = useMemo(() => {
@@ -155,14 +209,26 @@ export const PersonalRankProgression = React.memo(function PersonalRankProgressi
         >
           <Svg width={dims.containerInnerW} height={dims.svgH}>
             <Defs>
-              <SvgLinearGradient id="rpBarFill" x1="0" y1="0" x2="1" y2="0">
-                <Stop offset="0" stopColor={RANK_BAR_GRADIENT_START} />
-                <Stop offset="1" stopColor={RANK_BAR_GRADIENT_END} />
-              </SvgLinearGradient>
-              <SvgLinearGradient id="rpTxtGrad" x1="0" y1="0" x2="1" y2="0">
-                <Stop offset="0" stopColor={RANK_NEXT_GRADIENT_START} />
-                <Stop offset="1" stopColor={RANK_NEXT_GRADIENT_END} />
-              </SvgLinearGradient>
+              {/* All clan gradients defined statically — stopColor never changes */}
+              <SvgLinearGradient id="rpBarFill_sin_clan"          x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#c7ff02" /><Stop offset="1" stopColor="#a8d600" /></SvgLinearGradient>
+              <SvgLinearGradient id="rpBarFill_nihilista"         x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#535147" /><Stop offset="1" stopColor="#bdb29c" /></SvgLinearGradient>
+              <SvgLinearGradient id="rpBarFill_cientista"         x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#54d5cf" /><Stop offset="1" stopColor="#fdfef0" /></SvgLinearGradient>
+              <SvgLinearGradient id="rpBarFill_estoico"           x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#818a41" /><Stop offset="1" stopColor="#444827" /></SvgLinearGradient>
+              <SvgLinearGradient id="rpBarFill_existencialista"   x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#f9bc4b" /><Stop offset="1" stopColor="#c93a39" /></SvgLinearGradient>
+              <SvgLinearGradient id="rpBarFill_trascendentalista" x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#e4de5b" /><Stop offset="1" stopColor="#cb6ce6" /></SvgLinearGradient>
+              <SvgLinearGradient id="rpBarFill_humanista"         x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#efb318" /><Stop offset="1" stopColor="#d08733" /></SvgLinearGradient>
+              <SvgLinearGradient id="rpBarFill_realista"          x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#f9a666" /><Stop offset="1" stopColor="#a2a3a8" /></SvgLinearGradient>
+              <SvgLinearGradient id="rpBarFill_racionalista"      x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#46b8f9" /><Stop offset="1" stopColor="#395df2" /></SvgLinearGradient>
+              {/* Text gradients — same palette as bar fill */}
+              <SvgLinearGradient id="rpTxtGrad_sin_clan"          x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#c7ff02" /><Stop offset="1" stopColor="#a8d600" /></SvgLinearGradient>
+              <SvgLinearGradient id="rpTxtGrad_nihilista"         x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#535147" /><Stop offset="1" stopColor="#bdb29c" /></SvgLinearGradient>
+              <SvgLinearGradient id="rpTxtGrad_cientista"         x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#54d5cf" /><Stop offset="1" stopColor="#fdfef0" /></SvgLinearGradient>
+              <SvgLinearGradient id="rpTxtGrad_estoico"           x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#818a41" /><Stop offset="1" stopColor="#444827" /></SvgLinearGradient>
+              <SvgLinearGradient id="rpTxtGrad_existencialista"   x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#f9bc4b" /><Stop offset="1" stopColor="#c93a39" /></SvgLinearGradient>
+              <SvgLinearGradient id="rpTxtGrad_trascendentalista" x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#e4de5b" /><Stop offset="1" stopColor="#cb6ce6" /></SvgLinearGradient>
+              <SvgLinearGradient id="rpTxtGrad_humanista"         x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#efb318" /><Stop offset="1" stopColor="#d08733" /></SvgLinearGradient>
+              <SvgLinearGradient id="rpTxtGrad_realista"          x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#f9a666" /><Stop offset="1" stopColor="#a2a3a8" /></SvgLinearGradient>
+              <SvgLinearGradient id="rpTxtGrad_racionalista"      x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#46b8f9" /><Stop offset="1" stopColor="#395df2" /></SvgLinearGradient>
               <ClipPath id="rpClipEmpty">
                 <Rect
                   x={dims.fillW}
@@ -198,7 +264,7 @@ export const PersonalRankProgression = React.memo(function PersonalRankProgressi
                 height={dims.visualBarThickness}
                 rx={RANK_BAR_RADIUS}
                 ry={RANK_BAR_RADIUS}
-                fill="url(#rpBarFill)"
+                fill={`url(#${barFillId})`}
               />
             )}
 
@@ -208,7 +274,7 @@ export const PersonalRankProgression = React.memo(function PersonalRankProgressi
               y={dims.textY + RANK_CURRENT_INSIDE_OFFSET_Y}
               fontSize={RANK_CURRENT_FONT_SIZE * RANK_CURRENT_INSIDE_SCALE}
               fontWeight="700"
-              fill="url(#rpTxtGrad)"
+              fill={`url(#${txtGradId})`}
               clipPath="url(#rpClipEmpty)"
               textAnchor="start"
               alignmentBaseline="central"
@@ -220,7 +286,7 @@ export const PersonalRankProgression = React.memo(function PersonalRankProgressi
               y={dims.textY + RANK_NEXT_INSIDE_OFFSET_Y}
               fontSize={RANK_NEXT_FONT_SIZE * RANK_NEXT_INSIDE_SCALE}
               fontWeight="700"
-              fill="url(#rpTxtGrad)"
+              fill={`url(#${txtGradId})`}
               clipPath="url(#rpClipEmpty)"
               textAnchor="end"
               alignmentBaseline="central"
