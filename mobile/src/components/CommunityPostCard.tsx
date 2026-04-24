@@ -9,12 +9,12 @@ import { CARD_LAYOUT_SHARED, cardLayoutBlockForTier } from '@evoconn/constants/c
 import { ClanBanner } from './ClanBanner';
 import { getCardMaxLinesForTier, getReflectionCardTier } from '@evoconn/utils/getCardSizeFromText';
 import { formatNumber } from '@evoconn/utils/formatNumber';
-import { getSmallClanBackgroundAsset } from '@evoconn/assets/cards/smallClanBackgrounds';
 import { getSmallClanBannerAsset } from '@evoconn/assets/cards/smallClanBanners';
-import { getMediumClanBackgroundAsset } from '@evoconn/assets/cards/mediumClanBackgrounds';
 import { getMediumClanBannerAsset } from '@evoconn/assets/cards/mediumClanBanners';
-import { getQuoteClanBackgroundAsset } from '@evoconn/assets/cards/quoteClanBackgrounds';
 import { getQuoteClanBannerAsset } from '@evoconn/assets/cards/quoteClanBanners';
+import { getSmallClanBackgroundSvg } from '@evoconn/assets/cards/smallClanBackgroundsSvg';
+import { getMediumClanBackgroundSvg } from '@evoconn/assets/cards/mediumClanBackgroundsSvg';
+import { getQuoteClanBackgroundSvg } from '@evoconn/assets/cards/quoteClanBackgroundsSvg';
 import { CARD_ASSET_LAYOUT, SIN_CLAN_BANNER_OFFSET_X, SIN_CLAN_BANNER_OFFSET_Y } from '@evoconn/constants/cardAssetLayout';
 import { smallStatsIcons } from '@evoconn/assets/icons/smallStats';
 import { useFeedStore } from '@evoconn/hooks/useFeedStore';
@@ -122,16 +122,18 @@ export function CommunityPostCard({
   const isQuoteCard = cardTier === 'quote';
   const isCanvaCard = isSmallCard || isMediumCard || isQuoteCard;
 
-  const smallClanBgAsset = isSmallCard ? getSmallClanBackgroundAsset(post.author.clanId) : undefined;
-  const mediumClanBgAsset = isMediumCard ? getMediumClanBackgroundAsset(post.author.clanId) : undefined;
-  const quoteClanBgAsset = isQuoteCard ? getQuoteClanBackgroundAsset(post.author.clanId) : undefined;
+  // SVG background component for canva cards (replaces PNG ImageBackground)
+  const CardBgSvg = useMemo(() => {
+    if (isSmallCard) return getSmallClanBackgroundSvg(post.author.clanId);
+    if (isMediumCard) return getMediumClanBackgroundSvg(post.author.clanId);
+    if (isQuoteCard) return getQuoteClanBackgroundSvg(post.author.clanId);
+    return null;
+  }, [isSmallCard, isMediumCard, isQuoteCard, post.author.clanId]);
 
-  const hasClanBg = isSmallCard ? !!smallClanBgAsset : isMediumCard ? !!mediumClanBgAsset : isQuoteCard ? !!quoteClanBgAsset : false;
-
-  const canvaBgAsset = isSmallCard ? smallClanBgAsset : isMediumCard ? mediumClanBgAsset : isQuoteCard ? quoteClanBgAsset : undefined;
-  const resolvedOuterAsset = isCanvaCard ? canvaBgAsset : outerAsset;
-  const Outer = resolvedOuterAsset ? ImageBackground : View;
-  const outerProps = resolvedOuterAsset
+  // Non-canva fallback (legacy path — currently unreachable since all cards are canva)
+  const resolvedOuterAsset = isCanvaCard ? undefined : outerAsset;
+  const Outer = (!isCanvaCard && resolvedOuterAsset) ? ImageBackground : View;
+  const outerProps = (!isCanvaCard && resolvedOuterAsset)
     ? { source: resolvedOuterAsset, resizeMode: 'stretch' as const }
     : {};
 
@@ -144,28 +146,6 @@ export function CommunityPostCard({
         : undefined;
 
   
-
-  const QA = CARD_ASSET_LAYOUT.QUOTE;
-  const canvaAssetScale = isSmallCard
-    ? CARD_ASSET_LAYOUT.SMALL.SMALL_CARD_ASSET_SCALE
-    : isMediumCard ? CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_ASSET_SCALE
-    : QA.QUOTE_CARD_ASSET_SCALE;
-  const canvaAssetWidthAdjust = isSmallCard
-    ? CARD_ASSET_LAYOUT.SMALL.SMALL_CARD_ASSET_WIDTH_ADJUST
-    : isMediumCard ? CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_ASSET_WIDTH_ADJUST
-    : QA.QUOTE_CARD_ASSET_WIDTH_ADJUST;
-  const canvaAssetHeightAdjust = isSmallCard
-    ? CARD_ASSET_LAYOUT.SMALL.SMALL_CARD_ASSET_HEIGHT_ADJUST
-    : isMediumCard ? CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_ASSET_HEIGHT_ADJUST
-    : QA.QUOTE_CARD_ASSET_HEIGHT_ADJUST;
-  const canvaAssetOffsetX = isSmallCard
-    ? CARD_ASSET_LAYOUT.SMALL.SMALL_CARD_ASSET_OFFSET_X
-    : isMediumCard ? CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_ASSET_OFFSET_X
-    : QA.QUOTE_CARD_ASSET_OFFSET_X;
-  const canvaAssetOffsetY = isSmallCard
-    ? CARD_ASSET_LAYOUT.SMALL.SMALL_CARD_ASSET_OFFSET_Y
-    : isMediumCard ? CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_ASSET_OFFSET_Y
-    : QA.QUOTE_CARD_ASSET_OFFSET_Y;
 
   const feedUpvoteIcon = smallUpvoted ? smallStatsIcons.upvoteActive : smallStatsIcons.upvoteInactive;
   const feedSaveIcon = isPostSaved ? smallStatsIcons.saveActive : smallStatsIcons.saveInactive;
@@ -208,11 +188,7 @@ export function CommunityPostCard({
   );
 
   const { width: screenWidth } = useWindowDimensions();
-  const MEDIUM_PNG_ASPECT = 1024 / 576;
   const cardWidth = screenWidth - 24;
-  const mediumScaledHeight = isMediumCard
-    ? Math.round((cardWidth / MEDIUM_PNG_ASPECT) * canvaAssetScale) + canvaAssetHeightAdjust
-    : 0;
 
   const contentHeightForOuterSizing = measuredBlackBoxContentHeight ?? L.INNER_BOX_MIN_HEIGHT;
   const coloredHeaderHeightForOuterSizing = measuredColoredHeaderHeight ?? L.HEADER_HEIGHT;
@@ -240,6 +216,7 @@ export function CommunityPostCard({
   const topSpacerHeight = isCanvaCard ? 0 : topSpacerHeightBase;
   const desiredOuterMinHeight = outerMinHeightFromContent + minHeightGap;
 
+  const QA = CARD_ASSET_LAYOUT.QUOTE;
   const cropTop = isSmallCard
     ? CARD_ASSET_LAYOUT.SMALL.SMALL_CARD_CROP_TOP
     : isMediumCard ? CARD_ASSET_LAYOUT.MEDIUM.MEDIUM_CARD_CROP_TOP
@@ -263,62 +240,23 @@ export function CommunityPostCard({
             backgroundColor: isCanvaCard ? 'transparent' : outerColor,
             paddingHorizontal: L.OUTER_PADDING_HORIZONTAL,
             paddingVertical: L.OUTER_PADDING_VERTICAL,
-            ...(isCanvaCard
-              ? {
-                  transform: [
-                    { translateX: L.CARD_GROUP_OFFSET_X },
-                    { translateY: L.CARD_GROUP_OFFSET_Y },
-                  ],
-                }
-              : null),
-            ...(isCanvaCard
-              ? {
-                  height: L.OUTER_COLORED_COLLAPSED_HEIGHT,
-                  minHeight: undefined,
-                }
-              : { height: L.OUTER_COLORED_COLLAPSED_HEIGHT, minHeight: undefined }),
+            transform: [
+              { translateX: L.CARD_GROUP_OFFSET_X },
+              { translateY: L.CARD_GROUP_OFFSET_Y },
+            ],
+            height: L.OUTER_COLORED_COLLAPSED_HEIGHT,
+            minHeight: undefined,
           },
         ]}
-        imageStyle={[
-          styles.outerImage,
-          isSmallCard
-            ? {
-                left: -canvaAssetWidthAdjust / 2,
-                right: -canvaAssetWidthAdjust / 2,
-                top: -canvaAssetHeightAdjust / 2,
-                bottom: -canvaAssetHeightAdjust / 2,
-                transform: [
-                  { translateX: canvaAssetOffsetX },
-                  { translateY: canvaAssetOffsetY },
-                  { scale: canvaAssetScale },
-                ],
-              }
-            : isMediumCard
-              ? {
-                  left: -canvaAssetWidthAdjust / 2,
-                  right: -canvaAssetWidthAdjust / 2,
-                  top: -canvaAssetHeightAdjust / 2,
-                  bottom: -canvaAssetHeightAdjust / 2,
-                  transform: [
-                    { translateX: canvaAssetOffsetX },
-                    { translateY: canvaAssetOffsetY },
-                  ],
-                }
-              : isQuoteCard
-                ? {
-                    left: -canvaAssetWidthAdjust / 2,
-                    right: -canvaAssetWidthAdjust / 2,
-                    top: -canvaAssetHeightAdjust / 2,
-                    bottom: -canvaAssetHeightAdjust / 2,
-                    transform: [
-                      { translateX: canvaAssetOffsetX },
-                      { translateY: canvaAssetOffsetY },
-                      { scale: canvaAssetScale },
-                    ],
-                  }
-                : null,
-        ]}
       >
+        {isCanvaCard && CardBgSvg ? (
+          <CardBgSvg
+            width={cardWidth}
+            height={L.OUTER_COLORED_COLLAPSED_HEIGHT}
+            style={StyleSheet.absoluteFillObject}
+            preserveAspectRatio="none"
+          />
+        ) : null}
         {topSpacerHeight > 0 ? <View style={{ height: topSpacerHeight }} /> : null}
 
         <View
