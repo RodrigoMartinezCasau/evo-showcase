@@ -31,6 +31,7 @@ import {
   applyDailyRollover,
   applyStreakActivation,
   applyDecrementUses,
+  reconcileStreakOnLoad,
   getLocalDayKey,
   DAILY_USES_LIMIT,
   type UserStats,
@@ -109,12 +110,24 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
   const [statsLoaded, setStatsLoaded] = useState(false);
 
   // Load the entire DB ONCE on app mount.
+  // After loading, reconcile every user's streak so that stale non-zero
+  // streaks from missed days are reset immediately — even when the daily
+  // rollover already ran today (before the streak-break fix was present).
   useEffect(() => {
     let cancelled = false;
     loadStatsDB().then((loaded) => {
       if (cancelled) return;
-      console.log('[USERSTATS] Initial DB hydrated:', loaded);
-      setDB(loaded);
+      const today = getLocalDayKey();
+      let changed = false;
+      const reconciled: StatsDatabase = {};
+      for (const [uid, stats] of Object.entries(loaded)) {
+        const fixed = reconcileStreakOnLoad(stats, today);
+        reconciled[uid] = fixed;
+        if (fixed !== stats) changed = true;
+      }
+      console.log('[USERSTATS] Initial DB hydrated:', reconciled);
+      setDB(reconciled);
+      if (changed) saveStatsDB(reconciled);
       setStatsLoaded(true);
     });
     return () => {

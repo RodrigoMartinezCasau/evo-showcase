@@ -65,6 +65,20 @@ function getYesterdayKey(): string {
   ].join('-');
 }
 
+/**
+ * Returns the calendar day immediately before the given YYYY-MM-DD key.
+ * Uses noon to avoid DST edge-case bugs when subtracting 24 h.
+ */
+function getPrevDayKey(dayKey: string): string {
+  const d = new Date(`${dayKey}T12:00:00`);
+  d.setDate(d.getDate() - 1);
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, '0'),
+    String(d.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
 /** Default stats for a brand-new user. */
 export function defaultUserStats(): UserStats {
   return {
@@ -115,15 +129,50 @@ export async function saveStatsDB(db: StatsDatabase): Promise<void> {
 
 /**
  * Apply daily-uses rollover to a stats slice if the calendar day has changed.
- * Returns either the unchanged input or a new slice with reset uses.
+ *
+ * Besides resetting dailyUsesRemaining, this is also the right place to
+ * break the streak: if the user's last activation was neither today nor
+ * yesterday (relative to the new day), they missed at least one day and
+ * their currentStreak resets to 0.
+ *
+ * The historical record (hasSentTodayDate) is intentionally preserved so
+ * the calendar UI keeps showing past activity dots even after a reset.
  */
 export function applyDailyRollover(stats: UserStats, today: string): UserStats {
   if (stats.lastUsesResetDate === today) return stats;
+
+  const yesterday = getPrevDayKey(today);
+  const streakAlive =
+    stats.hasSentTodayDate === today ||
+    stats.hasSentTodayDate === yesterday;
+
   return {
     ...stats,
     dailyUsesRemaining: DAILY_USES_LIMIT,
     lastUsesResetDate: today,
+    currentStreak: streakAlive ? stats.currentStreak : 0,
   };
+}
+
+/**
+ * Checks—independently of whether a rollover is needed—whether a stored
+ * streak should already be 0 because the user missed one or more days.
+ *
+ * This is called once on DB load so that stale streaks stored before the
+ * rollover fix are corrected immediately, even when lastUsesResetDate is
+ * already today (meaning the old rollover already ran without resetting
+ * the streak).
+ *
+ * hasSentTodayDate is preserved so the calendar keeps its history dots.
+ */
+export function reconcileStreakOnLoad(stats: UserStats, today: string): UserStats {
+  if (!stats.currentStreak) return stats; // already 0, nothing to do
+  const yesterday = getPrevDayKey(today);
+  const streakAlive =
+    stats.hasSentTodayDate === today ||
+    stats.hasSentTodayDate === yesterday;
+  if (streakAlive) return stats;
+  return { ...stats, currentStreak: 0 };
 }
 
 /**
