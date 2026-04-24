@@ -40,8 +40,6 @@ type CommunityPostCardProps = {
    * Vistas ampliadas usan `ReflectionDetailItem`, no esta tarjeta.
    */
   showPhraseAuthor?: boolean;
-  /** Añade sombra negra al botón de seguir. True en Siguiendo/Más votadas, false en Para Ti. */
-  followButtonOutline?: boolean;
 };
 
 export function CommunityPostCard({
@@ -50,7 +48,6 @@ export function CommunityPostCard({
   onAuthorPress,
   onClanPress: _onClanPress,
   showPhraseAuthor = false,
-  followButtonOutline = false,
 }: CommunityPostCardProps) {
   const { updatePostVote, updatePostSaveToggle, getMyVote } = useFeedStore();
   const { savePost, unsavePost, isSaved } = usePersonalProfile();
@@ -158,7 +155,7 @@ export function CommunityPostCard({
           />
         </View>
 
-        {/* Top colored strip — username + follow */}
+        {/* Top colored strip — username + follow button */}
         <View
           style={[
             styles.topStrip,
@@ -173,13 +170,11 @@ export function CommunityPostCard({
               {post.author.username}
             </Text>
           </TouchableOpacity>
-          <View style={followButtonOutline ? styles.followShadow : undefined}>
-            <FollowButton
-              authorId={post.author.id}
-              authorClanId={post.author.clanId}
-              context="community"
-            />
-          </View>
+          <FollowButton
+            authorId={post.author.id}
+            authorClanId={post.author.clanId}
+            context="community"
+          />
         </View>
 
         {/* Inner black area — title + body */}
@@ -270,6 +265,9 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontSize: 14,
     letterSpacing: 0.5,
+    textShadowColor: '#000000',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   title: {
     color: evoconnColors.text,
@@ -301,13 +299,6 @@ const styles = StyleSheet.create({
   feedStatPress: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  followShadow: {
-    shadowColor: '#000000',
-    shadowOffset: { width: 1, height: 1 },
-    shadowOpacity: 1,
-    shadowRadius: 2,
-    elevation: 3,
   },
   feedStatCount: {
     color: evoconnColors.text,
