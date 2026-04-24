@@ -80,7 +80,6 @@ export function ChatInputBar({
     interimText,
     elapsedSeconds,
     volumeLevel,
-    isAvailable: voiceAvailable,
     startRecording,
     stopRecording,
     cancelRecording,
@@ -205,15 +204,13 @@ export function ChatInputBar({
                 maxLength={2000}
               />
               {/* Icono micrófono — esquina inferior derecha del input */}
-              {voiceAvailable && (
-                <TouchableOpacity
-                  onPress={startRecording}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  style={styles.micBtn}
-                >
-                  <Ionicons name="mic" size={17} color="#949ba6" />
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                onPress={startRecording}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={styles.micBtn}
+              >
+                <Ionicons name="mic" size={17} color="#949ba6" />
+              </TouchableOpacity>
             </>
           )}
         </View>
