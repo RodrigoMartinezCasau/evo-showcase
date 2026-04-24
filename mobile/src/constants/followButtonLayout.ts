@@ -1,3 +1,9 @@
+/**
+ * Thickness (in SVG units, viewBox 0–600) of the black outline around the + icon.
+ * Increase to make the border thicker. 6 ≈ 1px at typical render sizes.
+ */
+export const FOLLOW_OUTLINE_PX = 10;
+
 /** Layout editors for the follow button — independent per screen context. */
 
 export const COMMUNITY_FOLLOW_BUTTON_LAYOUT = {

@@ -7,6 +7,7 @@ import {
   COMMUNITY_FOLLOW_BUTTON_LAYOUT,
   DETAIL_FOLLOW_BUTTON_LAYOUT,
   FORYOU_FOLLOW_BUTTON_LAYOUT,
+  FOLLOW_OUTLINE_PX,
 } from '@evoconn/constants/followButtonLayout';
 
 type FollowButtonContext = 'community' | 'detail' | 'foryou';
@@ -26,12 +27,27 @@ const LAYOUT_BY_CONTEXT: Record<FollowButtonContext, { offsetX: number; offsetY:
 const BASE_SIZE = 28;
 
 function FollowPlusSvg({ borderColor, size }: { borderColor: string; size: number }) {
+  const O = FOLLOW_OUTLINE_PX;
+  // Colored plus arm inner corners (original path)
+  const C1 = 241.8, C2 = 358.2;
+  // Black outline: expand each inner corner by O, outer boundary extends to -O / 600+O
+  const vbSize = 600 + O * 2;
+  const vb = `-${O} -${O} ${vbSize} ${vbSize}`;
+  const b1 = C1 - O, b2 = C2 + O, bMax = 600 + O;
+
   return (
-    <Svg width={size} height={size} viewBox="0 0 600 600">
+    <Svg width={size} height={size} viewBox={vb}>
+      {/* Black outer outline */}
+      <Path
+        d={`M${bMax} ${b1} H${b2} V${-O} H${b1} V${b1} H${-O} V${b2} H${b1} V${bMax} H${b2} V${b2} H${bMax} Z`}
+        fill="#000000"
+      />
+      {/* Colored plus (clan secondary color) */}
       <Path
         d="M600 241.8 H358.2 V0 H241.8 V241.8 H0 V358.2 H241.8 V600 H358.2 V358.2 H600 Z"
         fill={borderColor}
       />
+      {/* White inner plus */}
       <Path
         d="M584.2 235.5 H348.8 V0 H235.5 V235.5 H0 V348.8 H235.5 V584.2 H348.8 V348.8 H584.2 Z"
         fill="#ffffff"
