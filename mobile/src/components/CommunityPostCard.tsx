@@ -40,6 +40,8 @@ type CommunityPostCardProps = {
    * Vistas ampliadas usan `ReflectionDetailItem`, no esta tarjeta.
    */
   showPhraseAuthor?: boolean;
+  /** Añade sombra negra al botón de seguir. True en Siguiendo/Más votadas, false en Para Ti. */
+  followButtonOutline?: boolean;
 };
 
 export function CommunityPostCard({
@@ -48,6 +50,7 @@ export function CommunityPostCard({
   onAuthorPress,
   onClanPress: _onClanPress,
   showPhraseAuthor = false,
+  followButtonOutline = false,
 }: CommunityPostCardProps) {
   const { updatePostVote, updatePostSaveToggle, getMyVote } = useFeedStore();
   const { savePost, unsavePost, isSaved } = usePersonalProfile();
@@ -170,11 +173,13 @@ export function CommunityPostCard({
               {post.author.username}
             </Text>
           </TouchableOpacity>
-          <FollowButton
-            authorId={post.author.id}
-            authorClanId={post.author.clanId}
-            context="community"
-          />
+          <View style={followButtonOutline ? styles.followShadow : undefined}>
+            <FollowButton
+              authorId={post.author.id}
+              authorClanId={post.author.clanId}
+              context="community"
+            />
+          </View>
         </View>
 
         {/* Inner black area — title + body */}
@@ -222,9 +227,8 @@ export function CommunityPostCard({
 
         {/* Banner (estandarte) — top-right corner, square PNG rendered at BANNER_SIZE */}
         {bannerAsset ? (
-          <Image
-            source={bannerAsset}
-            resizeMode="contain"
+          <View
+            pointerEvents="none"
             style={{
               position: 'absolute',
               top: V.BANNER_TOP,
@@ -232,8 +236,13 @@ export function CommunityPostCard({
               width: V.BANNER_SIZE,
               height: V.BANNER_SIZE,
             }}
-            pointerEvents="none"
-          />
+          >
+            <Image
+              source={bannerAsset}
+              resizeMode="contain"
+              style={{ width: V.BANNER_SIZE, height: V.BANNER_SIZE }}
+            />
+          </View>
         ) : null}
       </View>
     </TouchableOpacity>
@@ -292,6 +301,13 @@ const styles = StyleSheet.create({
   feedStatPress: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  followShadow: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 1, height: 1 },
+    shadowOpacity: 1,
+    shadowRadius: 2,
+    elevation: 3,
   },
   feedStatCount: {
     color: evoconnColors.text,
