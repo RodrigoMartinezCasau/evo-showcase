@@ -88,6 +88,7 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
     MIN_RESERVED_RIGHT_SPACE,
     shieldDisplaySize + TEXT_BADGE_SAFE_GAP + Math.max(0, -clampedShieldOffsetX),
   );
+  const usernameMaxWidth = screenW - 20 * 2 - 28;
   // Container height is always TEXT-ONLY height. The badge is absolute and
   // overflows visually without pushing sibling components down — so we must
   // NOT expand containerHeight to accommodate the badge size.
@@ -107,7 +108,7 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
   return (
     <View style={[styles.container, { height: containerHeight }]}>
       {/* Text column — username + clan+rank row */}
-      <View style={[styles.textBlock, { paddingRight: reservedRightSpace }]}>
+      <View style={styles.textBlock}>
         {/* Username row */}
         <TouchableOpacity
           onPress={handleShare}
@@ -123,16 +124,22 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
           ]}
         >
           <Text
-            style={[styles.username, { fontSize: USERNAME_FONT_SIZE, lineHeight: USERNAME_LINE_HEIGHT }]}
+            style={[
+              styles.username,
+              {
+                fontSize: USERNAME_FONT_SIZE,
+                lineHeight: USERNAME_LINE_HEIGHT,
+                maxWidth: usernameMaxWidth,
+              },
+            ]}
             numberOfLines={1}
             ellipsizeMode="clip"
             adjustsFontSizeToFit
-            minimumFontScale={0.4}
+            minimumFontScale={0.25}
           >
             {username}
-            {' '}
-            <Text style={styles.shareInline}>↗</Text>
           </Text>
+          <Text style={styles.shareInline}>↗</Text>
         </TouchableOpacity>
 
         {/* Clan + rank row — inline, same baseline */}
@@ -140,6 +147,7 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
           style={[
             styles.clanRankRow,
             {
+              paddingRight: reservedRightSpace,
               marginBottom: CLAN_ROW_MARGIN_BOTTOM,
               transform: [{ translateX: CLAN_ROW_OFFSET_X }, { scale: CLAN_ROW_SCALE }],
             },
@@ -197,23 +205,27 @@ const styles = StyleSheet.create({
     position: 'relative',
     paddingHorizontal: 20,
   },
-  textBlock: {
-    paddingRight: SHIELD_BASE_SIZE + 20,
-  },
+  textBlock: {},
   usernameRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    overflow: 'visible',
+    zIndex: 3,
   },
   username: {
     color: '#FFFFFF',
     fontWeight: '800',
     letterSpacing: 0.6,
-    flex: 1,
+    flexShrink: 1,
   },
   shareInline: {
     fontSize: USERNAME_FONT_SIZE * 0.75,
     color: 'rgba(255,255,255,0.85)',
     fontWeight: '500',
+    marginLeft: 5,
+    flexShrink: 0,
+    zIndex: 10,
+    elevation: 10,
   },
   clanRankRow: {
     flexDirection: 'row',

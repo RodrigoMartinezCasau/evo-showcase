@@ -1,5 +1,5 @@
 import React, { useMemo, useCallback } from 'react';
-import { View, Text, TouchableOpacity, Share, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Share, StyleSheet, useWindowDimensions } from 'react-native';
 import { getTopBarInsigniaByHouse } from '@evoconn/utils/getTopBarInsigniaByHouse';
 import type { Rank } from '@evoconn/types';
 import {
@@ -40,7 +40,9 @@ export const UserIdentityHeader = React.memo(function UserIdentityHeader({
   rank,
   onShieldPress,
 }: Props) {
+  const { width: screenW } = useWindowDimensions();
   const ShieldSvg = useMemo(() => getTopBarInsigniaByHouse(clanId), [clanId]);
+  const usernameMaxWidth = screenW - 20 * 2 - SHARE_BUTTON_SIZE - 10;
 
   // Render at true display size so the SVG is not GPU-upscaled from a small
   // rasterisation layer. See PersonalIdentityHeader for full explanation.
@@ -66,10 +68,13 @@ export const UserIdentityHeader = React.memo(function UserIdentityHeader({
               styles.username,
               {
                 fontSize: USERNAME_FONT_SIZE,
+                maxWidth: usernameMaxWidth,
                 transform: [{ translateX: USERNAME_OFFSET_X }, { translateY: USERNAME_OFFSET_Y }],
               },
             ]}
             numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.25}
           >
             {username}
           </Text>
@@ -90,7 +95,7 @@ export const UserIdentityHeader = React.memo(function UserIdentityHeader({
             <ShareIcon size={SHARE_BUTTON_SIZE} />
           </TouchableOpacity>
         </View>
-        <View style={styles.clanRankRow}>
+        <View style={[styles.clanRankRow, { paddingRight: SHIELD_BASE_SIZE + 20 }]}>
           <Text
             style={[
               styles.clanName,
@@ -149,14 +154,14 @@ const styles = StyleSheet.create({
     position: 'relative',
     paddingHorizontal: 20,
   },
-  textBlock: {
-    paddingRight: SHIELD_BASE_SIZE + 20,
-  },
+  textBlock: {},
   usernameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     marginBottom: 4,
+    overflow: 'visible',
+    zIndex: 3,
   },
   username: {
     color: '#FFFFFF',
@@ -167,6 +172,9 @@ const styles = StyleSheet.create({
   shareButton: {
     justifyContent: 'center',
     alignItems: 'center',
+    flexShrink: 0,
+    zIndex: 10,
+    elevation: 10,
   },
   clanRankRow: {
     flexDirection: 'row',
