@@ -1821,6 +1821,109 @@ class PhraseIntroResponse(BaseModel):
     intro: str | None
 
 
+class QuoteCandidate(BaseModel):
+    id: str
+    text: str
+    author: str = ""
+    domain: str = ""
+    tags: list[str] = []
+    themes: list[str] = []
+
+
+class QuoteSelectRequest(BaseModel):
+    reflection: str
+    candidates: list[QuoteCandidate]
+
+
+class QuoteSelectResponse(BaseModel):
+    quote_id: str
+    reason: str | None = None
+    source: str = "llm"
+
+
+def _strip_json_fence(raw: str) -> str:
+    raw = (raw or "").strip()
+    if raw.startswith("```"):
+        lines = raw.split("\n")
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        raw = "\n".join(lines).strip()
+    return raw
+
+
+@app.post("/quotes/select", response_model=QuoteSelectResponse)
+def select_quote(payload: QuoteSelectRequest):
+    """
+    Select the best existing phrase for a reflection.
+
+    The LLM is only a ranker: it must return one quote_id from the provided
+    candidates. If anything goes wrong, return the first local candidate so
+    the mobile app never receives generated/free-form phrases.
+    """
+    reflection = (payload.reflection or "").strip()
+    candidates = [c for c in payload.candidates if (c.id or "").strip() and (c.text or "").strip()]
+    candidates = candidates[:30]
+
+    if not reflection:
+        raise HTTPException(status_code=400, detail="reflection is required")
+    if not candidates:
+        raise HTTPException(status_code=400, detail="at least one quote candidate is required")
+
+    allowed_ids = {c.id for c in candidates}
+    fallback_id = candidates[0].id
+    candidates_payload = [
+        {
+            "id": c.id,
+            "text": c.text,
+            "author": c.author,
+            "domain": c.domain,
+            "tags": c.tags,
+            "themes": c.themes,
+        }
+        for c in candidates
+    ]
+    system = (
+        "Eres un selector filosófico de frases para EVO APP.\n"
+        "Tu tarea NO es escribir frases nuevas. Solo debes elegir la frase existente "
+        "que mejor encaje con el significado filosófico de la reflexión del usuario.\n"
+        "Evalúa tema, tensión central, dominio, intención emocional y profundidad conceptual.\n"
+        "REGLAS ESTRICTAS:\n"
+        "- Devuelve SOLO JSON válido, sin markdown.\n"
+        "- El quote_id debe ser exactamente uno de los IDs candidatos.\n"
+        "- No inventes IDs ni frases.\n"
+        "- Formato: {\"quote_id\":\"...\",\"reason\":\"...\"}"
+    )
+    user_prompt = (
+        f"Reflexión del usuario:\n{reflection}\n\n"
+        f"Frases candidatas:\n{json.dumps(candidates_payload, ensure_ascii=False)}\n\n"
+        "Elige la frase más adecuada y devuelve SOLO JSON."
+    )
+
+    try:
+        from llm import OpenAIClient
+
+        llm = OpenAIClient()
+        raw = llm.complete(
+            system=system,
+            user=user_prompt,
+            language="es",
+            max_tokens=220,
+            prompt_id="QUOTE_SELECTOR",
+        )
+        data = json.loads(_strip_json_fence(raw))
+        quote_id = str(data.get("quote_id", "")).strip()
+        reason = str(data.get("reason", "")).strip() or None
+        if quote_id in allowed_ids:
+            return QuoteSelectResponse(quote_id=quote_id, reason=reason, source="llm")
+        logger.warning("quotes/select returned invalid quote_id=%s; falling back", quote_id)
+    except Exception as e:
+        logger.warning("quotes/select LLM fallback: %s", e)
+
+    return QuoteSelectResponse(quote_id=fallback_id, reason=None, source="fallback")
+
+
 @app.post("/phrase/intro", response_model=PhraseIntroResponse)
 def phrase_intro(payload: PhraseIntroRequest):
     """

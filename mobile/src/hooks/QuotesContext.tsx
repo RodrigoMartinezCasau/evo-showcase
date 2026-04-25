@@ -22,7 +22,8 @@ import React, {
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getDomainStats, type DomainStats } from '@evoconn/logic/quotes/getDomainStats';
-import { ALL_QUOTES, selectBestQuote } from '@evoconn/data/quotes';
+import { ALL_QUOTES, selectBestQuote, selectQuoteCandidates } from '@evoconn/data/quotes';
+import { selectQuoteWithAI } from '@evoconn/services/quoteSelectionApi';
 import type { Quote } from '@evoconn/types/quotes';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
 
@@ -58,7 +59,7 @@ interface QuotesContextValue {
    * unlock it for the active user (no-op if already unlocked), and return it.
    * This is the main entry point after a user sends a reflection.
    */
-  selectAndUnlockQuote: (reflectionText: string) => Quote;
+  selectAndUnlockQuote: (reflectionText: string) => Promise<Quote>;
 }
 
 // ─── Context defaults ─────────────────────────────────────────────────────────
@@ -70,7 +71,7 @@ const QuotesContext = createContext<QuotesContextValue>({
   unlockPhrase:         () => {},
   isUnlocked:           () => false,
   unlockNextPhrase:     () => {},
-  selectAndUnlockQuote: (text: string) => selectBestQuote(text),
+  selectAndUnlockQuote: async (text: string) => selectBestQuote(text),
 });
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
@@ -142,8 +143,13 @@ export function QuotesProvider({ children }: { children: React.ReactNode }) {
   );
 
   const selectAndUnlockQuote = useCallback(
-    (reflectionText: string): Quote => {
-      const selected = selectBestQuote(reflectionText);
+    async (reflectionText: string): Promise<Quote> => {
+      const candidates = selectQuoteCandidates(reflectionText, 25);
+      const aiSelectedId = await selectQuoteWithAI(reflectionText, candidates);
+      const selected =
+        (aiSelectedId ? candidates.find((quote) => quote.id === aiSelectedId) : null) ??
+        candidates[0] ??
+        selectBestQuote(reflectionText);
       // Unlock it (unlockPhrase is a no-op if already unlocked, counter stays same)
       const current = db[sim.activeUserId] ?? [];
       if (!current.includes(selected.id)) {

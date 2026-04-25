@@ -118,20 +118,37 @@ export function selectBestQuote(reflectionText: string): Quote {
 
   const tokens = tokenize(reflectionText);
 
-  let best: Quote[] = [];
-  let bestScore = -1;
+  const candidates = selectQuoteCandidates(reflectionText, ALL_QUOTES.length);
+  const bestScore = candidates.length > 0 ? scoreQuote(candidates[0], tokens, reflectionText) : -1;
+  const best = candidates.filter((quote) => scoreQuote(quote, tokens, reflectionText) === bestScore);
 
-  for (const quote of ALL_QUOTES) {
-    const s = scoreQuote(quote, tokens, reflectionText);
-    if (s > bestScore) {
-      bestScore = s;
-      best = [quote];
-    } else if (s === bestScore) {
-      best.push(quote);
-    }
-  }
+  if (best.length === 0) return ALL_QUOTES[0];
 
   // Tie-break: use text length mod best.length as a stable pseudo-random index
   const idx = reflectionText.length % best.length;
   return best[idx];
+}
+
+/**
+ * Return the best local candidate quotes for a reflection.
+ * Used before the LLM selector so the backend only ranks a compact, relevant set.
+ */
+export function selectQuoteCandidates(reflectionText: string, limit = 25): Quote[] {
+  if (!reflectionText || !reflectionText.trim()) {
+    return ALL_QUOTES.slice(0, limit);
+  }
+
+  const tokens = tokenize(reflectionText);
+  return [...ALL_QUOTES]
+    .map((quote, index) => ({
+      quote,
+      index,
+      score: scoreQuote(quote, tokens, reflectionText),
+    }))
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return a.index - b.index;
+    })
+    .slice(0, limit)
+    .map((entry) => entry.quote);
 }

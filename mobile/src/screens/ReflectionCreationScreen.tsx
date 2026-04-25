@@ -355,7 +355,7 @@ export default function ReflectionCreationScreen() {
         console.log('[STREAK] Reflection created/sent → marking streak activated.');
         markStreakActivated();
         decrementUses();
-        const pickedQuote = selectAndUnlockQuote(text);
+        const pickedQuote = await selectAndUnlockQuote(text);
         const domainMeta = DOMAIN_MAP[pickedQuote.domain];
         const selectedPhrase: SelectedPhrase = {
           id: pickedQuote.id,
