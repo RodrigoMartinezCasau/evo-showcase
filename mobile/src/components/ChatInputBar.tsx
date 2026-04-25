@@ -257,7 +257,7 @@ export function ChatInputBar({
 
   const keyboardAnim = useKeyboardAnim();
   const keyboardGapOffset = keyboardAnim.interpolate({
-    inputRange: [0, 1],
+    inputRange: [0, ISLAND.keyboardBubbleGapBlendPx],
     outputRange: [0, ISLAND.keyboardBubbleGapOffsetY],
     extrapolate: 'clamp',
   });

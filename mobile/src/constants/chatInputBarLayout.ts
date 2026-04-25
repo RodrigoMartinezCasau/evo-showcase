@@ -157,6 +157,11 @@ export const CHAT_INPUT_ISLAND_LAYOUT = {
    * Positive = bubble moves down closer to keyboard. Negative = more space.
    */
   keyboardBubbleGapOffsetY: 20,
+  /**
+   * Distance over which the keyboard gap offset fades in/out.
+   * Higher = smoother close/open, lower = more immediate.
+   */
+  keyboardBubbleGapBlendPx: 120,
   /** Minimum duration guard so the animation never snaps instantly. */
   keyboardMinDurationMs: 80,
   /**
