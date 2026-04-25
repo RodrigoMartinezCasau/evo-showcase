@@ -57,7 +57,7 @@ export const STREAK_CALENDAR_OFFSET_Y = 0;
  * Scale of the clan-based fire SVG shown in the top summary card.
  * 1 = default size. Increasing makes the icon larger; does not affect card or text.
  */
-export const STREAK_FIRE_ICON_SCALE = 2.5;
+export const STREAK_FIRE_ICON_SCALE = 2.1;
 
 /**
  * Horizontal offset (px) of the fire icon inside the hero card.
@@ -138,7 +138,7 @@ export const USES_CALENDAR_OFFSET_Y = 0;
  * Scale of the clan-based heart SVG shown in the top usage summary card.
  * 1 = default size. Increasing makes the icon larger; does not affect card or text.
  */
-export const USAGE_HEART_ICON_SCALE = 2.1;
+export const USAGE_HEART_ICON_SCALE = 2.0;
 
 /**
  * Horizontal offset (px) of the heart icon inside the usage hero card.
@@ -174,7 +174,7 @@ export const USAGE_SUMMARY_TEXT_GROUP_OFFSET_Y = 0;
  * Scale of the clan-based pencil SVG in the left block of the Frases summary card.
  * 1 = native size (PHRASES_COUNT_FONT px). Does not affect layout — visual only.
  */
-export const QUOTES_PENCIL_ICON_SCALE = 1.6;
+export const QUOTES_PENCIL_ICON_SCALE = 1.4 ;
 
 /**
  * Fine-tune horizontal offset (px) of the pencil icon inside the left block.

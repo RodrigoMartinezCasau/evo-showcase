@@ -29,6 +29,7 @@ import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { IS_DEBUG_STATS_MODE, useDebugStats } from '../debug/DebugStatsContext';
 import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
 import { fetchUsesLog, type UsesLogData } from '@evoconn/services/streakApi';
+import { DAILY_USES_LIMIT } from '@evoconn/services/userStatsStorage';
 import { getTopBarUsosByHouse } from '@evoconn/utils/getTopBarUsosByHouse';
 import { getClanStreakColors } from '@evoconn/constants/clanStreakColors';
 import {
@@ -53,7 +54,7 @@ import {
   USAGE_SUMMARY_TEXT_GROUP_OFFSET_Y,
 } from '@evoconn/constants/streakLayout';
 
-const DAILY_LIMIT     = 30;
+const DAILY_LIMIT     = DAILY_USES_LIMIT;
 const MAX_MONTHS_BACK = 12;
 const NAV_SLIDE_DIST  = 350; // px — wider than any calendar grid
 
@@ -70,7 +71,7 @@ function getViewedYearMonth(baseY: number, baseM: number, offset: number): [numb
 
 function usageColor(count: number, limit: number): string {
   if (count === 0) return 'rgba(255,255,255,0.07)';
-  const ratio = count / limit;
+  const ratio = Math.min(count / limit, 1);
   if (ratio <= 0.1) return '#2d6a4f';
   if (ratio <= 0.3) return '#40916c';
   if (ratio <= 0.6) return '#f4a261';
@@ -363,8 +364,11 @@ export default function DailyUsesScreen() {
   // ─── Single source of truth for all usage UI ─────────────────────────────
   // In debug mode every UI element (summary, bar, text, calendar) derives
   // from remainingUses; in prod everything derives from the real API log.
-  const computedRemaining  = IS_DEBUG_STATS_MODE ? remainingUses : realRemaining;
-  const computedUsedToday  = Math.max(0, DAILY_LIMIT - computedRemaining);
+  const computedRemaining  = Math.min(
+    Math.max(IS_DEBUG_STATS_MODE ? remainingUses : realRemaining, 0),
+    DAILY_LIMIT,
+  );
+  const computedUsedToday  = Math.min(Math.max(DAILY_LIMIT - computedRemaining, 0), DAILY_LIMIT);
   // Override today's entry in the log so the calendar matches the simulated value.
   const computedLog        = IS_DEBUG_STATS_MODE
     ? { ...log, [today]: computedUsedToday }

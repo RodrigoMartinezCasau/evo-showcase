@@ -27,6 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { mockCurrentUser, mockUserStats } from '@evoconn/data/mockUser';
+import { DAILY_USES_LIMIT } from '@evoconn/services/userStatsStorage';
 import { AppTopBar, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
@@ -435,7 +436,7 @@ export default function SettingsScreen() {
       id: 'ai',
       title: 'INTELIGENCIA ARTIFICIAL',
       rows: [
-        { id: 'ai-uses',   label: 'Usos de IA hoy',         value: `${usesLeft} / 30`,         icon: 'flash-outline',        iconBg: IC.green,  type: 'info' },
+        { id: 'ai-uses',   label: 'Usos de IA hoy',         value: `${usesLeft} / ${DAILY_USES_LIMIT}`,         icon: 'flash-outline',        iconBg: IC.green,  type: 'info' },
         // Modo de IA removed.
         { id: 'ai-ref-q',  label: 'Preguntas reflexivas',   subtitle: 'Incluir pregunta socrática',     icon: 'flask-outline',        iconBg: IC.cyan,   type: 'toggle', onToggleKey: 'reflectiveQuestion' },
         { id: 'ai-phi',    label: 'Referencias filosóficas', subtitle: 'Citar filósofos',               icon: 'book-outline',         iconBg: IC.purple, type: 'toggle', onToggleKey: 'philosophicalRefs' },
