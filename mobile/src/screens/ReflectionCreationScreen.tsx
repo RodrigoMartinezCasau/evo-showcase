@@ -477,11 +477,7 @@ export default function ReflectionCreationScreen() {
               styles.reflectionWelcomeTripleStars,
               {
                 top: EMPTY_WELCOME_TRIPLE_STARS.offsetY,
-                right: 0,
-                transform: [
-                  { translateX: EMPTY_WELCOME_TRIPLE_STARS.offsetX },
-                  { scale: EMPTY_WELCOME_TRIPLE_STARS.scale },
-                ],
+                transform: [{ scale: EMPTY_WELCOME_TRIPLE_STARS.scale }],
               },
             ]}
             pointerEvents="none"
@@ -501,7 +497,7 @@ export default function ReflectionCreationScreen() {
             },
           ]}
         >
-          Escribe abajo para empezar un debate con hechos, citas y preguntas abiertas.
+          Cada reflexión que mandes ayudará a determinar tu pensamiento filosófico.
         </Text>
       </View>
     );
@@ -863,6 +859,9 @@ const styles = StyleSheet.create({
   },
   reflectionWelcomeTripleStars: {
     position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
   },
   reflectionWelcomeTitle: {
     color: '#FFFFFF',

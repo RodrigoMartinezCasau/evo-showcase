@@ -150,19 +150,19 @@ function useKeyboardAnim() {
   return anim;
 }
 
-// ─── Gradient strips ─────────────────────────────────────────────────────────
+// ─── Island backdrop ─────────────────────────────────────────────────────────
 
 /**
- * Pure-RN gradient fade: an array of thin strips going from transparent (top)
- * to AREA.backgroundColor (bottom), positioned absolutely above the bar.
+ * Pure-RN backdrop: the top edge fades in progressively, then continues as a
+ * translucent rectangle behind the whole input island down to the screen edge.
  */
-function GradientFade({ height }: { height: number }) {
+function IslandBackdrop({ fadeHeight }: { fadeHeight: number }) {
   const strips = useMemo(() => {
     const steps = ISLAND.gradientSteps;
     return Array.from({ length: steps }, (_, i) => {
       // Use an ease-in curve so the fade feels more natural
       const t = (i + 1) / steps;
-      const opacity = t * t; // quadratic
+      const opacity = t * t * ISLAND.islandBackdropOpacity; // quadratic
       return (
         <View
           key={i}
@@ -180,13 +180,19 @@ function GradientFade({ height }: { height: number }) {
       pointerEvents="none"
       style={{
         position: 'absolute',
-        top: -height,
+        top: -fadeHeight + ISLAND.gradientStartOffsetY,
         left: 0,
         right: 0,
-        height,
+        bottom: 0,
       }}
     >
-      {strips}
+      <View style={{ height: fadeHeight }}>{strips}</View>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: `rgba(${BR},${BG},${BB},${ISLAND.islandBackdropOpacity})`,
+        }}
+      />
     </View>
   );
 }
@@ -213,6 +219,7 @@ export function ChatInputBar({
   inputCursorColor = clanColor,
 }: ChatInputBarProps) {
   const [text, setText] = useState('');
+  const welcomeOpacity = useRef(new Animated.Value(1)).current;
 
   // The TextInput auto-grows from minHeight to maxInputHeight thanks to
   // multiline + maxHeight. After that it becomes scrollable (default RN behaviour).
@@ -249,9 +256,23 @@ export function ChatInputBar({
   };
 
   const keyboardAnim = useKeyboardAnim();
+  const keyboardGapOffset = keyboardAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, ISLAND.keyboardBubbleGapOffsetY],
+    extrapolate: 'clamp',
+  });
   const windowHeight = Dimensions.get('window').height;
   const welcomeBottom =
     windowHeight * ISLAND.welcomeCenterBottomRatio + ISLAND.welcomeCenterOffsetY;
+
+  useEffect(() => {
+    const hasTypedText = text.length > 0;
+    Animated.timing(welcomeOpacity, {
+      toValue: hasTypedText ? 0 : 1,
+      duration: hasTypedText ? ISLAND.welcomeHideDurationMs : ISLAND.welcomeShowDurationMs,
+      useNativeDriver: true,
+    }).start();
+  }, [text, welcomeOpacity]);
 
   // ── Action button ──────────────────────────────────────────────────────────
 
@@ -273,12 +294,21 @@ export function ChatInputBar({
     <Animated.View
       style={[
         styles.outerWrapper,
-        { transform: [{ translateY: Animated.multiply(keyboardAnim, -1) }] },
+        {
+          transform: [
+            {
+              translateY: Animated.add(
+                Animated.multiply(keyboardAnim, -1),
+                keyboardGapOffset,
+              ),
+            },
+          ],
+        },
       ]}
     >
 
-      {/* ── Gradient fade that overlays scroll content above the bar ── */}
-      <GradientFade height={ISLAND.gradientHeight} />
+      {/* ── Translucent island backdrop with a progressive top edge ── */}
+      <IslandBackdrop fadeHeight={ISLAND.gradientHeight} />
 
       {/* ── Empty-state welcome centered in the screen ── */}
       {contentAboveBar ? (
@@ -288,12 +318,16 @@ export function ChatInputBar({
             styles.welcomeOverlay,
             {
               bottom: welcomeBottom,
+              opacity: welcomeOpacity,
               transform: [
                 {
                   translateY: Animated.multiply(
                     keyboardAnim,
                     1 - ISLAND.welcomeKeyboardLiftRatio,
                   ),
+                },
+                {
+                  translateY: Animated.multiply(keyboardGapOffset, -1),
                 },
               ],
             },
@@ -371,7 +405,7 @@ export function ChatInputBar({
                 style={[
                   styles.input,
                   {
-                    fontSize: INP.fontSize,
+                    fontSize: INP.textFontSize,
                     paddingHorizontal: INP.paddingHorizontal,
                     paddingVertical: INP.paddingVertical,
                     paddingRight: INP.paddingHorizontal + 34,

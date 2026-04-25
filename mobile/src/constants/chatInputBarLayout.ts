@@ -19,7 +19,7 @@ export const CHAT_BOTTOM_AREA_LAYOUT = {
 /** The text input field. */
 export const CHAT_INPUT_LAYOUT = {
   offsetX: 0,
-  offsetY: -20,
+  offsetY: -25,
   widthScale: 0.95,
   minHeight: 40,
   maxHeight: 120,
@@ -27,7 +27,8 @@ export const CHAT_INPUT_LAYOUT = {
   backgroundColor: '#262626',
   borderWidth: 1,
   borderColor: '#303030',
-  fontSize: 14,
+  /** Text size for both typed text and placeholder ("Escribe tu..."). */
+  textFontSize: 16,
   paddingHorizontal: 16,
   paddingVertical: 10,
 } as const;
@@ -128,6 +129,16 @@ export const CHAT_INPUT_ISLAND_LAYOUT = {
    * This overlaps the scroll content, making text progressively fade out.
    */
   gradientHeight: 80,
+  /**
+   * Moves the top start of the gradient fade.
+   * Positive = starts lower / closer to the input bubble. Negative = starts higher.
+   */
+  gradientStartOffsetY: 30,
+  /**
+   * Opacity of the translucent rectangle behind the input island.
+   * The gradient fades from 0 to this value, then remains solid to the bottom.
+   */
+  islandBackdropOpacity: 0.9,
   /** Number of gradient strips — more strips = smoother gradient. */
   gradientSteps: 14,
   /** Max number of text lines before the input becomes scrollable. */
@@ -141,6 +152,11 @@ export const CHAT_INPUT_ISLAND_LAYOUT = {
    */
   keyboardOpenSpeed: 1.85,
   keyboardCloseSpeed: 1.45,
+  /**
+   * Fine gap editor between the open keyboard and the input bubble.
+   * Positive = bubble moves down closer to keyboard. Negative = more space.
+   */
+  keyboardBubbleGapOffsetY: 20,
   /** Minimum duration guard so the animation never snaps instantly. */
   keyboardMinDurationMs: 80,
   /**
@@ -155,13 +171,17 @@ export const CHAT_INPUT_ISLAND_LAYOUT = {
    * How much the welcome follows the keyboard upward.
    * 0 = stays still. 0.18 = moves up 18% of the keyboard height.
    */
-  welcomeKeyboardLiftRatio: 0.4,
+  welcomeKeyboardLiftRatio: 0.3,
+  /** Fade-out duration when the user types the first character. */
+  welcomeHideDurationMs: 140,
+  /** Fade-in duration when the input becomes empty again. */
+  welcomeShowDurationMs: 180,
 } as const;
 
 /** The send button (clan SVG replaces the old star icon). */
 export const CHAT_SEND_BUTTON_LAYOUT = {
   offsetX: -10,
-  offsetY: -20,
+  offsetY: -27,
   scale: 1,
   /** Diameter of the tap target / SVG container. */
   size: 40,

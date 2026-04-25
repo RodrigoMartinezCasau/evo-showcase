@@ -500,11 +500,7 @@ export default function PhraseCreationScreen() {
               styles.phraseWelcomeTripleStars,
               {
                 top: PHRASE_TRIPLE_STARS.offsetY,
-                right: 0,
-                transform: [
-                  { translateX: PHRASE_TRIPLE_STARS.offsetX },
-                  { scale: PHRASE_TRIPLE_STARS.scale },
-                ],
+                transform: [{ scale: PHRASE_TRIPLE_STARS.scale }],
               },
             ]}
             pointerEvents="none"
@@ -791,6 +787,9 @@ const styles = StyleSheet.create({
   },
   phraseWelcomeTripleStars: {
     position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
   },
   phraseWelcomeTitle: {
     color: '#FFFFFF',
