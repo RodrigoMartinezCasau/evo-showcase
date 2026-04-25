@@ -103,6 +103,15 @@ export type SendMessageResponse = {
   lang?: string;
 };
 
+/** A locally-selected philosophical phrase from the app's own phrase DB. */
+export type SelectedPhrase = {
+  id: string;
+  text: string;
+  author: string;
+  domain: string;
+  domainColor: string;
+};
+
 export type DebateMessage =
   | { role: 'user'; content: string; id?: string }
   | {
@@ -114,6 +123,11 @@ export type DebateMessage =
       nextQuestion?: string;
       topic?: string;
       lang?: string;
+      /**
+       * The phrase from our own DB that was selected and unlocked after this reflection.
+       * Replaces the AI-generated author_layer quote in the displayed card.
+       */
+      selectedPhrase?: SelectedPhrase;
       /** Nueva frase (sin IA): bloque publicar; `pending` → editable, `published` → solo lectura + barra ✓. */
       phrasePublishUI?: {
         status: 'pending' | 'published';

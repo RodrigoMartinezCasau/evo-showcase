@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import type { DebateResponse } from '@evoconn/types/debate';
+import type { DebateResponse, SelectedPhrase } from '@evoconn/types/debate';
 import {
   AI_RESPONSE_LAYOUT as L,
   AI_RESPONSE_BLOCK_GAPS as GAPS,
@@ -20,6 +20,8 @@ import { DebateQuoteCard } from './DebateQuoteCard';
 type Props = {
   response: DebateResponse;
   clanId: string | null | undefined;
+  /** Locally-selected phrase from our DB — shown instead of the backend AI quote. */
+  selectedPhrase?: SelectedPhrase | null;
 };
 
 type SectionData = {
@@ -53,6 +55,7 @@ function extractSection(
 export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
   response,
   clanId,
+  selectedPhrase,
 }: Props) {
   const dl = response.debate_layer;
 
@@ -74,12 +77,15 @@ export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
     dl.socratic_questions?.[0] ??
     null;
 
-  const firstQuote = response.author_layer?.quotes?.[0] ?? null;
+  // Only show our locally-selected DB phrase — never fall back to the backend AI quote.
+  const displayQuote = selectedPhrase
+    ? { quote: selectedPhrase.text, author: selectedPhrase.author, work: undefined, domainColor: selectedPhrase.domainColor }
+    : null;
 
   const hasStance = !!stance.body || stance.points.length > 0;
   const hasCounter = !!counter.body || counter.points.length > 0;
   const hasQuestion = !!questionText;
-  const hasQuote = !!firstQuote;
+  const hasQuote = !!displayQuote;
 
   /* ── Pregunta + Cita share height ── */
   const qaHeights = useRef({ question: 0, quote: 0 });
@@ -169,12 +175,13 @@ export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
       ) : null}
 
       {/* ── 4. CITA TEXTUAL ── */}
-      {hasQuote ? (
+      {hasQuote && displayQuote ? (
         <View style={{ marginTop: GAPS.questionToQuote }}>
           <DebateQuoteCard
-            quote={firstQuote.quote}
-            author={firstQuote.author}
-            work={firstQuote.work}
+            quote={displayQuote.quote}
+            author={displayQuote.author}
+            work={displayQuote.work}
+            domainColor={displayQuote.domainColor}
             unifiedHeight={qaSharedHeight}
             onMeasure={onQuoteMeasure}
           />

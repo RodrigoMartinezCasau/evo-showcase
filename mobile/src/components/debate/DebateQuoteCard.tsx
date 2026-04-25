@@ -64,6 +64,8 @@ type Props = {
   quote: string;
   author?: string;
   work?: string;
+  /** Domain color for the left accent border. Falls back to IC.accentColorFallback. */
+  domainColor?: string;
   unifiedHeight?: number;
   onMeasure?: (h: number) => void;
 };
@@ -72,6 +74,7 @@ export const DebateQuoteCard = React.memo(function DebateQuoteCard({
   quote,
   author,
   work,
+  domainColor,
   unifiedHeight,
   onMeasure,
 }: Props) {
@@ -111,7 +114,7 @@ export const DebateQuoteCard = React.memo(function DebateQuoteCard({
             paddingVertical: IC.paddingVertical,
             backgroundColor: IC.backgroundColor,
             borderLeftWidth: IC.accentWidth,
-            borderLeftColor: IC.accentColorFallback,
+            borderLeftColor: domainColor ?? IC.accentColorFallback,
             marginLeft: IC.offsetX,
             marginTop: IC.offsetY,
           },

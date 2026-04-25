@@ -30,7 +30,9 @@ import { evoconnColors } from '@evoconn/theme/colors';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import * as debateApi from '@evoconn/services/debateApi';
-import type { DebateMessage, DebateResponse } from '@evoconn/types/debate';
+import type { DebateMessage, DebateResponse, SelectedPhrase } from '@evoconn/types/debate';
+import { DOMAIN_MAP } from '@evoconn/types/quotes';
+import { selectBestQuote } from '@evoconn/data/quotes';
 import {
   getChatUserAccentColor,
   CHAT_USER_MESSAGE_LAYOUT,
@@ -137,7 +139,7 @@ export default function ReflectionCreationScreen() {
   const publishedRef = useRef<Set<string>>(new Set());
   const { markStreakActivated } = useDebugStreak();
   const { decrementUses } = useDebugStats();
-  const { unlockNextPhrase } = useQuotes();
+  const { selectAndUnlockQuote } = useQuotes();
   const { includeReflectiveQuestion, includePhilosophicalReferences } = useAISettings();
 
   const doPublish = useCallback(
@@ -346,12 +348,20 @@ export default function ReflectionCreationScreen() {
           includeReflectiveQuestion,
           includePhilosophicalReferences,
         });
-        // Reflection sent → activate streak, consume one daily use, unlock one KB phrase.
+        // Reflection sent → activate streak, consume one daily use, select+unlock a KB phrase.
         // eslint-disable-next-line no-console
         console.log('[STREAK] Reflection created/sent → marking streak activated.');
         markStreakActivated();
         decrementUses();
-        unlockNextPhrase();
+        const pickedQuote = selectAndUnlockQuote(text);
+        const domainMeta = DOMAIN_MAP[pickedQuote.domain];
+        const selectedPhrase: SelectedPhrase = {
+          id: pickedQuote.id,
+          text: pickedQuote.text,
+          author: pickedQuote.author,
+          domain: pickedQuote.domain,
+          domainColor: domainMeta?.color ?? '#7C3AED',
+        };
         const assistantText = resp.assistant_text;
 
         const introText = resp.debate_response?.debate_layer?.conversational_intro ?? '';
@@ -366,6 +376,7 @@ export default function ReflectionCreationScreen() {
           nextQuestion: resp.next_question,
           topic: resp.topic,
           lang: resp.lang,
+          selectedPhrase,
           streaming: false,
           revealed: assistantText,
           // Si hay intro, arrancamos en fase 'intro' (typewriter sin estrella),
@@ -420,7 +431,7 @@ export default function ReflectionCreationScreen() {
         setSending(false);
       }
     },
-    [sending, debateId, createThought, updateThought, scrollToEnd, thoughts, markStreakActivated, decrementUses, unlockNextPhrase, includeReflectiveQuestion, includePhilosophicalReferences, toPersistedMessage, recordClassificationInput],
+    [sending, debateId, createThought, updateThought, scrollToEnd, thoughts, markStreakActivated, decrementUses, selectAndUnlockQuote, includeReflectiveQuestion, includePhilosophicalReferences, toPersistedMessage, recordClassificationInput],
   );
 
   const conversationItems = useMemo(
@@ -553,11 +564,30 @@ export default function ReflectionCreationScreen() {
                 </View>
               );
             }
-            // Assistant message — PublishBlock is now with the preceding user bubble
+            // Assistant message — PublishBlock is now with the preceding user bubble.
+            // Retroactively compute selectedPhrase for older messages that predate this feature.
+            let msgToRender = msg;
+            if (
+              msg.role === 'assistant' &&
+              !(msg as Extract<ChatBubble, { role: 'assistant' }>).selectedPhrase &&
+              (msg as Extract<ChatBubble, { role: 'assistant' }>).debateResponse
+            ) {
+              const prevUserText = i > 0 ? messages[i - 1].content ?? '' : '';
+              const derived = selectBestQuote(prevUserText);
+              const meta = DOMAIN_MAP[derived.domain];
+              const derivedPhrase: SelectedPhrase = {
+                id: derived.id,
+                text: derived.text,
+                author: derived.author,
+                domain: derived.domain,
+                domainColor: meta?.color ?? '#7C3AED',
+              };
+              msgToRender = { ...msg, selectedPhrase: derivedPhrase } as ChatBubble;
+            }
             return (
               <MessageBubble
                 key={`${msg.id ?? i}-${msg.role}`}
-                message={msg}
+                message={msgToRender}
                 clanColor={clanColor}
                 clanId={activeClan}
               />
@@ -793,6 +823,7 @@ const MessageBubble = React.memo(function MessageBubble({
       <DebateResponseDisplay
         response={assistantMsg.debateResponse!}
         clanId={clanId}
+        selectedPhrase={assistantMsg.selectedPhrase}
       />
     </View>
   );

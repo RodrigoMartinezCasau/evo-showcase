@@ -22,10 +22,13 @@ import React, {
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getDomainStats, type DomainStats } from '@evoconn/logic/quotes/getDomainStats';
-import { ALL_QUOTES } from '@evoconn/data/quotes';
+import { ALL_QUOTES, selectBestQuote } from '@evoconn/data/quotes';
+import type { Quote } from '@evoconn/types/quotes';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
 
-const STORAGE_KEY = '@physicscopilot/quotes_v1';
+// v2: reset to zero — old sequential unlocks (unlockNextPhrase) are discarded.
+// Only phrases selected and shown via selectAndUnlockQuote count from now on.
+const STORAGE_KEY = '@physicscopilot/quotes_v2';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -50,17 +53,24 @@ interface QuotesContextValue {
    * No-op if all quotes are already unlocked.
    */
   unlockNextPhrase: (preferDomain?: string) => void;
+  /**
+   * Select the best matching quote from the DB for the given reflection text,
+   * unlock it for the active user (no-op if already unlocked), and return it.
+   * This is the main entry point after a user sends a reflection.
+   */
+  selectAndUnlockQuote: (reflectionText: string) => Quote;
 }
 
 // ─── Context defaults ─────────────────────────────────────────────────────────
 
 const QuotesContext = createContext<QuotesContextValue>({
-  unlockedPhraseIds: [],
-  totalUnlocked:     0,
-  domainStats:       [],
-  unlockPhrase:      () => {},
-  isUnlocked:        () => false,
-  unlockNextPhrase:  () => {},
+  unlockedPhraseIds:    [],
+  totalUnlocked:        0,
+  domainStats:          [],
+  unlockPhrase:         () => {},
+  isUnlocked:           () => false,
+  unlockNextPhrase:     () => {},
+  selectAndUnlockQuote: (text: string) => selectBestQuote(text),
 });
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
@@ -131,6 +141,19 @@ export function QuotesProvider({ children }: { children: React.ReactNode }) {
     [unlockedPhraseIds],
   );
 
+  const selectAndUnlockQuote = useCallback(
+    (reflectionText: string): Quote => {
+      const selected = selectBestQuote(reflectionText);
+      // Unlock it (unlockPhrase is a no-op if already unlocked, counter stays same)
+      const current = db[sim.activeUserId] ?? [];
+      if (!current.includes(selected.id)) {
+        persistForUser(sim.activeUserId, [...current, selected.id]);
+      }
+      return selected;
+    },
+    [db, sim.activeUserId, persistForUser],
+  );
+
   const domainStats = useMemo(
     () => getDomainStats(unlockedPhraseIds),
     [unlockedPhraseIds],
@@ -144,8 +167,9 @@ export function QuotesProvider({ children }: { children: React.ReactNode }) {
       unlockPhrase,
       isUnlocked,
       unlockNextPhrase,
+      selectAndUnlockQuote,
     }),
-    [unlockedPhraseIds, domainStats, unlockPhrase, isUnlocked, unlockNextPhrase],
+    [unlockedPhraseIds, domainStats, unlockPhrase, isUnlocked, unlockNextPhrase, selectAndUnlockQuote],
   );
 
   return <QuotesContext.Provider value={value}>{children}</QuotesContext.Provider>;
