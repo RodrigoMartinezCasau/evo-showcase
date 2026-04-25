@@ -3,23 +3,30 @@
  * ================
  * Barra de input compartida entre ReflectionCreationScreen y PhraseCreationScreen.
  *
- * Modos:
- *  IDLE         → TextInput normal + icono mic (bottom-right, color #949ba6)
- *  RECORDING    → Waveform animado + contador de tiempo + botón PARAR (color clan)
- *  TRANSCRIBING → Breve indicador de carga mientras se finaliza la transcripción
+ * Features:
+ *  - Smooth keyboard animation: the bar follows the keyboard upward frame-by-frame
+ *    (no jump/cut) using keyboard event listeners + Animated.timing.
+ *  - Dynamic height: the input field grows line by line up to MAX_LINES, then scrolls.
+ *  - Gradient island: the bar floats over a fade-gradient that progressively blurs
+ *    the scroll content behind it (à la Claude / ChatGPT). No external lib required.
  *
- * Librería de voz: expo-speech-recognition (instalada con npm install)
- * Plugin configurado en app.json con permisos de micrófono.
+ * Modes:
+ *  IDLE         → TextInput normal + icono mic
+ *  RECORDING    → Waveform animado + contador de tiempo + botón PARAR
+ *  TRANSCRIBING → Indicador de carga mientras se finaliza la transcripción
  */
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  KeyboardAvoidingView,
   Platform,
+  Animated,
+  Keyboard,
+  Dimensions,
+  type KeyboardEvent,
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,9 +35,24 @@ import {
   CHAT_BOTTOM_AREA_LAYOUT as AREA,
   CHAT_INPUT_LAYOUT as INP,
   CHAT_SEND_BUTTON_LAYOUT as BTN,
+  CHAT_INPUT_ISLAND_LAYOUT as ISLAND,
 } from '@evoconn/constants/chatInputBarLayout';
 import { useVoiceInput } from '@evoconn/hooks/useVoiceInput';
 import { VoiceWaveform } from './VoiceWaveform';
+
+// ─── Background color (parsed once for gradient strips) ───────────────────────
+
+/** Parse AREA.backgroundColor into an rgb triple (fallback: 11,11,15). */
+function parseBgRgb(hex: string): [number, number, number] {
+  const clean = hex.replace('#', '');
+  if (clean.length !== 6) return [11, 11, 15];
+  return [
+    parseInt(clean.slice(0, 2), 16),
+    parseInt(clean.slice(2, 4), 16),
+    parseInt(clean.slice(4, 6), 16),
+  ];
+}
+const [BR, BG, BB] = parseBgRgb(AREA.backgroundColor as string);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -40,19 +62,119 @@ function formatTime(s: number): string {
   return `${m}:${sec.toString().padStart(2, '0')}`;
 }
 
+// ─── Keyboard animation hook ─────────────────────────────────────────────────
+
+/**
+ * Returns an Animated.Value that tracks the keyboard height smoothly,
+ * synced to the keyboard's own animation duration so the bar moves with it.
+ */
+function useKeyboardAnim() {
+  const anim = useRef(new Animated.Value(0)).current;
+  const keyboardHeightRef = useRef(0);
+
+  useEffect(() => {
+    const animateToKeyboardFrame = (e: KeyboardEvent) => {
+      const keyboardTop = e.endCoordinates.screenY;
+      const windowHeight = Dimensions.get('window').height;
+      const keyboardHeight =
+        Platform.OS === 'ios'
+          ? Math.max(0, windowHeight - keyboardTop)
+          : e.endCoordinates.height;
+      const isOpening = keyboardHeight > keyboardHeightRef.current;
+      const speed = isOpening ? ISLAND.keyboardOpenSpeed : ISLAND.keyboardCloseSpeed;
+      const baseDuration = e.duration ?? 250;
+      const duration = Math.max(ISLAND.keyboardMinDurationMs, baseDuration / speed);
+
+      anim.stopAnimation();
+      keyboardHeightRef.current = keyboardHeight;
+      Animated.timing(anim, {
+        toValue: keyboardHeight,
+        duration,
+        // The bar only moves with transform, so this can run on the native thread.
+        // That keeps it locked to the keyboard instead of trailing behind JS work.
+        useNativeDriver: true,
+      }).start();
+    };
+
+    if (Platform.OS === 'ios') {
+      const onFrameChange = Keyboard.addListener('keyboardWillChangeFrame', animateToKeyboardFrame);
+      return () => onFrameChange.remove();
+    }
+
+    const onShow = Keyboard.addListener('keyboardDidShow', animateToKeyboardFrame);
+    const onHide = Keyboard.addListener('keyboardDidHide', (e: KeyboardEvent) => {
+      const baseDuration = e.duration ?? 250;
+      const duration = Math.max(
+        ISLAND.keyboardMinDurationMs,
+        baseDuration / ISLAND.keyboardCloseSpeed,
+      );
+
+      anim.stopAnimation();
+      keyboardHeightRef.current = 0;
+      Animated.timing(anim, {
+        toValue: 0,
+        duration,
+        useNativeDriver: true,
+      }).start();
+    });
+
+    return () => {
+      onShow.remove();
+      onHide.remove();
+    };
+  }, [anim]);
+
+  return anim;
+}
+
+// ─── Gradient strips ─────────────────────────────────────────────────────────
+
+/**
+ * Pure-RN gradient fade: an array of thin strips going from transparent (top)
+ * to AREA.backgroundColor (bottom), positioned absolutely above the bar.
+ */
+function GradientFade({ height }: { height: number }) {
+  const strips = useMemo(() => {
+    const steps = ISLAND.gradientSteps;
+    return Array.from({ length: steps }, (_, i) => {
+      // Use an ease-in curve so the fade feels more natural
+      const t = (i + 1) / steps;
+      const opacity = t * t; // quadratic
+      return (
+        <View
+          key={i}
+          style={{
+            flex: 1,
+            backgroundColor: `rgba(${BR},${BG},${BB},${opacity.toFixed(3)})`,
+          }}
+        />
+      );
+    });
+  }, []);
+
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        top: -height,
+        left: 0,
+        right: 0,
+        height,
+      }}
+    >
+      {strips}
+    </View>
+  );
+}
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 type ChatInputBarProps = {
   placeholder?: string;
   onSend: (text: string) => void;
-  /** Clan-specific SVG rendered inside the send button. Falls back to a star if omitted. */
   sendIcon?: React.ReactNode;
-  /** Rendered above the input row, inside the same keyboard-avoiding wrapper. */
   contentAboveBar?: React.ReactNode;
-  /**
-   * Color principal del clan activo — usado para la waveform y el botón PARAR.
-   * Default: #c7ff02 (sin clan).
-   */
   clanColor?: string;
 };
 
@@ -67,7 +189,12 @@ export function ChatInputBar({
 }: ChatInputBarProps) {
   const [text, setText] = useState('');
 
-  // Cuando la transcripción finaliza, añade el texto al campo (o lo reemplaza si estaba vacío)
+  // The TextInput auto-grows from minHeight to maxInputHeight thanks to
+  // multiline + maxHeight. After that it becomes scrollable (default RN behaviour).
+  // We deliberately DO NOT keep height in state nor use onContentSizeChange:
+  // doing so creates a measurement feedback loop (state → re-render → re-measure → state…).
+  const maxInputHeight = ISLAND.lineHeight * ISLAND.maxInputLines;
+
   const handleTranscriptReady = useCallback((transcript: string) => {
     setText((prev) => {
       const trimmed = prev.trim();
@@ -85,20 +212,25 @@ export function ChatInputBar({
     cancelRecording,
   } = useVoiceInput({ onTranscriptReady: handleTranscriptReady });
 
-  const isRecording     = voiceState === 'recording';
-  const isTranscribing  = voiceState === 'transcribing';
+  const isRecording    = voiceState === 'recording';
+  const isTranscribing = voiceState === 'transcribing';
 
   const handleSend = () => {
     const t = text.trim();
-    if (t) { onSend(t); setText(''); }
+    if (t) {
+      onSend(t);
+      setText('');
+    }
   };
 
-  // ── Send / Stop button ─────────────────────────────────────────────────────
+  const keyboardAnim = useKeyboardAnim();
 
-  const actionButtonBg = isRecording ? clanColor : BTN.backgroundColor;
+  // ── Action button ──────────────────────────────────────────────────────────
+
+  const actionButtonBg      = isRecording ? clanColor : BTN.backgroundColor;
+  const handleActionButton  = isRecording ? stopRecording : handleSend;
 
   const actionButtonContent = isRecording ? (
-    // Cuadrado de stop
     <View style={styles.stopSquare} />
   ) : isTranscribing ? (
     <ActivityIndicator size="small" color="#0b0b0f" />
@@ -106,35 +238,44 @@ export function ChatInputBar({
     sendIcon ?? <Text style={{ color: '#0b0b0f', fontSize: 20 }}>★</Text>
   );
 
-  const handleActionButton = isRecording ? stopRecording : handleSend;
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.keyboardWrap}
+    /* Move over the keyboard without changing the ScrollView layout every frame. */
+    <Animated.View
+      style={[
+        styles.outerWrapper,
+        { transform: [{ translateY: Animated.multiply(keyboardAnim, -1) }] },
+      ]}
     >
+
+      {/* ── Gradient fade that overlays scroll content above the bar ── */}
+      <GradientFade height={ISLAND.gradientHeight} />
+
+      {/* ── Content above bar (welcome screen, etc.) ── */}
       {contentAboveBar}
+
+      {/* ── The actual bar row ── */}
       <View
         style={[
           styles.bar,
           {
-            backgroundColor: AREA.backgroundColor,
             paddingTop: AREA.paddingTop,
-            paddingBottom: AREA.paddingBottom,
+            paddingBottom: AREA.paddingBottom + ISLAND.extraHeight,
             paddingHorizontal: AREA.paddingHorizontal,
             borderTopWidth: AREA.borderTopWidth,
             borderTopColor: AREA.borderTopColor,
-            transform: [{ translateY: AREA.offsetY }],
-            ...(AREA.height != null ? { height: AREA.height } : {}),
+            transform: [{ translateY: AREA.offsetY + ISLAND.relativeOffsetY }],
           },
         ]}
       >
-        {/* ── Input area (normal o grabación) ─────────────────────── */}
+        {/* Input area */}
         <View
           style={[
             styles.inputWrap,
             {
               minHeight: INP.minHeight,
+              maxHeight: maxInputHeight,
               borderRadius: INP.borderRadius,
               backgroundColor: INP.backgroundColor,
               borderWidth: INP.borderWidth,
@@ -148,9 +289,7 @@ export function ChatInputBar({
           ]}
         >
           {isRecording || isTranscribing ? (
-            // ── RECORDING / TRANSCRIBING mode ─────────────────────────────
             <View style={styles.recordingInner}>
-              {/* Botón cancelar (esquina izquierda) */}
               <TouchableOpacity
                 onPress={cancelRecording}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -159,7 +298,6 @@ export function ChatInputBar({
                 <Text style={styles.cancelText}>Cancelar</Text>
               </TouchableOpacity>
 
-              {/* Waveform centrada */}
               {isTranscribing ? (
                 <View style={styles.transcribingWrap}>
                   <ActivityIndicator size="small" color={clanColor} />
@@ -168,27 +306,17 @@ export function ChatInputBar({
                   </Text>
                 </View>
               ) : (
-                <VoiceWaveform
-                  volume={volumeLevel}
-                  color={clanColor}
-                  height={28}
-                />
+                <VoiceWaveform volume={volumeLevel} color={clanColor} height={28} />
               )}
 
-              {/* Contador de tiempo (esquina derecha) */}
               <Text style={styles.timer}>{formatTime(elapsedSeconds)}</Text>
             </View>
           ) : (
-            // ── IDLE mode — TextInput + mic icon ──────────────────────────
             <>
               <TextInput
                 value={text}
                 onChangeText={setText}
-                placeholder={
-                  interimText
-                    ? '…'      // brief flash after transcription
-                    : placeholder
-                }
+                placeholder={interimText ? '…' : placeholder}
                 placeholderTextColor={evoconnColors.muted}
                 style={[
                   styles.input,
@@ -196,14 +324,15 @@ export function ChatInputBar({
                     fontSize: INP.fontSize,
                     paddingHorizontal: INP.paddingHorizontal,
                     paddingVertical: INP.paddingVertical,
-                    // Extra right padding so text doesn't go under the mic icon
                     paddingRight: INP.paddingHorizontal + 34,
+                    minHeight: INP.minHeight,
+                    maxHeight: maxInputHeight,
                   },
                 ]}
                 multiline
+                scrollEnabled
                 maxLength={2000}
               />
-              {/* Icono micrófono — esquina inferior derecha del input */}
               <TouchableOpacity
                 onPress={startRecording}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -215,7 +344,7 @@ export function ChatInputBar({
           )}
         </View>
 
-        {/* ── Send / Stop button ──────────────────────────────────── */}
+        {/* Send / Stop button */}
         <TouchableOpacity
           onPress={handleActionButton}
           disabled={isTranscribing}
@@ -237,47 +366,51 @@ export function ChatInputBar({
           {actionButtonContent}
         </TouchableOpacity>
       </View>
-    </KeyboardAvoidingView>
+    </Animated.View>
   );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  keyboardWrap: {
+  outerWrapper: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 50,
     width: '100%',
+    // Transparent background — the gradient provides the visual backdrop
+    backgroundColor: 'transparent',
+    // Needed so the absolutely-positioned gradient (negative bottom) shows above scroll content
+    overflow: 'visible',
   },
   bar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
+    // No background — fully transparent so the gradient shows through
+    backgroundColor: 'transparent',
   },
-  // Wrapper relativo para el area del input (reemplaza el TextInput directo)
   inputWrap: {
     flex: 1,
     marginRight: 8,
-    overflow: 'visible',
+    overflow: 'hidden',
   },
-  // TextInput sin height fija — hereda del wrapper
   input: {
-    flex: 1,
     color: evoconnColors.text,
-    maxHeight: INP.maxHeight,
-    minHeight: INP.minHeight,
   },
-  // Icono mic — absoluto en esquina inferior derecha del input
   micBtn: {
     position: 'absolute',
     bottom: 9,
     right: 10,
   },
-  // Layout interno del modo grabación
   recordingInner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 12,
     paddingVertical: 10,
-    minHeight: INP.minHeight,
+    flex: 1,
   },
   cancelBtn: {
     paddingRight: 8,
@@ -305,7 +438,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
-  // Cuadrado de stop (dentro del botón de acción cuando graba)
   stopSquare: {
     width: 12,
     height: 12,

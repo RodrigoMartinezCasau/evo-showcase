@@ -108,6 +108,43 @@ export const AI_INTRO_TYPING_LAYOUT = {
   introTypingDurationMultiplier: 1,
 };
 
+/**
+ * ── CHAT INPUT ISLAND ─────────────────────────────────────────────────────
+ * Controls the floating island appearance of the chat input bar.
+ */
+export const CHAT_INPUT_ISLAND_LAYOUT = {
+  /**
+   * Vertical offset of the whole bar relative to its natural bottom position.
+   * Positive = moves up. Negative = moves down.
+   */
+  relativeOffsetY: 0,
+  /**
+   * Extra height added to the bar container (in addition to the input's
+   * natural height). Useful to make the bar feel more spacious.
+   */
+  extraHeight: 0,
+  /**
+   * Height of the gradient fade zone above the input bar.
+   * This overlaps the scroll content, making text progressively fade out.
+   */
+  gradientHeight: 80,
+  /** Number of gradient strips — more strips = smoother gradient. */
+  gradientSteps: 14,
+  /** Max number of text lines before the input becomes scrollable. */
+  maxInputLines: 11,
+  /** Approximate line height (pt) used to compute the max input height. */
+  lineHeight: 20,
+  /**
+   * Keyboard sync editors.
+   * Increase these numbers to make the input island react faster.
+   * 1 = same duration as the native keyboard event. 1.4 = about 40% faster.
+   */
+  keyboardOpenSpeed: 1.85,
+  keyboardCloseSpeed: 1.45,
+  /** Minimum duration guard so the animation never snaps instantly. */
+  keyboardMinDurationMs: 80,
+} as const;
+
 /** The send button (clan SVG replaces the old star icon). */
 export const CHAT_SEND_BUTTON_LAYOUT = {
   offsetX: -10,

@@ -17,6 +17,8 @@ import { getPhraseSendButtonByHouse } from '@evoconn/utils/getPhraseSendButtonBy
 import {
   CHAT_SEND_BUTTON_LAYOUT,
   CHAT_BOTTOM_AREA_LAYOUT as CHAT_BOTTOM_AREA,
+  CHAT_INPUT_LAYOUT as CHAT_INPUT,
+  CHAT_INPUT_ISLAND_LAYOUT,
 } from '@evoconn/constants/chatInputBarLayout';
 import {
   ThinkingStar,
@@ -578,7 +580,12 @@ export default function PhraseCreationScreen() {
           contentContainerStyle={{
             paddingHorizontal: PHRASE_STACK.scrollPaddingHorizontal,
             paddingTop: PHRASE_STACK.scrollPaddingTop,
-            paddingBottom: PHRASE_STACK.scrollPaddingBottom,
+            paddingBottom:
+              PHRASE_STACK.scrollPaddingBottom +
+              CHAT_INPUT_ISLAND_LAYOUT.gradientHeight +
+              CHAT_BOTTOM_AREA.paddingTop +
+              CHAT_INPUT.minHeight +
+              CHAT_BOTTOM_AREA.paddingBottom,
           }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"

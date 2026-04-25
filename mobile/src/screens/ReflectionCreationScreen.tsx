@@ -44,8 +44,10 @@ import { getChatSendButtonByHouse } from '@evoconn/utils/getChatSendButtonByHous
 import {
   CHAT_SEND_BUTTON_LAYOUT,
   CHAT_BOTTOM_AREA_LAYOUT as CHAT_BOTTOM_AREA,
+  CHAT_INPUT_LAYOUT as CHAT_INPUT,
   PUBLISH_JUMP_ISLAND_LAYOUT as ISLAND,
   REFLECTION_PUBLISH_MIN_CHARS,
+  CHAT_INPUT_ISLAND_LAYOUT,
 } from '@evoconn/constants/chatInputBarLayout';
 import Svg, { Polyline } from 'react-native-svg';
 import {
@@ -839,7 +841,15 @@ const styles = StyleSheet.create({
   edgeHitStrip: { position: 'absolute', left: 0, bottom: 0, zIndex: 250 },
   loadingText: { color: evoconnColors.muted, marginTop: 12, fontSize: 14 },
   scroll: { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 24 },
+  scrollContent: {
+    padding: 16,
+    paddingBottom:
+      CHAT_INPUT_ISLAND_LAYOUT.gradientHeight +
+      CHAT_BOTTOM_AREA.paddingTop +
+      CHAT_INPUT.minHeight +
+      CHAT_BOTTOM_AREA.paddingBottom +
+      24,
+  },
 
   reflectionWelcomeAboveInput: {
     alignItems: 'center',
