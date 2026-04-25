@@ -29,7 +29,7 @@ import {
   type KeyboardEvent,
   ActivityIndicator,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
 import { evoconnColors } from '@evoconn/theme/colors';
 import {
   CHAT_BOTTOM_AREA_LAYOUT as AREA,
@@ -53,6 +53,29 @@ function parseBgRgb(hex: string): [number, number, number] {
   ];
 }
 const [BR, BG, BB] = parseBgRgb(AREA.backgroundColor as string);
+
+function AppleKeyboardMicIcon({ color = '#8E8E93' }: { color?: string }) {
+  return (
+    <Svg width={18} height={22} viewBox="0 0 18 22" fill="none">
+      <Path
+        d="M9 12.25c2.05 0 3.42-1.48 3.42-3.63V4.28C12.42 2.05 11.05.6 9 .6S5.58 2.05 5.58 4.28v4.34c0 2.15 1.37 3.63 3.42 3.63Z"
+        fill={color}
+      />
+      <Path
+        d="M3.2 8.2c0 3.28 2.34 5.62 5.8 5.62s5.8-2.34 5.8-5.62"
+        stroke={color}
+        strokeWidth={1.75}
+        strokeLinecap="round"
+      />
+      <Path
+        d="M9 13.7v4.2M5.55 18.05h6.9"
+        stroke={color}
+        strokeWidth={1.75}
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -176,6 +199,7 @@ type ChatInputBarProps = {
   sendIcon?: React.ReactNode;
   contentAboveBar?: React.ReactNode;
   clanColor?: string;
+  inputCursorColor?: string;
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -186,6 +210,7 @@ export function ChatInputBar({
   sendIcon,
   contentAboveBar,
   clanColor = '#c7ff02',
+  inputCursorColor = clanColor,
 }: ChatInputBarProps) {
   const [text, setText] = useState('');
 
@@ -224,6 +249,9 @@ export function ChatInputBar({
   };
 
   const keyboardAnim = useKeyboardAnim();
+  const windowHeight = Dimensions.get('window').height;
+  const welcomeBottom =
+    windowHeight * ISLAND.welcomeCenterBottomRatio + ISLAND.welcomeCenterOffsetY;
 
   // ── Action button ──────────────────────────────────────────────────────────
 
@@ -252,8 +280,28 @@ export function ChatInputBar({
       {/* ── Gradient fade that overlays scroll content above the bar ── */}
       <GradientFade height={ISLAND.gradientHeight} />
 
-      {/* ── Content above bar (welcome screen, etc.) ── */}
-      {contentAboveBar}
+      {/* ── Empty-state welcome centered in the screen ── */}
+      {contentAboveBar ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.welcomeOverlay,
+            {
+              bottom: welcomeBottom,
+              transform: [
+                {
+                  translateY: Animated.multiply(
+                    keyboardAnim,
+                    1 - ISLAND.welcomeKeyboardLiftRatio,
+                  ),
+                },
+              ],
+            },
+          ]}
+        >
+          {contentAboveBar}
+        </Animated.View>
+      ) : null}
 
       {/* ── The actual bar row ── */}
       <View
@@ -318,6 +366,8 @@ export function ChatInputBar({
                 onChangeText={setText}
                 placeholder={interimText ? '…' : placeholder}
                 placeholderTextColor={evoconnColors.muted}
+                selectionColor={inputCursorColor}
+                cursorColor={inputCursorColor}
                 style={[
                   styles.input,
                   {
@@ -338,7 +388,7 @@ export function ChatInputBar({
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 style={styles.micBtn}
               >
-                <Ionicons name="mic" size={17} color="#949ba6" />
+                <AppleKeyboardMicIcon />
               </TouchableOpacity>
             </>
           )}
@@ -390,6 +440,12 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     // No background — fully transparent so the gradient shows through
     backgroundColor: 'transparent',
+  },
+  welcomeOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
   },
   inputWrap: {
     flex: 1,

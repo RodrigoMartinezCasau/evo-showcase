@@ -678,6 +678,7 @@ export default function ReflectionCreationScreen() {
         sendIcon={sendIconNode}
         contentAboveBar={emptyReflectionWelcome}
         clanColor={clanColor}
+        inputCursorColor={clanColor}
       />
 
       {!sidebarOpen ? (
@@ -853,7 +854,7 @@ const styles = StyleSheet.create({
 
   reflectionWelcomeAboveInput: {
     alignItems: 'center',
-    backgroundColor: CHAT_BOTTOM_AREA.backgroundColor,
+    backgroundColor: 'transparent',
   },
   reflectionWelcomeTitleWrap: {
     width: '100%',

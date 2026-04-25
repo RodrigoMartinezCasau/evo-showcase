@@ -14,6 +14,7 @@ import { useSidebarGesture } from '@evoconn/hooks/useSidebarGesture';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { getPhraseSendButtonByHouse } from '@evoconn/utils/getPhraseSendButtonByHouse';
+import { getClanSecondaryColor } from '@evoconn/constants/clanColors';
 import {
   CHAT_SEND_BUTTON_LAYOUT,
   CHAT_BOTTOM_AREA_LAYOUT as CHAT_BOTTOM_AREA,
@@ -115,6 +116,7 @@ export default function PhraseCreationScreen() {
   const { decrementUses } = useDebugStats();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const clanColor = getChatUserAccentColor(activeClan);
+  const phraseCursorColor = getClanSecondaryColor(activeClan);
 
   const SendIcon = useMemo(() => getPhraseSendButtonByHouse(activeClan), [activeClan]);
   const sendBtnSize = CHAT_SEND_BUTTON_LAYOUT.size;
@@ -737,6 +739,7 @@ export default function PhraseCreationScreen() {
         sendIcon={sendIconNode}
         contentAboveBar={emptyPhraseWelcome}
         clanColor={clanColor}
+        inputCursorColor={phraseCursorColor}
       />
 
       {!sidebarOpen ? (
@@ -779,7 +782,7 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   phraseWelcomeAboveInput: {
     alignItems: 'center',
-    backgroundColor: CHAT_BOTTOM_AREA.backgroundColor,
+    backgroundColor: 'transparent',
   },
   phraseWelcomeTitleWrap: {
     width: '100%',

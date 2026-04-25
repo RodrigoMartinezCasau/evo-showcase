@@ -143,6 +143,19 @@ export const CHAT_INPUT_ISLAND_LAYOUT = {
   keyboardCloseSpeed: 1.45,
   /** Minimum duration guard so the animation never snaps instantly. */
   keyboardMinDurationMs: 80,
+  /**
+   * Empty welcome overlay placement.
+   * `welcomeCenterBottomRatio` positions the welcome from the bottom of the
+   * screen. Increase it to move the welcome higher, decrease it to move lower.
+   */
+  welcomeCenterBottomRatio: 0.47,
+  /** Fine Y editor for the welcome overlay. Positive = up, negative = down. */
+  welcomeCenterOffsetY: 0,
+  /**
+   * How much the welcome follows the keyboard upward.
+   * 0 = stays still. 0.18 = moves up 18% of the keyboard height.
+   */
+  welcomeKeyboardLiftRatio: 0.4,
 } as const;
 
 /** The send button (clan SVG replaces the old star icon). */
