@@ -18,8 +18,9 @@
  *       AND any clan reaches REVEAL_PCT_THRESHOLD (30%)
  *   - phrases contribute to scores but NOT to the reflection counter
  *   - after reveal, new inputs are dampened (POST_REVEAL_WEIGHT)
- *   - clan switches require the new top clan to beat the current one by
- *     SWITCH_MARGIN percentage points to avoid noise-driven flicker
+ *   - after first reveal, clan switches require the new top clan to beat the
+ *     current visible clan by SWITCH_MARGIN percentage points. The first-reveal
+ *     percentage threshold does NOT apply to later reallocations.
  *
  * Persistence: all of the above survives reload and user switch via
  * `classificationStorage` (single AsyncStorage key, keyed by userId).
@@ -114,8 +115,8 @@ const PRE_REVEAL_WEIGHT = 1.0;
 const POST_REVEAL_WEIGHT = 0.35;
 
 /** A new top clan must beat the current visible clan by at least this many
- *  percentage points before we switch (PART 14: "should not happen too easily"). */
-const SWITCH_MARGIN = 5;
+ *  percentage points before we switch after the first assignment. */
+export const SWITCH_MARGIN = 5;
 
 // ── Momentum constants ────────────────────────────────────────────────────────
 
@@ -277,7 +278,7 @@ function deriveVisibleClan(
   const topIsDifferent = top.id !== prev.visibleClanId;
   const beatsByMargin = top.pct - currentPct >= SWITCH_MARGIN;
 
-  if (topIsDifferent && beatsByMargin && top.pct >= REVEAL_PCT_THRESHOLD) {
+  if (topIsDifferent && beatsByMargin) {
     return {
       visibleClanId: top.id,
       revealedAt: prev.revealedAt,
