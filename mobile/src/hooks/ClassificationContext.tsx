@@ -55,6 +55,8 @@ import {
   type ClassificationDatabase,
   type UserClassificationState,
 } from '@evoconn/services/classificationStorage';
+import { getRankFromPct } from '@evoconn/utils/getRankFromPct';
+import type { Rank } from '@evoconn/types';
 
 // ─── Backend URL helper ──────────────────────────────────────────────────────
 
@@ -156,6 +158,9 @@ export type ClassificationContextValue = {
   /** Total reflections sent by a user. Defaults to active user. */
   getReflectionCount: (userId?: string) => number;
 
+  /** Highest rank ever reached per clan. Defaults to active user. */
+  getClanRankHistory: (userId?: string) => Partial<Record<ClanScoreId, Rank>>;
+
   /** Raw state for debugging / advanced screens. */
   getUserState: (userId?: string) => UserClassificationState;
 };
@@ -233,6 +238,23 @@ function pickTopClan(pcts: Record<ClanScoreId, number>): { id: ClanScoreId; pct:
     }
   }
   return { id: topId, pct: topPct };
+}
+
+const RANK_VALUE: Record<Rank, number> = {
+  aprendiz: 1,
+  maestro: 2,
+  filosofo: 3,
+};
+
+function mergeClanRankRecord(
+  history: Partial<Record<ClanScoreId, Rank>>,
+  clanId: ClanScoreId | null,
+  rank: Rank | null,
+): Partial<Record<ClanScoreId, Rank>> {
+  if (!clanId || !rank) return history;
+  const previous = history[clanId];
+  if (previous && RANK_VALUE[previous] >= RANK_VALUE[rank]) return history;
+  return { ...history, [clanId]: rank };
 }
 
 /**
@@ -363,6 +385,19 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
     [getUserStateInternal],
   );
 
+  const getClanRankHistory = useCallback(
+    (userId?: string): Partial<Record<ClanScoreId, Rank>> => {
+      const state = getUserStateInternal(userId);
+      const history = state.clanRankHistory ?? {};
+      if (!state.visibleClanId) return history;
+
+      const pcts = totalsToPercentages(state.totals);
+      const currentRank = getRankFromPct(pcts[state.visibleClanId] ?? 0);
+      return mergeClanRankRecord(history, state.visibleClanId, currentRank);
+    },
+    [getUserStateInternal],
+  );
+
   // ── Action: record a new input ────────────────────────────────────────
   const recordInput = useCallback(
     async (text: string, type: InputType, inputId?: string): Promise<void> => {
@@ -438,6 +473,15 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
           prevState.totalPhrasesSent + (type === 'phrase' ? 1 : 0);
 
         const reveal = deriveVisibleClan(prevState, newTotals, totalReflectionsSent, nowIso);
+        const pcts = totalsToPercentages(newTotals);
+        const achievedRank = reveal.visibleClanId
+          ? getRankFromPct(pcts[reveal.visibleClanId] ?? 0)
+          : null;
+        const clanRankHistory = mergeClanRankRecord(
+          prevState.clanRankHistory ?? {},
+          reveal.visibleClanId,
+          achievedRank,
+        );
 
         const nextRecord = {
           inputId: generatedId,
@@ -454,6 +498,7 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
           totalReflectionsSent,
           totalPhrasesSent,
           visibleClanId: reveal.visibleClanId,
+          clanRankHistory,
           revealedAt: reveal.revealedAt,
           lastSwitchAt: reveal.lastSwitchAt,
         };
@@ -472,9 +517,10 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
       getPercentages,
       getVisibleClanId,
       getReflectionCount,
+      getClanRankHistory,
       getUserState: getUserStateInternal,
     }),
-    [loading, recordInput, getPercentages, getVisibleClanId, getReflectionCount, getUserStateInternal],
+    [loading, recordInput, getPercentages, getVisibleClanId, getReflectionCount, getClanRankHistory, getUserStateInternal],
   );
 
   return (

@@ -30,10 +30,12 @@ import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
+import { usePreviewMode } from '@evoconn/debug/PreviewModeContext';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
 import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
 
 import { AiSummaryCard } from '@evoconn/components/philosophyProfile/AiSummaryCard';
+import { ClanBadgesRecordCard } from '@evoconn/components/philosophyProfile/ClanBadgesRecordCard';
 import { DetailedRankCard } from '@evoconn/components/philosophyProfile/DetailedRankCard';
 import { ClanPercentagesTable } from '@evoconn/components/philosophyProfile/ClanPercentagesTable';
 import { SimilarPhilosophersCard } from '@evoconn/components/philosophyProfile/SimilarPhilosophersCard';
@@ -89,6 +91,7 @@ export default function PersonalPhilosophyDetailScreen() {
   const insets = useSafeAreaInsets();
   const { height: screenH } = useWindowDimensions();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
+  const { isPreviewActive, previewBadgeHistory, cyclePreviewBadgeRank } = usePreviewMode();
   const { thoughts } = useThoughts();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -96,6 +99,9 @@ export default function PersonalPhilosophyDetailScreen() {
   // Use real philosophical-classification data instead of seed mock values.
   const classification = useClassification();
   const realPercentages = classification.getPercentages(baseProfile.id);
+  const clanRankHistory = isPreviewActive
+    ? previewBadgeHistory
+    : classification.getClanRankHistory(baseProfile.id);
   const profile = { ...baseProfile, philosophyPercentages: realPercentages };
   const clanId = activeClan;
 
@@ -239,7 +245,15 @@ export default function PersonalPhilosophyDetailScreen() {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            {/* 1. AI philosophical summary */}
+            {/* 1. Permanent clan badge record */}
+            <ClanBadgesRecordCard
+              rankHistory={clanRankHistory}
+              onBadgePress={isPreviewActive ? cyclePreviewBadgeRank : undefined}
+            />
+
+            <View style={styles.gap} />
+
+            {/* 2. AI philosophical summary */}
             <AiSummaryCard
               summary={summaryText}
               state={summaryState}
@@ -249,12 +263,12 @@ export default function PersonalPhilosophyDetailScreen() {
 
             <View style={styles.gap} />
 
-            {/* 2. Full clan percentages table */}
+            {/* 3. Full clan percentages table */}
             <ClanPercentagesTable percentages={profile.philosophyPercentages} />
 
             <View style={styles.gap} />
 
-            {/* 3. Detailed rank / progression */}
+            {/* 4. Detailed rank / progression */}
             <DetailedRankCard
               dominantClanLabel={dominant.label}
               dominantPct={dominant.pct}
@@ -262,7 +276,7 @@ export default function PersonalPhilosophyDetailScreen() {
 
             <View style={styles.gap} />
 
-            {/* 4. Similar philosophers */}
+            {/* 5. Similar philosophers */}
             <SimilarPhilosophersCard
               philosophers={philosophers}
               state={philosophersState}
@@ -272,7 +286,7 @@ export default function PersonalPhilosophyDetailScreen() {
 
             <View style={styles.gap} />
 
-            {/* 5. Two small side-by-side AI blocks */}
+            {/* 6. Two small side-by-side AI blocks */}
             <View style={styles.bottomRow}>
               <View style={styles.halfCard}>
                 <BookRecommendationsCard

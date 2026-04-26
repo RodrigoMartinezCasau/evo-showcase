@@ -27,6 +27,7 @@ import {
   ALL_CLAN_IDS,
   makeZeroScores,
 } from './clanClassifier';
+import type { Rank } from '@evoconn/types';
 
 const KEY = '@physicscopilot/classification_v1';
 
@@ -51,6 +52,8 @@ export type UserClassificationState = {
   totalReflectionsSent: number;
   totalPhrasesSent: number;
   visibleClanId: ClanScoreId | null;
+  /** Highest rank ever reached by clan. Never downgraded. */
+  clanRankHistory: Partial<Record<ClanScoreId, Rank>>;
   revealedAt: string | null;
   lastSwitchAt: string | null;
 };
@@ -66,6 +69,7 @@ export function makeEmptyUserState(): UserClassificationState {
     totalReflectionsSent: 0,
     totalPhrasesSent: 0,
     visibleClanId: null,
+    clanRankHistory: {},
     revealedAt: null,
     lastSwitchAt: null,
   };
@@ -108,6 +112,17 @@ function sanitiseUserState(raw: unknown): UserClassificationState {
       ? (vid as ClanScoreId)
       : null;
 
+  const clanRankHistory: Partial<Record<ClanScoreId, Rank>> = {};
+  const rawHistory = (r as Partial<UserClassificationState>).clanRankHistory;
+  if (rawHistory && typeof rawHistory === 'object') {
+    for (const c of ALL_CLAN_IDS) {
+      const rank = (rawHistory as Record<string, unknown>)[c];
+      if (rank === 'aprendiz' || rank === 'maestro' || rank === 'filosofo') {
+        clanRankHistory[c] = rank;
+      }
+    }
+  }
+
   return {
     inputs,
     totals,
@@ -120,6 +135,7 @@ function sanitiseUserState(raw: unknown): UserClassificationState {
         ? r.totalPhrasesSent
         : 0,
     visibleClanId,
+    clanRankHistory,
     revealedAt: typeof r.revealedAt === 'string' ? r.revealedAt : null,
     lastSwitchAt: typeof r.lastSwitchAt === 'string' ? r.lastSwitchAt : null,
   };

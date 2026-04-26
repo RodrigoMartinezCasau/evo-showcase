@@ -24,6 +24,7 @@ import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import { getRankForUser } from '@evoconn/utils/getRankFromPct';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
+import { usePreviewMode } from '@evoconn/debug/PreviewModeContext';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
 import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
 import {
@@ -49,6 +50,7 @@ export default function PersonalProfileScreen() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { thoughts } = useThoughts();
   const classification = useClassification();
+  const { isPreviewActive } = usePreviewMode();
 
   const profile = getPersonalProfile();
   // Real per-user philosophical percentages from the classification engine.
@@ -238,6 +240,7 @@ export default function PersonalProfileScreen() {
               percentages={profileWithClan.philosophyPercentages}
               clanId={profileWithClan.clanId}
               onPress={() => router.push('/philosophy-profile')}
+              allowLockedAccess={isPreviewActive}
             />
             <View style={styles.contentGap} />
             <PersonalRecentPostsSlider

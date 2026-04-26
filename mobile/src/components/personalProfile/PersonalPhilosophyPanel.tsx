@@ -31,12 +31,15 @@ type Props = {
   clanId?: string | null;
   /** When provided AND user has a clan, wraps panel in a TouchableOpacity. */
   onPress?: () => void;
+  /** Debug/MOD only: allow opening the locked detail screen without a revealed clan. */
+  allowLockedAccess?: boolean;
 };
 
 export const PersonalPhilosophyPanel = React.memo(function PersonalPhilosophyPanel({
   percentages,
   clanId,
   onPress,
+  allowLockedAccess = false,
 }: Props) {
   const titleColor = getClanColor(clanId ?? null);
   const sorted = [...percentages].sort((a, b) => b.pct - a.pct);
@@ -44,7 +47,7 @@ export const PersonalPhilosophyPanel = React.memo(function PersonalPhilosophyPan
 
   // Sin clan: tapping anywhere on the card shows the alert instead of navigating
   const effectivePress = isSinClan
-    ? () => Alert.alert('', 'Sigue reflexionando...')
+    ? (allowLockedAccess && onPress ? onPress : () => Alert.alert('', 'Sigue reflexionando...'))
     : onPress;
 
   const inner = (
@@ -67,36 +70,36 @@ export const PersonalPhilosophyPanel = React.memo(function PersonalPhilosophyPan
           onPress && <Text style={styles.expandHint}>Ver detalle →</Text>
         )}
       </View>
-      {sorted.map((entry, i) => (
-        <View
-          key={entry.clanId}
-          style={[
-            styles.row,
-            i > 0 && { marginTop: PHILOSOPHY_ROW_GAP },
-            PHILOSOPHY_ROW_HEIGHT !== undefined && { height: PHILOSOPHY_ROW_HEIGHT, overflow: 'hidden' },
-          ]}
-        >
-          <PhilosophyClanBanner
-            clanId={entry.clanId}
-            label={entry.label}
-            scale={PHILOSOPHY_BANNER_SCALE}
-            offsetX={PHILOSOPHY_BANNER_OFFSET_X}
-            offsetY={PHILOSOPHY_BANNER_OFFSET_Y}
-            containerWidth={110}
-            fallbackTextStyle={styles.label}
-          />
-          <View style={styles.barTrack}>
-            <GradientBarFill
-              widthStyle={`${entry.pct}%`}
-              height={7}
-              radius={4}
-              clanColor={PHILOSOPHY_BAR_CLAN_COLORS[entry.clanId] ?? PHILOSOPHY_BAR_DEFAULT_COLOR}
-              gradId={entry.clanId}
+      {!isSinClan && sorted.map((entry, i) => (
+          <View
+            key={entry.clanId}
+            style={[
+              styles.row,
+              i > 0 && { marginTop: PHILOSOPHY_ROW_GAP },
+              PHILOSOPHY_ROW_HEIGHT !== undefined && { height: PHILOSOPHY_ROW_HEIGHT, overflow: 'hidden' },
+            ]}
+          >
+            <PhilosophyClanBanner
+              clanId={entry.clanId}
+              label={entry.label}
+              scale={PHILOSOPHY_BANNER_SCALE}
+              offsetX={PHILOSOPHY_BANNER_OFFSET_X}
+              offsetY={PHILOSOPHY_BANNER_OFFSET_Y}
+              containerWidth={110}
+              fallbackTextStyle={styles.label}
             />
+            <View style={styles.barTrack}>
+              <GradientBarFill
+                widthStyle={`${entry.pct}%`}
+                height={7}
+                radius={4}
+                clanColor={PHILOSOPHY_BAR_CLAN_COLORS[entry.clanId] ?? PHILOSOPHY_BAR_DEFAULT_COLOR}
+                gradId={entry.clanId}
+              />
+            </View>
+            <Text style={styles.pct}>{entry.pct}%</Text>
           </View>
-          <Text style={styles.pct}>{entry.pct}%</Text>
-        </View>
-      ))}
+        ))}
     </View>
   );
 

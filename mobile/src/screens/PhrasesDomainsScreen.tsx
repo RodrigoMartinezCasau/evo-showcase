@@ -126,12 +126,6 @@ function DomainDetailModal({ domain, unlockedIds, onClose }: DetailModalProps) {
 
   const quotes = getQuotesByDomain(domain.id);
 
-  const difficultyLabel: Record<string, string> = {
-    beginner:     'Inicial',
-    intermediate: 'Medio',
-    advanced:     'Avanzado',
-  };
-
   return (
     <Modal
       visible={domain !== null}
@@ -187,26 +181,7 @@ function DomainDetailModal({ domain, unlockedIds, onClose }: DetailModalProps) {
                       <Text style={styles.phraseText}>"{q.text}"</Text>
                       <View style={styles.phraseMetaRow}>
                         <Text style={styles.phraseAuthor}>— {q.author}</Text>
-                        {q.sourceBook && (
-                          <Text style={styles.phraseBook}>{q.sourceBook}</Text>
-                        )}
-                        {q.difficulty && (
-                          <View style={[styles.diffBadge, { borderColor: domain.color }]}>
-                            <Text style={[styles.diffBadgeText, { color: domain.color }]}>
-                              {difficultyLabel[q.difficulty] ?? q.difficulty}
-                            </Text>
-                          </View>
-                        )}
                       </View>
-                      {q.tags.length > 0 && (
-                        <View style={styles.tagsRow}>
-                          {q.tags.slice(0, 4).map(tag => (
-                            <View key={tag} style={styles.tag}>
-                              <Text style={styles.tagText}>{tag}</Text>
-                            </View>
-                          ))}
-                        </View>
-                      )}
                     </>
                   ) : (
                     <View style={styles.lockedRow}>
@@ -405,7 +380,7 @@ export default function PhrasesDomainsScreen() {
         <View style={styles.infoBox}>
           <Ionicons name="information-circle-outline" size={14} color={evoconnColors.muted} />
           <Text style={styles.infoText}>
-            Las frases asociadas a tus reflexiones provienen exclusivamente de esta base de datos.
+            Las frases asociadas a tus reflexiones provienen exclusivamente de esta base de datos enteramente diseñada por @Evoconn.
           </Text>
         </View>
       </ScrollView>
@@ -674,36 +649,6 @@ const styles = StyleSheet.create({
     color: evoconnColors.muted,
     fontSize: 12,
     fontWeight: '600',
-  },
-  phraseBook: {
-    color: evoconnColors.muted,
-    fontSize: 11,
-    fontStyle: 'italic',
-  },
-  diffBadge: {
-    borderWidth: 1,
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-  },
-  diffBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  tagsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 4,
-  },
-  tag: {
-    backgroundColor: evoconnColors.border,
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  tagText: {
-    color: evoconnColors.muted,
-    fontSize: 10,
   },
   lockedRow: {
     flexDirection: 'row',

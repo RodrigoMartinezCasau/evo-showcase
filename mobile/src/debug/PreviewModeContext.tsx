@@ -13,38 +13,63 @@
  */
 import React, { createContext, useCallback, useContext, useState } from 'react';
 import type { ClanId } from '@evoconn/constants/clanColors';
+import type { Rank } from '@evoconn/types';
 
 type PreviewModeState = {
   isPreviewActive: boolean;
   previewClanId: ClanId | null;
+  previewBadgeHistory: Partial<Record<ClanId, Rank>>;
   setPreviewClan: (id: ClanId | null) => void;
+  cyclePreviewBadgeRank: (id: ClanId) => void;
   exitPreview: () => void;
 };
 
 const PreviewModeContext = createContext<PreviewModeState>({
   isPreviewActive: false,
   previewClanId: null,
+  previewBadgeHistory: {},
   setPreviewClan: () => {},
+  cyclePreviewBadgeRank: () => {},
   exitPreview: () => {},
 });
 
 export function PreviewModeProvider({ children }: { children: React.ReactNode }) {
   const [previewClanId, setPreviewClanId] = useState<ClanId | null>(null);
   const [isPreviewActive, setIsPreviewActive] = useState(false);
+  const [previewBadgeHistory, setPreviewBadgeHistory] = useState<Partial<Record<ClanId, Rank>>>({});
 
   const setPreviewClan = useCallback((id: ClanId | null) => {
     setPreviewClanId(id);
     setIsPreviewActive(true);
   }, []);
 
+  const cyclePreviewBadgeRank = useCallback((id: ClanId) => {
+    setPreviewBadgeHistory((prev) => {
+      const current = prev[id];
+      const next =
+        current === undefined ? 'aprendiz' :
+        current === 'aprendiz' ? 'maestro' :
+        current === 'maestro' ? 'filosofo' :
+        undefined;
+
+      if (!next) {
+        const updated = { ...prev };
+        delete updated[id];
+        return updated;
+      }
+      return { ...prev, [id]: next };
+    });
+  }, []);
+
   const exitPreview = useCallback(() => {
     setIsPreviewActive(false);
     setPreviewClanId(null);
+    setPreviewBadgeHistory({});
   }, []);
 
   return (
     <PreviewModeContext.Provider
-      value={{ isPreviewActive, previewClanId, setPreviewClan, exitPreview }}
+      value={{ isPreviewActive, previewClanId, previewBadgeHistory, setPreviewClan, cyclePreviewBadgeRank, exitPreview }}
     >
       {children}
     </PreviewModeContext.Provider>

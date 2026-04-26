@@ -71,36 +71,36 @@ export const PhilosophyPercentagesPanel = React.memo(function PhilosophyPercenta
           </TouchableOpacity>
         )}
       </View>
-      {sorted.map((entry, i) => (
-        <View
-          key={entry.clanId}
-          style={[
-            styles.row,
-            i > 0 && { marginTop: PHILOSOPHY_ROW_GAP },
-            PHILOSOPHY_ROW_HEIGHT !== undefined && { height: PHILOSOPHY_ROW_HEIGHT, overflow: 'hidden' },
-          ]}
-        >
-          <PhilosophyClanBanner
-            clanId={entry.clanId}
-            label={entry.label}
-            scale={PHILOSOPHY_BANNER_SCALE}
-            offsetX={PHILOSOPHY_BANNER_OFFSET_X}
-            offsetY={PHILOSOPHY_BANNER_OFFSET_Y}
-            containerWidth={110}
-            fallbackTextStyle={styles.label}
-          />
-          <View style={styles.barTrack}>
-            <GradientBarFill
-              widthStyle={`${entry.pct}%`}
-              height={7}
-              radius={4}
-              clanColor={PHILOSOPHY_BAR_CLAN_COLORS[entry.clanId] ?? PHILOSOPHY_BAR_DEFAULT_COLOR}
-              gradId={entry.clanId}
+      {!isSinClan && sorted.map((entry, i) => (
+          <View
+            key={entry.clanId}
+            style={[
+              styles.row,
+              i > 0 && { marginTop: PHILOSOPHY_ROW_GAP },
+              PHILOSOPHY_ROW_HEIGHT !== undefined && { height: PHILOSOPHY_ROW_HEIGHT, overflow: 'hidden' },
+            ]}
+          >
+            <PhilosophyClanBanner
+              clanId={entry.clanId}
+              label={entry.label}
+              scale={PHILOSOPHY_BANNER_SCALE}
+              offsetX={PHILOSOPHY_BANNER_OFFSET_X}
+              offsetY={PHILOSOPHY_BANNER_OFFSET_Y}
+              containerWidth={110}
+              fallbackTextStyle={styles.label}
             />
+            <View style={styles.barTrack}>
+              <GradientBarFill
+                widthStyle={`${entry.pct}%`}
+                height={7}
+                radius={4}
+                clanColor={PHILOSOPHY_BAR_CLAN_COLORS[entry.clanId] ?? PHILOSOPHY_BAR_DEFAULT_COLOR}
+                gradId={entry.clanId}
+              />
+            </View>
+            <Text style={styles.pct}>{entry.pct}%</Text>
           </View>
-          <Text style={styles.pct}>{entry.pct}%</Text>
-        </View>
-      ))}
+        ))}
       </View>
     </View>
   );
