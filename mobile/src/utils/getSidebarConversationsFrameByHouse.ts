@@ -8,13 +8,13 @@ import type { ClanId } from '@evoconn/constants/clanColors';
  * Asignación explícita por clan (no inferir por orden de archivos):
  * - Sin clan / Evocon → verde lima
  * - Nihilista → #bdb29c
- * - Cientista → #54d5cf
+ * - Cientista → #529da2
  * - Estoico → #818a41
  * - Existencialista → #c93a39
  * - Racionalista → #395df2
  * - Humanista → #efb318
  * - Realista → #a2a3a8
- * - Trascendentalista → #cb6ce6
+ * - Trascendentalista → #8d61d1
  */
 const CONVERSATIONS_FRAME_BY_CLAN: Record<ClanId, ImageSourcePropType> = {
   nihilista: require('../assets/sidebar/conversations/conversations_nihilista.png'),

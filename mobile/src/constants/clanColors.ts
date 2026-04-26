@@ -12,10 +12,10 @@ export type ClanId =
 
 export const CLAN_TO_COLOR: Record<ClanId, string> = {
   nihilista: '#bdb29c',
-  cientista: '#54d5cf',
+  cientista: '#529da2',
   estoico: '#818a41',
   existencialista: '#c93a39',
-  trascendentalista: '#cb6ce6',
+  trascendentalista: '#8d61d1',
   humanista: '#efb318',
   realista: '#a2a3a8',
   racionalista: '#395df2',
@@ -44,7 +44,7 @@ export const CLAN_SECONDARY_COLOR: Record<ClanId, string> = {
   racionalista: '#46b8f9',
   humanista: '#d08733',
   realista: '#f9a666',
-  trascendentalista: '#e4de5b',
+  trascendentalista: '#4e327b',
 };
 
 export const CLAN_TERTIARY_COLOR: Record<ClanId, string> = {
@@ -106,8 +106,8 @@ export const CLAN_TO_TOP_BAR_STAR_COLOR: Record<ClanId, string> = {
   estoico: '#8A9A5B',
   humanista: '#F2C94C',
   existencialista: '#E74C3C',
-  trascendentalista: '#A66DD4',
-  cientista: '#4FD1C5',
+  trascendentalista: '#8d61d1',
+  cientista: '#529da2',
   realista: '#B0B0B0',
 };
 

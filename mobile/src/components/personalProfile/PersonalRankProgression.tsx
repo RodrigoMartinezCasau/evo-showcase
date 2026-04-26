@@ -58,10 +58,10 @@ type GradPair = readonly [string, string]; // [start, end]
 const CLAN_GRAD: Record<string, GradPair> = {
   'sin_clan':          ['#c7ff02', '#a8d600'],
   'nihilista':         ['#535147', '#bdb29c'],
-  'cientista':         ['#54d5cf', '#fdfef0'],
+  'cientista':         ['#529da2', '#fdfef0'],
   'estoico':           ['#818a41', '#444827'],   // normal dir
   'existencialista':   ['#f9bc4b', '#c93a39'],
-  'trascendentalista': ['#e4de5b', '#cb6ce6'],
+  'trascendentalista': ['#4e327b', '#8d61d1'],
   'humanista':         ['#efb318', '#d08733'],   // normal dir
   'realista':          ['#f9a666', '#a2a3a8'],
   'racionalista':      ['#46b8f9', '#395df2'],
@@ -212,20 +212,20 @@ export const PersonalRankProgression = React.memo(function PersonalRankProgressi
               {/* All clan gradients defined statically — stopColor never changes */}
               <SvgLinearGradient id="rpBarFill_sin_clan"          x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#c7ff02" /><Stop offset="1" stopColor="#a8d600" /></SvgLinearGradient>
               <SvgLinearGradient id="rpBarFill_nihilista"         x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#535147" /><Stop offset="1" stopColor="#bdb29c" /></SvgLinearGradient>
-              <SvgLinearGradient id="rpBarFill_cientista"         x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#54d5cf" /><Stop offset="1" stopColor="#fdfef0" /></SvgLinearGradient>
+              <SvgLinearGradient id="rpBarFill_cientista"         x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#529da2" /><Stop offset="1" stopColor="#fdfef0" /></SvgLinearGradient>
               <SvgLinearGradient id="rpBarFill_estoico"           x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#818a41" /><Stop offset="1" stopColor="#444827" /></SvgLinearGradient>
               <SvgLinearGradient id="rpBarFill_existencialista"   x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#f9bc4b" /><Stop offset="1" stopColor="#c93a39" /></SvgLinearGradient>
-              <SvgLinearGradient id="rpBarFill_trascendentalista" x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#e4de5b" /><Stop offset="1" stopColor="#cb6ce6" /></SvgLinearGradient>
+              <SvgLinearGradient id="rpBarFill_trascendentalista" x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#4e327b" /><Stop offset="1" stopColor="#8d61d1" /></SvgLinearGradient>
               <SvgLinearGradient id="rpBarFill_humanista"         x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#efb318" /><Stop offset="1" stopColor="#d08733" /></SvgLinearGradient>
               <SvgLinearGradient id="rpBarFill_realista"          x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#f9a666" /><Stop offset="1" stopColor="#a2a3a8" /></SvgLinearGradient>
               <SvgLinearGradient id="rpBarFill_racionalista"      x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#46b8f9" /><Stop offset="1" stopColor="#395df2" /></SvgLinearGradient>
               {/* Text gradients — same palette as bar fill */}
               <SvgLinearGradient id="rpTxtGrad_sin_clan"          x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#c7ff02" /><Stop offset="1" stopColor="#a8d600" /></SvgLinearGradient>
               <SvgLinearGradient id="rpTxtGrad_nihilista"         x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#535147" /><Stop offset="1" stopColor="#bdb29c" /></SvgLinearGradient>
-              <SvgLinearGradient id="rpTxtGrad_cientista"         x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#54d5cf" /><Stop offset="1" stopColor="#fdfef0" /></SvgLinearGradient>
+              <SvgLinearGradient id="rpTxtGrad_cientista"         x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#529da2" /><Stop offset="1" stopColor="#fdfef0" /></SvgLinearGradient>
               <SvgLinearGradient id="rpTxtGrad_estoico"           x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#818a41" /><Stop offset="1" stopColor="#444827" /></SvgLinearGradient>
               <SvgLinearGradient id="rpTxtGrad_existencialista"   x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#f9bc4b" /><Stop offset="1" stopColor="#c93a39" /></SvgLinearGradient>
-              <SvgLinearGradient id="rpTxtGrad_trascendentalista" x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#e4de5b" /><Stop offset="1" stopColor="#cb6ce6" /></SvgLinearGradient>
+              <SvgLinearGradient id="rpTxtGrad_trascendentalista" x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#4e327b" /><Stop offset="1" stopColor="#8d61d1" /></SvgLinearGradient>
               <SvgLinearGradient id="rpTxtGrad_humanista"         x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#efb318" /><Stop offset="1" stopColor="#d08733" /></SvgLinearGradient>
               <SvgLinearGradient id="rpTxtGrad_realista"          x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#f9a666" /><Stop offset="1" stopColor="#a2a3a8" /></SvgLinearGradient>
               <SvgLinearGradient id="rpTxtGrad_racionalista"      x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor="#46b8f9" /><Stop offset="1" stopColor="#395df2" /></SvgLinearGradient>

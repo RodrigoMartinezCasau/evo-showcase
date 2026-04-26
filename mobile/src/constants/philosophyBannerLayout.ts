@@ -88,13 +88,13 @@ export const EXPANDED_PHILOSOPHY_ROW_HEIGHT: number | undefined = 46;
  */
 export const PHILOSOPHY_BAR_CLAN_COLORS: Record<string, string> = {
   nihilista:        '#bdb29c',
-  cientista:        '#54d5cf',
+  cientista:        '#529da2',
   estoico:          '#818a41',
   existencialista:  '#c93a39',
   racionalista:     '#395df2',
   humanista:        '#efb318',
   realista:         '#a2a3a8',
-  trascendentalista:'#cb6ce6',
+  trascendentalista:'#8d61d1',
 };
 
 /** Fallback gradient end color when clanId is unknown. */

@@ -21,7 +21,7 @@ export const clanCardColors: Record<string, string> = {
   racionalista: '#3B82F6',
   humanista: '#FACC15',
   estoico: '#84CC16',
-  cientista: '#06B6D4',
+  cientista: '#529da2',
   epicureo: '#A855F7',
   escéptico: '#64748B',
   existencialista: '#F97316',

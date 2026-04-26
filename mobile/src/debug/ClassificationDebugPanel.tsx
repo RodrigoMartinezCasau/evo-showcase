@@ -36,13 +36,13 @@ import { REVEAL_REFLECTION_THRESHOLD, REVEAL_PCT_THRESHOLD } from '@evoconn/hook
 
 const CLAN_COLOURS: Record<ClanScoreId, string> = {
   nihilista:        '#9B9B9B',
-  cientista:        '#4FC3F7',
+  cientista:        '#529da2',
   estoico:          '#81C784',
   existencialista:  '#CE93D8',
   racionalista:     '#FFD54F',
   humanista:        '#FF8A65',
   realista:         '#90A4AE',
-  trascendentalista:'#F48FB1',
+  trascendentalista:'#8d61d1',
 };
 
 // ─── Small sub-components ────────────────────────────────────────────────────

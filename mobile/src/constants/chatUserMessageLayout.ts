@@ -16,8 +16,8 @@ export const CHAT_USER_MESSAGE_LAYOUT = {
     estoico: '#818a41',
     humanista: '#efb318',
     existencialista: '#c93a39',
-    trascendentalista: '#cb6ce6',
-    cientista: '#54d5cf',
+    trascendentalista: '#8d61d1',
+    cientista: '#529da2',
     realista: '#a2a3a8',
   },
 } as const;

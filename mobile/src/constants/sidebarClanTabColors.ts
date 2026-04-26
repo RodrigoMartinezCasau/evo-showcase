@@ -25,7 +25,7 @@ const SIDEBAR_CLAN_TAB_COLOR_EDITOR: Record<string, SidebarClanTabColorRow> = {
   },
   cientista: {
     favorites: { label: '#fdfef0', icon: '#fdfef0' },
-    folders: { label: '#54d5cf', icon: '#54d5cf' },
+    folders: { label: '#529da2', icon: '#529da2' },
     thoughts: { label: '#298280', icon: null },
   },
   estoico: {
@@ -54,9 +54,9 @@ const SIDEBAR_CLAN_TAB_COLOR_EDITOR: Record<string, SidebarClanTabColorRow> = {
     thoughts: { label: '#f9a666', icon: null },
   },
   trascendentalista: {
-    favorites: { label: '#e4de5b', icon: '#e4de5b' },
-    folders: { label: '#cb6ce6', icon: '#cb6ce6' },
-    thoughts: { label: '#e4de5b', icon: null },
+    favorites: { label: '#4e327b', icon: '#4e327b' },
+    folders: { label: '#8d61d1', icon: '#8d61d1' },
+    thoughts: { label: '#4e327b', icon: null },
   },
   default: {
     favorites: { label: '#7000ff', icon: '#C7FF02' },
