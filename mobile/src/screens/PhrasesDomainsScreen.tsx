@@ -272,19 +272,19 @@ export default function PhrasesDomainsScreen() {
   const computedUnlocked = IS_DEBUG_STATS_MODE ? simulatedUnlocked : totalUnlocked;
 
   const [sidebarOpen,  setSidebarOpen]  = useState(false);
-  const [activeTab,    setActiveTab]    = useState<TabId>('feed');
   const [detailDomain, setDetailDomain] = useState<DomainStats | null>(null);
 
   // ─── Bottom bar height ───────────────────────────────────────────────────────
-  const bottomBarH = BOTTOM_BAR_LAYOUT.BAR_TOTAL_HEIGHT + insets.bottom;
+  const bottomBarH =
+    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
+    insets.bottom +
+    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
+    20;
 
   // ─── Navigation ─────────────────────────────────────────────────────────────
   const handleTabChange = useCallback(
     (tab: TabId) => {
-      setActiveTab(tab);
-      if (tab === 'feed')    router.replace('/(tabs)');
-      if (tab === 'explore') router.push('/explore' as never);
-      if (tab === 'create')  router.push('/reflection');
+      router.replace({ pathname: '/(tabs)', params: { tab } });
     },
     [router],
   );
@@ -386,7 +386,19 @@ export default function PhrasesDomainsScreen() {
       </ScrollView>
 
       {/* Bottom bar */}
-      <BottomCommunityTabs activeTab={activeTab} onTabChange={handleTabChange} />
+      <View
+        style={[
+          styles.bottomTabsWrap,
+          {
+            paddingBottom: insets.bottom + BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION,
+            paddingHorizontal: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HORIZONTAL_PADDING,
+            bottom: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_BOTTOM_OFFSET,
+            borderRadius: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_BORDER_RADIUS,
+          },
+        ]}
+      >
+        <BottomCommunityTabs activeTab={null} onTabChange={handleTabChange} />
+      </View>
 
       {/* Sidebar */}
       <SidebarDrawer
@@ -419,6 +431,15 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: evoconnColors.background,
+  },
+  bottomTabsWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: evoconnColors.background,
+    borderTopWidth: 1,
+    borderTopColor: evoconnColors.background,
   },
 
   // ── Scroll ──

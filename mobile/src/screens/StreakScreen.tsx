@@ -419,7 +419,19 @@ export default function StreakScreen() {
         </ScrollView>
       </View>
 
-      <BottomCommunityTabs activeTab={null} onTabChange={handleBottomTabChange} />
+      <View
+        style={[
+          styles.bottomTabsWrap,
+          {
+            paddingBottom: insets.bottom + BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION,
+            paddingHorizontal: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HORIZONTAL_PADDING,
+            bottom: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_BOTTOM_OFFSET,
+            borderRadius: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_BORDER_RADIUS,
+          },
+        ]}
+      >
+        <BottomCommunityTabs activeTab={null} onTabChange={handleBottomTabChange} />
+      </View>
 
       <SidebarDrawer
         visible={sidebarOpen}
@@ -546,5 +558,14 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: 24,
+  },
+  bottomTabsWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: evoconnColors.background,
+    borderTopWidth: 1,
+    borderTopColor: evoconnColors.background,
   },
 });
