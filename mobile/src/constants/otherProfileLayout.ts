@@ -93,7 +93,7 @@ export const OTHER_PHILOSOPHY_CARD_OPACITY = 1;
  * Opacidad del fondo negro de las tarjetas "Reflexiones totales" y "Frases totales"
  * (solo en perfiles ajenos).
  */
-export const OTHER_TOTALS_CARD_OPACITY     = 0.5;
+export const OTHER_TOTALS_CARD_OPACITY     = 1;
 
 /** Espacio vertical ENTRE los contadores totales (Reflexiones/Frases) y la fila de tarjetas.
  *  El contenedor padre ya aporta un gap de 20 px. Un valor positivo suma a ese gap.
