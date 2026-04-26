@@ -1,7 +1,7 @@
 import React from 'react';
 import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import IcoNotificacionesSvg from '../../assets/personalProfile/Nuevo icono notis.svg';
+import IcoNotificacionesSvg from '../../assets/personalProfile/icono notificaciones.svg';
 import { useNotifications } from '@evoconn/hooks/NotificationsContext';
 import { getClanSecondaryColor } from '@evoconn/constants/clanColors';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';

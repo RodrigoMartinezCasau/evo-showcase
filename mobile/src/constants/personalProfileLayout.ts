@@ -262,6 +262,22 @@ export const ICON_SWITCH_SCALE = 1;
 export const APP_ICON_STAR_OFFSET_X = 0;
 export const APP_ICON_STAR_OFFSET_Y = 10;
 export const APP_ICON_STAR_SCALE = 3.8;
+/**
+ * Ajustes SOLO para los SVG nuevos del bloque "Icono de app".
+ * No afecta a otros clanes ni a otros bloques.
+ */
+export const APP_ICON_STAR_SVG_EDITOR = {
+  cientista: {
+    offsetX: -3,
+    offsetY: 0,
+    scale: 1.1,
+  },
+  trascendentalista: {
+    offsetX: -3,
+    offsetY: 0,
+    scale: 1.1,
+  },
+} as const;
 
 // ── Personal posts total-stats summary row ──────────────────────────
 
