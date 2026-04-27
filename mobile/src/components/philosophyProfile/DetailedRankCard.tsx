@@ -20,10 +20,12 @@ import {
   getNextRankThreshold,
   RANK_THRESHOLDS,
 } from '@evoconn/utils/getRankFromPct';
+import type { Rank } from '@evoconn/types';
 
 type Props = {
   dominantClanLabel: string;
   dominantPct: number;
+  displayRank?: Rank;
 };
 
 const RANK_LABELS: Record<string, string> = {
@@ -58,8 +60,10 @@ function getRankInfo(pct: number): {
 export const DetailedRankCard = React.memo(function DetailedRankCard({
   dominantClanLabel,
   dominantPct,
+  displayRank,
 }: Props) {
   const { rank, nextRank, remaining } = getRankInfo(dominantPct);
+  const badgeRank = displayRank ? RANK_LABELS[displayRank] : rank;
   const fill = getRankBarFill(dominantPct);
 
   const [trackW, setTrackW] = useState(0);
@@ -78,7 +82,7 @@ export const DetailedRankCard = React.memo(function DetailedRankCard({
       <View style={styles.rankRow}>
         <Text style={styles.pctBig}>{dominantPct}%</Text>
         <View style={styles.rankBadge}>
-          <Text style={styles.rankLabel}>{rank.toUpperCase()}</Text>
+          <Text style={styles.rankLabel}>{badgeRank.toUpperCase()}</Text>
         </View>
       </View>
 

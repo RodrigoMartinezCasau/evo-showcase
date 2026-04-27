@@ -16,6 +16,7 @@
  *   - `totalReflectionsSent` counter used for the reveal threshold
  *   - `totalPhrasesSent`     counter for completeness
  *   - `visibleClanId`        currently-revealed clan ('Sin clan' = null)
+ *   - `lastActivityAt`       ISO date of the last reflection or phrase
  *   - `revealedAt`           ISO date of the first reveal (null until then)
  *   - `lastSwitchAt`         ISO date of the last clan switch (null if none)
  */
@@ -52,8 +53,9 @@ export type UserClassificationState = {
   totalReflectionsSent: number;
   totalPhrasesSent: number;
   visibleClanId: ClanScoreId | null;
-  /** Highest rank ever reached by clan. Never downgraded. */
+  /** Highest rank reached for each clan during the current stay in that clan. */
   clanRankHistory: Partial<Record<ClanScoreId, Rank>>;
+  lastActivityAt: string | null;
   revealedAt: string | null;
   lastSwitchAt: string | null;
 };
@@ -70,6 +72,7 @@ export function makeEmptyUserState(): UserClassificationState {
     totalPhrasesSent: 0,
     visibleClanId: null,
     clanRankHistory: {},
+    lastActivityAt: null,
     revealedAt: null,
     lastSwitchAt: null,
   };
@@ -136,6 +139,10 @@ function sanitiseUserState(raw: unknown): UserClassificationState {
         : 0,
     visibleClanId,
     clanRankHistory,
+    lastActivityAt:
+      typeof r.lastActivityAt === 'string'
+        ? r.lastActivityAt
+        : (inputs[inputs.length - 1]?.createdAt ?? null),
     revealedAt: typeof r.revealedAt === 'string' ? r.revealedAt : null,
     lastSwitchAt: typeof r.lastSwitchAt === 'string' ? r.lastSwitchAt : null,
   };

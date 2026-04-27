@@ -102,7 +102,11 @@ export default function PersonalPhilosophyDetailScreen() {
   const clanRankHistory = isPreviewActive
     ? previewBadgeHistory
     : classification.getClanRankHistory(baseProfile.id);
-  const profile = { ...baseProfile, philosophyPercentages: realPercentages };
+  const profile = {
+    ...baseProfile,
+    philosophyPercentages: realPercentages,
+    rank: classification.getDisplayRank(baseProfile.id),
+  };
   const clanId = activeClan;
 
   // Dominant clan (highest pct)
@@ -272,6 +276,7 @@ export default function PersonalPhilosophyDetailScreen() {
             <DetailedRankCard
               dominantClanLabel={dominant.label}
               dominantPct={dominant.pct}
+              displayRank={profile.rank}
             />
 
             <View style={styles.gap} />

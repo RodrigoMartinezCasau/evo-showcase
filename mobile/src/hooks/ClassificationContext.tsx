@@ -21,6 +21,10 @@
  *   - after first reveal, clan switches require the new top clan to beat the
  *     current visible clan by SWITCH_MARGIN percentage points. The first-reveal
  *     percentage threshold does NOT apply to later reallocations.
+ *   - rank badges do not downgrade inside the same clan once Maestro/Filósofo
+ *     has been reached; a clan switch resets the badge path for the new clan.
+ *   - after 7 inactive days (no reflection or phrase), the visible badge is
+ *     temporarily Aprendiz until the user sends a new input.
  *
  * Persistence: all of the above survives reload and user switch via
  * `classificationStorage` (single AsyncStorage key, keyed by userId).
@@ -120,6 +124,10 @@ const POST_REVEAL_WEIGHT = 0.35;
  *  percentage points before we switch after the first assignment. */
 export const SWITCH_MARGIN = 5;
 
+/** Inactive users temporarily show Aprendiz until they send a new input again. */
+const INACTIVITY_RANK_DOWNGRADE_DAYS = 7;
+const INACTIVITY_RANK_DOWNGRADE_MS = INACTIVITY_RANK_DOWNGRADE_DAYS * 24 * 60 * 60 * 1000;
+
 // ── Momentum constants ────────────────────────────────────────────────────────
 
 /** Momentum activates from this input number onwards (1-indexed). */
@@ -160,6 +168,9 @@ export type ClassificationContextValue = {
 
   /** Highest rank ever reached per clan. Defaults to active user. */
   getClanRankHistory: (userId?: string) => Partial<Record<ClanScoreId, Rank>>;
+
+  /** Official rank badge to show for a user, including history + inactivity. */
+  getDisplayRank: (userId?: string) => Rank;
 
   /** Raw state for debugging / advanced screens. */
   getUserState: (userId?: string) => UserClassificationState;
@@ -255,6 +266,35 @@ function mergeClanRankRecord(
   const previous = history[clanId];
   if (previous && RANK_VALUE[previous] >= RANK_VALUE[rank]) return history;
   return { ...history, [clanId]: rank };
+}
+
+function setClanRankRecord(
+  history: Partial<Record<ClanScoreId, Rank>>,
+  clanId: ClanScoreId,
+  rank: Rank,
+): Partial<Record<ClanScoreId, Rank>> {
+  return { ...history, [clanId]: rank };
+}
+
+function isTemporarilyInactive(state: UserClassificationState, nowMs = Date.now()): boolean {
+  if (!state.lastActivityAt) return false;
+  const lastMs = Date.parse(state.lastActivityAt);
+  if (!Number.isFinite(lastMs)) return false;
+  return nowMs - lastMs >= INACTIVITY_RANK_DOWNGRADE_MS;
+}
+
+function getPersistentRankForState(state: UserClassificationState): Rank {
+  if (!state.visibleClanId) return 'aprendiz';
+  const pcts = totalsToPercentages(state.totals);
+  const percentageRank = getRankFromPct(pcts[state.visibleClanId] ?? 0);
+  const savedRank = state.clanRankHistory?.[state.visibleClanId];
+  return savedRank ?? percentageRank;
+}
+
+function getDisplayRankForState(state: UserClassificationState): Rank {
+  if (!state.visibleClanId) return 'aprendiz';
+  if (isTemporarilyInactive(state)) return 'aprendiz';
+  return getPersistentRankForState(state);
 }
 
 /**
@@ -388,12 +428,14 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
   const getClanRankHistory = useCallback(
     (userId?: string): Partial<Record<ClanScoreId, Rank>> => {
       const state = getUserStateInternal(userId);
-      const history = state.clanRankHistory ?? {};
-      if (!state.visibleClanId) return history;
+      return state.clanRankHistory ?? {};
+    },
+    [getUserStateInternal],
+  );
 
-      const pcts = totalsToPercentages(state.totals);
-      const currentRank = getRankFromPct(pcts[state.visibleClanId] ?? 0);
-      return mergeClanRankRecord(history, state.visibleClanId, currentRank);
+  const getDisplayRank = useCallback(
+    (userId?: string): Rank => {
+      return getDisplayRankForState(getUserStateInternal(userId));
     },
     [getUserStateInternal],
   );
@@ -474,14 +516,21 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
 
         const reveal = deriveVisibleClan(prevState, newTotals, totalReflectionsSent, nowIso);
         const pcts = totalsToPercentages(newTotals);
+        const switchedClan =
+          prevState.visibleClanId !== null &&
+          reveal.visibleClanId !== null &&
+          reveal.visibleClanId !== prevState.visibleClanId;
         const achievedRank = reveal.visibleClanId
           ? getRankFromPct(pcts[reveal.visibleClanId] ?? 0)
           : null;
-        const clanRankHistory = mergeClanRankRecord(
-          prevState.clanRankHistory ?? {},
-          reveal.visibleClanId,
-          achievedRank,
-        );
+        const clanRankHistory =
+          switchedClan && reveal.visibleClanId
+            ? setClanRankRecord(prevState.clanRankHistory ?? {}, reveal.visibleClanId, 'aprendiz')
+            : mergeClanRankRecord(
+                prevState.clanRankHistory ?? {},
+                reveal.visibleClanId,
+                achievedRank,
+              );
 
         const nextRecord = {
           inputId: generatedId,
@@ -499,6 +548,7 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
           totalPhrasesSent,
           visibleClanId: reveal.visibleClanId,
           clanRankHistory,
+          lastActivityAt: nowIso,
           revealedAt: reveal.revealedAt,
           lastSwitchAt: reveal.lastSwitchAt,
         };
@@ -518,9 +568,19 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
       getVisibleClanId,
       getReflectionCount,
       getClanRankHistory,
+      getDisplayRank,
       getUserState: getUserStateInternal,
     }),
-    [loading, recordInput, getPercentages, getVisibleClanId, getReflectionCount, getClanRankHistory, getUserStateInternal],
+    [
+      loading,
+      recordInput,
+      getPercentages,
+      getVisibleClanId,
+      getReflectionCount,
+      getClanRankHistory,
+      getDisplayRank,
+      getUserStateInternal,
+    ],
   );
 
   return (

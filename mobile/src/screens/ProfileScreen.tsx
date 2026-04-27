@@ -106,6 +106,7 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
   const profile = {
     ...baseProfile,
     clanId: realClanId,
+    rank: classification.getDisplayRank(userId),
     philosophyPercentages: realPercentages,
   };
 

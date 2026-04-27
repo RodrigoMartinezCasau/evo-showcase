@@ -22,7 +22,6 @@ import { AppTopBar, BottomCommunityTabs, SidebarDrawer } from '@evoconn/componen
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
-import { getRankForUser } from '@evoconn/utils/getRankFromPct';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { usePreviewMode } from '@evoconn/debug/PreviewModeContext';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
@@ -57,12 +56,11 @@ export default function PersonalProfileScreen() {
   // Replaces the seed `simUser.philosophyPercentages`. Empty array = empty
   // panel (FLOW A: brand-new user with zero reflections).
   const realPercentages = classification.getPercentages(profile.id);
-  const dominantPct = realPercentages.length > 0 ? realPercentages[0].pct : 0;
   const profileWithClan = {
     ...profile,
     clanId: activeClan,
     philosophyPercentages: realPercentages,
-    rank: getRankForUser(dominantPct, activeClan),
+    rank: classification.getDisplayRank(profile.id),
   };
 
   // ─── Personal profile shared state ────────────────────────────────
