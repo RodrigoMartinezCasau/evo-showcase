@@ -6,14 +6,13 @@ import {
   TouchableOpacity,
   StyleSheet,
   Pressable,
-  Image,
   Animated,
   Easing,
   Keyboard,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SIDEBAR_HEADER_LAYOUT as SH } from '@evoconn/constants/sidebarHeaderLayout';
-import { getStarByHouse, SIDEBAR_DEFAULT_STAR } from '@evoconn/utils/getSidebarStar';
+import { getSidebarStarSvgByHouse, SIDEBAR_DEFAULT_STAR_SVG } from '@evoconn/utils/getSidebarStarSvgByHouse';
 import { getCommunityButtonByHouse } from '@evoconn/utils/getSidebarCommunityButton';
 import { SIDEBAR_COMMUNITY_LAYOUT as SCL } from '@evoconn/constants/sidebarCommunityLayout';
 import { getNewReflectionButtonByHouse } from '@evoconn/utils/getSidebarNewReflectionButton';
@@ -120,10 +119,7 @@ export function SidebarDrawer({
     }
   }, [visible, openProgressProp]);
 
-  const starSource =
-    user.clanId != null && user.clanId !== ''
-      ? getStarByHouse(user.clanId)
-      : SIDEBAR_DEFAULT_STAR;
+  const StarSvg = getSidebarStarSvgByHouse(user.clanId);
   const communityButtonSource = getCommunityButtonByHouse(user.clanId);
   const newReflectionButtonSource = getNewReflectionButtonByHouse(user.clanId);
   const newReflectionPlusSource = getNewReflectionPlusIconByHouse(user.clanId);
@@ -160,18 +156,19 @@ export function SidebarDrawer({
           ]}
         >
           <TouchableOpacity onPress={closeSidebar} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Cerrar menú">
-            <Image
-              source={starSource}
+            <View
               style={{
                 width: SH.SIDEBAR_STAR_SIZE,
                 height: SH.SIDEBAR_STAR_SIZE,
                 transform: [
                   { translateX: SH.SIDEBAR_STAR_OFFSET_X },
                   { translateY: SH.SIDEBAR_STAR_OFFSET_Y },
+                  { scale: SH.SIDEBAR_STAR_SCALE },
                 ],
               }}
-              resizeMode="contain"
-            />
+            >
+              <StarSvg width={SH.SIDEBAR_STAR_SIZE} height={SH.SIDEBAR_STAR_SIZE} />
+            </View>
           </TouchableOpacity>
           <View
             style={[

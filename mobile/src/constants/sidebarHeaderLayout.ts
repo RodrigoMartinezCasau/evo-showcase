@@ -17,7 +17,10 @@ export const SIDEBAR_HEADER_LAYOUT = {
   SIDEBAR_HEADER_PADDING_LEFT: 16,
   SIDEBAR_HEADER_HEIGHT: 44,
 
+  /** Tamaño base del contenedor de la estrella (px). */
   SIDEBAR_STAR_SIZE: 90,
+  /** Escala uniforme aplicada sobre el tamaño base. 1 = sin cambio, 1.2 = 20% más grande. */
+  SIDEBAR_STAR_SCALE: 0.5,
   SIDEBAR_STAR_OFFSET_X: -32,
   SIDEBAR_STAR_OFFSET_Y: -10,
 
