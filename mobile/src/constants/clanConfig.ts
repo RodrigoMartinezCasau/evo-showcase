@@ -9,10 +9,12 @@
  */
 
 export type Philosopher = {
-  /** Nombre visible bajo la foto */
+  /** Nombre visible bajo el icono */
   name: string;
-  /** Iniciales para el placeholder circular */
+  /** Iniciales para el placeholder circular (se usa solo si no hay svgKey) */
   initials: string;
+  /** Clave para getPhilosopherSvg(). Si está presente se renderiza el SVG en vez del placeholder. */
+  svgKey?: string;
   /** URI de imagen opcional. Si null se muestra el placeholder de iniciales */
   imageUri?: string | null;
 };
@@ -29,10 +31,10 @@ export const CLAN_CONFIG: Record<string, ClanConfigEntry> = {
     description:
       'El nihilista no colapsa ante el vacío — lo habita. Sus miembros cuestionan cada certeza heredada y encuentran en la deconstrucción una forma radical de honestidad. No buscan consuelo en sistemas de valores absolutos. Prefieren la incomodidad de la verdad desnuda a la comodidad de una ilusión bien construida. Su potencial: ver con claridad donde otros prefieren no mirar.',
     philosophers: [
-      { name: 'Nietzsche', initials: 'N' },
-      { name: 'Cioran', initials: 'C' },
-      { name: 'Schopenhauer', initials: 'S' },
-      { name: 'Camus', initials: 'C' },
+      { name: 'Friedrich Nietzsche', initials: 'N', svgKey: 'nietzsche' },
+      { name: 'Martin Heidegger', initials: 'H', svgKey: 'heidegger' },
+      { name: 'Arthur Schopenhauer', initials: 'S', svgKey: 'schopenhauer' },
+      { name: 'Philipp Mainländer', initials: 'M', svgKey: 'mainlander' },
     ],
   },
   cientista: {
@@ -40,10 +42,10 @@ export const CLAN_CONFIG: Record<string, ClanConfigEntry> = {
     description:
       'El cientista confía en el método por encima de la intuición. Sus miembros miden, contrastan y actualizan sus creencias cuando los datos cambian. No les incomoda la incertidumbre — la abrazan como motor del conocimiento. Rechazan el dogma en todas sus formas, incluyendo el científico mal aplicado. Su potencial: tomar decisiones sin dejarse engañar por sesgos ni narrativas.',
     philosophers: [
-      { name: 'Dawkins', initials: 'D' },
-      { name: 'Sagan', initials: 'S' },
-      { name: 'Hawking', initials: 'H' },
-      { name: 'Darwin', initials: 'D' },
+      { name: 'Richard Dawkins', initials: 'D', svgKey: 'dawkins' },
+      { name: 'Carl Sagan', initials: 'S', svgKey: 'sagan' },
+      { name: 'Stephen Hawking', initials: 'H', svgKey: 'hawking' },
+      { name: 'Charles Darwin', initials: 'D', svgKey: 'darwin' },
     ],
   },
   estoico: {
@@ -51,10 +53,10 @@ export const CLAN_CONFIG: Record<string, ClanConfigEntry> = {
     description:
       'El estoico no evita el sufrimiento — lo entrena. Sus miembros distinguen con precisión lo que depende de ellos y lo que no, y actúan solo sobre lo primero. La disciplina no es un sacrificio para el estoico: es la expresión más alta de la libertad. Ante la adversidad, no preguntan "¿por qué a mí?" sino "¿qué puedo hacer con esto?". Su potencial: mantener la calma y la dirección cuando todo colapsa a su alrededor.',
     philosophers: [
-      { name: 'Marco Aurelio', initials: 'MA' },
-      { name: 'Séneca', initials: 'S' },
-      { name: 'Musashi', initials: 'M' },
-      { name: 'Epicteto', initials: 'E' },
+      { name: 'Marco Aurelio', initials: 'MA', svgKey: 'marcoaurelio' },
+      { name: 'Lucio Séneca', initials: 'S', svgKey: 'seneca' },
+      { name: 'Miyamoto Musashi', initials: 'M', svgKey: 'musashi' },
+      { name: 'Epicteto', initials: 'E', svgKey: 'epicteto' },
     ],
   },
   existencialista: {
@@ -62,10 +64,10 @@ export const CLAN_CONFIG: Record<string, ClanConfigEntry> = {
     description:
       'El existencialista rechaza la idea de una esencia predefinida. Naces sin manual y eso, lejos de ser una condena, es la mayor libertad posible. Sus miembros cargan con esa libertad de forma consciente: cada decisión es una declaración de identidad. La angustia no los paraliza — los define. Su potencial: crear significado propio allí donde otros buscan que alguien se lo dé.',
     philosophers: [
-      { name: 'Sartre', initials: 'S' },
-      { name: 'Camus', initials: 'C' },
-      { name: 'Heidegger', initials: 'H' },
-      { name: 'Kierkegaard', initials: 'K' },
+      { name: 'Jean-Paul Sartre', initials: 'S', svgKey: 'sartre' },
+      { name: 'Albert Camus', initials: 'C', svgKey: 'camus' },
+      { name: 'Simone de Beauvoir', initials: 'SB', svgKey: 'simone' },
+      { name: 'Søren Kierkegaard', initials: 'K', svgKey: 'kierkegaard' },
     ],
   },
   racionalista: {
@@ -73,10 +75,10 @@ export const CLAN_CONFIG: Record<string, ClanConfigEntry> = {
     description:
       'El racionalista construye su visión del mundo desde los primeros principios. No acepta nada por tradición ni por autoridad — solo por demostración lógica. Sus miembros tienen una relación casi íntima con la coherencia: la inconsistencia les duele como una piedra en el zapato. Son lentos para creer pero sólidos una vez convencidos. Su potencial: construir sistemas de pensamiento que resisten el tiempo y la crítica.',
     philosophers: [
-      { name: 'Descartes', initials: 'D' },
-      { name: 'Spinoza', initials: 'S' },
-      { name: 'Leibniz', initials: 'L' },
-      { name: 'Kant', initials: 'K' },
+      { name: 'René Descartes', initials: 'D', svgKey: 'descartes' },
+      { name: 'Baruch Spinoza', initials: 'S', svgKey: 'spinoza' },
+      { name: 'Gottfried Leibniz', initials: 'L', svgKey: 'nleibniz' },
+      { name: 'Immanuel Kant', initials: 'K', svgKey: 'nkant' },
     ],
   },
   humanista: {
@@ -84,10 +86,10 @@ export const CLAN_CONFIG: Record<string, ClanConfigEntry> = {
     description:
       'El humanista pone al ser humano en el centro de todo análisis. Sus miembros no separan la filosofía de la empatía: para ellos, un sistema de ideas que ignore el sufrimiento real es un sistema fallido. Creen en la dignidad como principio no negociable y en la conexión entre personas como fuente de sentido. Su potencial: construir puentes donde otros levantan muros, y encontrar lo humano en lo más oscuro.',
     philosophers: [
-      { name: 'Rousseau', initials: 'R' },
-      { name: 'Erasmo', initials: 'E' },
-      { name: 'Fromm', initials: 'F' },
-      { name: 'Maslow', initials: 'M' },
+      { name: 'Jean-Jacques Rousseau', initials: 'R', svgKey: 'rousseau' },
+      { name: 'Erasmo de Rotterdam', initials: 'E', svgKey: 'erasmo' },
+      { name: 'Erich Fromm', initials: 'F', svgKey: 'fromm' },
+      { name: 'Abraham Maslow', initials: 'M', svgKey: 'maslow' },
     ],
   },
   realista: {
@@ -95,10 +97,10 @@ export const CLAN_CONFIG: Record<string, ClanConfigEntry> = {
     description:
       'El realista no se consuela con ideales que no existen. Sus miembros ven las estructuras de poder, los incentivos reales y las limitaciones humanas con una claridad que a veces incomoda. No son cínicos — son precisos. Prefieren una verdad difícil a una esperanza vacía. Cuando toman decisiones, lo hacen sobre el terreno que hay, no el que desearían. Su potencial: actuar con efectividad en un mundo imperfecto sin perder la brújula moral.',
     philosophers: [
-      { name: 'Maquiavelo', initials: 'M' },
-      { name: 'Hobbes', initials: 'H' },
-      { name: 'Tocqueville', initials: 'T' },
-      { name: 'Weber', initials: 'W' },
+      { name: 'Nicolás Maquiavelo', initials: 'M', svgKey: 'maquiavelo' },
+      { name: 'Thomas Hobbes', initials: 'H', svgKey: 'hobbes' },
+      { name: 'Alexis de Tocqueville', initials: 'T', svgKey: 'tocqueville' },
+      { name: 'Max Weber', initials: 'W', svgKey: 'weber' },
     ],
   },
   trascendentalista: {
@@ -106,10 +108,10 @@ export const CLAN_CONFIG: Record<string, ClanConfigEntry> = {
     description:
       'El trascendentalista siente que la realidad visible es solo la superficie. Sus miembros buscan capas más profundas de sentido — en la naturaleza, en la conciencia, en lo que la ciencia aún no puede medir. No son irracionales: son sensibles a dimensiones de la experiencia que otros pasan por alto. La intuición, la belleza y el asombro son datos válidos para ellos. Su potencial: conectar lo cotidiano con algo mayor y encontrar sentido donde otros solo ven azar.',
     philosophers: [
-      { name: 'Emerson', initials: 'E' },
-      { name: 'Thoreau', initials: 'T' },
-      { name: 'Jung', initials: 'J' },
-      { name: 'Plotino', initials: 'P' },
+      { name: 'Ralph W. Emerson', initials: 'E', svgKey: 'emerson' },
+      { name: 'Henry D. Thoreau', initials: 'T', svgKey: 'thoreau' },
+      { name: 'Carl Jung', initials: 'J', svgKey: 'jung' },
+      { name: 'Plotino', initials: 'P', svgKey: 'fuller' },
     ],
   },
 };

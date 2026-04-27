@@ -1,17 +1,24 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import type { Philosopher } from '@evoconn/constants/clanConfig';
+import { getPhilosopherSvg } from '@evoconn/utils/getPhilosopherSvg';
 
 type Props = {
   philosopher: Philosopher;
   accentColor: string;
 };
 
+const PHOTO_SIZE = 68;
+
 export function ClanPhilosopherSlot({ philosopher, accentColor }: Props) {
+  const SvgIcon = philosopher.svgKey ? getPhilosopherSvg(philosopher.svgKey) : null;
+
   return (
     <View style={styles.slot}>
       <View style={styles.photoWrap}>
-        {philosopher.imageUri ? (
+        {SvgIcon != null ? (
+          <SvgIcon width={PHOTO_SIZE} height={PHOTO_SIZE} />
+        ) : philosopher.imageUri ? (
           <Image
             source={{ uri: philosopher.imageUri }}
             style={[styles.photo, { borderColor: accentColor }]}
@@ -32,8 +39,6 @@ export function ClanPhilosopherSlot({ philosopher, accentColor }: Props) {
   );
 }
 
-const PHOTO_SIZE = 68;
-
 const styles = StyleSheet.create({
   slot: {
     flex: 1,
@@ -43,6 +48,8 @@ const styles = StyleSheet.create({
   photoWrap: {
     alignItems: 'center',
     justifyContent: 'center',
+    width: PHOTO_SIZE,
+    height: PHOTO_SIZE,
   },
   photo: {
     width: PHOTO_SIZE,
