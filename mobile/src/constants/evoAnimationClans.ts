@@ -26,13 +26,16 @@ export interface AnimClanData {
   label: string;
   primary: string;
   secondary: string;
+  /** Color oscuro del fondo para StreakAnimation (distinto del secondary claro del perfil) */
+  streakBg: string;
   idleDurationMs: number;
   streakMsg: string;
   /** SVG component de estrellasPrincipales (17–25) — renderizar como <StarComponent /> */
   StarComponent: FC<SidebarEstrellaSvgProps>;
   /** SVG component del fueguito topbar */
   FireComponent: FC<TopBarFueguitoSvgProps>;
-  animalAsset: null;
+  /** PNG del animal del clan — usar con <Image source={animalAsset} /> */
+  animalAsset: ReturnType<typeof require> | null;
 }
 
 const NO_CLAN_PRIMARY = '#c7ff02';
@@ -44,6 +47,7 @@ export const ANIM_CLANS: Record<AnimClanId, AnimClanData> = {
     label: 'Sin clan',
     primary: NO_CLAN_PRIMARY,
     secondary: NO_CLAN_SECONDARY,
+    streakBg: '#30007a',
     idleDurationMs: 3000,
     streakMsg: 'Sigue reflexionando cada día.',
     StarComponent: getSidebarEstrellaByHouse(null),
@@ -55,88 +59,96 @@ export const ANIM_CLANS: Record<AnimClanId, AnimClanData> = {
     label: 'Nihilista',
     primary: getClanColor('nihilista'),
     secondary: getClanSecondaryColor('nihilista'),
+    streakBg: '#2a2720',
     idleDurationMs: 2800,
     streakMsg: 'El vacío no te ha detenido.',
     StarComponent: getSidebarEstrellaByHouse('nihilista'),
     FireComponent: getTopBarFueguitoByHouse('nihilista'),
-    animalAsset: null,
+    animalAsset: require('../assets/animals/nihilista.png'),
   },
   cientista: {
     id: 'cientista',
     label: 'Cientista',
     primary: getClanColor('cientista'),
     secondary: getClanSecondaryColor('cientista'),
+    streakBg: '#0d2e30',
     idleDurationMs: 3200,
     streakMsg: 'Un día más de evidencia acumulada.',
     StarComponent: getSidebarEstrellaByHouse('cientista'),
     FireComponent: getTopBarFueguitoByHouse('cientista'),
-    animalAsset: null,
+    animalAsset: require('../assets/animals/cientista.png'),
   },
   estoico: {
     id: 'estoico',
     label: 'Estoico',
     primary: getClanColor('estoico'),
     secondary: getClanSecondaryColor('estoico'),
+    streakBg: '#222610',
     idleDurationMs: 3600,
     streakMsg: 'La constancia es la única virtud real.',
     StarComponent: getSidebarEstrellaByHouse('estoico'),
     FireComponent: getTopBarFueguitoByHouse('estoico'),
-    animalAsset: null,
+    animalAsset: require('../assets/animals/estoico.png'),
   },
   existencialista: {
     id: 'existencialista',
     label: 'Existencialista',
     primary: getClanColor('existencialista'),
     secondary: getClanSecondaryColor('existencialista'),
+    streakBg: '#2e0a0a',
     idleDurationMs: 1600,
     streakMsg: 'Otro día eligiéndote a ti mismo.',
     StarComponent: getSidebarEstrellaByHouse('existencialista'),
     FireComponent: getTopBarFueguitoByHouse('existencialista'),
-    animalAsset: null,
+    animalAsset: require('../assets/animals/existencialista.png'),
   },
   trascendentalista: {
     id: 'trascendentalista',
     label: 'Trascendentalista',
     primary: getClanColor('trascendentalista'),
     secondary: getClanSecondaryColor('trascendentalista'),
+    streakBg: '#260f40',
     idleDurationMs: 4000,
     streakMsg: 'Tu camino interior continúa.',
     StarComponent: getSidebarEstrellaByHouse('trascendentalista'),
     FireComponent: getTopBarFueguitoByHouse('trascendentalista'),
-    animalAsset: null,
+    animalAsset: require('../assets/animals/trascendentalista.png'),
   },
   humanista: {
     id: 'humanista',
     label: 'Humanista',
     primary: getClanColor('humanista'),
     secondary: getClanSecondaryColor('humanista'),
+    streakBg: '#2e1900',
     idleDurationMs: 2400,
     streakMsg: 'Cada día más conectado.',
     StarComponent: getSidebarEstrellaByHouse('humanista'),
     FireComponent: getTopBarFueguitoByHouse('humanista'),
-    animalAsset: null,
+    animalAsset: require('../assets/animals/humanista.png'),
   },
   realista: {
     id: 'realista',
     label: 'Realista',
     primary: getClanColor('realista'),
     secondary: getClanSecondaryColor('realista'),
+    streakBg: '#18191e',
     idleDurationMs: 2200,
     streakMsg: 'Un día más con los pies en la tierra.',
     StarComponent: getSidebarEstrellaByHouse('realista'),
     FireComponent: getTopBarFueguitoByHouse('realista'),
-    animalAsset: null,
+    animalAsset: require('../assets/animals/realista.png'),
   },
   racionalista: {
     id: 'racionalista',
     label: 'Racionalista',
     primary: getClanColor('racionalista'),
     secondary: getClanSecondaryColor('racionalista'),
+    streakBg: '#0a1240',
     idleDurationMs: 3400,
     streakMsg: 'La razón no toma días libres.',
     StarComponent: getSidebarEstrellaByHouse('racionalista'),
     FireComponent: getTopBarFueguitoByHouse('racionalista'),
-    animalAsset: null,
+    animalAsset: require('../assets/animals/racionalista.png'),
   },
 };
 

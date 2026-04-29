@@ -1,38 +1,24 @@
-/**
- * ClanEntryAnimation
- *
- * Variante A — Sin clan (clanId === null | 'none'):
- *   Estrella base fade-in → círculo de 8 estrellas → giro acelerado → zoom fill
- *
- * Variante B — Con clan:
- *   Estrella base → estrella del clan (blur dissolve) → animal → flash fill
- *
- * Uso típico en la sesión de tabs:
- *   const [done, setDone] = useState(false);
- *   if (!done) return <ClanEntryAnimation clanId={userClan} onComplete={() => setDone(true)} />;
- */
+// EVO — ClanEntryAnimation.tsx
+// Pantalla de entrada al abrir la app. Dos variantes:
+//   - Sin clan: estrella base → 8 estrellas en círculo → giro → zoom fill
+//   - Con clan:  estrella base → estrella del clan → zoom out → animal → flash
 
-import React, { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Image, StyleSheet, Dimensions } from 'react-native';
 import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  Easing,
-  cancelAnimation,
+  useSharedValue, useAnimatedStyle,
+  withTiming, Easing, cancelAnimation,
 } from 'react-native-reanimated';
-
+import Svg, { Defs, RadialGradient, Stop, Circle as SvgCircle } from 'react-native-svg';
 import {
-  ANIM_CLANS,
-  ANIM_CLAN_IDS,
-  CIRCLE_POSITIONS,
+  ANIM_CLANS, ANIM_CLAN_IDS, CIRCLE_POSITIONS,
   type AnimClanId,
 } from '../../constants/evoAnimationClans';
 
 const { width: W, height: H } = Dimensions.get('window');
 
-// ─── Star field ───────────────────────────────────────────────────────────────
-function StarField({ seed = 0 }: { seed?: number }) {
+// ─── Tiny star field ─────────────────────────────────────────────────────────
+function StarField({ seed = 0 }) {
   const stars = React.useMemo(() => {
     const rng = (i: number) => {
       const x = Math.sin((i + seed) * 9999) * 10000;
@@ -45,55 +31,78 @@ function StarField({ seed = 0 }: { seed?: number }) {
       opacity: 0.15 + rng(i * 4) * 0.4,
     }));
   }, [seed]);
-
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       {stars.map((s, i) => (
-        <View
-          key={i}
-          style={{
-            position: 'absolute',
-            left: `${s.x}%` as `${number}%`,
-            top: `${s.y}%` as `${number}%`,
-            width: s.size,
-            height: s.size,
-            borderRadius: s.size / 2,
-            backgroundColor: '#fff',
-            opacity: s.opacity,
-          }}
-        />
+        <View key={i} style={{
+          position: 'absolute',
+          left: `${s.x}%` as any,
+          top: `${s.y}%` as any,
+          width: s.size, height: s.size,
+          borderRadius: s.size / 2,
+          backgroundColor: '#fff',
+          opacity: s.opacity,
+        }} />
       ))}
     </View>
   );
 }
 
-// ─── Variante A — Sin clan ────────────────────────────────────────────────────
-function NoClanEntry({
-  onComplete,
-  runKey = 0,
-}: {
-  onComplete?: () => void;
-  runKey?: number;
+// ─── SVG radial glow helper ──────────────────────────────────────────────────
+function RadialGlow({ size, color, id }: { size: number; color: string; id: string }) {
+  return (
+    <Svg width={size} height={size} style={{ position: 'absolute' }}>
+      <Defs>
+        <RadialGradient id={id} cx="50%" cy="50%" r="50%">
+          <Stop offset="0%"   stopColor={color} stopOpacity="0.55" />
+          <Stop offset="60%"  stopColor={color} stopOpacity="0.18" />
+          <Stop offset="100%" stopColor={color} stopOpacity="0" />
+        </RadialGradient>
+      </Defs>
+      <SvgCircle cx="50%" cy="50%" r="50%" fill={`url(#${id})`} />
+    </Svg>
+  );
+}
+
+// ─── Star wrapped with radial glow ───────────────────────────────────────────
+function StarWithGlow({ size, color, id, children }: {
+  size: number; color: string; id: string; children: React.ReactNode;
 }) {
-  const baseOp = useSharedValue(0);
+  const glowSize = size * 1.8;
+  const offset   = (glowSize - size) / 2;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ position: 'absolute', left: -offset, top: -offset, width: glowSize, height: glowSize }}>
+        <RadialGlow size={glowSize} color={color} id={id} />
+      </View>
+      {children}
+    </View>
+  );
+}
+
+// ─── No-clan animation ────────────────────────────────────────────────────────
+function NoClanEntry({ onComplete, runKey = 0 }: { onComplete?: () => void; runKey?: number }) {
+  const clan = ANIM_CLANS.none;
+  const BaseStar = clan.StarComponent;
+
+  const baseOp    = useSharedValue(0);
   const baseScale = useSharedValue(1);
-  const starsOp = useSharedValue(0);
+  const starsOp    = useSharedValue(0);
   const starsScale = useSharedValue(0.15);
 
   const circleRotation = useRef(0);
-  const circleViewRef = useRef<View>(null);
-  const rafRef = useRef<ReturnType<typeof requestAnimationFrame> | null>(null);
+  const circleRot      = useSharedValue(0);
+  const rafRef         = useRef<number>(0);
 
   useEffect(() => {
-    baseOp.value = withTiming(1, {
-      duration: 800,
-      easing: Easing.out(Easing.ease),
-    });
+    baseOp.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.ease) });
 
     const t1 = setTimeout(() => {
-      baseOp.value = withTiming(0, { duration: 800 });
-      baseScale.value = withTiming(1.6, { duration: 800 });
-      starsOp.value = withTiming(1, { duration: 557 });
+      cancelAnimation(baseOp); cancelAnimation(baseScale);
+      cancelAnimation(starsOp); cancelAnimation(starsScale);
+      baseOp.value     = withTiming(0, { duration: 800 });
+      baseScale.value  = withTiming(1.6, { duration: 800 });
+      starsOp.value    = withTiming(1, { duration: 557 });
       starsScale.value = withTiming(1, { duration: 435 });
     }, 1113);
 
@@ -101,23 +110,16 @@ function NoClanEntry({
       const start = Date.now();
       const spin = () => {
         const elapsed = (Date.now() - start) / 1000;
-        circleRotation.current +=
-          (0.3 + (5 - 0.3) * Math.min(elapsed / 2.7, 1)) * 0.36;
-        if (circleViewRef.current) {
-          (circleViewRef.current as unknown as { setNativeProps: (s: object) => void }).setNativeProps({
-            style: { transform: [{ rotate: `${circleRotation.current}deg` }] },
-          });
-        }
+        circleRotation.current += (0.3 + (5 - 0.3) * Math.min(elapsed / 2.7, 1)) * 0.36;
+        circleRot.value = circleRotation.current;
         if (elapsed < 2.7) {
           rafRef.current = requestAnimationFrame(spin);
         } else {
           setTimeout(() => {
-            starsScale.value = withTiming(5, {
-              duration: 1739,
-              easing: Easing.in(Easing.ease),
-            });
-            starsOp.value = withTiming(0, { duration: 1200 });
-            setTimeout(() => onComplete?.(), 1800);
+            cancelAnimation(starsScale); cancelAnimation(starsOp);
+            starsScale.value = withTiming(5, { duration: 1739, easing: Easing.in(Easing.ease) });
+            starsOp.value    = withTiming(0, { duration: 1200 });
+            setTimeout(() => { onComplete && onComplete(); }, 1800);
           }, 521);
         }
       };
@@ -125,13 +127,15 @@ function NoClanEntry({
     }, 1809);
 
     return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+      clearTimeout(t1); clearTimeout(t2);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      cancelAnimation(baseOp); cancelAnimation(baseScale);
+      cancelAnimation(starsOp); cancelAnimation(starsScale);
+      cancelAnimation(circleRot);
     };
   }, [runKey]);
 
-  const baseStyle = useAnimatedStyle(() => ({
+  const baseStyle  = useAnimatedStyle(() => ({
     opacity: baseOp.value,
     transform: [{ scale: baseScale.value }],
   }));
@@ -139,103 +143,124 @@ function NoClanEntry({
     opacity: starsOp.value,
     transform: [{ scale: starsScale.value }],
   }));
+  const circleRotStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${circleRot.value}deg` }],
+  }));
 
   return (
     <View style={styles.root}>
       <StarField seed={1} />
 
-      {/* Base star (sin clan) */}
+      {/* Radial center glow */}
+      <View pointerEvents="none" style={styles.centerGlow}>
+        <RadialGlow size={460} color={clan.primary} id="nc_base_glow" />
+      </View>
+
+      {/* Base star */}
       <Animated.View style={[styles.center, baseStyle]}>
-        {React.createElement(ANIM_CLANS.none.StarComponent, { width: 180, height: 180 })}
+        <StarWithGlow size={180} color={clan.primary} id="nc_base_star">
+          <BaseStar width={180} height={180} />
+        </StarWithGlow>
       </Animated.View>
 
-      {/* 8 clan stars in circle */}
+      {/* 8 clan stars in circle — rotation via shared value */}
       <Animated.View style={[styles.center, starsStyle]}>
-        <View ref={circleViewRef} style={{ transform: [{ rotate: '0deg' }] }}>
+        <Animated.View style={circleRotStyle}>
           {ANIM_CLAN_IDS.map((id, i) => {
-            const { StarComponent } = ANIM_CLANS[id];
+            const c = ANIM_CLANS[id];
             const pos = CIRCLE_POSITIONS[i];
+            const S = c.StarComponent;
             return (
-              <View
-                key={id}
-                style={[styles.circleItem, { left: pos.x - 33, top: pos.y - 33 }]}
-              >
-                <StarComponent width={66} height={66} />
+              <View key={id} style={[styles.circleItem, { left: pos.x - 33, top: pos.y - 33 }]}>
+                <StarWithGlow size={66} color={c.primary} id={`nc_sm_${id}`}>
+                  <S width={66} height={66} />
+                </StarWithGlow>
               </View>
             );
           })}
-        </View>
+        </Animated.View>
       </Animated.View>
     </View>
   );
 }
 
-// ─── Variante B — Con clan ────────────────────────────────────────────────────
-function WithClanEntry({
-  clanId,
-  onComplete,
-  runKey = 0,
-}: {
-  clanId: Exclude<AnimClanId, 'none'>;
-  onComplete?: () => void;
-  runKey?: number;
+// ─── With-clan animation ──────────────────────────────────────────────────────
+function WithClanEntry({ clanId, onComplete, runKey = 0 }: {
+  clanId: Exclude<AnimClanId, 'none'>; onComplete?: () => void; runKey?: number;
 }) {
-  const c = ANIM_CLANS[clanId] ?? ANIM_CLANS.estoico;
+  const c = ANIM_CLANS[clanId] || ANIM_CLANS.estoico;
+  const BaseStar = ANIM_CLANS.none.StarComponent;
+  const ClanStar = c.StarComponent;
 
-  const baseOp = useSharedValue(0);
-  const clanOp = useSharedValue(0);
+  const baseOp    = useSharedValue(0);
+  const clanOp    = useSharedValue(0);
   const clanScale = useSharedValue(0.9);
-  const bgOp = useSharedValue(0);
+  const animalOp    = useSharedValue(0);
+  const animalScale = useSharedValue(0.15);
+  const bgOp    = useSharedValue(0);
   const flashOp = useSharedValue(0);
+  const auraOp  = useSharedValue(0);
 
   useEffect(() => {
-    baseOp.value = 0;
-    clanOp.value = 0;
-    clanScale.value = 0.9;
-    bgOp.value = 0;
-    flashOp.value = 0;
+    baseOp.value = 0; clanOp.value = 0; clanScale.value = 0.9;
+    animalOp.value = 0; animalScale.value = 0.15;
+    bgOp.value = 0; flashOp.value = 0; auraOp.value = 0;
 
     baseOp.value = withTiming(1, { duration: 800 });
 
     const t1 = setTimeout(() => {
-      baseOp.value = withTiming(0, { duration: 800 });
-      clanOp.value = withTiming(1, { duration: 720 });
-      clanScale.value = withTiming(1, {
-        duration: 880,
-        easing: Easing.out(Easing.ease),
-      });
-      bgOp.value = withTiming(0.3, { duration: 800 });
+      cancelAnimation(baseOp);
+      cancelAnimation(clanOp); cancelAnimation(clanScale); cancelAnimation(bgOp);
+      baseOp.value    = withTiming(0, { duration: 800 });
+      clanOp.value    = withTiming(1, { duration: 720 });
+      clanScale.value = withTiming(1, { duration: 880, easing: Easing.out(Easing.ease) });
+      bgOp.value      = withTiming(0.30, { duration: 800 });
     }, 1280);
 
     const t2 = setTimeout(() => {
-      clanOp.value = withTiming(0, { duration: 720 });
-      clanScale.value = withTiming(0, {
-        duration: 880,
-        easing: Easing.in(Easing.ease),
-      });
-      bgOp.value = withTiming(0.42, { duration: 600 });
+      cancelAnimation(clanOp); cancelAnimation(clanScale); cancelAnimation(bgOp);
+      clanOp.value    = withTiming(0, { duration: 720 });
+      clanScale.value = withTiming(0, { duration: 880, easing: Easing.in(Easing.ease) });
+      bgOp.value      = withTiming(0.42, { duration: 600 });
     }, 2560);
 
-    // No animal assets yet — skip to flash phase early
     const t3 = setTimeout(() => {
-      bgOp.value = withTiming(1, { duration: 400 });
-      flashOp.value = withTiming(0.65, { duration: 400 });
+      cancelAnimation(animalOp); cancelAnimation(animalScale); cancelAnimation(auraOp);
+      animalOp.value    = withTiming(1, { duration: 640 });
+      animalScale.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.back(1.2)) });
+      auraOp.value      = withTiming(1, { duration: 600 });
+    }, 3600);
+
+    const t4 = setTimeout(() => {
+      cancelAnimation(animalScale); cancelAnimation(animalOp);
+      cancelAnimation(bgOp); cancelAnimation(flashOp); cancelAnimation(auraOp);
+      animalScale.value = withTiming(3.0, { duration: 560, easing: Easing.in(Easing.ease) });
+      animalOp.value    = withTiming(0, { duration: 400 });
+      bgOp.value        = withTiming(1, { duration: 400 });
+      flashOp.value     = withTiming(0.65, { duration: 400 });
+      auraOp.value      = withTiming(0, { duration: 300 });
     }, 5600);
 
-    const t4 = setTimeout(() => onComplete?.(), 6160);
+    const t5 = setTimeout(() => { onComplete && onComplete(); }, 6160);
 
     return () => {
-      [t1, t2, t3, t4].forEach(clearTimeout);
+      [t1, t2, t3, t4, t5].forEach(clearTimeout);
+      cancelAnimation(baseOp); cancelAnimation(clanOp); cancelAnimation(clanScale);
+      cancelAnimation(animalOp); cancelAnimation(animalScale);
+      cancelAnimation(bgOp); cancelAnimation(flashOp); cancelAnimation(auraOp);
     };
   }, [runKey, clanId]);
 
-  const baseStyle = useAnimatedStyle(() => ({ opacity: baseOp.value }));
-  const clanStyle = useAnimatedStyle(() => ({
-    opacity: clanOp.value,
-    transform: [{ scale: clanScale.value }],
+  const baseStyle   = useAnimatedStyle(() => ({ opacity: baseOp.value }));
+  const clanStyle   = useAnimatedStyle(() => ({
+    opacity: clanOp.value, transform: [{ scale: clanScale.value }],
   }));
-  const bgStyle = useAnimatedStyle(() => ({ opacity: bgOp.value }));
+  const animalStyle = useAnimatedStyle(() => ({
+    opacity: animalOp.value, transform: [{ scale: animalScale.value }],
+  }));
+  const bgStyle    = useAnimatedStyle(() => ({ opacity: bgOp.value }));
   const flashStyle = useAnimatedStyle(() => ({ opacity: flashOp.value }));
+  const auraStyle  = useAnimatedStyle(() => ({ opacity: auraOp.value }));
 
   return (
     <View style={styles.root}>
@@ -243,50 +268,57 @@ function WithClanEntry({
 
       {/* Clan background fill */}
       <Animated.View
-        style={[
-          StyleSheet.absoluteFill,
-          { backgroundColor: c.primary },
-          bgStyle,
-        ]}
+        style={[StyleSheet.absoluteFill, { backgroundColor: c.primary }, bgStyle]}
         pointerEvents="none"
       />
 
+      {/* Radial center glow */}
+      <View pointerEvents="none" style={styles.centerGlow}>
+        <RadialGlow size={460} color={c.primary} id={`wc_cg_${c.id}`} />
+      </View>
+
+      {/* Animal aura + image */}
+      {c.animalAsset && (
+        <Animated.View style={[styles.centerAnimal, animalStyle]}>
+          {/* SVG aura behind animal */}
+          <Animated.View style={[{ position: 'absolute', left: -40, top: -40 }, auraStyle]}>
+            <RadialGlow size={400} color={c.primary} id={`wc_aa_${c.id}`} />
+          </Animated.View>
+          <Image source={c.animalAsset} style={styles.animalImg} resizeMode="contain" />
+        </Animated.View>
+      )}
+
       {/* Base star */}
       <Animated.View style={[styles.center, baseStyle]}>
-        {React.createElement(ANIM_CLANS.none.StarComponent, { width: 180, height: 180 })}
+        <StarWithGlow size={180} color={ANIM_CLANS.none.primary} id={`wc_bs_${c.id}`}>
+          <BaseStar width={180} height={180} />
+        </StarWithGlow>
       </Animated.View>
 
       {/* Clan star */}
       <Animated.View style={[styles.center, clanStyle]}>
-        {React.createElement(c.StarComponent, { width: 180, height: 180 })}
+        <StarWithGlow size={180} color={c.primary} id={`wc_cs_${c.id}`}>
+          <ClanStar width={180} height={180} />
+        </StarWithGlow>
       </Animated.View>
 
       {/* Flash */}
       <Animated.View
-        style={[
-          StyleSheet.absoluteFill,
-          { backgroundColor: c.primary },
-          flashStyle,
-        ]}
+        style={[StyleSheet.absoluteFill, { backgroundColor: c.primary }, flashStyle]}
         pointerEvents="none"
       />
     </View>
   );
 }
 
-// ─── Public API ───────────────────────────────────────────────────────────────
-export interface ClanEntryAnimationProps {
+// ─── Public wrapper ───────────────────────────────────────────────────────────
+export default function ClanEntryAnimation({
+  clanId, onComplete, runKey = 0,
+}: {
   clanId: AnimClanId | null;
   onComplete?: () => void;
-  /** Increment to re-run the animation from the start */
   runKey?: number;
-}
-
-export default function ClanEntryAnimation({
-  clanId,
-  onComplete,
-  runKey = 0,
-}: ClanEntryAnimationProps) {
+}) {
   if (!clanId || clanId === 'none') {
     return <NoClanEntry onComplete={onComplete} runKey={runKey} />;
   }
@@ -310,16 +342,27 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: W / 2 - 90,
     top: H / 2 - 90,
-    width: 180,
-    height: 180,
+    width: 180, height: 180,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  centerAnimal: {
+    position: 'absolute',
+    left: W / 2 - 160,
+    top: H / 2 - 160,
+    width: 320, height: 320,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  centerGlow: {
+    position: 'absolute',
+    left: W / 2 - 230,
+    top: H / 2 - 230,
+    width: 460, height: 460,
+  },
+  animalImg: { width: 320, height: 320 },
   circleItem: {
     position: 'absolute',
-    width: 66,
-    height: 66,
+    width: 66, height: 66,
   },
-  starLg: { width: 180, height: 180 },
-  starSm: { width: 66, height: 66 },
 });

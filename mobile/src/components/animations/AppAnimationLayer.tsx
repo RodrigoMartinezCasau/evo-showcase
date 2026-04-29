@@ -1,61 +1,85 @@
 /**
  * AppAnimationLayer
  *
- * Overlay global que se renderiza encima del Stack completo (en _layout.tsx).
- * Responsabilidades:
- *   1. Detecta cuando `streakDays` sube → muestra StreakAnimation.
+ * Global overlay rendered above the full Stack (in _layout.tsx).
+ * Manages all app-level animation triggers via WebView.
  *
- * Uso en _layout.tsx:
- *   <AppAnimationLayer />   ← renderizado DESPUÉS del <Stack>
+ * Triggers:
+ *   - App launch       → clan-entry animation (every launch, with user's actual clan)
+ *   - streakDays rises → streak animation
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-
+import { EvoAnimationWebView, ensureAnimationAssets } from './EvoAnimationWebView';
 import { useDebugStats } from '@evoconn/debug/DebugStatsContext';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 
-import StreakAnimation from './StreakAnimation';
-import type { AnimClanId } from '../../constants/evoAnimationClans';
-
 export default function AppAnimationLayer() {
   const { streakDays, statsLoaded } = useDebugStats();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
+  const clanId = (activeClan ?? 'none') as string;
 
-  const [showStreak, setShowStreak] = useState(false);
-  const [streakForAnim, setStreakForAnim] = useState(1);
-
-  // Persiste el valor previo de streakDays para detectar subidas
-  const prevStreakRef = useRef<number | null>(null);
+  // Assets must be ready before we show any animation (avoids showing the spinner)
+  const [assetsReady, setAssetsReady] = useState(false);
+  // Entry animation: shown once assets are ready
+  const [showEntry, setShowEntry] = useState(false);
 
   useEffect(() => {
-    // Esperar a que los stats estén cargados antes de comparar
+    ensureAnimationAssets()
+      .then(() => {
+        setAssetsReady(true);
+        setShowEntry(true);
+      })
+      .catch(() => {
+        // If copy fails, skip entry animation gracefully
+        setAssetsReady(true);
+      });
+  }, []);
+
+  // Streak animation
+  const [showStreak, setShowStreak] = useState(false);
+  const [streakCount, setStreakCount] = useState(1);
+  const [prevStreakCount, setPrevStreakCount] = useState(0);
+
+  const prevStreakRef = useRef<number | null>(null);
+
+  // ── Streak trigger ──────────────────────────────────────────────────────
+  useEffect(() => {
     if (!statsLoaded) return;
-
     const prev = prevStreakRef.current;
-
-    if (prev === null) {
-      // Primera vez que cargamos los stats — guardamos sin disparar
-      prevStreakRef.current = streakDays;
-      return;
-    }
-
+    if (prev === null) { prevStreakRef.current = streakDays; return; }
     if (streakDays > prev) {
-      // La racha subió → lanzar animación
-      setStreakForAnim(streakDays);
-      setShowStreak(true);
+      setPrevStreakCount(prev);
+      setStreakCount(streakDays);
+      if (assetsReady && !showEntry) setShowStreak(true);
     }
-
     prevStreakRef.current = streakDays;
-  }, [streakDays, statsLoaded]);
-
-  if (!showStreak) return null;
+  }, [streakDays, statsLoaded, showEntry, assetsReady]);
 
   return (
-    <StreakAnimation
-      clanId={(activeClan ?? 'none') as AnimClanId}
-      streakCount={streakForAnim}
-      onClose={() => setShowStreak(false)}
-    />
+    <>
+      {/* ── Entry animation (plays on every launch) ── */}
+      <EvoAnimationWebView
+        visible={showEntry}
+        name="clanEntry"
+        params={{ clanId }}
+        onComplete={() => setShowEntry(false)}
+        onClose={() => setShowEntry(false)}
+      />
+
+      {/* ── Streak animation ── */}
+      <EvoAnimationWebView
+        visible={showStreak}
+        name="streak"
+        params={{
+          clanId,
+          streakCount,
+          previousStreakCount: prevStreakCount,
+        }}
+        onComplete={() => setShowStreak(false)}
+        onClose={() => setShowStreak(false)}
+      />
+    </>
   );
 }
