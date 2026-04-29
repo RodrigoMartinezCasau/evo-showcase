@@ -21,7 +21,7 @@ import {
   Platform,
 } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Asset } from 'expo-asset';
 import * as Haptics from 'expo-haptics';
 
@@ -74,9 +74,8 @@ export async function ensureAnimationAssets(): Promise<void> {
   if (_copyPromise) return _copyPromise;
 
   _copyPromise = (async () => {
-    // Use a version stamp to re-copy when app is updated
     const STAMP_FILE = ANIM_DIR + '.stamp';
-    const APP_VERSION = '1'; // bump this to force re-copy after an update
+    const APP_VERSION = '3';
 
     try {
       const stampInfo = await FileSystem.getInfoAsync(STAMP_FILE);
@@ -132,6 +131,9 @@ export async function ensureAnimationAssets(): Promise<void> {
     } catch {}
   })();
 
+  // Reset on rejection so the next call can retry instead of returning a stuck promise
+  _copyPromise.catch(() => { _copyPromise = null; });
+
   return _copyPromise;
 }
 
@@ -175,14 +177,18 @@ export function EvoAnimationWebView({
   // Resolve local URI when visible
   useEffect(() => {
     if (!visible) return;
+    let cancelled = false;
     ensureAnimationAssets()
       .then(() => {
-        setHtmlUri(ANIM_DIR + HTML_FILENAMES[name]);
+        if (!cancelled) setHtmlUri(ANIM_DIR + HTML_FILENAMES[name]);
       })
       .catch((e) => {
         if (__DEV__) console.warn('[EvoAnim] ensureAnimationAssets failed:', e);
+        // Close the modal instead of staying stuck on the loading spinner
+        if (!cancelled) onClose?.();
       });
-  }, [visible, name]);
+    return () => { cancelled = true; };
+  }, [visible, name, onClose]);
 
   // Build query string (fallback for Android webviews that strip query on file:// URIs)
   const queryString = useMemo(() => {
