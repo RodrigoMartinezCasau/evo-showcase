@@ -75,7 +75,7 @@ export async function ensureAnimationAssets(): Promise<void> {
 
   _copyPromise = (async () => {
     const STAMP_FILE = ANIM_DIR + '.stamp';
-    const APP_VERSION = '19';
+    const APP_VERSION = '25';
 
     try {
       const stampInfo = await FileSystem.getInfoAsync(STAMP_FILE);
