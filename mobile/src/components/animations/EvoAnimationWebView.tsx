@@ -75,7 +75,7 @@ export async function ensureAnimationAssets(): Promise<void> {
 
   _copyPromise = (async () => {
     const STAMP_FILE = ANIM_DIR + '.stamp';
-    const APP_VERSION = '33';
+    const APP_VERSION = '34';
 
     try {
       const stampInfo = await FileSystem.getInfoAsync(STAMP_FILE);
@@ -162,6 +162,53 @@ type Props = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+// ─── Asset inlining ────────────────────────────────────────────────────────────
+// iOS WKWebView loaded with loadHTMLString:baseURL: does NOT grant access to
+// subdirectories (e.g. assets/). The only 100 % reliable cross-platform fix is
+// to replace every  assets/foo.svg / assets/foo.png  reference inside the HTML
+// string with an inline data URI before the WebView ever sees it.
+//
+// SVGs → already in SVG_DATA (bundled JS module, zero filesystem access needed).
+// PNGs → read from ASSETS_DIR as base64 (copied there by ensureAnimationAssets).
+
+async function buildInlinedHtml(name: EvoAnimationName): Promise<string> {
+  let html = await FileSystem.readAsStringAsync(ANIM_DIR + HTML_FILENAMES[name]);
+
+  // 1. Replace SVG references using the in-memory SVG_DATA map.
+  html = html.replace(/(['"`])assets\/([\w.\-]+\.svg)\1/g, (match, q, filename) => {
+    const svg = SVG_DATA[filename];
+    if (!svg) return match;
+    return `${q}data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}${q}`;
+  });
+
+  // 2. Collect unique PNG filenames referenced in this HTML.
+  const pngNames = new Set<string>();
+  const pngScan = /['"`]assets\/([\w.\-]+\.png)['"`]/g;
+  let m: RegExpExecArray | null;
+  while ((m = pngScan.exec(html)) !== null) pngNames.add(m[1]);
+
+  // 3. Read each PNG as base64 and build a lookup map.
+  const pngData: Record<string, string> = {};
+  for (const filename of pngNames) {
+    try {
+      const b64 = await FileSystem.readAsStringAsync(ASSETS_DIR + filename, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      pngData[filename] = `data:image/png;base64,${b64}`;
+    } catch (e) {
+      if (__DEV__) console.warn(`[EvoAnim] PNG inline failed for ${filename}:`, e);
+    }
+  }
+
+  // 4. Replace PNG references with data URIs.
+  html = html.replace(/(['"`])assets\/([\w.\-]+\.png)\1/g, (match, q, filename) => {
+    const uri = pngData[filename];
+    return uri ? `${q}${uri}${q}` : match;
+  });
+
+  return html;
+}
+
 export function EvoAnimationWebView({
   visible,
   name,
@@ -172,36 +219,24 @@ export function EvoAnimationWebView({
   enableHaptics = true,
 }: Props) {
   const webRef = useRef<WebView>(null);
-  const [htmlUri, setHtmlUri] = useState<string | null>(null);
+  const [htmlContent, setHtmlContent] = useState<string | null>(null);
 
-  // Resolve local URI when visible
   useEffect(() => {
-    if (!visible) return;
+    if (!visible) { setHtmlContent(null); return; }
     let cancelled = false;
     ensureAnimationAssets()
-      .then(() => {
-        if (!cancelled) setHtmlUri(ANIM_DIR + HTML_FILENAMES[name]);
+      .then(() => buildInlinedHtml(name))
+      .then((content) => {
+        if (!cancelled) setHtmlContent(content);
       })
       .catch((e) => {
-        if (__DEV__) console.warn('[EvoAnim] ensureAnimationAssets failed:', e);
-        // Close the modal instead of staying stuck on the loading spinner
+        if (__DEV__) console.warn('[EvoAnim] failed to build HTML:', e);
         if (!cancelled) onClose?.();
       });
     return () => { cancelled = true; };
   }, [visible, name, onClose]);
 
-  // Build query string (fallback for Android webviews that strip query on file:// URIs)
-  const queryString = useMemo(() => {
-    const usp = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => {
-      if (v == null) return;
-      if (typeof v === 'object') usp.set(k, JSON.stringify(v));
-      else usp.set(k, String(v));
-    });
-    return usp.toString();
-  }, [params]);
-
-  // Inject props as window.EVO_PROPS before the page loads — most reliable method
+  // Inject props as window.EVO_PROPS before the page loads — most reliable method.
   const injectedBeforeLoad = useMemo(
     () => `window.EVO_PROPS = ${JSON.stringify(params)}; true;`,
     [params],
@@ -248,10 +283,6 @@ export function EvoAnimationWebView({
 
   if (!visible) return null;
 
-  const uriWithQuery = htmlUri
-    ? `${htmlUri}${queryString ? '?' + queryString : ''}`
-    : null;
-
   return (
     <Modal
       visible={visible}
@@ -261,10 +292,12 @@ export function EvoAnimationWebView({
       onRequestClose={onClose}
     >
       <View style={styles.root}>
-        {uriWithQuery ? (
+        {htmlContent ? (
           <WebView
             ref={webRef}
-            source={{ uri: uriWithQuery }}
+            // All asset references (SVGs + PNGs) are already inlined as data
+            // URIs inside htmlContent, so no baseUrl or file:// access is needed.
+            source={{ html: htmlContent }}
             originWhitelist={['*']}
             allowFileAccess
             allowFileAccessFromFileURLs

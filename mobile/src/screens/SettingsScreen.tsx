@@ -326,7 +326,7 @@ function ProfileHeader() {
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-export default function SettingsScreen() {
+export default function SettingsScreen({ onLogout }: { onLogout?: () => void }) {
   const router                    = useRouter();
   const insets                    = useSafeAreaInsets();
   const { height: screenH }       = useWindowDimensions();
@@ -381,16 +381,12 @@ export default function SettingsScreen() {
     );
   }, []);
 
-  const confirmLogout = useCallback(() => {
-    Alert.alert(
-      'Cerrar sesión',
-      '¿Quieres cerrar tu sesión actual?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Cerrar sesión', style: 'destructive', onPress: () => Alert.alert('Próximamente', 'Auth en desarrollo.') },
-      ],
-    );
+  const defaultLogout = useCallback(() => {
+    Alert.alert('Cerrar sesión', '¿Quieres cerrar tu sesión actual?', [
+      { text: 'Cancelar', style: 'cancel' },
+    ]);
   }, []);
+  const confirmLogout = onLogout ?? defaultLogout;
 
   // Subscription rows all show this message (no backend, no navigation).
   const showSubscriptionAlert = useCallback(() => {

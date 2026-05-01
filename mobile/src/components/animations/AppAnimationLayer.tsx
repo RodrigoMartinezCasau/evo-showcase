@@ -22,6 +22,14 @@ import type { Rank } from '@evoconn/types';
 
 const RANK_ORDER: Record<Rank, number> = { aprendiz: 0, maestro: 1, filosofo: 2 };
 
+// Module-level setter so login/signup screens can trigger the entry animation
+// from outside the React tree without needing a shared context.
+let _requestEntry: (() => void) | null = null;
+
+export function requestEntryAnimation() {
+  _requestEntry?.();
+}
+
 export default function AppAnimationLayer() {
   const { streakDays, statsLoaded } = useDebugStats();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
@@ -43,6 +51,15 @@ export default function AppAnimationLayer() {
         setAssetsReady(true);
       });
   }, []);
+
+  // Register the module-level trigger so login/signup screens can replay the
+  // entry animation after a successful sign-in.
+  useEffect(() => {
+    _requestEntry = () => {
+      if (assetsReady) setShowEntry(true);
+    };
+    return () => { _requestEntry = null; };
+  }, [assetsReady]);
 
   // ── Streak animation ────────────────────────────────────────────────────
   const [showStreak, setShowStreak] = useState(false);
