@@ -58,6 +58,15 @@ export default function AppAnimationLayer() {
     return () => { _requestEntry = null; };
   }, [assetsReady]);
 
+  // Safety net: if the WebView never sends the 'complete' message (e.g. because
+  // of a JS error inside the HTML in production), force-close after 12 s so the
+  // overlay can never block the UI permanently.
+  useEffect(() => {
+    if (!showEntry) return;
+    const t = setTimeout(() => setShowEntry(false), 12000);
+    return () => clearTimeout(t);
+  }, [showEntry]);
+
   // ── Streak animation ────────────────────────────────────────────────────
   const [showStreak, setShowStreak] = useState(false);
   const [streakCount, setStreakCount] = useState(1);
