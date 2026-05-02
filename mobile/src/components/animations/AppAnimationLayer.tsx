@@ -14,6 +14,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { EvoAnimationWebView, ensureAnimationAssets } from './EvoAnimationWebView';
+import { setEntryAnimPlaying } from '../../../mobile/lib/animationState';
 import { useDebugStats } from '@evoconn/debug/DebugStatsContext';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
@@ -30,6 +31,12 @@ let _requestEntry: (() => void) | null = null;
 let _entryQueued = false;
 
 export function requestEntryAnimation() {
+  // Signal the guard IMMEDIATELY (synchronous) in ALL code paths so that
+  // React 18 can batch this with any pending state update in the same call
+  // stack. This prevents (tabs)/_layout.tsx from ever rendering community
+  // content before the animation modal has a chance to cover it.
+  setEntryAnimPlaying(true);
+
   if (_requestEntry) {
     _requestEntry();
   } else {
@@ -60,8 +67,14 @@ export default function AppAnimationLayer() {
   // entry animation after a successful sign-in.
   useEffect(() => {
     _requestEntry = () => {
-      if (assetsReady) setShowEntry(true);
-      else pendingEntryRef.current = true;
+      if (assetsReady) {
+        setShowEntry(true);
+      } else {
+        // Assets still loading — queue and keep the guard signal active until
+        // the drain effect fires (which will call setShowEntry(true) and
+        // trigger the useEffect([showEntry]) → setEntryAnimPlaying(true) path).
+        pendingEntryRef.current = true;
+      }
     };
     return () => { _requestEntry = null; };
   }, [assetsReady]);
@@ -74,6 +87,12 @@ export default function AppAnimationLayer() {
       setShowEntry(true);
     }
   }, [assetsReady]);
+
+  // Tell (tabs)/_layout.tsx to keep showing StarFieldBackground while the
+  // entry animation is active (prevents community-screen flash before Modal mounts).
+  useEffect(() => {
+    setEntryAnimPlaying(showEntry);
+  }, [showEntry]);
 
   // Safety net: if the WebView never sends 'complete' (JS error in HTML in
   // production), force-close after 12 s so the modal can never block the UI.

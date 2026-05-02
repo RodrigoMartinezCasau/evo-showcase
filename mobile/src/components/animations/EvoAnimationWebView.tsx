@@ -16,14 +16,14 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Modal,
   StyleSheet,
-  View,
-  Platform,
+  Animated,
 } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Asset } from 'expo-asset';
 import * as Haptics from 'expo-haptics';
 import StarFieldBackground from './StarFieldBackground';
+import { setEntryAnimPlaying } from '../../../mobile/lib/animationState';
 
 // ─── Asset map ─────────────────────────────────────────────────────────────────
 // HTML files are bundled as raw assets (assetExts includes 'html').
@@ -75,7 +75,7 @@ export async function ensureAnimationAssets(): Promise<void> {
 
   _copyPromise = (async () => {
     const STAMP_FILE = ANIM_DIR + '.stamp';
-    const APP_VERSION = '34';
+    const APP_VERSION = '35';
 
     try {
       const stampInfo = await FileSystem.getInfoAsync(STAMP_FILE);
@@ -221,8 +221,35 @@ export function EvoAnimationWebView({
   const webRef = useRef<WebView>(null);
   const [htmlContent, setHtmlContent] = useState<string | null>(null);
 
+  // Opacity of the WebView layer. Starts at 0 so the static starfield shows
+  // through, then fades to 1 once the WebView has finished painting — making
+  // the transition from static → animated stars invisible.
+  const webOpacity = useRef(new Animated.Value(0)).current;
+
+  // Reset webOpacity every time the animation is shown.
   useEffect(() => {
-    if (!visible) { setHtmlContent(null); return; }
+    if (visible) {
+      webOpacity.setValue(0);
+      setHtmlContent(null);
+    }
+  }, [visible, webOpacity]);
+
+  // Called when the animation signals completion (or is closed).
+  // Releases the entry guard immediately (so the community screen renders
+  // behind the now-transparent modal), then calls the callback so the modal
+  // unmounts. The HTML flash (opacity 1 white) is still covering everything
+  // at this moment — it acts as the visual wipe so the switch to community
+  // is imperceptible.
+  const closeAndCall = useCallback(
+    (callback?: (extra?: unknown) => void, extra?: unknown) => {
+      setEntryAnimPlaying(false);
+      callback?.(extra);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!visible) return;
     let cancelled = false;
     ensureAnimationAssets()
       .then(() => buildInlinedHtml(name))
@@ -235,6 +262,16 @@ export function EvoAnimationWebView({
       });
     return () => { cancelled = true; };
   }, [visible, name, onClose]);
+
+  const handleWebLoadEnd = useCallback(() => {
+    // Once the WebView has painted its first frame, fade it in so the user
+    // never sees a white flash or hard swap from the starfield.
+    Animated.timing(webOpacity, {
+      toValue: 1,
+      duration: 350,
+      useNativeDriver: true,
+    }).start();
+  }, [webOpacity]);
 
   // Inject props as window.EVO_PROPS before the page loads — most reliable method.
   const injectedBeforeLoad = useMemo(
@@ -268,17 +305,20 @@ export function EvoAnimationWebView({
           }
           break;
         case 'complete':
-          onComplete?.(msg);
+          // The HTML flash is still at opacity 1 when this fires — it acts as
+          // the visual wipe. Close immediately so the community appears as the
+          // flash covers the transition.
+          closeAndCall(onComplete, msg);
           break;
         case 'close':
-          onClose?.();
+          closeAndCall(onClose);
           break;
         case 'error':
           if (__DEV__) console.warn('[EvoAnimation:' + name + ']', msg.message);
           break;
       }
     },
-    [enableHaptics, name, onComplete, onClose, onPhase],
+    [enableHaptics, closeAndCall, name, onComplete, onClose, onPhase],
   );
 
   if (!visible) return null;
@@ -287,48 +327,53 @@ export function EvoAnimationWebView({
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType="none"
       statusBarTranslucent
-      onRequestClose={onClose}
+      onRequestClose={() => closeAndCall(onClose)}
     >
-      <View style={styles.root}>
-        {htmlContent ? (
-          <WebView
-            ref={webRef}
-            // All asset references (SVGs + PNGs) are already inlined as data
-            // URIs inside htmlContent, so no baseUrl or file:// access is needed.
-            source={{ html: htmlContent }}
-            originWhitelist={['*']}
-            allowFileAccess
-            allowFileAccessFromFileURLs
-            allowUniversalAccessFromFileURLs
-            javaScriptEnabled
-            domStorageEnabled
-            mixedContentMode="always"
-            scrollEnabled={false}
-            bounces={false}
-            overScrollMode="never"
-            androidLayerType="hardware"
-            setSupportMultipleWindows={false}
-            injectedJavaScriptBeforeContentLoaded={injectedBeforeLoad}
-            onMessage={onMessage}
-            style={styles.web}
-          />
-        ) : (
-          // While the HTML is being inlined / WebView is loading, show the
-          // same starfield background as the animation itself so there is no
-          // visible "loading" gap.
-          <View style={styles.loading}>
-            <StarFieldBackground />
-          </View>
+      <Animated.View style={styles.root}>
+        {/*
+          Layer 1 — Static starfield. Always visible while the modal is open.
+          Serves as both the loading state and the seamless base for the animation
+          (same dark background color + star style).
+        */}
+        <StarFieldBackground />
+
+        {/*
+          Layer 2 — WebView animation. Rendered on top once htmlContent is ready,
+          but starts fully transparent. Fades to opacity 1 on onLoadEnd, so the
+          transition from static stars → animated stars is imperceptible.
+        */}
+        {htmlContent && (
+          <Animated.View style={[StyleSheet.absoluteFill, { opacity: webOpacity }]}>
+            <WebView
+              ref={webRef}
+              source={{ html: htmlContent }}
+              originWhitelist={['*']}
+              allowFileAccess
+              allowFileAccessFromFileURLs
+              allowUniversalAccessFromFileURLs
+              javaScriptEnabled
+              domStorageEnabled
+              mixedContentMode="always"
+              scrollEnabled={false}
+              bounces={false}
+              overScrollMode="never"
+              androidLayerType="hardware"
+              setSupportMultipleWindows={false}
+              injectedJavaScriptBeforeContentLoaded={injectedBeforeLoad}
+              onMessage={onMessage}
+              onLoadEnd={handleWebLoadEnd}
+              style={styles.web}
+            />
+          </Animated.View>
         )}
-      </View>
+      </Animated.View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  root:    { flex: 1, backgroundColor: '#0f0f12' },
-  web:     { flex: 1, backgroundColor: '#0f0f12' },
-  loading: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0f0f12' },
+  root: { flex: 1, backgroundColor: '#0f0f12' },
+  web:  { flex: 1, backgroundColor: '#0f0f12' },
 });
