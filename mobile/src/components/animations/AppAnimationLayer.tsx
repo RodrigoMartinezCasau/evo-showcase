@@ -23,11 +23,18 @@ import type { Rank } from '@evoconn/types';
 const RANK_ORDER: Record<Rank, number> = { aprendiz: 0, maestro: 1, filosofo: 2 };
 
 // Module-level setter so login/signup screens can trigger the entry animation
-// from outside the React tree without needing a shared context.
+// from outside the React tree without needing a shared context. We also keep
+// a "queued" flag so a request fired BEFORE the layer mounts (e.g. during
+// initial AuthGate routing) still plays once we are ready.
 let _requestEntry: (() => void) | null = null;
+let _entryQueued = false;
 
 export function requestEntryAnimation() {
-  _requestEntry?.();
+  if (_requestEntry) {
+    _requestEntry();
+  } else {
+    _entryQueued = true;
+  }
 }
 
 export default function AppAnimationLayer() {
@@ -40,10 +47,10 @@ export default function AppAnimationLayer() {
   const [assetsReady, setAssetsReady] = useState(false);
   // Entry animation: shown once assets are ready
   const [showEntry, setShowEntry] = useState(false);
+  // If a request was queued before we mounted, remember it
+  const pendingEntryRef = useRef(_entryQueued);
 
   useEffect(() => {
-    // Pre-load assets in the background. Entry animation is now handled by
-    // ClanEntryAnimation (React Native) in (tabs)/_layout.tsx — no WebView delay.
     ensureAnimationAssets()
       .then(() => setAssetsReady(true))
       .catch(() => setAssetsReady(true));
@@ -54,13 +61,22 @@ export default function AppAnimationLayer() {
   useEffect(() => {
     _requestEntry = () => {
       if (assetsReady) setShowEntry(true);
+      else pendingEntryRef.current = true;
     };
     return () => { _requestEntry = null; };
   }, [assetsReady]);
 
-  // Safety net: if the WebView never sends the 'complete' message (e.g. because
-  // of a JS error inside the HTML in production), force-close after 12 s so the
-  // overlay can never block the UI permanently.
+  // Drain queued request (from before mount, or before assets ready)
+  useEffect(() => {
+    if (assetsReady && (pendingEntryRef.current || _entryQueued)) {
+      pendingEntryRef.current = false;
+      _entryQueued = false;
+      setShowEntry(true);
+    }
+  }, [assetsReady]);
+
+  // Safety net: if the WebView never sends 'complete' (JS error in HTML in
+  // production), force-close after 12 s so the modal can never block the UI.
   useEffect(() => {
     if (!showEntry) return;
     const t = setTimeout(() => setShowEntry(false), 12000);
