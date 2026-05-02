@@ -17,13 +17,13 @@ import {
   Modal,
   StyleSheet,
   View,
-  ActivityIndicator,
   Platform,
 } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Asset } from 'expo-asset';
 import * as Haptics from 'expo-haptics';
+import StarFieldBackground from './StarFieldBackground';
 
 // ─── Asset map ─────────────────────────────────────────────────────────────────
 // HTML files are bundled as raw assets (assetExts includes 'html').
@@ -315,8 +315,11 @@ export function EvoAnimationWebView({
             style={styles.web}
           />
         ) : (
+          // While the HTML is being inlined / WebView is loading, show the
+          // same starfield background as the animation itself so there is no
+          // visible "loading" gap.
           <View style={styles.loading}>
-            <ActivityIndicator color="#c7ff02" size="large" />
+            <StarFieldBackground />
           </View>
         )}
       </View>
