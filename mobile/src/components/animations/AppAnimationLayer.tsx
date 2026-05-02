@@ -42,14 +42,11 @@ export default function AppAnimationLayer() {
   const [showEntry, setShowEntry] = useState(false);
 
   useEffect(() => {
+    // Pre-load assets in the background. Entry animation is now handled by
+    // ClanEntryAnimation (React Native) in (tabs)/_layout.tsx — no WebView delay.
     ensureAnimationAssets()
-      .then(() => {
-        setAssetsReady(true);
-        setShowEntry(true);
-      })
-      .catch(() => {
-        setAssetsReady(true);
-      });
+      .then(() => setAssetsReady(true))
+      .catch(() => setAssetsReady(true));
   }, []);
 
   // Register the module-level trigger so login/signup screens can replay the

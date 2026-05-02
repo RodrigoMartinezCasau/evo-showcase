@@ -263,15 +263,22 @@ function SettingsSection({ section, toggleState, onToggleChange }: SectionProps)
 
 // ─── Profile header ───────────────────────────────────────────────────────────
 
-function ProfileHeader() {
+function ProfileHeader({
+  username,
+  rank: rawRank,
+}: {
+  username: string;
+  rank: string;
+}) {
   const activeClan  = useActiveClan(mockCurrentUser.clanId);
   const ProfileIcon = useMemo(() => getClanProfileByHouse(activeClan), [activeClan]);
   const { visibleClanId } = useClassification();
   const effectiveClan = visibleClanId ?? activeClan;
   const clanColor     = effectiveClan ? CLAN_TO_COLOR[effectiveClan as keyof typeof CLAN_TO_COLOR] ?? null : null;
 
-  const rank = mockCurrentUser.rank
-    ? mockCurrentUser.rank.charAt(0).toUpperCase() + mockCurrentUser.rank.slice(1)
+  const displayName = username || mockCurrentUser.username;
+  const rank = rawRank
+    ? rawRank.charAt(0).toUpperCase() + rawRank.slice(1)
     : 'Aprendiz';
 
   return (
@@ -280,7 +287,6 @@ function ProfileHeader() {
       activeOpacity={0.8}
       onPress={() => Alert.alert('Próximamente', 'El editor de perfil está en desarrollo.')}
     >
-      {/* Avatar — clan SVG replaces the initial letter */}
       <View style={styles.avatarWrap}>
         <View style={[
           styles.avatar,
@@ -306,13 +312,12 @@ function ProfileHeader() {
         </View>
       </View>
 
-      {/* Info */}
       <View style={styles.profileInfo}>
-        <Text style={styles.profileName}>{mockCurrentUser.username}</Text>
+        <Text style={styles.profileName}>{displayName}</Text>
         <Text style={styles.profileHandle}>
-          {mockCurrentUser.username.startsWith('@')
-            ? mockCurrentUser.username.toLowerCase()
-            : `@${mockCurrentUser.username.toLowerCase()}`}
+          {displayName.startsWith('@')
+            ? displayName.toLowerCase()
+            : `@${displayName.toLowerCase()}`}
         </Text>
         <View style={styles.rankBadge}>
           <Text style={styles.rankText}>{rank}</Text>
@@ -326,7 +331,17 @@ function ProfileHeader() {
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-export default function SettingsScreen({ onLogout }: { onLogout?: () => void }) {
+export default function SettingsScreen({
+  onLogout,
+  userEmail,
+  userUsername,
+  userRank,
+}: {
+  onLogout?: () => void;
+  userEmail?: string;
+  userUsername?: string;
+  userRank?: string;
+}) {
   const router                    = useRouter();
   const insets                    = useSafeAreaInsets();
   const { height: screenH }       = useWindowDimensions();
@@ -403,7 +418,7 @@ export default function SettingsScreen({ onLogout }: { onLogout?: () => void }) 
       id: 'account',
       title: 'CUENTA',
       rows: [
-        { id: 'email',   label: 'Correo electrónico', value: 'rodrigo@evoconn.app', icon: 'mail-outline',        iconBg: IC.blue,  type: 'navigate' },
+        { id: 'email',   label: 'Correo electrónico', value: userEmail || '—',      icon: 'mail-outline',        iconBg: IC.blue,  type: 'info' },
         { id: 'phone',   label: 'Teléfono',           value: 'No vinculado',        icon: 'call-outline',        iconBg: IC.blue,  type: 'navigate' },
         { id: 'pass',    label: 'Contraseña y seguridad',                           icon: 'lock-closed-outline', iconBg: IC.slate, type: 'navigate' },
         { id: 'linked',  label: 'Cuentas vinculadas',  subtitle: 'Google, Apple…',  icon: 'link-outline',        iconBg: IC.gray,  type: 'navigate' },
@@ -503,7 +518,10 @@ export default function SettingsScreen({ onLogout }: { onLogout?: () => void }) 
           <Text style={styles.pageTitle}>Ajustes</Text>
 
           {/* ── Profile header (clan SVG avatar) ── */}
-          <ProfileHeader />
+          <ProfileHeader
+            username={userUsername || mockCurrentUser.username}
+            rank={userRank || mockCurrentUser.rank || 'aprendiz'}
+          />
 
           {/* ── Dynamic sections ── */}
           {SECTIONS.map((section) => (
