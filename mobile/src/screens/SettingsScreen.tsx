@@ -333,11 +333,15 @@ function ProfileHeader({
 
 export default function SettingsScreen({
   onLogout,
+  onDeleteAccount,
+  deletingAccount,
   userEmail,
   userUsername,
   userRank,
 }: {
   onLogout?: () => void;
+  onDeleteAccount?: () => void;
+  deletingAccount?: boolean;
   userEmail?: string;
   userUsername?: string;
   userRank?: string;
@@ -385,16 +389,10 @@ export default function SettingsScreen({
 
   const usesLeft = mockUserStats.dailyUsesLeft;
 
-  const confirmDeleteAccount = useCallback(() => {
-    Alert.alert(
-      'Eliminar cuenta',
-      '¿Estás seguro de que quieres eliminar tu cuenta? Esta acción es irreversible.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Eliminar', style: 'destructive', onPress: () => Alert.alert('Próximamente', 'Función en desarrollo.') },
-      ],
-    );
+  const fallbackDeleteAccount = useCallback(() => {
+    Alert.alert('Eliminar cuenta', 'Función no disponible.');
   }, []);
+  const confirmDeleteAccount = onDeleteAccount ?? fallbackDeleteAccount;
 
   const defaultLogout = useCallback(() => {
     Alert.alert('Cerrar sesión', '¿Quieres cerrar tu sesión actual?', [
@@ -462,7 +460,7 @@ export default function SettingsScreen({
         { id: 'download',  label: 'Descargar mis datos',                            icon: 'download-outline',  iconBg: IC.slate, type: 'action' },
         { id: 'pub-prof',  label: 'Perfil público', subtitle: 'Visible para todos', icon: 'eye-outline',       iconBg: IC.gray,  type: 'toggle', onToggleKey: 'publicProfile' },
         // Mostrar estadísticas removed.
-        { id: 'delete',    label: 'Eliminar cuenta',                                icon: 'trash-outline',     iconBg: IC.red,   type: 'danger', onPress: confirmDeleteAccount },
+        { id: 'delete',    label: deletingAccount ? 'Eliminando…' : 'Eliminar cuenta', icon: 'trash-outline', iconBg: IC.red, type: 'danger', onPress: confirmDeleteAccount },
       ],
     },
     {

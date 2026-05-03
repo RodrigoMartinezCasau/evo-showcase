@@ -37,6 +37,7 @@ import {
 } from '@evoconn/components/personalProfile';
 import { ProfileDetailPanel } from '@evoconn/components/ProfileDetailPanel';
 import { usePersonalProfile } from '@evoconn/hooks/PersonalProfileContext';
+import { useAuth } from '../../mobile/lib/AuthContext';
 import type { CommunityPost } from '@evoconn/types';
 
 const ANIM_DURATION = 200;
@@ -45,6 +46,7 @@ export default function PersonalProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width: screenW, height: screenH } = useWindowDimensions();
+  const { profile: authProfile } = useAuth();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { thoughts } = useThoughts();
@@ -53,14 +55,17 @@ export default function PersonalProfileScreen() {
 
   const profile = getPersonalProfile();
   // Real per-user philosophical percentages from the classification engine.
-  // Replaces the seed `simUser.philosophyPercentages`. Empty array = empty
-  // panel (FLOW A: brand-new user with zero reflections).
   const realPercentages = classification.getPercentages(profile.id);
+  // Overlay Supabase identity fields so real users see their own data,
+  // not the rodrigomartinez simulation fallback.
   const profileWithClan = {
     ...profile,
     clanId: activeClan,
     philosophyPercentages: realPercentages,
     rank: classification.getDisplayRank(profile.id),
+    insigniaPhrase: authProfile?.insignia_phrase ?? profile.insigniaPhrase,
+    totalReflections: authProfile?.total_reflections ?? profile.totalReflections,
+    totalQuotes: authProfile?.total_quotes ?? profile.totalQuotes,
   };
 
   // ─── Personal profile shared state ────────────────────────────────

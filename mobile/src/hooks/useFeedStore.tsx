@@ -15,12 +15,17 @@ import React, {
 import type { CommunityPost, PhrasePost, User, VoteStats } from '../types';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { SIM_USERS_BY_ID, type SimPost } from '@evoconn/data/simulation/simulatedNetwork';
+import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { useNotifications } from '@evoconn/hooks/NotificationsContext';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function simPostToCommunityPost(p: SimPost): CommunityPost {
-  const author = SIM_USERS_BY_ID[p.authorId];
+  const simAuthor = SIM_USERS_BY_ID[p.authorId];
+  // Fall back to the mutable mockCurrentUser when the authorId is a real
+  // Supabase UUID (not in the 9-user simulation). This covers posts published
+  // by the authenticated user during the current session.
+  const author = simAuthor ?? (p.authorId === mockCurrentUser.id ? mockCurrentUser : undefined);
   return {
     id: p.id,
     type: p.type,

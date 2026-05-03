@@ -1,10 +1,12 @@
-import React, { useCallback, useState, useRef, useMemo } from 'react';
+import React, { useCallback, useState, useRef, useMemo, useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet, Animated, Easing, useWindowDimensions } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { mockCurrentUser, mockUserStats } from '@evoconn/data/mockUser';
-import { getOtherUserProfileOrFallback } from '@evoconn/data/mockOtherUsers';
+import { getOtherUserProfile } from '@evoconn/data/mockOtherUsers';
+import type { OtherUserProfile } from '@evoconn/data/mockOtherUsers';
+import { supabase } from '../../mobile/lib/supabase';
 import { AppTopBar, RankBadge, ClanBanner, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
@@ -90,8 +92,51 @@ function OwnProfileView() {
 }
 
 function OtherUserProfileView({ userId, router }: { userId: string; router: ReturnType<typeof useRouter> }) {
+  // Try the 9-user simulation first; if not found, fetch from Supabase.
+  const mockProfile = getOtherUserProfile(userId);
+  const [supabaseProfile, setSupabaseProfile] = useState<OtherUserProfile | null>(null);
+
+  useEffect(() => {
+    if (mockProfile || !userId) return;
+    supabase
+      .from('profiles')
+      .select('id, username, clan_id, rank, insignia_phrase, total_reflections, total_quotes')
+      .eq('id', userId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          setSupabaseProfile({
+            id: data.id,
+            username: '@' + (data.username ?? '').toUpperCase(),
+            clanId: data.clan_id ?? null,
+            rank: data.rank ?? 'aprendiz',
+            followersCount: 0,
+            followingCount: 0,
+            insigniaPhrase: data.insignia_phrase ?? '',
+            philosophyPercentages: [],
+            totalReflections: data.total_reflections ?? 0,
+            totalQuotes: data.total_quotes ?? 0,
+            recentPosts: [],
+          });
+        }
+      });
+  }, [userId, mockProfile]);
+
   // Static profile data (username, rank, insignia, etc.)
-  const baseProfile = getOtherUserProfileOrFallback(userId);
+  // Falls back to supabaseProfile for real users, or first mock user as last resort.
+  const baseProfile = mockProfile ?? supabaseProfile ?? {
+    id: userId,
+    username: '?',
+    clanId: null,
+    rank: 'aprendiz' as const,
+    followersCount: 0,
+    followingCount: 0,
+    insigniaPhrase: '',
+    philosophyPercentages: [],
+    totalReflections: 0,
+    totalQuotes: 0,
+    recentPosts: [],
+  };
 
   // Live posts from the simulation so "Últimas publicaciones" reflects any newly
   // published reflections/phrases and never goes stale after a reload or user switch.

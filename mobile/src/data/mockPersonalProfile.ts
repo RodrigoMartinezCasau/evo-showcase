@@ -98,7 +98,30 @@ function simPostToCommunityPost(p: SimPost, authorUser: SimUser): CommunityPost 
  */
 export function getPersonalProfile(): PersonalProfile {
   const currentUser = getCurrentUser();
-  const simUser = SIM_USERS_BY_ID[currentUser.id] ?? SIM_USERS[0];
+  const simUser = SIM_USERS_BY_ID[currentUser.id];
+
+  // Real Supabase user — not in the 9-user simulation. Build a PersonalProfile
+  // directly from the mutable currentUser object (kept in sync by AuthContext
+  // via setActiveSimUser) so the screen shows the correct identity.
+  if (!simUser) {
+    return {
+      id: currentUser.id,
+      username: currentUser.username,
+      clanId: currentUser.clanId,
+      rank: currentUser.rank,
+      followersCount: currentUser.followersCount,
+      followingCount: currentUser.followingCount,
+      insigniaPhrase: '',
+      philosophyPercentages: [],
+      totalReflections: 0,
+      totalQuotes: 0,
+      recentPosts: [],
+      friends: [],
+      savedPosts: [],
+      followers: [],
+      following: [],
+    };
+  }
 
   const myPosts: CommunityPost[] = SIM_POSTS
     .filter(p => p.authorId === simUser.id)
