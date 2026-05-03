@@ -5,34 +5,16 @@
  * Generation endpoints each consume 1 daily use (enforced by backend middleware).
  * GET /philosophy-profile/{userId} is free (no usage counted).
  */
-import { Platform } from 'react-native';
+import { getDefaultApiUrl, mergeApiHeaders } from './apiRuntimeConfig';
 
-// ─── Base URL (identical setup to debateApi.ts) ──────────────────────────────
-function stripTrailingSlash(url: string): string {
-  return url.replace(/\/$/, '');
-}
-
-const _fromEnv =
-  typeof process !== 'undefined' && process.env.EXPO_PUBLIC_API_URL
-    ? String(process.env.EXPO_PUBLIC_API_URL).trim()
-    : '';
-
-const _defaultUrl = _fromEnv
-  ? stripTrailingSlash(_fromEnv)
-  : Platform.select({ android: 'http://10.0.2.2:8000', default: 'http://127.0.0.1:8000' });
-
-let _apiUrl: string = _defaultUrl ?? 'http://127.0.0.1:8000';
+let _apiUrl: string = getDefaultApiUrl();
 
 export function setPhilApiBaseUrl(url: string) {
   _apiUrl = url.replace(/\/$/, '');
 }
 
-const TESTER_API_KEY: string | undefined = undefined;
-
 function makeHeaders(extra?: Record<string, string>): Record<string, string> {
-  const h: Record<string, string> = { 'Content-Type': 'application/json', ...extra };
-  if (TESTER_API_KEY) h['x-api-key'] = TESTER_API_KEY;
-  return h;
+  return mergeApiHeaders({ 'Content-Type': 'application/json', ...extra });
 }
 
 async function parseError(res: Response): Promise<string> {

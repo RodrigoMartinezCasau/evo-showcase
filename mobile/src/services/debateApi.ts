@@ -2,7 +2,6 @@
  * Mobile debate API client — ported from frontend/app/debate/api.ts.
  * Talks to the same FastAPI backend (POST /debates, POST /debates/{id}/chat, etc.).
  */
-import { Platform } from 'react-native';
 import type {
   DebateListItem,
   DebateMessage,
@@ -11,31 +10,15 @@ import type {
   FullDebate,
   SendMessageResponse,
 } from '@evoconn/types/debate';
+import { getDefaultApiUrl, mergeApiHeaders } from './apiRuntimeConfig';
 
 /**
  * Backend base URL.
- * - Optional override (physical device, otra red): `EXPO_PUBLIC_API_URL` en `mobile/mobile/.env`
- *   Ej: EXPO_PUBLIC_API_URL=http://192.168.1.42:8000 — reinicia Expo tras cambiarlo.
- * - iOS simulator: 127.0.0.1 works (shares host network).
- * - Android emulator: 10.0.2.2 maps to host loopback.
+ * @see `./apiRuntimeConfig` — EXPO_PUBLIC_API_URL / EXPO_PUBLIC_API_KEY
+ * (TestFlight needs a public HTTPS URL).
  */
-function stripTrailingSlash(url: string): string {
-  return url.replace(/\/$/, '');
-}
 
-const fromEnv =
-  typeof process !== 'undefined' && process.env.EXPO_PUBLIC_API_URL
-    ? String(process.env.EXPO_PUBLIC_API_URL).trim()
-    : '';
-
-const DEFAULT_API_URL = fromEnv
-  ? stripTrailingSlash(fromEnv)
-  : Platform.select({
-      android: 'http://10.0.2.2:8000',
-      default: 'http://127.0.0.1:8000',
-    });
-
-let _apiUrl: string = DEFAULT_API_URL;
+let _apiUrl: string = getDefaultApiUrl();
 
 export function setApiBaseUrl(url: string) {
   _apiUrl = url.replace(/\/$/, '');
@@ -45,20 +28,11 @@ export function getApiBaseUrl(): string {
   return _apiUrl;
 }
 
-const TESTER_API_KEY: string | undefined = undefined;
-
 function withApiKey(init?: RequestInit & { requestId?: string }): RequestInit {
   const { requestId, ...rest } = init ?? {};
-  const headers: Record<string, string> = {
-    ...(rest?.headers as Record<string, string> | undefined),
-  };
-  if (TESTER_API_KEY) {
-    headers['x-api-key'] = TESTER_API_KEY;
-  }
-  if (requestId) {
-    headers['x-request-id'] = requestId;
-  }
-  return { ...rest, headers };
+  const base = mergeApiHeaders(rest?.headers as Record<string, string> | undefined);
+  if (requestId) base['x-request-id'] = requestId;
+  return { ...rest, headers: base };
 }
 
 async function getApiErrorMessage(res: Response): Promise<string> {

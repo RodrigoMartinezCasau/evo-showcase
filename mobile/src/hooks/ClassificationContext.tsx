@@ -39,8 +39,6 @@ import React, {
   useState,
   type ReactNode,
 } from 'react';
-import { Platform } from 'react-native';
-import { useSimulation } from './SimulationContext';
 import {
   ALL_CLAN_IDS,
   CLAN_LABELS,
@@ -51,6 +49,7 @@ import {
   type ClanScores,
   type InputType,
 } from '@evoconn/services/clanClassifier';
+import { useSimulation } from './SimulationContext';
 import {
   loadClassificationDb,
   saveClassificationDb,
@@ -59,21 +58,14 @@ import {
   type ClassificationDatabase,
   type UserClassificationState,
 } from '@evoconn/services/classificationStorage';
+import { getDefaultApiUrl, mergeApiHeaders } from '@evoconn/services/apiRuntimeConfig';
 import { getRankFromPct } from '@evoconn/utils/getRankFromPct';
 import type { Rank } from '@evoconn/types';
 
 // ─── Backend URL helper ──────────────────────────────────────────────────────
 
 function _getApiBaseUrl(): string {
-  const fromEnv =
-    typeof process !== 'undefined' && process.env.EXPO_PUBLIC_API_URL
-      ? String(process.env.EXPO_PUBLIC_API_URL).trim()
-      : '';
-  if (fromEnv) return fromEnv.replace(/\/$/, '');
-  return (
-    Platform.select({ android: 'http://10.0.2.2:8000', default: 'http://127.0.0.1:8000' }) ??
-    'http://127.0.0.1:8000'
-  );
+  return getDefaultApiUrl();
 }
 
 /**
@@ -87,7 +79,7 @@ async function _fetchClaudeScores(text: string): Promise<ClanScores | null> {
   try {
     const res = await fetch(`${_getApiBaseUrl()}/classify/reflection`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: mergeApiHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ texto: text }),
       signal: controller.signal,
     });

@@ -8,6 +8,7 @@
  * configuration source.
  */
 import { getApiBaseUrl } from './debateApi';
+import { mergeApiHeaders } from './apiRuntimeConfig';
 
 export type PhraseIntroRequest = {
   phrase: string;
@@ -32,7 +33,7 @@ export async function generatePhraseIntro(
   try {
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: mergeApiHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         phrase: payload.phrase,
         author: payload.author ?? null,
