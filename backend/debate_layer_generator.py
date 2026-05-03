@@ -158,7 +158,7 @@ contrarian: {es_layer.contrarian_position}
 Rewrite Spanish to match English density. Output JSON only."""
 
     try:
-        raw = llm_client.complete(system=system, user=user, language=None, max_tokens=1500)
+        raw = llm_client.complete(system=system, user=user, language=None, max_tokens=700)
         raw = (raw or "").strip()
         if raw.startswith("```"):
             lines = raw.split("\n")

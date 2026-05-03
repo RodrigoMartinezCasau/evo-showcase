@@ -60,9 +60,11 @@ class OpenAIClient(LLMClient):
             msgs.append({"role": "system", "content": system_content})
         msgs.append({"role": "user", "content": user})
         kwargs = {"model": self._model, "messages": msgs}
-        if max_tokens is not None:
-            kwargs["max_tokens"] = max_tokens
-            kwargs["temperature"] = 0.7
+        # Always cap tokens: if caller didn't specify, use MAX_TOKENS_DEBATE so
+        # un-bounded calls (facts/author generators) don't generate huge responses
+        # that take 10-15 s each and push total latency to 40 s.
+        kwargs["max_tokens"] = max_tokens if max_tokens is not None else MAX_TOKENS_DEBATE
+        kwargs["temperature"] = 0.7
         r = client.chat.completions.create(**kwargs)
         return (r.choices[0].message.content or "").strip()
 
