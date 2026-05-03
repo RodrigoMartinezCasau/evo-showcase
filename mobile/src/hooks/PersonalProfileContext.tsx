@@ -127,9 +127,11 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
       .filter(([, followingSet]) => followingSet.has(activeUserId))
       .map(([uid]) => {
         const u = users[uid];
-        return u ? { id: u.id, username: u.username, clanId: u.clanId, rank: u.rank } : null;
-      })
-      .filter((f): f is FollowerEntry => f !== null);
+        // For real users (UUID not in sim), show a truncated identifier.
+        return u
+          ? { id: u.id, username: u.username, clanId: u.clanId, rank: u.rank }
+          : { id: uid, username: `@${uid.slice(0, 8)}`, clanId: null, rank: 'aprendiz' as const };
+      });
   }, [followGraph, activeUserId, users]);
 
   // ── Following ──────────────────────────────────────────────────────────────
@@ -138,9 +140,11 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
     return [...myFollowing]
       .map(uid => {
         const u = users[uid];
-        return u ? { id: u.id, username: u.username, clanId: u.clanId, rank: u.rank } : null;
-      })
-      .filter((f): f is FollowingEntry => f !== null);
+        // For real users (UUID not in sim), show a truncated identifier.
+        return u
+          ? { id: u.id, username: u.username, clanId: u.clanId, rank: u.rank }
+          : { id: uid, username: `@${uid.slice(0, 8)}`, clanId: null, rank: 'aprendiz' as const };
+      });
   }, [followGraph, activeUserId, users]);
 
   // followingBackIds = users I already follow back (who are in my followers list)

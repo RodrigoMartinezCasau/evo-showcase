@@ -28,12 +28,15 @@ import {
 } from '@evoconn/data/simulation/simulatedNetwork';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setActiveSimUser, mockCurrentUser } from '@evoconn/data/mockUser';
+import { useAuth } from '../../mobile/lib/AuthContext';
 
 // v2: bumped to wipe cached sim data and start fresh for public launch
-const SIM_POSTS_STORAGE_KEY    = '@physicscopilot/sim_posts_v2';
+// v3: bumped to wipe old posts/comments that lack authorUsername snapshot fields.
+const SIM_POSTS_STORAGE_KEY    = '@physicscopilot/sim_posts_v3';
 const SIM_VOTES_STORAGE_KEY    = '@physicscopilot/sim_votes_v2';
 const SIM_FOLLOW_STORAGE_KEY   = '@physicscopilot/sim_follow_v2';
-const SIM_COMMENTS_STORAGE_KEY = '@physicscopilot/sim_comments_v2';
+const SIM_COMMENTS_STORAGE_KEY = '@physicscopilot/sim_comments_v3';
+const SIM_SAVED_STORAGE_KEY    = '@physicscopilot/sim_saved_v1';
 
 // ─── State initialisers ───────────────────────────────────────────────────────
 
@@ -128,7 +131,18 @@ const SimCtx = createContext<SimulationContextValue | null>(null);
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function SimulationProvider({ children }: { children: ReactNode }) {
+  const { profile: authProfile } = useAuth();
   const [activeUserId, setActiveUserIdRaw] = useState('u1');
+
+  // When a real Supabase user is authenticated (UUID not in the 9-user sim),
+  // make activeUserId equal to their UUID. This ensures ALL sim-backed features
+  // (saves, follow graph, posts filter, notifications) use the correct key.
+  useEffect(() => {
+    const id = authProfile?.id;
+    if (id && !SIM_USERS_BY_ID[id]) {
+      setActiveUserIdRaw(id);
+    }
+  }, [authProfile?.id]);
 
   // ── Posts ─────────────────────────────────────────────────────────────────
   const [posts, setPosts] = useState<SimPost[]>(() => SIM_POSTS.map(p => ({ ...p })));
@@ -273,6 +287,31 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     }
     return m;
   });
+  const savedHydrated = useRef(false);
+
+  // Load persisted saved map on mount.
+  useEffect(() => {
+    AsyncStorage.getItem(SIM_SAVED_STORAGE_KEY)
+      .then((raw) => {
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+              setSavedMapArr((prev) => ({ ...prev, ...parsed }));
+            }
+          } catch { /* ignore */ }
+        }
+        savedHydrated.current = true;
+      })
+      .catch(() => { savedHydrated.current = true; });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist saved map on every change after initial hydration.
+  useEffect(() => {
+    if (!savedHydrated.current) return;
+    AsyncStorage.setItem(SIM_SAVED_STORAGE_KEY, JSON.stringify(savedMapArr)).catch(console.error);
+  }, [savedMapArr]);
   const [hiddenMapArr, setHiddenMapArr] = useState<Record<string, string[]>>({});
 
   // Convert array-based maps to Set-based maps (memoised) for O(1) lookups by consumers
@@ -294,7 +333,9 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const activeUser = users[activeUserId] ?? SIM_USERS[0];
+  // For real authenticated users (UUID not in SIM), activeUser may be undefined.
+  // Callers that need a SimUser should check for undefined before using.
+  const activeUser = users[activeUserId];
 
   // Derived follower/following counts for the active user
   const activeFollowersCount = useMemo(
@@ -307,14 +348,9 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   );
 
   // ── Keep mockCurrentUser in sync (simulation users only) ─────────────────
-  // Skip the sync when a real Supabase auth user has already set mockCurrentUser
-  // to their UUID (not a sim ID). Without this guard the sim's useEffect would
-  // always overwrite the real user's identity with rodrigomartinez's data.
+  // Skip when a real Supabase auth user is active (activeUser is undefined for UUIDs).
   useEffect(() => {
-    if (!SIM_USERS_BY_ID[mockCurrentUser.id]) {
-      // Real auth user is active — don't touch mockCurrentUser.
-      return;
-    }
+    if (!activeUser) return; // Real auth user — don't touch mockCurrentUser.
     setActiveSimUser({
       id: activeUser.id,
       username: activeUser.username,
@@ -327,8 +363,8 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
 
   // ── setActiveUserId ───────────────────────────────────────────────────────
   const setActiveUserId = useCallback((id: string) => {
-    if (users[id]) setActiveUserIdRaw(id);
-  }, [users]);
+    setActiveUserIdRaw(id);
+  }, []);
 
   // ── Follow actions ────────────────────────────────────────────────────────
   const follow = useCallback((fromId: string, toId: string) => {

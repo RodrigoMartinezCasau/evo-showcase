@@ -110,8 +110,6 @@ export function AppTopBar({
   const prevFireRef = useRef<boolean | null>(null);
 
   useEffect(() => {
-    if (!IS_DEBUG_STREAK_MODE) return;
-
     // Don't commit to any state until the real persisted value has been loaded
     // from AsyncStorage. This prevents a grey flash on app startup/node reload
     // when hasSentToday is false only because the async read hasn't completed yet.
@@ -257,33 +255,29 @@ export function AppTopBar({
                 topBarIconEditorStyle('fireIcon', 'fireIcon'),
               ]}
             >
-              {IS_DEBUG_STREAK_MODE ? (
-                <>
-                  {/* Apagado (grey) layer — visible when hasSentToday = false */}
-                  <Animated.View
-                    style={[
-                      StyleSheet.absoluteFill,
-                      { opacity: Animated.subtract(1, fireAnim) },
-                    ]}
-                  >
-                    <FuegoApagadoIcon
-                      width={counterIconFrame.width}
-                      height={counterIconFrame.height}
-                    />
-                  </Animated.View>
-                  {/* Encendido (clan) layer — fades in on first send */}
-                  <Animated.View
-                    style={[StyleSheet.absoluteFill, { opacity: fireAnim }]}
-                  >
-                    <RachaIcon
-                      width={counterIconFrame.width}
-                      height={counterIconFrame.height}
-                    />
-                  </Animated.View>
-                </>
-              ) : (
-                <RachaIcon width={counterIconFrame.width} height={counterIconFrame.height} />
-              )}
+              <>
+                {/* Apagado (grey) layer — visible when hasSentToday = false */}
+                <Animated.View
+                  style={[
+                    StyleSheet.absoluteFill,
+                    { opacity: Animated.subtract(1, fireAnim) },
+                  ]}
+                >
+                  <FuegoApagadoIcon
+                    width={counterIconFrame.width}
+                    height={counterIconFrame.height}
+                  />
+                </Animated.View>
+                {/* Encendido (clan) layer — fades in on first send */}
+                <Animated.View
+                  style={[StyleSheet.absoluteFill, { opacity: fireAnim }]}
+                >
+                  <RachaIcon
+                    width={counterIconFrame.width}
+                    height={counterIconFrame.height}
+                  />
+                </Animated.View>
+              </>
             </View>
             {showCounters && (
               <View

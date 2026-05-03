@@ -7,6 +7,7 @@
 import React, { createContext, useCallback, useContext, useMemo } from 'react';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { useNotifications } from '@evoconn/hooks/NotificationsContext';
+import { mockCurrentUser } from '@evoconn/data/mockUser';
 
 type FollowContextValue = {
   followingSet: Set<string>;
@@ -37,7 +38,8 @@ export function FollowProvider({ children }: { children: React.ReactNode }) {
           recipientUserId: uid,
           type: 'follow',
           fromUserId: activeUserId,
-          fromUsername: follower?.username ?? activeUserId,
+          // For real users, sim.users[activeUserId] is undefined — use mockCurrentUser.
+          fromUsername: follower?.username ?? mockCurrentUser.username,
         });
       }
     },

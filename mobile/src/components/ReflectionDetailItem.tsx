@@ -99,11 +99,21 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     const simComments = commentsMap[post.id] ?? [];
     return simComments.map((sc): Comment => {
       const su = simUsers[sc.authorId];
+      const isSelf = sc.authorId === mockCurrentUser.id;
       return {
         id: sc.id,
         author: su
           ? { id: su.id, username: su.username, clanId: su.clanId, rank: su.rank }
-          : { id: sc.authorId, username: sc.authorId, clanId: null, rank: 'aprendiz' },
+          // Self: use live mockCurrentUser (stays up to date if they change username).
+          : isSelf
+            ? { id: mockCurrentUser.id, username: mockCurrentUser.username, clanId: mockCurrentUser.clanId, rank: mockCurrentUser.rank }
+            // Other real users: use snapshot stored at comment time.
+            : {
+                id: sc.authorId,
+                username: sc.authorUsername ?? '?',
+                clanId: sc.authorClanId ?? null,
+                rank: sc.authorRank ?? 'aprendiz',
+              },
         body: sc.body,
         upCount: sc.upCount,
         createdAt: sc.createdAt,
@@ -125,6 +135,10 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
       id: newId,
       postId: post.id,
       authorId: mockCurrentUser.id,
+      // Snapshot so the username survives restarts and is visible to other users.
+      authorUsername: mockCurrentUser.username,
+      authorClanId: mockCurrentUser.clanId,
+      authorRank: mockCurrentUser.rank,
       body: text,
       upCount: 0,
       createdAt: new Date().toISOString(),
@@ -561,6 +575,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                         onUpvote={() => toggleCommentVote(c.id)}
                         onReport={() => console.log(`Reported comment ${c.id}`)}
                         onBlockUser={() => handleBlockUser(c.author.id)}
+                        onAuthorPress={() => onAuthorPress(c.author.id)}
                       />
                     ))}
                   </ScrollView>

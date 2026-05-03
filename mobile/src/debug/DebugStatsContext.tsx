@@ -24,6 +24,7 @@ import React, {
 } from 'react';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { useQuotes } from '@evoconn/hooks/QuotesContext';
+import { useAuth } from '../../mobile/lib/AuthContext';
 import {
   loadStatsDB,
   saveStatsDB,
@@ -103,7 +104,12 @@ const Ctx = createContext<DebugStatsContextValue>({
 
 export function DebugStatsProvider({ children }: { children: ReactNode }) {
   const sim = useSimulation();
+  const { profile: authProfile } = useAuth();
   const { totalUnlocked: quotesTotalUnlocked } = useQuotes();
+
+  // Use the real Supabase user ID when authenticated, fall back to sim ID for
+  // dev/simulator sessions without a real account.
+  const activeUserId = authProfile?.id ?? sim.activeUserId;
 
   // ── Whole multi-user DB held in memory ────────────────────────────────────
   const [db, setDB] = useState<StatsDatabase>({});
@@ -146,7 +152,7 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
   const mutateActiveSlice = useCallback(
     (mutator: (slice: UserStats) => UserStats) => {
       setDB((prev) => {
-        const userId = sim.activeUserId;
+        const userId = activeUserId;
         const current = prev[userId] ?? defaultUserStats();
         // Always apply day-rollover before any other mutation.
         const rolled = applyDailyRollover(current, getLocalDayKey());
@@ -158,23 +164,23 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
         return nextDB;
       });
     },
-    [sim.activeUserId],
+    [activeUserId],
   );
 
   // ── Auto-rollover for the active user when the calendar day changes ──────
   useEffect(() => {
     if (!statsLoaded) return;
-    const userId = sim.activeUserId;
+    const userId = activeUserId;
     const slice = db[userId];
     if (!slice) return; // No record yet — nothing to roll over.
     if (slice.lastUsesResetDate === currentDay) return; // Already up to date.
     mutateActiveSlice((s) => s); // Forces rollover via mutateActiveSlice.
-  }, [currentDay, sim.activeUserId, statsLoaded, db, mutateActiveSlice]);
+  }, [currentDay, activeUserId, statsLoaded, db, mutateActiveSlice]);
 
   // ── Derived values for the ACTIVE user ────────────────────────────────────
   const activeSlice: UserStats = useMemo(
-    () => db[sim.activeUserId] ?? defaultUserStats(),
-    [db, sim.activeUserId],
+    () => db[activeUserId] ?? defaultUserStats(),
+    [db, activeUserId],
   );
   const hasSentToday = activeSlice.hasSentTodayDate === currentDay;
   const streakDays = activeSlice.currentStreak;
@@ -185,14 +191,14 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
 
   // ── Mutations ─────────────────────────────────────────────────────────────
   const markStreakActivated = useCallback(() => {
-    console.log('[USERSTATS] markStreakActivated() for user', sim.activeUserId);
+    console.log('[USERSTATS] markStreakActivated() for user', activeUserId);
     mutateActiveSlice((s) => applyStreakActivation(s));
-  }, [mutateActiveSlice, sim.activeUserId]);
+  }, [mutateActiveSlice, activeUserId]);
 
   const decrementUses = useCallback(() => {
-    console.log('[USERSTATS] decrementUses() for user', sim.activeUserId);
+    console.log('[USERSTATS] decrementUses() for user', activeUserId);
     mutateActiveSlice((s) => applyDecrementUses(s));
-  }, [mutateActiveSlice, sim.activeUserId]);
+  }, [mutateActiveSlice, activeUserId]);
 
   // ── Production compat ─────────────────────────────────────────────────────
   const [realStreakDays, setRealStreakRaw] = useState(0);
@@ -208,8 +214,12 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<DebugStatsContextValue>(
     () => ({
-      streakDays: IS_DEBUG_STATS_MODE ? streakDays : realStreakDays,
-      remainingUses: IS_DEBUG_STATS_MODE ? remainingUses : realRemainingUses,
+      // Always use the local AsyncStorage values — they persist correctly per
+      // user, handle day-rollover, and are updated immediately on every action.
+      // The "real*" API values are kept for backwards-compat with StreakScreen /
+      // DailyUsesScreen but the top bar now always reads from local storage.
+      streakDays,
+      remainingUses,
       unlockedPhrases,
       hasSentToday,
       statsLoaded,

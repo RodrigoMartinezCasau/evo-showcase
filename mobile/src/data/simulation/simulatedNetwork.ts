@@ -35,6 +35,10 @@ export type SimUser = {
 export type SimPost = {
   id: string;
   authorId: string;
+  /** Snapshot of the author's display name at publish time (survives restarts). */
+  authorUsername?: string;
+  authorClanId?: string | null;
+  authorRank?: Rank;
   type: 'reflection' | 'phrase';
   title?: string;
   body: string;
@@ -51,6 +55,10 @@ export type SimComment = {
   id: string;
   postId: string;
   authorId: string;
+  /** Snapshot of the author's display name at comment time (survives restarts). */
+  authorUsername?: string;
+  authorClanId?: string | null;
+  authorRank?: Rank;
   body: string;
   upCount: number;
   createdAt: string;

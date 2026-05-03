@@ -31,7 +31,13 @@ function simPostToCommunityPost(p: SimPost): CommunityPost {
     type: p.type,
     author: author
       ? { id: author.id, username: author.username, clanId: author.clanId, rank: author.rank }
-      : { id: p.authorId, username: '?', clanId: null, rank: 'aprendiz' },
+      // Use the author snapshot stored at publish time so names survive restarts.
+      : {
+          id: p.authorId,
+          username: p.authorUsername ?? '?',
+          clanId: p.authorClanId ?? null,
+          rank: p.authorRank ?? 'aprendiz',
+        },
     title: p.title,
     body: p.body,
     quoteAuthor: p.quoteAuthor,
@@ -76,10 +82,15 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
 
   const publishPost = useCallback(
     (post: CommunityPost) => {
-      // Convert to SimPost shape and add to simulation
+      // Convert to SimPost shape and add to simulation.
+      // Store author snapshot so the username survives app restarts without
+      // needing a runtime lookup table that only knows the 9 sim users.
       const simPost: SimPost = {
         id: post.id,
         authorId: post.author.id,
+        authorUsername: post.author.username,
+        authorClanId: post.author.clanId,
+        authorRank: post.author.rank,
         type: post.type,
         title: post.title,
         body: post.body,

@@ -22,6 +22,8 @@ type CommentCardProps = {
   onUpvote?: () => void;
   onReport?: () => void;
   onBlockUser?: () => void;
+  /** Called when the user taps the author's name — use for profile navigation. */
+  onAuthorPress?: () => void;
 };
 
 export const CommentCard = React.memo(function CommentCard({
@@ -34,6 +36,7 @@ export const CommentCard = React.memo(function CommentCard({
   onUpvote,
   onReport,
   onBlockUser,
+  onAuthorPress,
 }: CommentCardProps) {
   const [charLimit, setCharLimit] = useState(EXP.initialLimit);
   const isLong = text.length > EXP.initialLimit;
@@ -141,9 +144,11 @@ export const CommentCard = React.memo(function CommentCard({
           },
         ]}
       >
-        <Text style={[styles.username, { fontSize: CARD.usernameFontSize }]}>
-          {displayUsername}
-        </Text>
+        <TouchableOpacity onPress={onAuthorPress} disabled={!onAuthorPress} hitSlop={8}>
+          <Text style={[styles.username, { fontSize: CARD.usernameFontSize }]}>
+            {displayUsername}
+          </Text>
+        </TouchableOpacity>
         <Text style={[styles.body, { fontSize: CARD.bodyFontSize }]}>
           {visibleText}
         </Text>
