@@ -12,4 +12,4 @@ ENV PYTHONUNBUFFERED=1
 # Railway (y otros hosts) envían PORT dinámico; local sigue usando 8000 por defecto.
 EXPOSE 8000
 
-CMD sh -c "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"
+CMD ["sh", "-c", "exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
