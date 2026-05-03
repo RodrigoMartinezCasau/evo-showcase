@@ -7,7 +7,7 @@ API_KEY = os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY")
 BASE_URL = os.getenv("LLM_BASE_URL")  # e.g. https://api.together.xyz/v1
 MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")
 # Same for EN and ES flows; ensure rich output (enough for long steelman + contrarian + JSON)
-MAX_TOKENS_DEBATE = int(os.getenv("LLM_MAX_TOKENS_DEBATE", "700"))
+MAX_TOKENS_DEBATE = int(os.getenv("LLM_MAX_TOKENS_DEBATE", "1000"))
 
 
 def _language_instruction(lang: str | None) -> str:
