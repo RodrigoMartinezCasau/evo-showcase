@@ -325,13 +325,13 @@ export default function PersonalProfileScreen() {
               value={phraseEditDraft}
               onChangeText={setPhraseEditDraft}
               multiline
-              maxLength={160}
+              maxLength={80}
               placeholder="Escribe tu frase..."
               placeholderTextColor="rgba(255,255,255,0.35)"
               autoFocus
               selectionColor="#FFFFFF"
             />
-            <Text style={editorStyles.counter}>{phraseEditDraft.length}/160</Text>
+            <Text style={editorStyles.counter}>{phraseEditDraft.length}/80</Text>
             <View style={editorStyles.buttons}>
               <TouchableOpacity style={editorStyles.cancelBtn} onPress={handlePhraseEditCancel}>
                 <Text style={editorStyles.cancelTxt}>Cancelar</Text>
