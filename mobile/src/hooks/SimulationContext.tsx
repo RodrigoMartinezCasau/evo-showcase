@@ -27,12 +27,13 @@ import {
   type FollowGraph,
 } from '@evoconn/data/simulation/simulatedNetwork';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { setActiveSimUser } from '@evoconn/data/mockUser';
+import { setActiveSimUser, mockCurrentUser } from '@evoconn/data/mockUser';
 
-const SIM_POSTS_STORAGE_KEY    = '@physicscopilot/sim_posts_v1';
-const SIM_VOTES_STORAGE_KEY    = '@physicscopilot/sim_votes_v1';
-const SIM_FOLLOW_STORAGE_KEY   = '@physicscopilot/sim_follow_v1';
-const SIM_COMMENTS_STORAGE_KEY = '@physicscopilot/sim_comments_v1';
+// v2: bumped to wipe cached sim data and start fresh for public launch
+const SIM_POSTS_STORAGE_KEY    = '@physicscopilot/sim_posts_v2';
+const SIM_VOTES_STORAGE_KEY    = '@physicscopilot/sim_votes_v2';
+const SIM_FOLLOW_STORAGE_KEY   = '@physicscopilot/sim_follow_v2';
+const SIM_COMMENTS_STORAGE_KEY = '@physicscopilot/sim_comments_v2';
 
 // ─── State initialisers ───────────────────────────────────────────────────────
 
@@ -305,8 +306,15 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     [followGraph, activeUserId],
   );
 
-  // ── Keep mockCurrentUser in sync ──────────────────────────────────────────
+  // ── Keep mockCurrentUser in sync (simulation users only) ─────────────────
+  // Skip the sync when a real Supabase auth user has already set mockCurrentUser
+  // to their UUID (not a sim ID). Without this guard the sim's useEffect would
+  // always overwrite the real user's identity with rodrigomartinez's data.
   useEffect(() => {
+    if (!SIM_USERS_BY_ID[mockCurrentUser.id]) {
+      // Real auth user is active — don't touch mockCurrentUser.
+      return;
+    }
     setActiveSimUser({
       id: activeUser.id,
       username: activeUser.username,

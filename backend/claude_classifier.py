@@ -22,7 +22,8 @@ CLANS: list[str] = [
     "racionalista", "humanista", "realista", "trascendentalista",
 ]
 
-MODEL = "claude-sonnet-4-6"
+# haiku-4-5 is ~5x faster than sonnet for this short classification task
+MODEL = "claude-haiku-4-5"
 
 _SYSTEM = (
     "Eres un clasificador filosófico experto. Solo devuelves JSON válido con claves entre comillas. "
