@@ -75,7 +75,7 @@ export async function ensureAnimationAssets(): Promise<void> {
 
   _copyPromise = (async () => {
     const STAMP_FILE = ANIM_DIR + '.stamp';
-    const APP_VERSION = '36';
+    const APP_VERSION = '39';
 
     try {
       const stampInfo = await FileSystem.getInfoAsync(STAMP_FILE);
@@ -221,31 +221,38 @@ export function EvoAnimationWebView({
   const webRef = useRef<WebView>(null);
   const [htmlContent, setHtmlContent] = useState<string | null>(null);
 
-  // Opacity of the WebView layer. Starts at 0 so the static starfield shows
-  // through, then fades to 1 once the WebView has finished painting — making
-  // the transition from static → animated stars invisible.
+  // Opacity of the WebView layer: 0 on mount, fades to 1 on first paint.
   const webOpacity = useRef(new Animated.Value(0)).current;
 
-  // Reset webOpacity every time the animation is shown.
+  // Opacity of the entire modal root: stays at 1 during the animation,
+  // then fades to 0 when complete fires — revealing the community screen
+  // (already rendered behind the modal) as the white flash dissolves.
+  const rootOpacity = useRef(new Animated.Value(1)).current;
+
+  // Reset both opacities every time the animation becomes visible.
   useEffect(() => {
     if (visible) {
+      rootOpacity.setValue(1);
       webOpacity.setValue(0);
       setHtmlContent(null);
     }
-  }, [visible, webOpacity]);
+  }, [visible, rootOpacity, webOpacity]);
 
   // Called when the animation signals completion (or is closed).
-  // Releases the entry guard immediately (so the community screen renders
-  // behind the now-transparent modal), then calls the callback so the modal
-  // unmounts. The HTML flash (opacity 1 white) is still covering everything
-  // at this moment — it acts as the visual wipe so the switch to community
-  // is imperceptible.
+  // By the time this fires the community screen is already rendered behind
+  // the modal (setEntryAnimPlaying was called on the flash-start phase
+  // ~500ms earlier). We fade rootOpacity 1→0 so the white flash dissolves
+  // directly into the community — no star background visible at any point.
   const closeAndCall = useCallback(
     (callback?: (extra?: unknown) => void, extra?: unknown) => {
-      setEntryAnimPlaying(false);
-      callback?.(extra);
+      setEntryAnimPlaying(false); // safety net if phase handler didn't fire
+      Animated.timing(rootOpacity, {
+        toValue: 0,
+        duration: 650,
+        useNativeDriver: true,
+      }).start(() => callback?.(extra));
     },
-    [],
+    [rootOpacity],
   );
 
   useEffect(() => {
@@ -292,6 +299,14 @@ export function EvoAnimationWebView({
           break;
         case 'phase':
           onPhase?.(msg.phase ?? '');
+          // 'exit' (no-clan path) and 'zoom_fill' (with-clan path) are fired
+          // when the final flash appears — ~500ms before Bridge.complete().
+          // Dropping the entry guard here pre-renders the community screen
+          // behind the still-opaque modal so that by the time the fade-out
+          // starts it dissolves into community, not into the star background.
+          if (msg.phase === 'exit' || msg.phase === 'zoom_fill') {
+            setEntryAnimPlaying(false);
+          }
           break;
         case 'tap':
           if (enableHaptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -331,7 +346,7 @@ export function EvoAnimationWebView({
       statusBarTranslucent
       onRequestClose={() => closeAndCall(onClose)}
     >
-      <Animated.View style={styles.root}>
+      <Animated.View style={[styles.root, { opacity: rootOpacity }]}>
         {/*
           Layer 1 — Static starfield. Always visible while the modal is open.
           Serves as both the loading state and the seamless base for the animation
