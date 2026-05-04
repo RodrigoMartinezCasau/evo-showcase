@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getSidebarFooterClanLineColor } from '@evoconn/constants/clanColors';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
@@ -33,6 +34,7 @@ function underlineWidthForTab(tabId: TabId): number | null {
 
 export function BottomCommunityTabs({ activeTab, onTabChange }: BottomCommunityTabsProps) {
   const activeClan = useActiveClan(mockCurrentUser.clanId);
+  const insets = useSafeAreaInsets();
   const selectedColor = getSidebarFooterClanLineColor(activeClan);
   const LupitaIcon = useMemo(() => {
     if (activeTab === 'search') {
@@ -48,7 +50,7 @@ export function BottomCommunityTabs({ activeTab, onTabChange }: BottomCommunityT
   );
 
   return (
-    <View style={styles.bar}>
+    <View style={[styles.bar, Platform.OS === 'android' && { paddingBottom: insets.bottom }]}>
       {TABS.map((tab) => {
         const isActive = activeTab !== null && activeTab === tab.id;
         const uw = underlineWidthForTab(tab.id);

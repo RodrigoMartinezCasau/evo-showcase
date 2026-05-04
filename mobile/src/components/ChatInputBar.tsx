@@ -29,6 +29,7 @@ import {
   type KeyboardEvent,
   ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { evoconnColors } from '@evoconn/theme/colors';
 import {
@@ -218,6 +219,7 @@ export function ChatInputBar({
   clanColor = '#c7ff02',
   inputCursorColor = clanColor,
 }: ChatInputBarProps) {
+  const insets = useSafeAreaInsets();
   const [text, setText] = useState('');
   const welcomeOpacity = useRef(new Animated.Value(1)).current;
 
@@ -294,6 +296,7 @@ export function ChatInputBar({
     <Animated.View
       style={[
         styles.outerWrapper,
+        Platform.OS === 'android' && { bottom: insets.bottom },
         {
           transform: [
             {

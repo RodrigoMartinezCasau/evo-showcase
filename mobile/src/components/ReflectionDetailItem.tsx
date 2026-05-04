@@ -349,7 +349,9 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
 
   const actionColStyle = useMemo(() => ({
     position: 'absolute' as const,
-    left: screenW - 70 + COL.offsetX,
+    left: Platform.OS === 'android'
+      ? screenW - 55 + COL.offsetX
+      : screenW - 70 + COL.offsetX,
     top: itemHeight / 2 + COL.offsetY,
     zIndex: 10,
   }), [screenW, itemHeight]);

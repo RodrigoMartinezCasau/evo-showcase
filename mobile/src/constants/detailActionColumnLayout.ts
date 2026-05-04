@@ -2,53 +2,56 @@
  * Columna lateral derecha de acciones (detalle reflexión / frase).
  * Editores individuales para cada botón: posición y escala independientes.
  */
+import { Platform } from 'react-native';
+
+const AND = Platform.OS === 'android';
 
 /** Configuración global de la columna. */
 export const DETAIL_ACTION_COLUMN_LAYOUT = {
   /** Desplazamiento X de toda la columna respecto al borde derecho del display. */
-  offsetX: -49,
+  offsetX: AND ? -58 : -49,
   /** Desplazamiento Y de toda la columna. */
-  offsetY: -345,
+  offsetY: AND ? -280 : -345,
   /** Espacio vertical entre botones (px). */
-  gap: 26,
+  gap: AND ? 18 : 26,
   /** Tamaño base de cada icono (px). Los editores de scale lo multiplican. */
-  iconSize: 36,
-} as const;
+  iconSize: AND ? 28 : 36,
+};
 
 /** Botón CLAN (insignia). */
 export const DETAIL_CLAN_BUTTON_LAYOUT = {
-  offsetX: 17.5,
-  offsetY: -0,
-  scale: 3.3,
-} as const;
+  offsetX: AND ? 12 : 17.5,
+  offsetY: 0,
+  scale: AND ? 2.4 : 3.3,
+};
 
 /** Botón UPVOTE. */
 export const DETAIL_UPVOTE_BUTTON_LAYOUT = {
-  offsetX: 18.5,
+  offsetX: AND ? 14 : 18.5,
   offsetY: 0,
-  scale: 1.8,
-} as const;
+  scale: AND ? 1.4 : 1.8,
+};
 
 /** Botón DOWNVOTE. */
 export const DETAIL_DOWNVOTE_BUTTON_LAYOUT = {
-  offsetX: 18.5,
+  offsetX: AND ? 14 : 18.5,
   offsetY: 0,
-  scale: 1.8,
-} as const;
+  scale: AND ? 1.4 : 1.8,
+};
 
 /** Botón SAVE (guardar / bookmark). */
 export const DETAIL_SAVE_BUTTON_LAYOUT = {
-  offsetX: 18,
+  offsetX: AND ? 13 : 18,
   offsetY: 0,
-  scale: 1.6,
-} as const;
+  scale: AND ? 1.2 : 1.6,
+};
 
 /** Botón MÁS (tres puntitos). */
 export const DETAIL_MORE_BUTTON_LAYOUT = {
-  offsetX: 18,
-  offsetY: -25,
-  scale: 2,
-} as const;
+  offsetX: AND ? 13 : 18,
+  offsetY: AND ? -18 : -25,
+  scale: AND ? 1.5 : 2,
+};
 
 /* ──────────────────────────────────────────────
  *  Stats visuales (números de votos + porcentaje)
@@ -62,30 +65,30 @@ export const DETAIL_MORE_BUTTON_LAYOUT = {
 
 /** Número de upvotes. */
 export const DETAIL_UPVOTE_COUNT_LAYOUT = {
-  offsetX: 75,
-  offsetY: 125,
+  offsetX: AND ? 58 : 75,
+  offsetY: AND ? 95 : 125,
   scale: 1.1,
   fontSize: 13,
   fontWeight: '700' as const,
   colorActive: '#A3FF3B',
   colorInactive: '#FFFFFF',
-} as const;
+};
 
 /** Número de downvotes. */
 export const DETAIL_DOWNVOTE_COUNT_LAYOUT = {
-  offsetX: 75,
-  offsetY: 304,
+  offsetX: AND ? 58 : 75,
+  offsetY: AND ? 235 : 304,
   scale: 1.1,
   fontSize: 13,
   fontWeight: '700' as const,
   colorActive: '#ff4a31',
   colorInactive: '#FFFFFF',
-} as const;
+};
 
 /** Porcentaje de aprobación. */
 export const DETAIL_APPROVAL_PERCENT_LAYOUT = {
-  offsetX: 75,
-  offsetY: 215,
+  offsetX: AND ? 58 : 75,
+  offsetY: AND ? 165 : 215,
   scale: 1.1,
   fontSize: 12,
   fontWeight: '800' as const,
@@ -96,4 +99,4 @@ export const DETAIL_APPROVAL_PERCENT_LAYOUT = {
   colorAbove50: '#FFD166',
   colorBelow50: '#FF8C42',
   colorBelow10: '#FF3B30',
-} as const;
+};

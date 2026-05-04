@@ -17,6 +17,8 @@ import {
   Modal,
   StyleSheet,
   Animated,
+  Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -336,6 +338,8 @@ export function EvoAnimationWebView({
     [enableHaptics, closeAndCall, name, onComplete, onClose, onPhase],
   );
 
+  const { width: winW, height: winH } = useWindowDimensions();
+
   if (!visible) return null;
 
   return (
@@ -346,7 +350,17 @@ export function EvoAnimationWebView({
       statusBarTranslucent
       onRequestClose={() => closeAndCall(onClose)}
     >
-      <Animated.View style={[styles.root, { opacity: rootOpacity }]}>
+      {/*
+        On Android with edgeToEdgeEnabled the Modal may not correctly fill the full
+        screen with flex:1 alone. Using absoluteFill + explicit dimensions ensures the
+        animation covers every pixel including behind the status bar and navigation bar.
+      */}
+      <Animated.View
+        style={[
+          Platform.OS === 'android' ? StyleSheet.absoluteFill : styles.root,
+          { opacity: rootOpacity, backgroundColor: '#0f0f12' },
+        ]}
+      >
         {/*
           Layer 1 — Static starfield. Always visible while the modal is open.
           Serves as both the loading state and the seamless base for the animation
@@ -376,10 +390,14 @@ export function EvoAnimationWebView({
               overScrollMode="never"
               androidLayerType="hardware"
               setSupportMultipleWindows={false}
+              scalesPageToFit={false}
               injectedJavaScriptBeforeContentLoaded={injectedBeforeLoad}
               onMessage={onMessage}
               onLoadEnd={handleWebLoadEnd}
-              style={styles.web}
+              style={[
+                styles.web,
+                Platform.OS === 'android' && { width: winW, height: winH },
+              ]}
             />
           </Animated.View>
         )}
