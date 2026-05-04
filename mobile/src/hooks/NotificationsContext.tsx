@@ -31,6 +31,12 @@ import {
   type NotificationType,
 } from '@evoconn/services/notificationsStorage';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
+import {
+  isRealUserId,
+  fetchMyNotifications,
+  insertNotification,
+  markNotificationsRead,
+} from '@evoconn/services/supabaseSocial';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -71,13 +77,30 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     dbRef.current = db;
   }, [db]);
 
-  // One-time load on mount — same pattern as thoughtsStorage.
+  // Load notifications — Supabase for real users, AsyncStorage for sim users.
   useEffect(() => {
-    loadNotificationsDB()
-      .then((loaded) => setDb(loaded))
-      .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (isRealUserId(activeUserId)) {
+      fetchMyNotifications(activeUserId).then((rows) => {
+        const notifs: AppNotification[] = rows.map((r) => ({
+          id: r.id,
+          type: r.type as NotificationType,
+          fromUserId: r.from_user_id ?? '',
+          fromUsername: r.from_username,
+          targetPostId: r.post_id,
+          targetCommentId: r.comment_id,
+          textPreview: r.text_preview,
+          createdAt: r.created_at,
+          read: r.read,
+        }));
+        setDb((prev) => ({ ...prev, [activeUserId]: notifs }));
+      });
+    } else {
+      loadNotificationsDB()
+        .then((loaded) => setDb(loaded))
+        .catch(() => {});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeUserId]);
 
   // ── Core mutation (write-through) ────────────────────────────────────────
 
@@ -111,12 +134,26 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         read: false,
       };
 
+      // Persist to Supabase for real users so the recipient sees it on any device.
+      if (isRealUserId(args.recipientUserId)) {
+        insertNotification({
+          recipient_id:  args.recipientUserId,
+          type:          args.type,
+          from_user_id:  args.fromUserId,
+          from_username: args.fromUsername,
+          post_id:       args.targetPostId,
+          comment_id:    args.targetCommentId,
+          text_preview:  args.textPreview,
+        });
+      }
+
       mutateSlice(args.recipientUserId, (prev) => [notif, ...prev]);
     },
     [mutateSlice],
   );
 
   const markAllRead = useCallback(() => {
+    markNotificationsRead(activeUserId); // update Supabase for real users
     mutateSlice(activeUserId, (prev) =>
       prev.every((n) => n.read) ? prev : prev.map((n) => ({ ...n, read: true })),
     );

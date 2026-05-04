@@ -7,6 +7,7 @@ import { mockCurrentUser, mockUserStats } from '@evoconn/data/mockUser';
 import { getOtherUserProfile } from '@evoconn/data/mockOtherUsers';
 import type { OtherUserProfile } from '@evoconn/data/mockOtherUsers';
 import { supabase } from '../../mobile/lib/supabase';
+import { fetchFollowCounts, fetchPostsByUser, isRealUserId } from '@evoconn/services/supabaseSocial';
 import { AppTopBar, RankBadge, ClanBanner, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
@@ -95,31 +96,53 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
   // Try the 9-user simulation first; if not found, fetch from Supabase.
   const mockProfile = getOtherUserProfile(userId);
   const [supabaseProfile, setSupabaseProfile] = useState<OtherUserProfile | null>(null);
+  const [supabasePosts, setSupabasePosts] = useState<CommunityPost[]>([]);
 
   useEffect(() => {
-    if (mockProfile || !userId) return;
-    supabase
-      .from('profiles')
-      .select('id, username, clan_id, rank, insignia_phrase, total_reflections, total_quotes')
-      .eq('id', userId)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data) {
-          setSupabaseProfile({
-            id: data.id,
-            username: '@' + (data.username ?? '').toUpperCase(),
-            clanId: data.clan_id ?? null,
-            rank: data.rank ?? 'aprendiz',
-            followersCount: 0,
-            followingCount: 0,
-            insigniaPhrase: data.insignia_phrase ?? '',
-            philosophyPercentages: [],
-            totalReflections: data.total_reflections ?? 0,
-            totalQuotes: data.total_quotes ?? 0,
-            recentPosts: [],
-          });
-        }
-      });
+    if (mockProfile || !isRealUserId(userId)) return;
+
+    // Fetch profile + follow counts in parallel.
+    Promise.all([
+      supabase
+        .from('profiles')
+        .select('id, username, clan_id, rank, insignia_phrase, total_reflections, total_quotes')
+        .eq('id', userId)
+        .maybeSingle(),
+      fetchFollowCounts(userId),
+      fetchPostsByUser(userId),
+    ]).then(([{ data }, counts, posts]) => {
+      if (data) {
+        setSupabaseProfile({
+          id: data.id,
+          username: '@' + (data.username ?? '').toUpperCase(),
+          clanId: data.clan_id ?? null,
+          rank: data.rank ?? 'aprendiz',
+          followersCount: counts.followersCount,
+          followingCount: counts.followingCount,
+          insigniaPhrase: data.insignia_phrase ?? '',
+          philosophyPercentages: [],
+          totalReflections: data.total_reflections ?? 0,
+          totalQuotes: data.total_quotes ?? 0,
+          recentPosts: [],
+        });
+      }
+      // Convert SimPost → CommunityPost for the slider.
+      setSupabasePosts(posts.map(p => ({
+        id: p.id,
+        type: p.type,
+        author: {
+          id: p.authorId,
+          username: p.authorUsername ?? '?',
+          clanId: p.authorClanId ?? null,
+          rank: p.authorRank ?? 'aprendiz',
+        },
+        title: p.title,
+        body: p.body,
+        quoteAuthor: p.quoteAuthor,
+        voteStats: { up: p.upvoterIds.length, down: p.downvoterIds.length, save: p.saverIds.length },
+        createdAt: p.createdAt,
+      })));
+    });
   }, [userId, mockProfile]);
 
   // Static profile data (username, rank, insignia, etc.)
@@ -155,9 +178,14 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
     philosophyPercentages: realPercentages,
   };
 
+  // For real Supabase users: use dedicated fetchPostsByUser result.
+  // For simulated users: filter the global sim posts array.
   const livePosts = useMemo<CommunityPost[]>(
-    () =>
-      allSimPosts
+    () => {
+      if (isRealUserId(userId) && supabasePosts.length > 0) {
+        return supabasePosts;
+      }
+      return allSimPosts
         .filter((p) => p.authorId === userId)
         .sort((a, b) => (b.createdAt > a.createdAt ? 1 : b.createdAt < a.createdAt ? -1 : 0))
         .map((p): CommunityPost => {
@@ -167,7 +195,7 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
             type: p.type,
             author: author
               ? { id: author.id, username: author.username, clanId: author.clanId, rank: author.rank }
-              : { id: p.authorId, username: '?', clanId: null, rank: 'aprendiz' },
+              : { id: p.authorId, username: p.authorUsername ?? '?', clanId: p.authorClanId ?? null, rank: p.authorRank ?? 'aprendiz' },
             title: p.title,
             body: p.body,
             quoteAuthor: p.quoteAuthor,
@@ -178,8 +206,9 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
             },
             createdAt: p.createdAt,
           };
-        }),
-    [allSimPosts, userId, simUsers],
+        });
+    },
+    [allSimPosts, userId, simUsers, supabasePosts],
   );
 
   // Live totals that always match the publications slider count.

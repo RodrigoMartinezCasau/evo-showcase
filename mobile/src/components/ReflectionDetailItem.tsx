@@ -87,7 +87,14 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     else unsavePost(post.id);
   }, [post, isSaved, updatePostSaveToggle, savePost, unsavePost]);
 
-  const { commentsMap, addComment: addSimComment, users: simUsers } = useSimulation();
+  const { commentsMap, addComment: addSimComment, users: simUsers, ensureCommentsForPost } = useSimulation();
+
+  // Fetch fresh comments from Supabase the first time this post is opened.
+  useEffect(() => {
+    ensureCommentsForPost(post.id).catch(console.error);
+  // We only want to run this once per post open, not on every update.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [post.id]);
 
   const [commentVotes, setCommentVotes] = useState<Record<string, boolean>>({});
   const toggleCommentVote = useCallback((commentId: string) => {

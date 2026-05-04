@@ -29,6 +29,27 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setActiveSimUser, mockCurrentUser } from '@evoconn/data/mockUser';
 import { useAuth } from '../../mobile/lib/AuthContext';
+import { supabase } from '../../mobile/lib/supabase';
+import {
+  isRealUserId,
+  fetchAllPosts,
+  fetchVotesForPosts,
+  fetchMyVotes,
+  fetchMySaves,
+  fetchFollowing,
+  fetchFollowers,
+  fetchCommentsForPost,
+  insertPost,
+  removePost,
+  upsertVote,
+  deleteVote as dbDeleteVote,
+  insertSave,
+  deleteSave as dbDeleteSave,
+  insertFollow,
+  deleteFollow as dbDeleteFollow,
+  insertComment,
+  dbRowToSimPost,
+} from '@evoconn/services/supabaseSocial';
 
 // v2: bumped to wipe cached sim data and start fresh for public launch
 // v3: bumped to wipe old posts/comments that lack authorUsername snapshot fields.
@@ -122,6 +143,8 @@ export type SimulationContextValue = {
   toggleHidePost: (userId: string, postId: string) => void;
   publishPost: (post: SimPost) => void;
   addComment: (comment: SimComment) => void;
+  /** Lazily fetch fresh comments from Supabase for a specific post. */
+  ensureCommentsForPost: (postId: string) => Promise<void>;
 };
 
 // ─── Context ─────────────────────────────────────────────────────────────────
@@ -153,8 +176,122 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   const followHydrated = useRef(false);
   const commentsHydrated = useRef(false);
 
-  // Load persisted posts on mount (merge strategy: keep seed + add stored extras)
+  // ── Supabase hydration for real users ────────────────────────────────────
+  // When the authenticated user's UUID is known, load ALL social data from
+  // Supabase so the app is consistent across devices.
+  const supabaseHydrated = useRef(false);
   useEffect(() => {
+    if (!isRealUserId(activeUserId) || supabaseHydrated.current) return;
+    supabaseHydrated.current = true;
+
+    (async () => {
+      console.log('[Social] Hydrating from Supabase for user', activeUserId);
+
+      // 1. Posts — the full global feed.
+      const sbPosts = await fetchAllPosts();
+
+      // 2. Vote counts — reconstruct upvoterIds / downvoterIds on each post.
+      const postIds = sbPosts.map(p => p.id);
+      const allVoteRows = await fetchVotesForPosts(postIds);
+      for (const row of allVoteRows) {
+        const post = sbPosts.find(p => p.id === row.post_id);
+        if (!post) continue;
+        if (row.vote === 'up')   post.upvoterIds   = [...post.upvoterIds,   row.user_id];
+        if (row.vote === 'down') post.downvoterIds = [...post.downvoterIds, row.user_id];
+      }
+
+      // 3. My votes → voteMap.
+      const myVotesMap = await fetchMyVotes(activeUserId);
+
+      // 4. My saves → savedMap.
+      const mySavedPostIds = await fetchMySaves(activeUserId);
+      for (const pid of mySavedPostIds) {
+        const post = sbPosts.find(p => p.id === pid);
+        if (post) post.saverIds = [...post.saverIds, activeUserId];
+      }
+
+      // 5. Follow graph — who I follow + who follows me.
+      const [following, followers] = await Promise.all([
+        fetchFollowing(activeUserId),
+        fetchFollowers(activeUserId),
+      ]);
+
+      // 6. Comments — fetch for all loaded posts in one query.
+      const allComments = await Promise.all(postIds.map(id => fetchCommentsForPost(id)));
+      const commentsByPost: Record<string, SimComment[]> = {};
+      postIds.forEach((id, i) => {
+        if (allComments[i].length > 0) commentsByPost[id] = allComments[i];
+      });
+
+      // ── Apply to state ──────────────────────────────────────────────────
+      setPosts(() => sbPosts);
+      setVoteMapRaw(prev => ({
+        ...prev,
+        [activeUserId]: myVotesMap,
+      }));
+      setSavedMapArr(prev => {
+        const updated = { ...prev };
+        updated[activeUserId] = mySavedPostIds;
+        return updated;
+      });
+      setFollowGraph(prev => {
+        const updated = { ...prev };
+        updated[activeUserId] = following;
+        // Populate reverse edges so followers appear in activeFollowersCount.
+        for (const followerId of followers) {
+          updated[followerId] = [...(updated[followerId] ?? []), activeUserId]
+            .filter((v, i, a) => a.indexOf(v) === i); // deduplicate
+        }
+        return updated;
+      });
+      setCommentsMap(prev => ({ ...prev, ...commentsByPost }));
+
+      postsHydrated.current  = true;
+      votesHydrated.current  = true;
+      followHydrated.current = true;
+      commentsHydrated.current = true;
+      savedHydrated.current  = true;
+      console.log('[Social] Supabase hydration complete. Posts:', sbPosts.length);
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeUserId]);
+
+  // ── Realtime subscription for new posts (real users only) ────────────────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const realtimeSubRef = useRef<any>(null);
+  useEffect(() => {
+    if (!isRealUserId(activeUserId)) return;
+    // Subscribe after hydration settles (tiny delay avoids double-processing seed data).
+    const timer = setTimeout(() => {
+      const ch = supabase
+        .channel('public:posts:realtime')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'posts' },
+          (payload: { new: Record<string, unknown> }) => {
+            const newPost: SimPost = dbRowToSimPost(payload.new);
+            setPosts(prev => {
+              if (prev.some(p => p.id === newPost.id)) return prev;
+              return [newPost, ...prev];
+            });
+          },
+        )
+        .subscribe();
+      realtimeSubRef.current = ch;
+    }, 2000);
+
+    return () => {
+      clearTimeout(timer);
+      if (realtimeSubRef.current) {
+        supabase.removeChannel(realtimeSubRef.current);
+        realtimeSubRef.current = null;
+      }
+    };
+  }, [activeUserId]);
+
+  // Load persisted posts on mount for sim users (AsyncStorage fallback)
+  useEffect(() => {
+    if (isRealUserId(activeUserId)) return; // Real users: use Supabase above.
     AsyncStorage.getItem(SIM_POSTS_STORAGE_KEY)
       .then((raw) => {
         if (raw) {
@@ -373,6 +510,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       if (arr.includes(toId)) return prev;
       return { ...prev, [fromId]: [...arr, toId] };
     });
+    insertFollow(fromId, toId); // persist to Supabase (no-op for sim users)
   }, []);
 
   const unfollow = useCallback((fromId: string, toId: string) => {
@@ -381,15 +519,19 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       if (!arr.includes(toId)) return prev;
       return { ...prev, [fromId]: arr.filter(id => id !== toId) };
     });
+    dbDeleteFollow(fromId, toId);
   }, []);
 
   const toggleFollow = useCallback((fromId: string, toId: string) => {
     setFollowGraph(prev => {
       const arr = prev[fromId] ?? [];
-      if (arr.includes(toId)) {
-        return { ...prev, [fromId]: arr.filter(id => id !== toId) };
-      }
-      return { ...prev, [fromId]: [...arr, toId] };
+      const nowFollowing = !arr.includes(toId);
+      // Side-effect inside setter is intentional: fire-and-forget Supabase write.
+      if (nowFollowing) insertFollow(fromId, toId);
+      else dbDeleteFollow(fromId, toId);
+      return nowFollowing
+        ? { ...prev, [fromId]: [...arr, toId] }
+        : { ...prev, [fromId]: arr.filter(id => id !== toId) };
     });
   }, []);
 
@@ -404,6 +546,10 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       const previousVote = voteMapRef.current[userId]?.[postId] ?? null;
       if (previousVote === newVote) return;
 
+      // Write to Supabase (fire-and-forget).
+      if (newVote === null) dbDeleteVote(userId, postId);
+      else upsertVote(userId, postId, newVote);
+
       // Update voteMap
       setVoteMapRaw(prev => {
         const updated = { ...prev, [userId]: { ...(prev[userId] ?? {}) } };
@@ -412,10 +558,14 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
         } else {
           updated[userId][postId] = newVote;
         }
+        // Persist for sim users only.
+        if (!isRealUserId(userId) && votesHydrated.current) {
+          AsyncStorage.setItem(SIM_VOTES_STORAGE_KEY, JSON.stringify(updated)).catch(console.error);
+        }
         return updated;
       });
 
-      // Update post's voter ID arrays and persist
+      // Update post's voter ID arrays (and persist for sim users).
       setPosts(prev => {
         const updated = prev.map(p => {
           if (p.id !== postId) return p;
@@ -426,7 +576,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
           if (newVote === 'down') downvoterIds = [...downvoterIds, userId];
           return { ...p, upvoterIds, downvoterIds };
         });
-        if (postsHydrated.current) {
+        if (!isRealUserId(userId) && postsHydrated.current) {
           AsyncStorage.setItem(SIM_POSTS_STORAGE_KEY, JSON.stringify(updated)).catch(console.error);
         }
         return updated;
@@ -440,12 +590,15 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     setSavedMapArr(prev => {
       const arr = prev[userId] ?? [];
       const alreadySaved = arr.includes(postId);
+      // Write-through to Supabase.
+      if (alreadySaved) dbDeleteSave(userId, postId);
+      else insertSave(userId, postId);
       return {
         ...prev,
         [userId]: alreadySaved ? arr.filter(id => id !== postId) : [...arr, postId],
       };
     });
-    // Also update saverIds on the post itself (so save count is always derivable)
+    // Also update saverIds on the post itself (so save count is always derivable).
     setPosts(prev =>
       prev.map(p => {
         if (p.id !== postId) return p;
@@ -462,9 +615,12 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
 
   // ── Delete / Hide post ────────────────────────────────────────────────────
   const deletePost = useCallback((authorId: string, postId: string) => {
+    removePost(postId); // remove from Supabase (no-op for sim users)
     setPosts((prev) => {
       const updated = prev.filter((p) => !(p.id === postId && p.authorId === authorId));
-      AsyncStorage.setItem(SIM_POSTS_STORAGE_KEY, JSON.stringify(updated)).catch(console.error);
+      if (!isRealUserId(authorId)) {
+        AsyncStorage.setItem(SIM_POSTS_STORAGE_KEY, JSON.stringify(updated)).catch(console.error);
+      }
       return updated;
     });
   }, []);
@@ -483,19 +639,39 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
 
   // ── Comments ─────────────────────────────────────────────────────────────
   const addComment = useCallback((comment: SimComment) => {
+    insertComment(comment); // persist to Supabase (no-op for sim users)
     setCommentsMap(prev => ({
       ...prev,
       [comment.postId]: [...(prev[comment.postId] ?? []), comment],
     }));
   }, []);
 
+  /** Fetch fresh comments from Supabase for a specific post (lazy-load on open). */
+  const ensureCommentsForPost = useCallback(async (postId: string) => {
+    if (!isRealUserId(activeUserId)) return; // sim users: already in local state
+    const fresh = await fetchCommentsForPost(postId);
+    if (fresh.length === 0) return;
+    setCommentsMap(prev => {
+      const existing = prev[postId] ?? [];
+      // Merge: deduplicate by comment id, fresh takes precedence.
+      const merged = [
+        ...fresh,
+        ...existing.filter(ec => !fresh.some(fc => fc.id === ec.id)),
+      ];
+      return { ...prev, [postId]: merged };
+    });
+  }, [activeUserId]);
+
   // ── Publish ───────────────────────────────────────────────────────────────
   const publishPost = useCallback((post: SimPost) => {
+    insertPost(post); // persist to Supabase (no-op for sim users)
     setPosts((prev) => {
       // Deduplicate: ignore if a post with the same id already exists.
       if (prev.some((p) => p.id === post.id)) return prev;
       const updated = [post, ...prev];
-      AsyncStorage.setItem(SIM_POSTS_STORAGE_KEY, JSON.stringify(updated)).catch(console.error);
+      if (!isRealUserId(post.authorId)) {
+        AsyncStorage.setItem(SIM_POSTS_STORAGE_KEY, JSON.stringify(updated)).catch(console.error);
+      }
       return updated;
     });
   }, []);
@@ -524,6 +700,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       toggleHidePost,
       publishPost,
       addComment,
+      ensureCommentsForPost,
     }),
     [
       activeUserId, setActiveUserId, users, posts,
@@ -531,7 +708,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       commentsMap,
       activeUser, activeFollowersCount, activeFollowingCount,
       follow, unfollow, toggleFollow, castVote, toggleSave,
-      deletePost, toggleHidePost, publishPost, addComment,
+      deletePost, toggleHidePost, publishPost, addComment, ensureCommentsForPost,
     ],
   );
 

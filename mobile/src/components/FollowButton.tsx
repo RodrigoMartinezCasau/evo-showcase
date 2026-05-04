@@ -3,6 +3,7 @@ import { TouchableOpacity, Animated, StyleSheet } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { getClanSecondaryColor } from '@evoconn/constants/clanColors';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
+import { mockCurrentUser } from '@evoconn/data/mockUser';
 import {
   COMMUNITY_FOLLOW_BUTTON_LAYOUT,
   DETAIL_FOLLOW_BUTTON_LAYOUT,
@@ -63,6 +64,9 @@ export const FollowButton = React.memo(function FollowButton({
 }: FollowButtonProps) {
   const { isFollowing, toggleFollow } = useFollowState();
   const following = isFollowing(authorId);
+
+  // Never show the follow button on the authenticated user's own posts.
+  if (authorId === mockCurrentUser.id) return null;
 
   const scaleAnim = useRef(new Animated.Value(following ? 0 : 1)).current;
   const opacityAnim = useRef(new Animated.Value(following ? 0 : 1)).current;

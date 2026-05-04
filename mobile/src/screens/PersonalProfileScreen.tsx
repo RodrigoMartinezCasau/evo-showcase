@@ -37,6 +37,7 @@ import {
 } from '@evoconn/components/personalProfile';
 import { ProfileDetailPanel } from '@evoconn/components/ProfileDetailPanel';
 import { usePersonalProfile } from '@evoconn/hooks/PersonalProfileContext';
+import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { useAuth } from '../../mobile/lib/AuthContext';
 import type { CommunityPost } from '@evoconn/types';
 
@@ -47,6 +48,7 @@ export default function PersonalProfileScreen() {
   const insets = useSafeAreaInsets();
   const { width: screenW, height: screenH } = useWindowDimensions();
   const { profile: authProfile } = useAuth();
+  const { activeFollowersCount, activeFollowingCount } = useSimulation();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { thoughts } = useThoughts();
@@ -215,8 +217,8 @@ export default function PersonalProfileScreen() {
               userId={profileWithClan.id}
               username={profileWithClan.username}
               clanId={profileWithClan.clanId}
-              followersCount={profileWithClan.followersCount}
-              followingCount={profileWithClan.followingCount}
+              followersCount={activeFollowersCount}
+              followingCount={activeFollowingCount}
               totalPosts={posts.length}
               onPostsPress={() => router.push('/personal-posts')}
               onFollowersPress={() => router.push('/personal-followers')}

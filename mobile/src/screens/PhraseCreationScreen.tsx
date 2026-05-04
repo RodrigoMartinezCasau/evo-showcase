@@ -13,6 +13,8 @@ import { COMMUNITY_DRAWER_EDGE_ZONE_WIDTH } from '@evoconn/constants/communityDr
 import { useSidebarGesture } from '@evoconn/hooks/useSidebarGesture';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
+import { incrementProfileStat } from '@evoconn/services/supabaseSocial';
+import { recordActivity, recordUsesLog } from '@evoconn/services/streakApi';
 import { getPhraseSendButtonByHouse } from '@evoconn/utils/getPhraseSendButtonByHouse';
 import { getClanSecondaryColor } from '@evoconn/constants/clanColors';
 import {
@@ -416,6 +418,11 @@ export default function PhraseCreationScreen() {
         console.log('[STREAK] Phrase created/sent → marking streak activated.');
         markStreakActivated();
         decrementUses();
+        // Sync streak + uses to backend (fire-and-forget).
+        void recordActivity(mockCurrentUser.id, 'frase').catch(console.error);
+        void recordUsesLog(mockCurrentUser.id).catch(console.error);
+        // Increment total_quotes in Supabase profiles.
+        void incrementProfileStat(mockCurrentUser.id, 'total_quotes').catch(console.error);
         // ── Real philosophical-clan classification ─────────────────────
         // Phrases contribute to the user's clan score totals (but NOT
         // to the 30-reflection reveal threshold — that is reflection-only).

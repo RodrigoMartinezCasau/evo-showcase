@@ -46,16 +46,34 @@ function tabToFeedMode(tab: TabId): FeedMode {
   }
 }
 
-function shuffled<T>(arr: T[]): T[] {
-  const copy = [...arr];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
+/**
+ * "PARA TI" ranking algorithm.
+ * Score = net_votes × recency_boost × clan_boost
+ * - Net votes: upvotes × 2 - downvotes + saves (engagement signal)
+ * - Recency boost: ×2 if post is < 6 h old, ×1.5 if < 24 h, ×1 otherwise
+ * - Clan boost: ×1.4 if author's clan matches viewer's clan
+ * Discovery-mode: discovery posts (not from followed users) are ranked first,
+ * but followed users still appear as fallback so the feed is never empty.
+ */
+function scorePostForYou(
+  post: CommunityPost,
+  viewerClanId: string | null,
+): number {
+  const net = post.voteStats.up * 2 - post.voteStats.down + post.voteStats.save;
+  const ageMs = Date.now() - new Date(post.createdAt).getTime();
+  const ageH = ageMs / 3_600_000;
+  const recency = ageH < 6 ? 2 : ageH < 24 ? 1.5 : 1;
+  const clanBoost = viewerClanId && post.author.clanId === viewerClanId ? 1.4 : 1;
+  return net * recency * clanBoost;
 }
 
-function getDataForMode(mode: FeedMode, allPosts: CommunityPost[], followingSet?: Set<string>): CommunityPost[] {
+function getDataForMode(
+  mode: FeedMode,
+  allPosts: CommunityPost[],
+  followingSet?: Set<string>,
+  viewerClanId?: string | null,
+  viewerUserId?: string,
+): CommunityPost[] {
   switch (mode) {
     case 'following':
       if (followingSet && followingSet.size > 0) {
@@ -64,8 +82,17 @@ function getDataForMode(mode: FeedMode, allPosts: CommunityPost[], followingSet?
       return allPosts;
     case 'top':
       return [...allPosts].sort((a, b) => b.voteStats.up - a.voteStats.up);
-    case 'foryou':
-      return shuffled(allPosts);
+    case 'foryou': {
+      // Exclude own posts from discovery.
+      const others = viewerUserId
+        ? allPosts.filter((p) => p.author.id !== viewerUserId)
+        : allPosts;
+      // Sort all by score (discovery + followed mixed, discovery floats higher
+      // because followed content already lives in SIGUIENDO).
+      return [...others].sort(
+        (a, b) => scorePostForYou(b, viewerClanId ?? null) - scorePostForYou(a, viewerClanId ?? null),
+      );
+    }
   }
 }
 
@@ -136,7 +163,7 @@ export default function CommunityScreen() {
 
   const openDetailFeed = useCallback(
     (mode: FeedMode, postId?: string) => {
-      const data = getDataForMode(mode, allPosts, followingSet);
+      const data = getDataForMode(mode, allPosts, followingSet, mockCurrentUser.clanId, mockCurrentUser.id);
       let initialIndex = 0;
       if (postId) {
         const idx = data.findIndex((p) => p.id === postId);
@@ -271,14 +298,14 @@ export default function CommunityScreen() {
   const feedItemHeight = screenH - topBarHeight - bottomBarHeight;
 
   const listData = useMemo(
-    () => getDataForMode(tabToFeedMode(activeTab), allPosts, followingSet),
+    () => getDataForMode(tabToFeedMode(activeTab), allPosts, followingSet, mockCurrentUser.clanId, mockCurrentUser.id),
     [activeTab, allPosts, followingSet],
   );
 
   const transitionData = useMemo(
     () =>
       transitionTab && transitionTab !== 'search' && transitionTab !== 'para-ti'
-        ? getDataForMode(tabToFeedMode(transitionTab), allPosts, followingSet)
+        ? getDataForMode(tabToFeedMode(transitionTab), allPosts, followingSet, mockCurrentUser.clanId, mockCurrentUser.id)
         : [],
     [transitionTab, allPosts, followingSet],
   );

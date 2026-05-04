@@ -39,6 +39,8 @@ import {
 } from '@evoconn/constants/chatUserMessageLayout';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
+import { incrementProfileStat } from '@evoconn/services/supabaseSocial';
+import { recordActivity, recordUsesLog } from '@evoconn/services/streakApi';
 import { getClanColor } from '@evoconn/constants/clanColors';
 import { getChatSendButtonByHouse } from '@evoconn/utils/getChatSendButtonByHouse';
 import {
@@ -355,6 +357,11 @@ export default function ReflectionCreationScreen() {
         console.log('[STREAK] Reflection created/sent → marking streak activated.');
         markStreakActivated();
         decrementUses();
+        // Sync streak + uses to backend (fire-and-forget).
+        void recordActivity(mockCurrentUser.id, 'reflexion').catch(console.error);
+        void recordUsesLog(mockCurrentUser.id).catch(console.error);
+        // Increment total_reflections in Supabase profiles.
+        void incrementProfileStat(mockCurrentUser.id, 'total_reflections').catch(console.error);
         const pickedQuote = await selectAndUnlockQuote(text);
         const domainMeta = DOMAIN_MAP[pickedQuote.domain];
         const selectedPhrase: SelectedPhrase = {

@@ -45,7 +45,7 @@ export function requestEntryAnimation() {
 }
 
 export default function AppAnimationLayer() {
-  const { streakDays, statsLoaded } = useDebugStats();
+  const { streakDays, statsLoaded, streakTrigger } = useDebugStats();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const clanId = (activeClan ?? 'none') as string;
   const classification = useClassification();
@@ -106,19 +106,21 @@ export default function AppAnimationLayer() {
   const [showStreak, setShowStreak] = useState(false);
   const [streakCount, setStreakCount] = useState(1);
   const [prevStreakCount, setPrevStreakCount] = useState(0);
-  const prevStreakRef = useRef<number | null>(null);
+  // Track the last trigger value we acted on (0 = none yet this session).
+  const prevTriggerRef = useRef(0);
 
   useEffect(() => {
-    if (!statsLoaded) return;
-    const prev = prevStreakRef.current;
-    if (prev === null) { prevStreakRef.current = streakDays; return; }
-    if (streakDays > prev) {
-      setPrevStreakCount(prev);
-      setStreakCount(streakDays);
-      if (assetsReady && !showEntry) setShowStreak(true);
-    }
-    prevStreakRef.current = streakDays;
-  }, [streakDays, statsLoaded, showEntry, assetsReady]);
+    // Only fire when markStreakActivated() was explicitly called this session
+    // (streakTrigger > 0 and different from last handled trigger). This prevents
+    // the animation from firing on app open or user-switch hydration.
+    if (!statsLoaded || streakTrigger === 0) return;
+    if (streakTrigger === prevTriggerRef.current) return;
+    prevTriggerRef.current = streakTrigger;
+    const prev = Math.max(0, streakDays - 1);
+    setPrevStreakCount(prev);
+    setStreakCount(streakDays);
+    if (assetsReady && !showEntry) setShowStreak(true);
+  }, [streakTrigger, streakDays, statsLoaded, showEntry, assetsReady]);
 
   // ── Clan reveal / change animation ──────────────────────────────────────
   const [showClanReveal, setShowClanReveal] = useState(false);

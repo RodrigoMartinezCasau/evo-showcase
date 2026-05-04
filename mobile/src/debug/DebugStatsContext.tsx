@@ -58,6 +58,12 @@ type DebugStatsContextValue = {
   hasSentToday: boolean;
   /** True once the initial AsyncStorage DB load has completed. */
   statsLoaded: boolean;
+  /**
+   * Increments every time markStreakActivated() is explicitly called this session.
+   * Use this (not streakDays) to gate the streak celebration animation, so it
+   * only fires after a real send — never on app open or user-switch hydration.
+   */
+  streakTrigger: number;
 
   // ── Mutation helpers ──────────────────────────────────────────────────────
   /** Call after a successful reflection or phrase send (not publish). */
@@ -86,6 +92,7 @@ const Ctx = createContext<DebugStatsContextValue>({
   unlockedPhrases: 0,
   hasSentToday: false,
   statsLoaded: false,
+  streakTrigger: 0,
   markStreakActivated: () => {},
   decrementUses: () => {},
   realStreakDays: 0,
@@ -190,9 +197,15 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
   const unlockedPhrases = quotesTotalUnlocked;
 
   // ── Mutations ─────────────────────────────────────────────────────────────
+  // Counter incremented ONLY when markStreakActivated() is explicitly called
+  // (not on storage load or user-switch). Used by AppAnimationLayer to gate
+  // the streak celebration so it never fires on app open.
+  const [streakTrigger, setStreakTrigger] = useState(0);
+
   const markStreakActivated = useCallback(() => {
     console.log('[USERSTATS] markStreakActivated() for user', activeUserId);
     mutateActiveSlice((s) => applyStreakActivation(s));
+    setStreakTrigger((n) => n + 1);
   }, [mutateActiveSlice, activeUserId]);
 
   const decrementUses = useCallback(() => {
@@ -220,6 +233,7 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
       // DailyUsesScreen but the top bar now always reads from local storage.
       streakDays,
       remainingUses,
+      streakTrigger,
       unlockedPhrases,
       hasSentToday,
       statsLoaded,
@@ -240,6 +254,7 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
     [
       streakDays,
       remainingUses,
+      streakTrigger,
       unlockedPhrases,
       hasSentToday,
       statsLoaded,

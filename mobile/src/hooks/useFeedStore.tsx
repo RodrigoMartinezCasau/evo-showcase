@@ -133,7 +133,8 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
             recipientUserId: post.authorId,
             type: 'upvote_post',
             fromUserId: sim.activeUserId,
-            fromUsername: voter?.username ?? sim.activeUserId,
+            // For real users, sim.users won't have an entry — fall back to mockCurrentUser.
+            fromUsername: voter?.username ?? mockCurrentUser.username,
             targetPostId: postId,
           });
         }
