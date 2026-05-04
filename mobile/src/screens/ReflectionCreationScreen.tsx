@@ -41,6 +41,7 @@ import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { incrementProfileStat } from '@evoconn/services/supabaseSocial';
 import { recordActivity, recordUsesLog } from '@evoconn/services/streakApi';
+import { AI_TEXT_SCALE } from '@evoconn/constants/textScale';
 import { getClanColor } from '@evoconn/constants/clanColors';
 import { getChatSendButtonByHouse } from '@evoconn/utils/getChatSendButtonByHouse';
 import {
@@ -919,8 +920,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     width: '100%',
   },
-  userText: { color: evoconnColors.text, fontSize: 15, lineHeight: 22 },
-  aiText: { color: evoconnColors.text, fontSize: 15, lineHeight: 22 },
+  userText: { color: evoconnColors.text, fontSize: AI_TEXT_SCALE.introFontSize, lineHeight: AI_TEXT_SCALE.introLineHeight },
+  aiText: { color: evoconnColors.text, fontSize: AI_TEXT_SCALE.introFontSize, lineHeight: AI_TEXT_SCALE.introLineHeight },
 
 
   errorBox: {

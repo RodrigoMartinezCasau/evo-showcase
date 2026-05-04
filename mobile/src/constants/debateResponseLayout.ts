@@ -1,6 +1,9 @@
 /**
  * Editable layout constants for the structured AI response display.
  *
+ * ⚡ Para cambiar el TAMAÑO DE FUENTE de los textos de la IA,
+ *    edita src/constants/textScale.ts — no este archivo.
+ *
  * Each card (ArgumentCard, QuestionCard, DebateQuoteCard, PublishBlock)
  * pulls values from here so you can tweak spacing/sizes in one place.
  */
@@ -8,6 +11,8 @@
 /* ──────────────────────────────────────────────
  * PART 1 — Individual gaps between blocks
  * ────────────────────────────────────────────── */
+
+import { AI_TEXT_SCALE } from './textScale';
 
 /**
  * ── INTER-BLOCK SPACING ──────────────────────────────
@@ -267,29 +272,29 @@ export const AI_RESPONSE_LAYOUT = {
 
   /* ── B) Display titles (block headers) ── */
   displayTitles: {
-    posture:      { offsetX: -10, offsetY: -15, fontSize: 22, lineHeight: 0 } as TextEditor,
-    counterpoint: { offsetX: -10, offsetY: -15, fontSize: 22, lineHeight: 0 } as TextEditor,
-    question:     { offsetX: -10, offsetY: -2, fontSize: 20, lineHeight: 0 } as TextEditor,
-    quote:        { offsetX: -10, offsetY: -2, fontSize: 20, lineHeight: 0 } as TextEditor,
-    publish:      { offsetX: -220, offsetY: -0, fontSize: 20, lineHeight: 0 } as TextEditor,
+    posture:      { offsetX: -10, offsetY: -15, fontSize: AI_TEXT_SCALE.sectionHeaderFontSize, lineHeight: 0 } as TextEditor,
+    counterpoint: { offsetX: -10, offsetY: -15, fontSize: AI_TEXT_SCALE.sectionHeaderFontSize, lineHeight: 0 } as TextEditor,
+    question:     { offsetX: -10, offsetY: -2,  fontSize: AI_TEXT_SCALE.sectionHeaderFontSize, lineHeight: 0 } as TextEditor,
+    quote:        { offsetX: -10, offsetY: -2,  fontSize: AI_TEXT_SCALE.sectionHeaderFontSize, lineHeight: 0 } as TextEditor,
+    publish:      { offsetX: -220, offsetY: -0, fontSize: AI_TEXT_SCALE.sectionHeaderFontSize, lineHeight: 0 } as TextEditor,
   },
 
   /* ── C) Body container (moves all points + bullets as a group) ── */
   bodyContainer: { offsetX: 0, offsetY: -15 },
 
   /* ── D) Point titles (numbered headings inside cards) ── */
-  pointTitles: { offsetX: 0, offsetY: 0, fontSize: 16, lineHeight: 22 } as TextEditor,
+  pointTitles: { offsetX: 0, offsetY: 0, fontSize: AI_TEXT_SCALE.pointTitleFontSize, lineHeight: AI_TEXT_SCALE.pointTitleLineHeight } as TextEditor,
 
   /* ── E) Point bullets / gray text ── */
-  pointBullets: { offsetX: 0, offsetY: 0, fontSize: 14, lineHeight: 23 } as TextEditor,
+  pointBullets: { offsetX: 0, offsetY: 0, fontSize: AI_TEXT_SCALE.pointBulletFontSize, lineHeight: AI_TEXT_SCALE.pointBulletLineHeight } as TextEditor,
 
   /* ── F) Summary container (moves label + body as a group) ── */
   summaryContainer: { offsetX: 0, offsetY: 0 },
 
   /* ── G) Summary section ── */
   summary: {
-    label: { offsetX: 0, offsetY: 0, fontSize: 11, lineHeight: 16 } as TextEditor,
-    body:  { offsetX: 0, offsetY: 0, fontSize: 13, lineHeight: 22 } as TextEditor,
+    label: { offsetX: 0, offsetY: 0, fontSize: AI_TEXT_SCALE.summaryLabelFontSize, lineHeight: AI_TEXT_SCALE.summaryLabelLineHeight } as TextEditor,
+    body:  { offsetX: 0, offsetY: 0, fontSize: AI_TEXT_SCALE.summaryBodyFontSize, lineHeight: AI_TEXT_SCALE.summaryBodyLineHeight } as TextEditor,
   },
 } as const;
 
@@ -382,10 +387,10 @@ export const AI_SPECIAL_BLOCK_LAYOUT = {
   },
 
   /* ── C) Text editors — Pregunta Reflexiva ── */
-  questionText: { offsetX: 0, offsetY: 0, fontSize: 13, lineHeight: 18, color: '#E0E0E0' },
+  questionText: { offsetX: 0, offsetY: 0, fontSize: AI_TEXT_SCALE.questionFontSize, lineHeight: AI_TEXT_SCALE.questionLineHeight, color: '#E0E0E0' },
 
   /* ── D) Text editors — Cita Textual ── */
-  quoteText:        { offsetX: 0, offsetY: 0, fontSize: 13, lineHeight: 18, color: '#FFFFFF' },
+  quoteText:        { offsetX: 0, offsetY: 0, fontSize: AI_TEXT_SCALE.quoteFontSize, lineHeight: AI_TEXT_SCALE.quoteLineHeight, color: '#FFFFFF' },
   quoteAuthor:      { offsetX: 0, offsetY: 0, fontSize: 11, lineHeight: 0,  color: '#808080' },
   unlockedLabel:    { offsetX: 0, offsetY: 0, fontSize: 9,  lineHeight: 0,  color: '#C7FF02' },
   widgetButtonText: { offsetX: 0, offsetY: 0, fontSize: 10, lineHeight: 0,  color: '#C7FF02' },

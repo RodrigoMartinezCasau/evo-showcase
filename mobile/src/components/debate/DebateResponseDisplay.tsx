@@ -16,6 +16,7 @@ import {
 import { ArgumentCard, type ArgumentPointData } from './ArgumentCard';
 import { QuestionCard } from './QuestionCard';
 import { DebateQuoteCard } from './DebateQuoteCard';
+import { AI_TEXT_SCALE } from '@evoconn/constants/textScale';
 
 type Props = {
   response: DebateResponse;
@@ -194,8 +195,8 @@ export const DebateResponseDisplay = React.memo(function DebateResponseDisplay({
 const styles = StyleSheet.create({
   introText: {
     color: '#D8D8D8',
-    fontSize: 15,
-    lineHeight: 24,
+    fontSize: AI_TEXT_SCALE.introFontSize,
+    lineHeight: AI_TEXT_SCALE.introLineHeight,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },

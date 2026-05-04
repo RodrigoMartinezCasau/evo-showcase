@@ -107,6 +107,9 @@ export function useVoiceInput({ onTranscriptReady }: Options): UseVoiceInputResu
   // NATIVE PATH
   // ═══════════════════════════════════════════════════════════════════════════
 
+  // Stores the best transcript captured so far from isFinal result events.
+  const finalTranscriptRef = useRef('');
+
   const startNative = useCallback(async () => {
     if (!speechModule) return;
 
@@ -123,46 +126,43 @@ export function useVoiceInput({ onTranscriptReady }: Options): UseVoiceInputResu
     }
 
     cancelledRef.current = false;
+    finalTranscriptRef.current = '';
     setVoiceState('recording');
     setInterimText('');
     startAnimations();
 
-    // Interim results → show live text while speaking
+    // Capture interim text AND the final transcript from the result event.
+    // expo-speech-recognition does NOT emit a separate 'finalresult' event —
+    // the final result arrives as a result with isFinal: true.
     listenersRef.current.push(
       speechModule.addListener('result', (e: unknown) => {
         const ev = e as { results?: Array<{ transcript?: string; isFinal?: boolean }> };
         const r = ev.results?.[0];
         if (!r) return;
+        const text = r.transcript ?? '';
         if (r.isFinal) {
-          // Final result delivered via end/finalresult; clear interim
+          finalTranscriptRef.current = text;
           setInterimText('');
         } else {
-          setInterimText(r.transcript ?? '');
+          setInterimText(text);
+          // Keep updating the best known transcript so stopRecording works too.
+          if (text) finalTranscriptRef.current = text;
         }
       }),
     );
 
-    // Recognition ended (user pressed stop or auto-end)
+    // Recognition ended — deliver whatever transcript we captured.
     listenersRef.current.push(
       speechModule.addListener('end', (_e: unknown) => {
+        clearTimers(); setVolume(0);
+        removeListeners();
         if (cancelledRef.current) {
-          clearTimers(); setVolume(0);
           setVoiceState('idle'); setInterimText('');
-          removeListeners();
           return;
         }
-        clearTimers(); setVolume(0);
-        setVoiceState('transcribing');
-      }),
-    );
-
-    // Final transcript
-    listenersRef.current.push(
-      speechModule.addListener('finalresult', (e: unknown) => {
-        const ev = e as { results?: Array<{ transcript?: string }> };
-        const transcript = ev.results?.[0]?.transcript ?? '';
-        removeListeners();
-        if (!cancelledRef.current && transcript) {
+        const transcript = finalTranscriptRef.current;
+        finalTranscriptRef.current = '';
+        if (transcript) {
           onTranscriptReady(transcript);
         }
         setInterimText('');
@@ -174,6 +174,7 @@ export function useVoiceInput({ onTranscriptReady }: Options): UseVoiceInputResu
       speechModule.addListener('error', (_e: unknown) => {
         clearTimers(); removeListeners();
         setVoiceState('idle'); setInterimText(''); setVolume(0);
+        finalTranscriptRef.current = '';
       }),
     );
 

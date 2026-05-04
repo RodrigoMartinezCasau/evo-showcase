@@ -204,9 +204,16 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
 
   const markStreakActivated = useCallback(() => {
     console.log('[USERSTATS] markStreakActivated() for user', activeUserId);
+    // Only fire the streak celebration animation on the FIRST send of the day
+    // (when the fire icon transitions from grey → clan color).
+    // If the user already sent something today, hasSentToday is true and the
+    // fire is already lit — no animation needed.
+    const isFirstSendToday = activeSlice.hasSentTodayDate !== getLocalDayKey();
     mutateActiveSlice((s) => applyStreakActivation(s));
-    setStreakTrigger((n) => n + 1);
-  }, [mutateActiveSlice, activeUserId]);
+    if (isFirstSendToday) {
+      setStreakTrigger((n) => n + 1);
+    }
+  }, [mutateActiveSlice, activeUserId, activeSlice]);
 
   const decrementUses = useCallback(() => {
     console.log('[USERSTATS] decrementUses() for user', activeUserId);

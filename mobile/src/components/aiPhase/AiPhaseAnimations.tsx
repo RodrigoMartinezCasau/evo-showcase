@@ -24,6 +24,7 @@ import {
   AI_THINKING_STAR_LAYOUT as THINK_STAR,
   AI_INTRO_TYPING_LAYOUT as INTRO_TYPING,
 } from '@evoconn/constants/chatInputBarLayout';
+import { AI_TEXT_SCALE } from '@evoconn/constants/textScale';
 import EstrellaComunidadSvg from '../../assets/sidebar/estrellaComunidadSvg/estrellaComunidad.svg';
 
 /** Pulsing white star shown while the AI is generating. */
@@ -132,8 +133,8 @@ const styles = StyleSheet.create({
   },
   introTypewriterText: {
     color: evoconnColors.text,
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: AI_TEXT_SCALE.introFontSize,
+    lineHeight: AI_TEXT_SCALE.introLineHeight,
     opacity: 0.95,
   },
 });
