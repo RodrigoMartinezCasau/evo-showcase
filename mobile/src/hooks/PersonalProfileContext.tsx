@@ -29,7 +29,8 @@ import {
   type SimPost,
   type SimUser,
 } from '@evoconn/data/simulation/simulatedNetwork';
-import { fetchProfilesBatch, type BasicProfile } from '@evoconn/services/supabaseSocial';
+import { fetchProfilesBatch, setPostHidden, isRealUserId, type BasicProfile } from '@evoconn/services/supabaseSocial';
+import { useAuth } from '../../mobile/lib/AuthContext';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -144,9 +145,17 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
     [sim, activeUserId],
   );
 
+  const { session } = useAuth();
   const toggleHidePost = useCallback(
-    (id: string) => sim.toggleHidePost(activeUserId, id),
-    [sim, activeUserId],
+    (id: string) => {
+      sim.toggleHidePost(activeUserId, id);
+      // Sync hidden state to Supabase for real users
+      if (session?.user && isRealUserId(activeUserId)) {
+        const willBeHidden = !((sim.hiddenMap[activeUserId] ?? new Set()).has(id));
+        setPostHidden(id, willBeHidden).catch(console.error);
+      }
+    },
+    [sim, activeUserId, session],
   );
 
   const isHidden = useCallback(

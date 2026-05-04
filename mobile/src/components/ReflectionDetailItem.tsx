@@ -31,6 +31,8 @@ import { usePersonalProfile } from '@evoconn/hooks/PersonalProfileContext';
 import { useNotifications } from '@evoconn/hooks/NotificationsContext';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import type { SimComment } from '@evoconn/data/simulation/simulatedNetwork';
+import { blockUser, insertReport, isRealUserId } from '@evoconn/services/supabaseSocial';
+import { useAuth } from '../../mobile/lib/AuthContext';
 
 type ReflectionDetailItemProps = {
   post: CommunityPost;
@@ -129,10 +131,14 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   }, [commentsMap, post.id, simUsers]);
 
   const [blockedUsers, setBlockedUsers] = useState<Set<string>>(new Set());
+  const { session } = useAuth();
 
-  const handleBlockUser = useCallback((userId: string) => {
+  const handleBlockUser = useCallback(async (userId: string) => {
     setBlockedUsers((prev) => new Set(prev).add(userId));
-  }, []);
+    if (session?.user && isRealUserId(session.user.id) && isRealUserId(userId)) {
+      await blockUser(session.user.id, userId).catch(console.error);
+    }
+  }, [session]);
 
   const { addNotification } = useNotifications();
 
@@ -186,7 +192,40 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
       {
         text: 'Denunciar publicación',
         onPress: () => {
-          Alert.alert('Publicación denunciada', 'Gracias por tu reporte.');
+          Alert.alert(
+            'Denunciar publicación',
+            '¿Por qué quieres denunciar esta publicación?',
+            [
+              {
+                text: 'Contenido inapropiado',
+                onPress: async () => {
+                  if (session?.user) {
+                    await insertReport({ reporterId: session.user.id, targetType: 'post', targetId: post.id, reason: 'Contenido inapropiado' }).catch(console.error);
+                  }
+                  Alert.alert('Publicación denunciada', 'Gracias por tu reporte. Lo revisaremos pronto.');
+                },
+              },
+              {
+                text: 'Spam',
+                onPress: async () => {
+                  if (session?.user) {
+                    await insertReport({ reporterId: session.user.id, targetType: 'post', targetId: post.id, reason: 'Spam' }).catch(console.error);
+                  }
+                  Alert.alert('Publicación denunciada', 'Gracias por tu reporte. Lo revisaremos pronto.');
+                },
+              },
+              {
+                text: 'Acoso o abuso',
+                onPress: async () => {
+                  if (session?.user) {
+                    await insertReport({ reporterId: session.user.id, targetType: 'post', targetId: post.id, reason: 'Acoso o abuso' }).catch(console.error);
+                  }
+                  Alert.alert('Publicación denunciada', 'Gracias por tu reporte. Lo revisaremos pronto.');
+                },
+              },
+              { text: 'Cancelar', style: 'cancel' },
+            ],
+          );
         },
       },
       {

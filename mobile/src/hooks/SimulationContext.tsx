@@ -58,6 +58,7 @@ const SIM_VOTES_STORAGE_KEY    = '@physicscopilot/sim_votes_v2';
 const SIM_FOLLOW_STORAGE_KEY   = '@physicscopilot/sim_follow_v2';
 const SIM_COMMENTS_STORAGE_KEY = '@physicscopilot/sim_comments_v3';
 const SIM_SAVED_STORAGE_KEY    = '@physicscopilot/sim_saved_v1';
+const SIM_HIDDEN_STORAGE_KEY   = '@physicscopilot/sim_hidden_v1';
 
 // ─── State initialisers ───────────────────────────────────────────────────────
 
@@ -449,7 +450,25 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     if (!savedHydrated.current) return;
     AsyncStorage.setItem(SIM_SAVED_STORAGE_KEY, JSON.stringify(savedMapArr)).catch(console.error);
   }, [savedMapArr]);
+  const hiddenHydrated = useRef(false);
   const [hiddenMapArr, setHiddenMapArr] = useState<Record<string, string[]>>({});
+
+  // Load persisted hidden map on mount.
+  useEffect(() => {
+    AsyncStorage.getItem(SIM_HIDDEN_STORAGE_KEY)
+      .then((raw) => {
+        if (raw) {
+          try { setHiddenMapArr(JSON.parse(raw)); } catch {}
+        }
+      })
+      .finally(() => { hiddenHydrated.current = true; });
+  }, []);
+
+  // Persist hidden map on every change after initial hydration.
+  useEffect(() => {
+    if (!hiddenHydrated.current) return;
+    AsyncStorage.setItem(SIM_HIDDEN_STORAGE_KEY, JSON.stringify(hiddenMapArr)).catch(console.error);
+  }, [hiddenMapArr]);
 
   // Convert array-based maps to Set-based maps (memoised) for O(1) lookups by consumers
   const followGraph_sets = useMemo<Record<string, Set<string>>>(

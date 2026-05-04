@@ -9,7 +9,20 @@
  */
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../mobile/lib/supabase';
+
+const NOTIFS_KEY = '@evo/notifications_enabled';
+
+async function areNotificationsEnabled(): Promise<boolean> {
+  try {
+    const val = await AsyncStorage.getItem(NOTIFS_KEY);
+    // Default to true if not set
+    return val === null || val === 'true';
+  } catch {
+    return true;
+  }
+}
 
 // Configurar cómo se muestran las notificaciones cuando la app está en primer plano.
 Notifications.setNotificationHandler({
@@ -72,6 +85,9 @@ export async function showLocalNotification(
   body: string,
 ): Promise<void> {
   try {
+    const enabled = await areNotificationsEnabled();
+    if (!enabled) return;
+
     await Notifications.scheduleNotificationAsync({
       content: {
         title,

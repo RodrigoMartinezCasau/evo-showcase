@@ -127,12 +127,16 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
         });
       }
       // Convert SimPost → CommunityPost for the slider.
+      // Use the already-fetched profile username so posts always show the real name.
+      const resolvedUsername = data?.username
+        ? '@' + data.username.toUpperCase()
+        : null;
       setSupabasePosts(posts.map(p => ({
         id: p.id,
         type: p.type,
         author: {
           id: p.authorId,
-          username: p.authorUsername ?? '?',
+          username: resolvedUsername ?? (p.authorUsername && p.authorUsername.length < 36 ? p.authorUsername : '?'),
           clanId: p.authorClanId ?? null,
           rank: p.authorRank ?? 'aprendiz',
         },

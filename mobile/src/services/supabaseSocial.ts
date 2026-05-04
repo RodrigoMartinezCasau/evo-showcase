@@ -46,6 +46,7 @@ export async function fetchAllPosts(): Promise<SimPost[]> {
   const { data, error } = await supabase
     .from('posts')
     .select('*')
+    .eq('is_hidden', false)
     .order('created_at', { ascending: false })
     .limit(200);
   if (error) { console.error('[Social] fetchAllPosts:', error.message); return []; }
@@ -310,6 +311,101 @@ export async function markNotificationsRead(userId: string): Promise<void> {
     .eq('recipient_id', userId)
     .eq('read', false);
   if (error) console.error('[Social] markNotificationsRead:', error.message);
+}
+
+// ─── Hide post ────────────────────────────────────────────────────────────────
+
+/** Toggle is_hidden on a post. Returns the new hidden state. */
+export async function setPostHidden(postId: string, isHidden: boolean): Promise<void> {
+  const { error } = await supabase
+    .from('posts')
+    .update({ is_hidden: isHidden })
+    .eq('id', postId);
+  if (error) console.error('[Social] setPostHidden:', error.message);
+}
+
+// ─── Blocks ───────────────────────────────────────────────────────────────────
+
+export async function blockUser(blockerId: string, blockedId: string): Promise<void> {
+  const { error } = await supabase
+    .from('blocks')
+    .upsert({ blocker_id: blockerId, blocked_id: blockedId }, { onConflict: 'blocker_id,blocked_id' });
+  if (error) console.error('[Social] blockUser:', error.message);
+}
+
+export async function unblockUser(blockerId: string, blockedId: string): Promise<void> {
+  const { error } = await supabase
+    .from('blocks')
+    .delete()
+    .eq('blocker_id', blockerId)
+    .eq('blocked_id', blockedId);
+  if (error) console.error('[Social] unblockUser:', error.message);
+}
+
+export interface BlockedProfile {
+  blockedId: string;
+  username: string;
+  clanId: string | null;
+}
+
+export async function fetchBlockedUsers(blockerId: string): Promise<BlockedProfile[]> {
+  const { data, error } = await supabase
+    .from('blocks')
+    .select('blocked_id, profiles!blocked_id(username, clan_id)')
+    .eq('blocker_id', blockerId);
+  if (error) { console.error('[Social] fetchBlockedUsers:', error.message); return []; }
+  return (data ?? []).map((row: Record<string, unknown>) => {
+    const profile = (row.profiles as Record<string, unknown> | null) ?? {};
+    const rawUsername = profile.username as string | null;
+    return {
+      blockedId: row.blocked_id as string,
+      username: rawUsername ? '@' + rawUsername.toUpperCase() : '@' + (row.blocked_id as string).slice(0, 8),
+      clanId: (profile.clan_id as string | null) ?? null,
+    };
+  });
+}
+
+// ─── Reports ──────────────────────────────────────────────────────────────────
+
+export interface ReportInsert {
+  reporterId: string;
+  targetType: 'post' | 'user' | 'comment' | 'bug';
+  targetId?: string;
+  reason: string;
+}
+
+export async function insertReport(r: ReportInsert): Promise<void> {
+  const { error } = await supabase.from('reports').insert({
+    reporter_id: r.reporterId,
+    target_type: r.targetType,
+    target_id: r.targetId ?? null,
+    reason: r.reason,
+  });
+  if (error) console.error('[Social] insertReport:', error.message);
+}
+
+export interface Report {
+  id: string;
+  targetType: string;
+  targetId: string | null;
+  reason: string;
+  createdAt: string;
+}
+
+export async function fetchMyReports(reporterId: string): Promise<Report[]> {
+  const { data, error } = await supabase
+    .from('reports')
+    .select('id, target_type, target_id, reason, created_at')
+    .eq('reporter_id', reporterId)
+    .order('created_at', { ascending: false });
+  if (error) { console.error('[Social] fetchMyReports:', error.message); return []; }
+  return (data ?? []).map((r: Record<string, unknown>) => ({
+    id: r.id as string,
+    targetType: r.target_type as string,
+    targetId: r.target_id as string | null,
+    reason: r.reason as string,
+    createdAt: r.created_at as string,
+  }));
 }
 
 // ─── Mapping helpers ──────────────────────────────────────────────────────────
