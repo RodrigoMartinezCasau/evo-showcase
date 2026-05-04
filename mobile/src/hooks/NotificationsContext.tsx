@@ -37,6 +37,8 @@ import {
   insertNotification,
   markNotificationsRead,
 } from '@evoconn/services/supabaseSocial';
+import { supabase } from '../../mobile/lib/supabase';
+import { showLocalNotification, registerPushToken } from '@evoconn/services/pushNotifications';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -100,6 +102,63 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         .catch(() => {});
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeUserId]);
+
+  // ── Register push token when a real user is active ───────────────────────
+  useEffect(() => {
+    if (!isRealUserId(activeUserId)) return;
+    registerPushToken(activeUserId).catch(console.error);
+  }, [activeUserId]);
+
+  // ── Realtime subscription — new notifications arrive instantly ───────────
+  useEffect(() => {
+    if (!isRealUserId(activeUserId)) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const channel = supabase
+      .channel(`notifications:${activeUserId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `recipient_id=eq.${activeUserId}`,
+        },
+        (payload: { new: Record<string, unknown> }) => {
+          const r = payload.new;
+          const notif: AppNotification = {
+            id: String(r.id ?? ''),
+            type: (r.type as NotificationType) ?? 'upvote',
+            fromUserId: String(r.from_user_id ?? ''),
+            fromUsername: String(r.from_username ?? ''),
+            targetPostId: r.post_id ? String(r.post_id) : undefined,
+            targetCommentId: r.comment_id ? String(r.comment_id) : undefined,
+            textPreview: r.text_preview ? String(r.text_preview) : undefined,
+            createdAt: String(r.created_at ?? new Date().toISOString()),
+            read: false,
+          };
+          setDb(prev => ({
+            ...prev,
+            [activeUserId]: [notif, ...(prev[activeUserId] ?? [])],
+          }));
+          // Only show native push (sound + vibration) for follow and comment.
+          // Likes, dislikes and saves are shown in the in-app bell only.
+          if (notif.type === 'follow' || notif.type === 'comment') {
+            const titleMap: Record<string, string> = {
+              comment: '💬 Nuevo comentario',
+              follow: '✨ Nuevo seguidor',
+            };
+            const title = titleMap[notif.type] ?? 'EVO';
+            const body = notif.fromUsername
+              ? `${notif.fromUsername}${notif.textPreview ? `: "${notif.textPreview}"` : ''}`
+              : 'Tienes una nueva notificación';
+            showLocalNotification(title, body).catch(console.error);
+          }
+        },
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [activeUserId]);
 
   // ── Core mutation (write-through) ────────────────────────────────────────

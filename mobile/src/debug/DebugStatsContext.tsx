@@ -25,6 +25,7 @@ import React, {
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { useQuotes } from '@evoconn/hooks/QuotesContext';
 import { useAuth } from '../../mobile/lib/AuthContext';
+import { scheduleStreakReminder, cancelStreakReminder } from '@evoconn/services/pushNotifications';
 import {
   loadStatsDB,
   saveStatsDB,
@@ -148,6 +149,19 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // ── Streak reminder at 22:00 if user hasn't sent today ───────────────────
+  useEffect(() => {
+    if (!statsLoaded) return;
+    const todaySent = activeSlice.hasSentTodayDate === getLocalDayKey();
+    if (!todaySent) {
+      scheduleStreakReminder().catch(console.error);
+    } else {
+      cancelStreakReminder().catch(console.error);
+    }
+  // Run once when stats load, and whenever the day changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statsLoaded, activeUserId]);
+
   // ── Day-rollover detection ────────────────────────────────────────────────
   const [currentDay, setCurrentDay] = useState(() => getLocalDayKey());
   useEffect(() => {
@@ -204,14 +218,12 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
 
   const markStreakActivated = useCallback(() => {
     console.log('[USERSTATS] markStreakActivated() for user', activeUserId);
-    // Only fire the streak celebration animation on the FIRST send of the day
-    // (when the fire icon transitions from grey → clan color).
-    // If the user already sent something today, hasSentToday is true and the
-    // fire is already lit — no animation needed.
     const isFirstSendToday = activeSlice.hasSentTodayDate !== getLocalDayKey();
     mutateActiveSlice((s) => applyStreakActivation(s));
     if (isFirstSendToday) {
       setStreakTrigger((n) => n + 1);
+      // Cancel the streak reminder — user has already reflected today.
+      cancelStreakReminder().catch(console.error);
     }
   }, [mutateActiveSlice, activeUserId, activeSlice]);
 

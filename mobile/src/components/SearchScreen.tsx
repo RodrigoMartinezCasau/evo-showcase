@@ -14,6 +14,7 @@ import { SEARCH_LAYOUT as SL } from '../constants/searchScreenLayout';
 import { mockSearchableUsers } from '../data/mockSearchUsers';
 import { searchUsers, type ScoredUser } from '../utils/searchUsers';
 import { UserResultCard } from './UserResultCard';
+import { searchSupabaseUsers } from '../services/supabaseSocial';
 
 const MAX_RECENTS = 10;
 const DEBOUNCE_MS = 250;
@@ -55,10 +56,31 @@ export function SearchScreen({ onUserPress }: SearchScreenProps) {
     };
   }, []);
 
-  const results: ScoredUser[] = useMemo(
+  const [supabaseResults, setSupabaseResults] = useState<ScoredUser[]>([]);
+  useEffect(() => {
+    if (!debouncedQuery.trim()) { setSupabaseResults([]); return; }
+    searchSupabaseUsers(debouncedQuery).then(profiles => {
+      setSupabaseResults(profiles.map(p => ({
+        id: p.id,
+        username: p.username,
+        clanId: p.clanId,
+        rank: p.rank as ScoredUser['rank'],
+        score: 1,
+      })));
+    });
+  }, [debouncedQuery]);
+
+  const localResults = useMemo(
     () => searchUsers(debouncedQuery, mockSearchableUsers),
     [debouncedQuery],
   );
+
+  // Merge: Supabase results first, then local sim results not already in Supabase.
+  const results: ScoredUser[] = useMemo(() => {
+    const sbIds = new Set(supabaseResults.map(r => r.id));
+    const localOnly = localResults.filter(r => !sbIds.has(r.id));
+    return [...supabaseResults, ...localOnly];
+  }, [supabaseResults, localResults]);
 
   const addRecent = useCallback((term: string) => {
     const trimmed = term.trim();

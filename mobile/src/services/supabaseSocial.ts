@@ -226,6 +226,48 @@ export async function fetchFollowCounts(
   };
 }
 
+// ─── Profiles batch fetch ─────────────────────────────────────────────────────
+
+export type BasicProfile = {
+  id: string;
+  username: string;
+  clanId: string | null;
+  rank: string;
+};
+
+/** Fetch basic profile info for a list of user IDs (for followers/following display). */
+export async function fetchProfilesBatch(userIds: string[]): Promise<BasicProfile[]> {
+  if (userIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, username, clan_id, rank')
+    .in('id', userIds);
+  if (error) { console.error('[Social] fetchProfilesBatch:', error.message); return []; }
+  return (data ?? []).map(r => ({
+    id: r.id,
+    username: r.username ? `@${r.username.toUpperCase()}` : `@${r.id.slice(0, 8)}`,
+    clanId: r.clan_id ?? null,
+    rank: r.rank ?? 'aprendiz',
+  }));
+}
+
+/** Search users by username prefix/substring in Supabase profiles. */
+export async function searchSupabaseUsers(query: string): Promise<BasicProfile[]> {
+  if (!query.trim()) return [];
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, username, clan_id, rank')
+    .ilike('username', `%${query.trim()}%`)
+    .limit(30);
+  if (error) { console.error('[Social] searchSupabaseUsers:', error.message); return []; }
+  return (data ?? []).map(r => ({
+    id: r.id,
+    username: r.username ?? r.id.slice(0, 8),
+    clanId: r.clan_id ?? null,
+    rank: r.rank ?? 'aprendiz',
+  }));
+}
+
 // ─── Profile stats ────────────────────────────────────────────────────────────
 
 /** Increment total_reflections or total_quotes in the profiles table. */

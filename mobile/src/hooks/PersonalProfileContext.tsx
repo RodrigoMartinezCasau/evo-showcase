@@ -16,7 +16,10 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
+  useState,
 } from 'react';
 import type { CommunityPost, User } from '@evoconn/types';
 import type { FollowerEntry, FollowingEntry } from '@evoconn/data/mockPersonalProfile';
@@ -26,6 +29,7 @@ import {
   type SimPost,
   type SimUser,
 } from '@evoconn/data/simulation/simulatedNetwork';
+import { fetchProfilesBatch, type BasicProfile } from '@evoconn/services/supabaseSocial';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -93,6 +97,35 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
   const sim = useSimulation();
   const { activeUserId, users, posts: simPosts, followGraph, savedMap, hiddenMap } = sim;
 
+  // Cache of Supabase profiles for real UUID users not in SIM_USERS_BY_ID.
+  const [profileCache, setProfileCache] = useState<Record<string, BasicProfile>>({});
+  const fetchingRef = useRef<Set<string>>(new Set());
+
+  // Collect all unknown UUIDs from followers + following, batch-fetch their profiles.
+  useEffect(() => {
+    const allUids = new Set<string>();
+    // Followers: UIDs that follow activeUserId.
+    Object.entries(followGraph)
+      .filter(([, set]) => set.has(activeUserId))
+      .forEach(([uid]) => { if (!users[uid] && !SIM_USERS_BY_ID[uid]) allUids.add(uid); });
+    // Following: UIDs that activeUserId follows.
+    const myFollowing = followGraph[activeUserId] ?? new Set<string>();
+    myFollowing.forEach(uid => { if (!users[uid] && !SIM_USERS_BY_ID[uid]) allUids.add(uid); });
+
+    const toFetch = [...allUids].filter(uid => !profileCache[uid] && !fetchingRef.current.has(uid));
+    if (toFetch.length === 0) return;
+    toFetch.forEach(uid => fetchingRef.current.add(uid));
+    fetchProfilesBatch(toFetch).then(profiles => {
+      setProfileCache(prev => {
+        const next = { ...prev };
+        profiles.forEach(p => { next[p.id] = p; });
+        return next;
+      });
+      toFetch.forEach(uid => fetchingRef.current.delete(uid));
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [followGraph, activeUserId, users]);
+
   // ── Posts ──────────────────────────────────────────────────────────────────
   const posts = useMemo<CommunityPost[]>(
     () => simPosts
@@ -127,12 +160,12 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
       .filter(([, followingSet]) => followingSet.has(activeUserId))
       .map(([uid]) => {
         const u = users[uid];
-        // For real users (UUID not in sim), show a truncated identifier.
-        return u
-          ? { id: u.id, username: u.username, clanId: u.clanId, rank: u.rank }
-          : { id: uid, username: `@${uid.slice(0, 8)}`, clanId: null, rank: 'aprendiz' as const };
+        if (u) return { id: u.id, username: u.username, clanId: u.clanId, rank: u.rank };
+        const cached = profileCache[uid];
+        if (cached) return { id: cached.id, username: cached.username, clanId: cached.clanId, rank: cached.rank as FollowerEntry['rank'] };
+        return { id: uid, username: `@${uid.slice(0, 8)}`, clanId: null, rank: 'aprendiz' as const };
       });
-  }, [followGraph, activeUserId, users]);
+  }, [followGraph, activeUserId, users, profileCache]);
 
   // ── Following ──────────────────────────────────────────────────────────────
   const following = useMemo<FollowingEntry[]>(() => {
@@ -140,12 +173,12 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
     return [...myFollowing]
       .map(uid => {
         const u = users[uid];
-        // For real users (UUID not in sim), show a truncated identifier.
-        return u
-          ? { id: u.id, username: u.username, clanId: u.clanId, rank: u.rank }
-          : { id: uid, username: `@${uid.slice(0, 8)}`, clanId: null, rank: 'aprendiz' as const };
+        if (u) return { id: u.id, username: u.username, clanId: u.clanId, rank: u.rank };
+        const cached = profileCache[uid];
+        if (cached) return { id: cached.id, username: cached.username, clanId: cached.clanId, rank: cached.rank as FollowingEntry['rank'] };
+        return { id: uid, username: `@${uid.slice(0, 8)}`, clanId: null, rank: 'aprendiz' as const };
       });
-  }, [followGraph, activeUserId, users]);
+  }, [followGraph, activeUserId, users, profileCache]);
 
   // followingBackIds = users I already follow back (who are in my followers list)
   const followingBackIds = useMemo<Set<string>>(() => {
