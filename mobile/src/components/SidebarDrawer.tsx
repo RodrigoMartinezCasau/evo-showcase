@@ -10,6 +10,7 @@ import {
   Easing,
   Keyboard,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -122,6 +123,8 @@ export function SidebarDrawer({
   }, [visible, openProgressProp]);
 
   const insets = useSafeAreaInsets();
+  const { width: screenW } = useWindowDimensions();
+  const isSmallScreen = screenW < 420;
   const StarSvg = getSidebarStarSvgByHouse(user.clanId);
   const communityButtonSource = getCommunityButtonByHouse(user.clanId);
   const newReflectionButtonSource = getNewReflectionButtonByHouse(user.clanId);
@@ -147,7 +150,7 @@ export function SidebarDrawer({
         style={[
           styles.drawer,
           { transform: [{ translateX: drawerTranslateX }] },
-          Platform.OS === 'android' && { paddingBottom: insets.bottom },
+          insets.bottom > 0 && { paddingBottom: insets.bottom },
         ]}
         onStartShouldSetResponder={() => true}
         onResponderRelease={() => Keyboard.dismiss()}
@@ -320,7 +323,7 @@ export function SidebarDrawer({
             router.push('/settings');
           }}
         />
-        <View style={[styles.footer, Platform.OS === 'android' && styles.footerAndroid]} />
+        <View style={[styles.footer, isSmallScreen && styles.footerSmall]} />
       </Animated.View>
     </View>
   );
@@ -369,10 +372,10 @@ const styles = StyleSheet.create({
   searchBarLayer: { zIndex: 25, marginTop: 8, paddingHorizontal: 10 },
   sidebarLowerBlock: { flex: 1, minHeight: 0, paddingHorizontal: 10 },
   footer: {},
-  footerAndroid: {
+  footerSmall: {
     // Espacio para que el panel de conversaciones no tape la sección de perfil
-    // (clan insignia + nombre + ajustes) que está posicionada absolutamente al fondo.
-    // Valor ampliado para garantizar separación visible en todos los dispositivos Android.
+    // (clan insignia + nombre + ajustes) absolutamente posicionada al fondo.
+    // Aplica en pantallas estrechas (< 420 pt): iPhone 15 / SE y Android pequeños.
     height: 160,
   },
 });

@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useEffect } from 'react';
-import { View, TouchableOpacity, StyleSheet, Text, Animated, Platform } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Text, Animated, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -69,6 +69,9 @@ export function AppTopBar({
 }: AppTopBarProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width: screenW } = useWindowDimensions();
+  /** Pantallas estrechas (< 420 pt): iPhone 15 / SE y Android pequeños. */
+  const isSmallScreen = screenW < 420;
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const { isPreviewActive, previewClanId } = usePreviewMode();
   const { getVisibleClanId, getReflectionCount } = useClassification();
@@ -169,7 +172,7 @@ export function AppTopBar({
         style={[
           styles.barRow,
           { transform: [{ translateY: TOP_BAR_LAYOUT.TOPBAR_WHOLE_SHIFT_Y }] },
-          Platform.OS === 'android' && styles.barRowAndroid,
+          isSmallScreen && styles.barRowAndroid,
         ]}
       >
         {/* ── Group 1: star + hamburger ── */}
@@ -200,7 +203,7 @@ export function AppTopBar({
         {/* ── Group 2: clan icon + label ──
             iOS: wrapped in a flex:1 center cluster.
             Android: standalone group for space-around distribution. ── */}
-        {Platform.OS !== 'android' ? (
+        {!isSmallScreen ? (
           <View style={styles.centerCluster} pointerEvents="box-none">
             {showClanIcon && (
               <TouchableOpacity onPress={handleClanPress} style={styles.centerPress} hitSlop={12}>
@@ -251,9 +254,9 @@ export function AppTopBar({
         )}
 
         {/* ── Groups 3-5: pencil / fire / heart ──
-            iOS: inside a shared right cluster with a gap.
-            Android: each group is a direct barRow child for space-around. ── */}
-        {Platform.OS !== 'android' ? (
+            Wide screens: inside a shared right cluster with a gap.
+            Small screens: each group is a direct barRow child for space-around. ── */}
+        {!isSmallScreen ? (
           <View style={[styles.rightCluster, { gap: TOP_BAR_LAYOUT.RIGHT_CLUSTER_GAP }]}>
             <TouchableOpacity onPress={() => router.push('/phrases-domains')} style={styles.counterBtn} hitSlop={14}>
               <View style={[styles.iconFrame, counterIconFrame, topBarIconEditorStyle('pencilIcon', 'pencilIcon')]}>
