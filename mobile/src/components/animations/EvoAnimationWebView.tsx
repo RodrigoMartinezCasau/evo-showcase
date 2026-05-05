@@ -176,6 +176,19 @@ type Props = {
 async function buildInlinedHtml(name: EvoAnimationName): Promise<string> {
   let html = await FileSystem.readAsStringAsync(ANIM_DIR + HTML_FILENAMES[name]);
 
+  // 0. Ensure correct mobile viewport so Android WebView doesn't default to
+  //    the 980px desktop viewport, which pushes animated content to the corner.
+  const VIEWPORT = '<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">';
+  if (!html.includes('name="viewport"') && !html.includes("name='viewport'")) {
+    if (html.includes('<head>')) {
+      html = html.replace('<head>', '<head>' + VIEWPORT);
+    } else if (html.includes('<HEAD>')) {
+      html = html.replace('<HEAD>', '<HEAD>' + VIEWPORT);
+    } else {
+      html = VIEWPORT + html;
+    }
+  }
+
   // 1. Replace SVG references using the in-memory SVG_DATA map.
   html = html.replace(/(['"`])assets\/([\w.\-]+\.svg)\1/g, (match, q, filename) => {
     const svg = SVG_DATA[filename];
@@ -282,10 +295,12 @@ export function EvoAnimationWebView({
     }).start();
   }, [webOpacity]);
 
-  // Inject props as window.EVO_PROPS before the page loads — most reliable method.
+  // Inject props + real screen dimensions before the page loads.
+  // EVO_SCREEN_WIDTH/HEIGHT let animations center themselves correctly on Android
+  // where the WebView viewport may differ from the physical screen size.
   const injectedBeforeLoad = useMemo(
-    () => `window.EVO_PROPS = ${JSON.stringify(params)}; true;`,
-    [params],
+    () => `window.EVO_PROPS = ${JSON.stringify(params)}; window.EVO_SCREEN_WIDTH = ${winW}; window.EVO_SCREEN_HEIGHT = ${winH}; true;`,
+    [params, winW, winH],
   );
 
   const onMessage = useCallback(
@@ -394,10 +409,7 @@ export function EvoAnimationWebView({
               injectedJavaScriptBeforeContentLoaded={injectedBeforeLoad}
               onMessage={onMessage}
               onLoadEnd={handleWebLoadEnd}
-              style={[
-                styles.web,
-                Platform.OS === 'android' && { width: winW, height: winH },
-              ]}
+              style={styles.web}
             />
           </Animated.View>
         )}

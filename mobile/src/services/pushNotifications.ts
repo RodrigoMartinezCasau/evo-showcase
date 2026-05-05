@@ -7,17 +7,32 @@
  *    local nativa con sonido y vibración usando expo-notifications.
  * 3. Para notificaciones push reales entre dispositivos, el token se usa desde el backend/Edge Functions.
  */
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import { supabase } from '../../mobile/lib/supabase';
+
+// expo-notifications remote push was removed from Expo Go in SDK 53.
+// Skip entirely when running inside Expo Go to avoid the fatal error.
+const IS_EXPO_GO =
+  Constants.appOwnership === 'expo' ||
+  (Constants.executionEnvironment as string) === 'storeClient';
+
+function getNotifications() {
+  if (IS_EXPO_GO) return null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require('expo-notifications') as typeof import('expo-notifications');
+  } catch {
+    return null;
+  }
+}
 
 const NOTIFS_KEY = '@evo/notifications_enabled';
 
 async function areNotificationsEnabled(): Promise<boolean> {
   try {
     const val = await AsyncStorage.getItem(NOTIFS_KEY);
-    // Default to true if not set
     return val === null || val === 'true';
   } catch {
     return true;
@@ -25,31 +40,37 @@ async function areNotificationsEnabled(): Promise<boolean> {
 }
 
 // Configurar cómo se muestran las notificaciones cuando la app está en primer plano.
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+// Se llama solo si el módulo está disponible (build nativo).
+const Notifications = getNotifications();
+if (Notifications) {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    }),
+  });
+}
 
 /** Solicita permisos y registra el push token en Supabase para este dispositivo. */
 export async function registerPushToken(userId: string): Promise<void> {
+  const N = getNotifications();
+  if (!N) return; // Expo Go — sin soporte de push remoto desde SDK 53
   try {
     if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
+      await N.setNotificationChannelAsync('default', {
         name: 'EVO',
-        importance: Notifications.AndroidImportance.MAX,
+        importance: N.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#C7FF02',
       });
     }
 
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    const { status: existingStatus } = await N.getPermissionsAsync();
     let finalStatus = existingStatus;
 
     if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
+      const { status } = await N.requestPermissionsAsync();
       finalStatus = status;
     }
 
@@ -58,14 +79,13 @@ export async function registerPushToken(userId: string): Promise<void> {
       return;
     }
 
-    const tokenData = await Notifications.getExpoPushTokenAsync({
+    const tokenData = await N.getExpoPushTokenAsync({
       projectId: '160e255b-b9ca-4948-ad82-88a29a5a2633',
     });
 
     const token = tokenData.data;
     console.log('[Push] Token registrado:', token);
 
-    // Guardar el token en Supabase para poder enviar push remotos.
     await supabase
       .from('profiles')
       .update({ push_token: token })
@@ -84,18 +104,20 @@ export async function showLocalNotification(
   title: string,
   body: string,
 ): Promise<void> {
+  const N = getNotifications();
+  if (!N) return;
   try {
     const enabled = await areNotificationsEnabled();
     if (!enabled) return;
 
-    await Notifications.scheduleNotificationAsync({
+    await N.scheduleNotificationAsync({
       content: {
         title,
         body,
         sound: true,
         vibrate: [0, 250, 250, 250],
       },
-      trigger: null, // Inmediata
+      trigger: null,
     });
   } catch (err) {
     console.error('[Push] Error mostrando notificación local:', err);
@@ -111,21 +133,20 @@ const STREAK_REMINDER_ID = 'evo_streak_reminder';
  * Llama esto al abrir la app cuando hasSentToday = false.
  */
 export async function scheduleStreakReminder(): Promise<void> {
+  const N = getNotifications();
+  if (!N) return;
   try {
-    // Cancela cualquier recordatorio previo para no duplicar.
     await cancelStreakReminder();
 
-    // Calcula cuántos segundos faltan para las 22:00 de hoy.
     const now = new Date();
     const target = new Date();
     target.setHours(22, 0, 0, 0);
 
-    // Si ya pasaron las 22:00, no programar (el usuario tiene hasta medianoche).
     if (target <= now) return;
 
     const secondsUntil = Math.floor((target.getTime() - now.getTime()) / 1000);
 
-    await Notifications.scheduleNotificationAsync({
+    await N.scheduleNotificationAsync({
       identifier: STREAK_REMINDER_ID,
       content: {
         title: '🔥 Tu racha está en peligro',
@@ -133,7 +154,7 @@ export async function scheduleStreakReminder(): Promise<void> {
         sound: true,
         vibrate: [0, 300, 200, 300],
       },
-      trigger: { seconds: secondsUntil },
+      trigger: { type: N.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: secondsUntil },
     });
     console.log('[Push] Recordatorio de racha programado en', secondsUntil, 'segundos.');
   } catch (err) {
@@ -145,8 +166,10 @@ export async function scheduleStreakReminder(): Promise<void> {
  * Cancela el recordatorio de racha (llama esto cuando el usuario reflexiona).
  */
 export async function cancelStreakReminder(): Promise<void> {
+  const N = getNotifications();
+  if (!N) return;
   try {
-    await Notifications.cancelScheduledNotificationAsync(STREAK_REMINDER_ID);
+    await N.cancelScheduledNotificationAsync(STREAK_REMINDER_ID);
   } catch {
     // Ignorar si no existe
   }

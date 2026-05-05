@@ -243,8 +243,8 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
   }, [slideAnim]);
 
   const handlePostPress = useCallback(
-    (post: CommunityPost) => openDetailFeed(clan.recentPosts, post.id),
-    [openDetailFeed, clan.recentPosts],
+    (post: CommunityPost) => openDetailFeed(livePosts, post.id),
+    [openDetailFeed, livePosts],
   );
 
   const handleDetailAuthorPress = useCallback(

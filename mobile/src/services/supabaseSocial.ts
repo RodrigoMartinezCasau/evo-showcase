@@ -46,11 +46,13 @@ export async function fetchAllPosts(): Promise<SimPost[]> {
   const { data, error } = await supabase
     .from('posts')
     .select('*')
-    .eq('is_hidden', false)
     .order('created_at', { ascending: false })
     .limit(200);
   if (error) { console.error('[Social] fetchAllPosts:', error.message); return []; }
-  return (data ?? []).map(dbRowToSimPost);
+  // Filter out hidden posts client-side; is_hidden column may not exist yet.
+  return (data ?? [])
+    .filter((row: Record<string, unknown>) => row['is_hidden'] !== true)
+    .map(dbRowToSimPost);
 }
 
 export async function insertPost(post: SimPost): Promise<void> {

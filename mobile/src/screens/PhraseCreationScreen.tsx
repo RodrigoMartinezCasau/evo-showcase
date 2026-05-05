@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Keyboard, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Keyboard, Alert, Animated, useWindowDimensions } from 'react-native';
 import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AppTopBar, ChatInputBar, SidebarDrawer } from '@evoconn/components';
 import { PublishBlock, PhraseNotesCard, PhraseFolderManagerCard } from '@evoconn/components/debate';
@@ -44,7 +44,9 @@ import {
 } from '@evoconn/constants/debateResponseLayout';
 import { getPublishStarByClan } from '@evoconn/utils/getDebateStarByClan';
 import type { DebateMessage } from '@evoconn/types/debate';
+import type { CommunityPost } from '@evoconn/types';
 import { useFeedStore, createPhrasePost } from '@evoconn/hooks/useFeedStore';
+import { ProfileDetailPanel } from '@evoconn/components/ProfileDetailPanel';
 import { useDebugStreak } from '../debug/DebugStreakContext';
 import { useDebugStats } from '../debug/DebugStatsContext';
 import { normalizePhraseInnerForPublish } from '@evoconn/utils/phrasePublish';
@@ -130,6 +132,31 @@ export default function PhraseCreationScreen() {
 
   const insets = useSafeAreaInsets();
   const topBarHeight = 60 + insets.top;
+  const { width: screenW, height: screenH } = useWindowDimensions();
+
+  // ── Post-publish preview overlay ────────────────────────────────────────────
+  const [previewPost, setPreviewPost] = useState<CommunityPost | null>(null);
+  const previewSlideAnim = useRef(new Animated.Value(0)).current;
+
+  const openPreview = useCallback((post: CommunityPost) => {
+    setPreviewPost(post);
+    previewSlideAnim.setValue(0);
+    requestAnimationFrame(() => {
+      Animated.timing(previewSlideAnim, {
+        toValue: 1,
+        duration: 220,
+        useNativeDriver: true,
+      }).start();
+    });
+  }, [previewSlideAnim]);
+
+  const closePreview = useCallback(() => {
+    Animated.timing(previewSlideAnim, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(({ finished }) => { if (finished) setPreviewPost(null); });
+  }, [previewSlideAnim]);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { drawerOpenProgress, edgeOpenGesture } = useSidebarGesture(sidebarOpen, setSidebarOpen);
@@ -298,6 +325,7 @@ export default function PhraseCreationScreen() {
       const post = createPhrasePost(mockCurrentUser, phraseInner, authorName);
       (post as { id: string }).id = sourceId;
       publishPost(post);
+      openPreview(post as CommunityPost);
 
       // Preserve the AI intro (if it was generated for this thread) so the
       // published view doesn't lose context on reopen. Read from the live ref
@@ -322,7 +350,7 @@ export default function PhraseCreationScreen() {
       publishAuthorRef.current = '';
       Keyboard.dismiss();
     },
-    [publishPost, updateThought],
+    [publishPost, updateThought, openPreview],
   );
 
   const handleAssignPhraseToFolder = useCallback(
@@ -771,6 +799,20 @@ export default function PhraseCreationScreen() {
         }}
         openProgress={drawerOpenProgress}
       />
+
+      {/* Post-publish preview — slides in from the right, swipe right to close */}
+      {previewPost !== null && (
+        <ProfileDetailPanel
+          data={[previewPost]}
+          initialIndex={0}
+          itemHeight={screenH - topBarHeight}
+          slideAnim={previewSlideAnim}
+          screenW={screenW}
+          onClose={closePreview}
+          onAuthorPress={() => { closePreview(); router.push('/my-profile'); }}
+          onClanPress={(clanId) => { closePreview(); router.push({ pathname: '/clan/[id]', params: { id: clanId } }); }}
+        />
+      )}
     </View>
     </GestureHandlerRootView>
   );
