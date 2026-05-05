@@ -372,6 +372,7 @@ const styles = StyleSheet.create({
   footerAndroid: {
     // Espacio para que el panel de conversaciones no tape la sección de perfil
     // (clan insignia + nombre + ajustes) que está posicionada absolutamente al fondo.
-    height: 190,
+    // Valor ampliado para garantizar separación visible en todos los dispositivos Android.
+    height: 160,
   },
 });

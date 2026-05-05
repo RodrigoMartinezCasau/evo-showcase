@@ -1,3 +1,7 @@
+import { Platform } from 'react-native';
+
+const AND = Platform.OS === 'android';
+
 /**
  * Texto inferior del sidebar (nombre / clan / rango).
  *
@@ -39,10 +43,10 @@ export const SIDEBAR_FOOTER_PROFILE_TEXT_LAYOUT = {
    * - `after_insignia`: se suma al bottom de la insignia.
    * - `drawer_edges`: distancia al borde inferior del drawer.
    */
-  SIDEBAR_FOOTER_PROFILE_TEXT_BLOCK_POS_Y: 40,
+  SIDEBAR_FOOTER_PROFILE_TEXT_BLOCK_POS_Y: AND ? 18 : 40,
 
   /** Escala global del bloque: multiplica tamaños de fuente y offsets de cada línea. */
-  SIDEBAR_FOOTER_PROFILE_TEXT_BLOCK_SCALE: 1.2,
+  SIDEBAR_FOOTER_PROFILE_TEXT_BLOCK_SCALE: AND ? 0.82 : 1.2,
 
   // ── B) Línea 1 — nombre (sans, gris) ───────────────────────────────────────
   SIDEBAR_FOOTER_PROFILE_TEXT_LINE1_OFFSET_X: 0,

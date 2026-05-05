@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useEffect } from 'react';
-import { View, TouchableOpacity, StyleSheet, Text, Animated } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Text, Animated, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -168,11 +168,11 @@ export function AppTopBar({
       <View
         style={[
           styles.barRow,
-          {
-            transform: [{ translateY: TOP_BAR_LAYOUT.TOPBAR_WHOLE_SHIFT_Y }],
-          },
+          { transform: [{ translateY: TOP_BAR_LAYOUT.TOPBAR_WHOLE_SHIFT_Y }] },
+          Platform.OS === 'android' && styles.barRowAndroid,
         ]}
       >
+        {/* ── Group 1: star + hamburger ── */}
         <View style={[styles.leftCluster, { gap: TOP_BAR_LAYOUT.LEFT_CLUSTER_GAP }]}>
           <TouchableOpacity onPress={onMenuPress} style={styles.iconBtn} hitSlop={14}>
             <View style={[styles.iconFrame, starFrame, topBarIconEditorStyle('star', 'star')]}>
@@ -197,8 +197,36 @@ export function AppTopBar({
           </TouchableOpacity>
         </View>
 
-        <View style={styles.centerCluster} pointerEvents="box-none">
-          {showClanIcon && (
+        {/* ── Group 2: clan icon + label ──
+            iOS: wrapped in a flex:1 center cluster.
+            Android: standalone group for space-around distribution. ── */}
+        {Platform.OS !== 'android' ? (
+          <View style={styles.centerCluster} pointerEvents="box-none">
+            {showClanIcon && (
+              <TouchableOpacity onPress={handleClanPress} style={styles.centerPress} hitSlop={12}>
+                <View style={[styles.iconFrame, shieldFrame, topBarIconEditorStyle('shield', 'shield')]}>
+                  <InsigniaIcon width={shieldFrame.width} height={shieldFrame.height} />
+                </View>
+                <View
+                  style={[
+                    styles.textBox,
+                    { height: shieldFrame.height },
+                    topBarIconEditorStyle('clanLabel', 'clanLabel'),
+                  ]}
+                >
+                  <Text
+                    style={[styles.clanLabel, { fontSize: TOP_BAR_LAYOUT.COUNTER_TEXT_SIZE + 1 }]}
+                    numberOfLines={1}
+                    ellipsizeMode="clip"
+                  >
+                    {clanLabel}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : (
+          showClanIcon && (
             <TouchableOpacity onPress={handleClanPress} style={styles.centerPress} hitSlop={12}>
               <View style={[styles.iconFrame, shieldFrame, topBarIconEditorStyle('shield', 'shield')]}>
                 <InsigniaIcon width={shieldFrame.width} height={shieldFrame.height} />
@@ -219,105 +247,96 @@ export function AppTopBar({
                 </Text>
               </View>
             </TouchableOpacity>
-          )}
-        </View>
+          )
+        )}
 
-        <View style={[styles.rightCluster, { gap: TOP_BAR_LAYOUT.RIGHT_CLUSTER_GAP }]}>
-          <TouchableOpacity onPress={() => router.push('/phrases-domains')} style={styles.counterBtn} hitSlop={14}>
-            <View
-              style={[
-                styles.iconFrame,
-                counterIconFrame,
-                topBarIconEditorStyle('pencilIcon', 'pencilIcon'),
-              ]}
-            >
-              <LapizIcon width={counterIconFrame.width} height={counterIconFrame.height} />
-            </View>
-            {showCounters && (
-              <View
-                style={[
-                  styles.textBox,
-                  { height: counterIconFrame.height },
-                  topBarIconEditorStyle('pencilText', 'pencilText'),
-                ]}
-              >
-                <Text style={[styles.counterText, { fontSize: TOP_BAR_LAYOUT.COUNTER_TEXT_SIZE }]}>
-                  {pencilCount}
-                </Text>
+        {/* ── Groups 3-5: pencil / fire / heart ──
+            iOS: inside a shared right cluster with a gap.
+            Android: each group is a direct barRow child for space-around. ── */}
+        {Platform.OS !== 'android' ? (
+          <View style={[styles.rightCluster, { gap: TOP_BAR_LAYOUT.RIGHT_CLUSTER_GAP }]}>
+            <TouchableOpacity onPress={() => router.push('/phrases-domains')} style={styles.counterBtn} hitSlop={14}>
+              <View style={[styles.iconFrame, counterIconFrame, topBarIconEditorStyle('pencilIcon', 'pencilIcon')]}>
+                <LapizIcon width={counterIconFrame.width} height={counterIconFrame.height} />
               </View>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push('/streak')} style={styles.counterBtn} hitSlop={14}>
-            <View
-              style={[
-                styles.iconFrame,
-                counterIconFrame,
-                topBarIconEditorStyle('fireIcon', 'fireIcon'),
-              ]}
-            >
-              <>
-                {/* Apagado (grey) layer — visible when hasSentToday = false */}
-                <Animated.View
-                  style={[
-                    StyleSheet.absoluteFill,
-                    { opacity: Animated.subtract(1, fireAnim) },
-                  ]}
-                >
-                  <FuegoApagadoIcon
-                    width={counterIconFrame.width}
-                    height={counterIconFrame.height}
-                  />
-                </Animated.View>
-                {/* Encendido (clan) layer — fades in on first send */}
-                <Animated.View
-                  style={[StyleSheet.absoluteFill, { opacity: fireAnim }]}
-                >
-                  <RachaIcon
-                    width={counterIconFrame.width}
-                    height={counterIconFrame.height}
-                  />
-                </Animated.View>
-              </>
-            </View>
-            {showCounters && (
-              <View
-                style={[
-                  styles.textBox,
-                  { height: counterIconFrame.height },
-                  topBarIconEditorStyle('fireText', 'fireText'),
-                ]}
-              >
-                <Text style={[styles.counterText, { fontSize: TOP_BAR_LAYOUT.COUNTER_TEXT_SIZE }]}>
-                  {fireCount}
-                </Text>
+              {showCounters && (
+                <View style={[styles.textBox, { height: counterIconFrame.height }, topBarIconEditorStyle('pencilText', 'pencilText')]}>
+                  <Text style={[styles.counterText, { fontSize: TOP_BAR_LAYOUT.COUNTER_TEXT_SIZE }]}>{pencilCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/streak')} style={styles.counterBtn} hitSlop={14}>
+              <View style={[styles.iconFrame, counterIconFrame, topBarIconEditorStyle('fireIcon', 'fireIcon')]}>
+                <>
+                  <Animated.View style={[StyleSheet.absoluteFill, { opacity: Animated.subtract(1, fireAnim) }]}>
+                    <FuegoApagadoIcon width={counterIconFrame.width} height={counterIconFrame.height} />
+                  </Animated.View>
+                  <Animated.View style={[StyleSheet.absoluteFill, { opacity: fireAnim }]}>
+                    <RachaIcon width={counterIconFrame.width} height={counterIconFrame.height} />
+                  </Animated.View>
+                </>
               </View>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push('/daily-uses')} style={styles.counterBtn} hitSlop={14}>
-            <View
-              style={[
-                styles.iconFrame,
-                counterIconFrame,
-                topBarIconEditorStyle('heartIcon', 'heartIcon'),
-              ]}
-            >
-              <UsosIcon width={counterIconFrame.width} height={counterIconFrame.height} />
-            </View>
-            {showCounters && (
-              <View
-                style={[
-                  styles.textBox,
-                  { height: counterIconFrame.height },
-                  topBarIconEditorStyle('heartText', 'heartText'),
-                ]}
-              >
-                <Text style={[styles.counterText, { fontSize: TOP_BAR_LAYOUT.COUNTER_TEXT_SIZE }]}>
-                  {heartCount}
-                </Text>
+              {showCounters && (
+                <View style={[styles.textBox, { height: counterIconFrame.height }, topBarIconEditorStyle('fireText', 'fireText')]}>
+                  <Text style={[styles.counterText, { fontSize: TOP_BAR_LAYOUT.COUNTER_TEXT_SIZE }]}>{fireCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/daily-uses')} style={styles.counterBtn} hitSlop={14}>
+              <View style={[styles.iconFrame, counterIconFrame, topBarIconEditorStyle('heartIcon', 'heartIcon')]}>
+                <UsosIcon width={counterIconFrame.width} height={counterIconFrame.height} />
               </View>
-            )}
-          </TouchableOpacity>
-        </View>
+              {showCounters && (
+                <View style={[styles.textBox, { height: counterIconFrame.height }, topBarIconEditorStyle('heartText', 'heartText')]}>
+                  <Text style={[styles.counterText, { fontSize: TOP_BAR_LAYOUT.COUNTER_TEXT_SIZE }]}>{heartCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            {/* Group 3 — pencil */}
+            <TouchableOpacity onPress={() => router.push('/phrases-domains')} style={styles.counterBtn} hitSlop={14}>
+              <View style={[styles.iconFrame, counterIconFrame, topBarIconEditorStyle('pencilIcon', 'pencilIcon')]}>
+                <LapizIcon width={counterIconFrame.width} height={counterIconFrame.height} />
+              </View>
+              {showCounters && (
+                <View style={[styles.textBox, { height: counterIconFrame.height }, topBarIconEditorStyle('pencilText', 'pencilText')]}>
+                  <Text style={[styles.counterText, { fontSize: TOP_BAR_LAYOUT.COUNTER_TEXT_SIZE }]}>{pencilCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            {/* Group 4 — fire */}
+            <TouchableOpacity onPress={() => router.push('/streak')} style={styles.counterBtn} hitSlop={14}>
+              <View style={[styles.iconFrame, counterIconFrame, topBarIconEditorStyle('fireIcon', 'fireIcon')]}>
+                <>
+                  <Animated.View style={[StyleSheet.absoluteFill, { opacity: Animated.subtract(1, fireAnim) }]}>
+                    <FuegoApagadoIcon width={counterIconFrame.width} height={counterIconFrame.height} />
+                  </Animated.View>
+                  <Animated.View style={[StyleSheet.absoluteFill, { opacity: fireAnim }]}>
+                    <RachaIcon width={counterIconFrame.width} height={counterIconFrame.height} />
+                  </Animated.View>
+                </>
+              </View>
+              {showCounters && (
+                <View style={[styles.textBox, { height: counterIconFrame.height }, topBarIconEditorStyle('fireText', 'fireText')]}>
+                  <Text style={[styles.counterText, { fontSize: TOP_BAR_LAYOUT.COUNTER_TEXT_SIZE }]}>{fireCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            {/* Group 5 — heart */}
+            <TouchableOpacity onPress={() => router.push('/daily-uses')} style={styles.counterBtn} hitSlop={14}>
+              <View style={[styles.iconFrame, counterIconFrame, topBarIconEditorStyle('heartIcon', 'heartIcon')]}>
+                <UsosIcon width={counterIconFrame.width} height={counterIconFrame.height} />
+              </View>
+              {showCounters && (
+                <View style={[styles.textBox, { height: counterIconFrame.height }, topBarIconEditorStyle('heartText', 'heartText')]}>
+                  <Text style={[styles.counterText, { fontSize: TOP_BAR_LAYOUT.COUNTER_TEXT_SIZE }]}>{heartCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </>
+        )}
       </View>
     </View>
 
@@ -343,6 +362,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     width: '100%',
+  },
+  barRowAndroid: {
+    justifyContent: 'space-around',
   },
   leftCluster: { flexDirection: 'row', alignItems: 'flex-end' },
   centerCluster: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },

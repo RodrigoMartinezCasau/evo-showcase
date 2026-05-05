@@ -20,37 +20,39 @@ export const DETAIL_ACTION_COLUMN_LAYOUT = {
 
 /** Botón CLAN (insignia). */
 export const DETAIL_CLAN_BUTTON_LAYOUT = {
-  offsetX: AND ? 12 : 17.5,
+  // Android: offsetX=0 → el centro del icono queda exactamente en el borde derecho
+  // del rectángulo de texto (mitad dentro, mitad fuera).
+  offsetX: AND ? 0 : 17.5,
   offsetY: 0,
-  scale: AND ? 2.4 : 3.3,
+  scale: AND ? 2.2 : 3.3,
 };
 
 /** Botón UPVOTE. */
 export const DETAIL_UPVOTE_BUTTON_LAYOUT = {
-  offsetX: AND ? 14 : 18.5,
+  offsetX: AND ? 0 : 18.5,
   offsetY: 0,
-  scale: AND ? 1.4 : 1.8,
+  scale: AND ? 1.3 : 1.8,
 };
 
 /** Botón DOWNVOTE. */
 export const DETAIL_DOWNVOTE_BUTTON_LAYOUT = {
-  offsetX: AND ? 14 : 18.5,
+  offsetX: AND ? 0 : 18.5,
   offsetY: 0,
-  scale: AND ? 1.4 : 1.8,
+  scale: AND ? 1.3 : 1.8,
 };
 
 /** Botón SAVE (guardar / bookmark). */
 export const DETAIL_SAVE_BUTTON_LAYOUT = {
-  offsetX: AND ? 13 : 18,
+  offsetX: AND ? 0 : 18,
   offsetY: 0,
-  scale: AND ? 1.2 : 1.6,
+  scale: AND ? 1.1 : 1.6,
 };
 
 /** Botón MÁS (tres puntitos). */
 export const DETAIL_MORE_BUTTON_LAYOUT = {
-  offsetX: AND ? 13 : 18,
-  offsetY: AND ? -18 : -25,
-  scale: AND ? 1.5 : 2,
+  offsetX: AND ? 0 : 18,
+  offsetY: AND ? 0 : -25,
+  scale: AND ? 1.4 : 2,
 };
 
 /* ──────────────────────────────────────────────

@@ -176,8 +176,8 @@ type Props = {
 async function buildInlinedHtml(name: EvoAnimationName): Promise<string> {
   let html = await FileSystem.readAsStringAsync(ANIM_DIR + HTML_FILENAMES[name]);
 
-  // 0. Ensure correct mobile viewport so Android WebView doesn't default to
-  //    the 980px desktop viewport, which pushes animated content to the corner.
+  // 0a. Ensure correct mobile viewport so Android WebView doesn't default to
+  //     the 980px desktop viewport.
   const VIEWPORT = '<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">';
   if (!html.includes('name="viewport"') && !html.includes("name='viewport'")) {
     if (html.includes('<head>')) {
@@ -186,6 +186,27 @@ async function buildInlinedHtml(name: EvoAnimationName): Promise<string> {
       html = html.replace('<HEAD>', '<HEAD>' + VIEWPORT);
     } else {
       html = VIEWPORT + html;
+    }
+  }
+
+  // 0b. Android WebView loaded from a string (null origin) does not honour
+  //     `position:fixed` — fixed elements collapse to 0×0 at (0,0), pushing
+  //     all animation content to the top-left corner.
+  //     Fix: override .stage and .flash to use position:absolute so they fill
+  //     the body (which already has height:100% / width:100% in all HTML files).
+  if (Platform.OS === 'android') {
+    const ANDROID_POS_FIX =
+      '<style id="evo-android-fix">' +
+      'html,body{height:100%!important;width:100%!important;overflow:hidden!important}' +
+      '.stage{position:absolute!important;top:0!important;left:0!important;right:0!important;bottom:0!important}' +
+      '.flash{position:absolute!important;top:0!important;left:0!important;right:0!important;bottom:0!important}' +
+      '</style>';
+    if (html.includes('<head>')) {
+      html = html.replace('<head>', '<head>' + ANDROID_POS_FIX);
+    } else if (html.includes('<HEAD>')) {
+      html = html.replace('<HEAD>', '<HEAD>' + ANDROID_POS_FIX);
+    } else {
+      html = ANDROID_POS_FIX + html;
     }
   }
 
@@ -295,9 +316,9 @@ export function EvoAnimationWebView({
     }).start();
   }, [webOpacity]);
 
+  const { width: winW, height: winH } = useWindowDimensions();
+
   // Inject props + real screen dimensions before the page loads.
-  // EVO_SCREEN_WIDTH/HEIGHT let animations center themselves correctly on Android
-  // where the WebView viewport may differ from the physical screen size.
   const injectedBeforeLoad = useMemo(
     () => `window.EVO_PROPS = ${JSON.stringify(params)}; window.EVO_SCREEN_WIDTH = ${winW}; window.EVO_SCREEN_HEIGHT = ${winH}; true;`,
     [params, winW, winH],
@@ -353,8 +374,6 @@ export function EvoAnimationWebView({
     [enableHaptics, closeAndCall, name, onComplete, onClose, onPhase],
   );
 
-  const { width: winW, height: winH } = useWindowDimensions();
-
   if (!visible) return null;
 
   return (
@@ -392,7 +411,7 @@ export function EvoAnimationWebView({
           <Animated.View style={[StyleSheet.absoluteFill, { opacity: webOpacity }]}>
             <WebView
               ref={webRef}
-              source={{ html: htmlContent }}
+              source={{ html: htmlContent, baseUrl: 'https://localhost/' }}
               originWhitelist={['*']}
               allowFileAccess
               allowFileAccessFromFileURLs

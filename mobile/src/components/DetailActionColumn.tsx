@@ -62,6 +62,12 @@ type DetailActionColumnProps = {
   onSave: () => void;
   onClanPress: () => void;
   onMorePress: () => void;
+  /**
+   * Android only. When provided the column fills exactly this height using
+   * `justifyContent: 'space-between'`, anchoring clan icon top to the
+   * reflection panel top and three-dots bottom to the panel bottom.
+   */
+  containerHeight?: number;
 };
 
 export type DetailActionColumnHandle = {
@@ -81,6 +87,7 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
       onSave,
       onClanPress,
       onMorePress,
+      containerHeight,
     },
     ref,
   ) {
@@ -100,10 +107,15 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
   const total = upCount + downCount;
   const approvalPct = total > 0 ? Math.round((upCount / total) * 100) : 100;
 
+  // When containerHeight is provided (Android), spread items to fill the panel height.
+  const columnStyle = containerHeight != null
+    ? [styles.column, { height: containerHeight, justifyContent: 'space-between' as const }]
+    : [styles.column, { gap: COL.gap }];
+
   return (
-    <View style={styles.root}>
+    <View style={containerHeight != null ? { width: COL_FIXED_WIDTH } : styles.root}>
       {/* ── Buttons (flex column) ── */}
-      <View style={[styles.column, { gap: COL.gap }]}>
+      <View style={columnStyle}>
         {/* Clan */}
         <TouchableOpacity onPress={onClanPress} activeOpacity={0.7}>
           <View
@@ -201,66 +213,71 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
         </TouchableOpacity>
       </View>
 
-      {/* ── Stats (absolute, centered on their anchor point) ── */}
-      <View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: UP_C.offsetX - STAT_BOX_W / 2,
-          top: UP_C.offsetY,
-          width: STAT_BOX_W,
-          transform: [{ scale: UP_C.scale }],
-        }}
-      >
-        <Text style={{
-          color: voted === 'up' ? UP_C.colorActive : UP_C.colorInactive,
-          fontSize: UP_C.fontSize,
-          fontWeight: UP_C.fontWeight,
-          textAlign: 'center',
-        }}>
-          {formatCount(upCount)}
-        </Text>
-      </View>
+      {/* ── Stats (absolute). Hidden when containerHeight drives the layout because
+           the fixed offsetY values no longer match item positions in space-between. ── */}
+      {containerHeight == null && (
+        <>
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              left: UP_C.offsetX - STAT_BOX_W / 2,
+              top: UP_C.offsetY,
+              width: STAT_BOX_W,
+              transform: [{ scale: UP_C.scale }],
+            }}
+          >
+            <Text style={{
+              color: voted === 'up' ? UP_C.colorActive : UP_C.colorInactive,
+              fontSize: UP_C.fontSize,
+              fontWeight: UP_C.fontWeight,
+              textAlign: 'center',
+            }}>
+              {formatCount(upCount)}
+            </Text>
+          </View>
 
-      <View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: APPR.offsetX - STAT_BOX_W / 2,
-          top: APPR.offsetY,
-          width: STAT_BOX_W,
-          transform: [{ scale: APPR.scale }],
-        }}
-      >
-        <Text style={{
-          color: getApprovalColor(approvalPct),
-          fontSize: APPR.fontSize,
-          fontWeight: APPR.fontWeight,
-          textAlign: 'center',
-        }}>
-          {approvalPct}%
-        </Text>
-      </View>
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              left: APPR.offsetX - STAT_BOX_W / 2,
+              top: APPR.offsetY,
+              width: STAT_BOX_W,
+              transform: [{ scale: APPR.scale }],
+            }}
+          >
+            <Text style={{
+              color: getApprovalColor(approvalPct),
+              fontSize: APPR.fontSize,
+              fontWeight: APPR.fontWeight,
+              textAlign: 'center',
+            }}>
+              {approvalPct}%
+            </Text>
+          </View>
 
-      <View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: DOWN_C.offsetX - STAT_BOX_W / 2,
-          top: DOWN_C.offsetY,
-          width: STAT_BOX_W,
-          transform: [{ scale: DOWN_C.scale }],
-        }}
-      >
-        <Text style={{
-          color: voted === 'down' ? DOWN_C.colorActive : DOWN_C.colorInactive,
-          fontSize: DOWN_C.fontSize,
-          fontWeight: DOWN_C.fontWeight,
-          textAlign: 'center',
-        }}>
-          {formatCount(downCount)}
-        </Text>
-      </View>
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              left: DOWN_C.offsetX - STAT_BOX_W / 2,
+              top: DOWN_C.offsetY,
+              width: STAT_BOX_W,
+              transform: [{ scale: DOWN_C.scale }],
+            }}
+          >
+            <Text style={{
+              color: voted === 'down' ? DOWN_C.colorActive : DOWN_C.colorInactive,
+              fontSize: DOWN_C.fontSize,
+              fontWeight: DOWN_C.fontWeight,
+              textAlign: 'center',
+            }}>
+              {formatCount(downCount)}
+            </Text>
+          </View>
+        </>
+      )}
     </View>
   );
 }));

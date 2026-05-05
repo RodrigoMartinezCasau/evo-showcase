@@ -9,13 +9,18 @@
  *   si `HEIGHT` es 0, el alto iguala el ancho (cuadrado).
  * - Con solo `HEIGHT` > 0: alto fijo y ancho = alto (cuadrado).
  */
+import { Platform } from 'react-native';
+
+const AND = Platform.OS === 'android';
+
 export const SIDEBAR_SETTINGS_ICON_LAYOUT = {
   SIDEBAR_SETTINGS_ICON_OFFSET_X: 10,
-  SIDEBAR_SETTINGS_ICON_OFFSET_Y: 65,
-  /** Escala cuando WIDTH y HEIGHT son 0. */
-  SIDEBAR_SETTINGS_ICON_SCALE: 0.09,
+  /** Android: más bajo (menos margen desde abajo) para alinear con el icono de clan reducido. */
+  SIDEBAR_SETTINGS_ICON_OFFSET_Y: AND ? 44 : 65,
+  /** Android: más pequeño para crear espacio entre el perfil y el panel de conversaciones. */
+  SIDEBAR_SETTINGS_ICON_SCALE: AND ? 0.062 : 0.09,
   /** 0 = derivar del scale; >0 fuerza ancho en px. */
   SIDEBAR_SETTINGS_ICON_WIDTH: 0,
   /** 0 = derivar del ancho o del scale; >0 fuerza alto en px. */
   SIDEBAR_SETTINGS_ICON_HEIGHT: 0,
-} as const;
+};

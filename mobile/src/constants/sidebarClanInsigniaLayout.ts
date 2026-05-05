@@ -1,3 +1,7 @@
+import { Platform } from 'react-native';
+
+const AND = Platform.OS === 'android';
+
 /**
  * Insignia de clan (footer): capa absoluta sobre el `drawer`. No participa en el flex;
  * solo desplaza esta capa con X/Y y escala el SVG de forma uniforme.
@@ -6,10 +10,11 @@ export const SIDEBAR_CLAN_INSIGNIA_LAYOUT = {
   /** px desde el borde izquierdo del drawer. */
   SIDEBAR_CLAN_INSIGNIA_OFFSET_X: -15,
   /** px desde el borde inferior del drawer (equivale a `bottom` en estilo). */
-  SIDEBAR_CLAN_INSIGNIA_OFFSET_Y: 25,
+  SIDEBAR_CLAN_INSIGNIA_OFFSET_Y: AND ? 10 : 25,
   /**
    * Escala uniforme del icono. Tamaño base de dibujo = 600×600 (viewBox del asset);
    * tamaño render ≈ 600 * SCALE en el eje mayor (cuadrado).
+   * Android: más pequeño para dejar espacio entre el perfil y el panel de conversaciones.
    */
-  SIDEBAR_CLAN_INSIGNIA_SCALE: 0.25,
-} as const;
+  SIDEBAR_CLAN_INSIGNIA_SCALE: AND ? 0.17 : 0.25,
+};

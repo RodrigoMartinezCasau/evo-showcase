@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Share, Keyboard, Platform, Animated, useWindowDimensions, InteractionManager } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Share, Keyboard, Platform, Animated, useWindowDimensions, InteractionManager, type LayoutChangeEvent } from 'react-native';
 import type { CommunityPost, Comment } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getClanColor } from '@evoconn/constants/clanColors';
@@ -18,7 +18,10 @@ import {
   REFLECTION_TEXT_RIGHT_INSET,
   DETAIL_TITLE_LAYOUT as TL,
 } from '@evoconn/constants/reflectionPanelsLayout';
-import { DETAIL_ACTION_COLUMN_LAYOUT as COL } from '@evoconn/constants/detailActionColumnLayout';
+import {
+  DETAIL_ACTION_COLUMN_LAYOUT as COL,
+  DETAIL_CLAN_BUTTON_LAYOUT as CLAN_L,
+} from '@evoconn/constants/detailActionColumnLayout';
 import {
   DETAIL_QUOTE_LAYOUT as QL,
   DETAIL_QUOTE_AUTHOR_LAYOUT as QAL,
@@ -64,6 +67,16 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   const [commentsReady, setCommentsReady] = useState(false);
   const [readingMode, setReadingMode] = useState(false);
   const readingModeRef = useRef(false);
+
+  // Android: measure the reflection panel to anchor the action column exactly.
+  const [reflPanelLayout, setReflPanelLayout] = useState<{ y: number; height: number } | null>(null);
+  const handleReflPanelLayout = useCallback((e: LayoutChangeEvent) => {
+    const { y, height } = e.nativeEvent.layout;
+    setReflPanelLayout(prev => {
+      if (prev && Math.abs(prev.y - y) < 1 && Math.abs(prev.height - height) < 1) return prev;
+      return { y, height };
+    });
+  }, []);
 
   useEffect(() => {
     const task = InteractionManager.runAfterInteractions(() => {
@@ -386,14 +399,35 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     [contextComments, blockedUsers],
   );
 
-  const actionColStyle = useMemo(() => ({
-    position: 'absolute' as const,
-    left: Platform.OS === 'android'
-      ? screenW - 55 + COL.offsetX
-      : screenW - 70 + COL.offsetX,
-    top: itemHeight / 2 + COL.offsetY,
-    zIndex: 10,
-  }), [screenW, itemHeight]);
+  const actionColStyle = useMemo(() => {
+    if (Platform.OS === 'android' && reflPanelLayout) {
+      // Compute the panel's visual right edge in container coordinates.
+      // The panel layout width = content area width = screenW - 2 * paddingH.
+      // scaleX(RP.widthScale) shrinks from center → right edge recedes by
+      // layoutWidth * (1 - widthScale) / 2.
+      // translateX(RP.offsetX) shifts visually.
+      const PADDING_H = 16;
+      const contentW = screenW - 2 * PADDING_H;
+      const panelVisualRight =
+        PADDING_H + contentW / 2 + (contentW * RP.widthScale) / 2 + RP.offsetX;
+
+      // Half the column width so the icon centers sit exactly on the panel edge.
+      const COL_FIXED_WIDTH = COL.iconSize * CLAN_L.scale;
+
+      return {
+        position: 'absolute' as const,
+        left: panelVisualRight - COL_FIXED_WIDTH / 2,
+        top: reflPanelLayout.y,
+        zIndex: 10,
+      };
+    }
+    return {
+      position: 'absolute' as const,
+      left: screenW - 70 + COL.offsetX,
+      top: itemHeight / 2 + COL.offsetY,
+      zIndex: 10,
+    };
+  }, [screenW, itemHeight, reflPanelLayout]);
 
   const handleClanPressAction = useCallback(() => {
     if (post.author.clanId) onClanPress(post.author.clanId);
@@ -470,6 +504,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
             onTouchMove={handlePanelTouchMove}
             onTouchEnd={handlePanelTouchEnd}
             onTouchCancel={handlePanelTouchCancel}
+            onLayout={Platform.OS === 'android' ? handleReflPanelLayout : undefined}
             style={[
               styles.reflectionPanel,
               {
@@ -662,6 +697,11 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
           onSave={handleSave}
           onClanPress={handleClanPressAction}
           onMorePress={handleMorePress}
+          containerHeight={
+            Platform.OS === 'android' && reflPanelLayout
+              ? reflPanelLayout.height
+              : undefined
+          }
         />
       </View>
     </View>
