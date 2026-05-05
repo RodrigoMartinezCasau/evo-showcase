@@ -351,18 +351,34 @@ export interface BlockedProfile {
 }
 
 export async function fetchBlockedUsers(blockerId: string): Promise<BlockedProfile[]> {
-  const { data, error } = await supabase
+  // Step 1: get blocked user IDs
+  const { data: blockRows, error: blockErr } = await supabase
     .from('blocks')
-    .select('blocked_id, profiles!blocked_id(username, clan_id)')
+    .select('blocked_id')
     .eq('blocker_id', blockerId);
-  if (error) { console.error('[Social] fetchBlockedUsers:', error.message); return []; }
-  return (data ?? []).map((row: Record<string, unknown>) => {
-    const profile = (row.profiles as Record<string, unknown> | null) ?? {};
-    const rawUsername = profile.username as string | null;
+  if (blockErr) { console.error('[Social] fetchBlockedUsers:', blockErr.message); return []; }
+  if (!blockRows || blockRows.length === 0) return [];
+
+  const ids = blockRows.map((r: Record<string, unknown>) => r.blocked_id as string);
+
+  // Step 2: fetch profiles for those IDs
+  const { data: profileRows, error: profileErr } = await supabase
+    .from('profiles')
+    .select('id, username, clan_id')
+    .in('id', ids);
+  if (profileErr) { console.error('[Social] fetchBlockedUsers profiles:', profileErr.message); }
+
+  const profileMap: Record<string, { username: string | null; clan_id: string | null }> = {};
+  for (const p of (profileRows ?? []) as Record<string, unknown>[]) {
+    profileMap[p.id as string] = { username: p.username as string | null, clan_id: p.clan_id as string | null };
+  }
+
+  return ids.map((blockedId) => {
+    const p = profileMap[blockedId];
     return {
-      blockedId: row.blocked_id as string,
-      username: rawUsername ? '@' + rawUsername.toUpperCase() : '@' + (row.blocked_id as string).slice(0, 8),
-      clanId: (profile.clan_id as string | null) ?? null,
+      blockedId,
+      username: p?.username ? '@' + p.username.toUpperCase() : '@' + blockedId.slice(0, 8),
+      clanId: p?.clan_id ?? null,
     };
   });
 }
