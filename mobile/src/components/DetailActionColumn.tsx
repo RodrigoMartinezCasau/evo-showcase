@@ -108,11 +108,9 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
   const approvalPct = total > 0 ? Math.round((upCount / total) * 100) : 100;
 
   // Measurement-based layout: fill panel height with space-between (6 items).
-  // alignItems: flex-end keeps every icon's right edge on the column right edge
-  // (= panel visual border). Counts appear to the LEFT of icons (inside the panel).
   const columnStyle = containerHeight != null
-    ? [styles.column, { height: containerHeight, justifyContent: 'space-between' as const, alignItems: 'flex-end' as const }]
-    : [styles.column, { gap: COL.gap, alignItems: 'flex-end' as const }];
+    ? [styles.column, { height: containerHeight, justifyContent: 'space-between' as const }]
+    : [styles.column, { gap: COL.gap }];
 
   return (
     <View style={styles.root}>
@@ -209,26 +207,24 @@ const styles = StyleSheet.create({
     width: COL_FIXED_WIDTH,
   },
   column: {
+    alignItems: 'center',
     justifyContent: 'flex-start',
     width: COL_FIXED_WIDTH,
   },
-  // row-reverse: first child (icon) sits on the RIGHT, second child (count) on the LEFT.
-  // This places the count text inside the black rectangle and the icon at the panel edge.
   iconWithStat: {
-    flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 6,
   },
   statText: {
     fontSize: 13,
     fontWeight: '700',
-    textAlign: 'right',
+    marginTop: 2,
+    textAlign: 'center',
     color: '#FFFFFF',
   },
   approvalText: {
     fontSize: 13,
     fontWeight: '800',
-    textAlign: 'right',
+    textAlign: 'center',
   },
   moreDots: {
     color: '#FFFFFF',
