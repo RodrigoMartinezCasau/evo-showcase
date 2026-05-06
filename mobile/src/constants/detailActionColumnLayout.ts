@@ -14,45 +14,46 @@ export const DETAIL_ACTION_COLUMN_LAYOUT = {
   offsetX: -58,
   /** Desplazamiento Y fallback. */
   offsetY: -280,
-  /** Espacio vertical entre botones en modo fallback. */
-  gap: 18,
+  /** Espacio vertical entre botones en modo fallback (sin containerHeight). */
+  gap: 12,
   /** Tamaño base de cada icono (px). Los editores de scale lo multiplican. */
   iconSize: 28,
 };
 
-/** Botón CLAN (insignia). */
+/** Botón CLAN (insignia).
+ *  Su scale define también el ancho total de la columna (COL_FIXED_WIDTH). */
 export const DETAIL_CLAN_BUTTON_LAYOUT = {
   offsetX: 0,
   offsetY: 0,
-  scale: 2.2,
+  scale: 2.8,
 };
 
 /** Botón UPVOTE. */
 export const DETAIL_UPVOTE_BUTTON_LAYOUT = {
   offsetX: 0,
   offsetY: 0,
-  scale: 1.3,
+  scale: 2.2,
 };
 
 /** Botón DOWNVOTE. */
 export const DETAIL_DOWNVOTE_BUTTON_LAYOUT = {
   offsetX: 0,
   offsetY: 0,
-  scale: 1.3,
+  scale: 2.2,
 };
 
 /** Botón SAVE (guardar / bookmark). */
 export const DETAIL_SAVE_BUTTON_LAYOUT = {
   offsetX: 0,
   offsetY: 0,
-  scale: 1.1,
+  scale: 2.0,
 };
 
 /** Botón MÁS (tres puntitos). */
 export const DETAIL_MORE_BUTTON_LAYOUT = {
   offsetX: 0,
   offsetY: 0,
-  scale: 1.4,
+  scale: 2.0,
 };
 
 /* ──────────────────────────────────────────────
