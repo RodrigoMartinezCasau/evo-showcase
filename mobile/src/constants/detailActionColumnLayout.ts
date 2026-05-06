@@ -14,52 +14,60 @@ export const DETAIL_ACTION_COLUMN_LAYOUT = {
   offsetX: -58,
   /** Desplazamiento Y fallback. */
   offsetY: -280,
-  /** Espacio vertical entre botones en modo fallback (sin containerHeight). */
-  gap: 12,
-  /** Tamaño base de cada icono (px). Los editores de scale lo multiplican. */
+  /** Tamaño base de cada icono (px) — sólo para el modo fallback. */
   iconSize: 28,
+  /**
+   * Ancho máximo del badge de clan (px).
+   * Define también el ancho fijo de la columna (COL_FIXED_WIDTH = maxClanW).
+   * Para caber en pantalla con un inset de columnCenterInset:
+   *   panelVisualRight - columnCenterInset + maxClanW/2 ≤ screenW
+   *   ≈ 353 - 20 + 60 = 393 ✓ en un teléfono de 393 px.
+   */
+  maxClanW: 120,
+  /**
+   * Cuántos px a la izquierda del borde del panel se centra la columna.
+   * Necesario para que la columna más ancha no sobresalga de la pantalla.
+   */
+  columnCenterInset: 20,
 };
 
-// Clan is 120% bigger than other icons (clan = other × 2.2).
-// Column width = iconSize * clan scale.
-// Screen constraint: clan scale ≤ 80/28 ≈ 2.86 on a 393px phone.
-const _CLAN_SCALE = 2.8;         // max safe value that stays within screen
-const _OTHER_SCALE = _CLAN_SCALE / 2.2; // ≈ 1.27 — other icons are 120% smaller
+// Fallback scales (usados antes de que containerHeight esté disponible).
+const _FB_CLAN_SCALE = 2.8;
+const _FB_OTHER_SCALE = _FB_CLAN_SCALE / 2.2;
 
-/** Botón CLAN (insignia) — 120% más grande que los otros iconos.
- *  Su scale define el ancho total de la columna (COL_FIXED_WIDTH). */
+/** Botón CLAN (insignia) — fallback. */
 export const DETAIL_CLAN_BUTTON_LAYOUT = {
   offsetX: 0,
   offsetY: 0,
-  scale: _CLAN_SCALE,
+  scale: _FB_CLAN_SCALE,
 };
 
-/** Botón UPVOTE. */
+/** Botón UPVOTE — fallback. */
 export const DETAIL_UPVOTE_BUTTON_LAYOUT = {
   offsetX: 0,
   offsetY: 0,
-  scale: _OTHER_SCALE,
+  scale: _FB_OTHER_SCALE,
 };
 
-/** Botón DOWNVOTE. */
+/** Botón DOWNVOTE — fallback. */
 export const DETAIL_DOWNVOTE_BUTTON_LAYOUT = {
   offsetX: 0,
   offsetY: 0,
-  scale: _OTHER_SCALE,
+  scale: _FB_OTHER_SCALE,
 };
 
-/** Botón SAVE (guardar / bookmark). */
+/** Botón SAVE (guardar / bookmark) — fallback. */
 export const DETAIL_SAVE_BUTTON_LAYOUT = {
   offsetX: 0,
   offsetY: 0,
-  scale: _OTHER_SCALE * 0.92,
+  scale: _FB_OTHER_SCALE * 0.92,
 };
 
-/** Botón MÁS (tres puntitos). */
+/** Botón MÁS (tres puntitos) — fallback. */
 export const DETAIL_MORE_BUTTON_LAYOUT = {
   offsetX: 0,
   offsetY: 0,
-  scale: _OTHER_SCALE * 0.92,
+  scale: _FB_OTHER_SCALE * 0.92,
 };
 
 /* ──────────────────────────────────────────────

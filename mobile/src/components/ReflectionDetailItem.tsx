@@ -411,15 +411,16 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
       const panelVisualRight =
         PADDING_H + contentW / 2 + (contentW * RP.widthScale) / 2 + RP.offsetX;
 
-      // Half the column width so the icon centers sit exactly on the panel edge.
-      const COL_FIXED_WIDTH = COL.iconSize * CLAN_L.scale;
+      // Column width = maxClanW. Shift center columnCenterInset px inside the panel
+      // so the wider column stays within screen bounds.
+      const COL_FIXED_WIDTH = COL.maxClanW;
 
       // Clan badge protrudes 10% of panel height above the grey box top.
       // Container height extends 10% upward so the bottom stays at the panel bottom.
       const overhang = reflPanelLayout.height * 0.1;
       return {
         position: 'absolute' as const,
-        left: panelVisualRight - COL_FIXED_WIDTH / 2,
+        left: panelVisualRight - COL_FIXED_WIDTH / 2 - COL.columnCenterInset,
         top: reflPanelLayout.y - overhang,
         zIndex: 10,
       };

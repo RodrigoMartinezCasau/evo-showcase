@@ -36,8 +36,12 @@ export const PANELS_GAP = 12;
 /** Espacio reservado debajo del panel de comentarios (px). Reducir para expandir los paneles hacia abajo. */
 export const PANELS_BOTTOM_RESERVE = 0;
 
-/** Reducción del ancho útil del texto de la reflexión desde la derecha (px). */
-export const REFLECTION_TEXT_RIGHT_INSET = 45;
+/**
+ * Reducción del ancho útil del texto de la reflexión desde la derecha (px).
+ * Aumentado a 66 para que el texto no quede bajo la columna de acciones
+ * ahora que la columna se centra 20 px dentro del borde del panel (columnCenterInset).
+ */
+export const REFLECTION_TEXT_RIGHT_INSET = 66;
 
 /** Control del título de la reflexión/frase. */
 export const DETAIL_TITLE_LAYOUT = {

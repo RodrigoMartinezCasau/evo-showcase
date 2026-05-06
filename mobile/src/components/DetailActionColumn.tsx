@@ -107,21 +107,47 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
   const total = upCount + downCount;
   const approvalPct = total > 0 ? Math.round((upCount / total) * 100) : 100;
 
-  // Measurement-based layout: fill panel height with space-between (7 items).
-  // Item order: clan / upvote-count / upvote-icon / approval% / downvote+count / save / dots
+  // ── Dynamic icon sizing ────────────────────────────────────────────────────
+  // Solve: ICON_RATIO_SUM * effectiveSz + FIXED_H = containerHeight
+  // Clan = 2.2 × other (120% bigger).  Icons fill the panel; gaps from space-between.
+  // Fixed items: 3 text nodes (upvote count, approval %, downvote count) @ ~18px + 2px inner margin.
+  const ICON_RATIO_SUM = 2.2 + 1 + 1 + 0.92 + 0.6; // clan + up + down + save + dots
+  const FIXED_H = 3 * 18 + 2; // 56 px
+
+  let clanSz: number;
+  let otherSz: number;
+  let saveSz: number;
+  let dotsFontSz: number;
+
+  if (containerHeight && containerHeight > 0) {
+    const derivedSz = Math.max(1, (containerHeight - FIXED_H) / ICON_RATIO_SUM);
+    const rawClanH = derivedSz * 2.2;
+    clanSz = Math.min(rawClanH, COL.maxClanW);
+    const effSz = clanSz / 2.2;
+    otherSz = effSz;
+    saveSz = effSz * 0.92;
+    dotsFontSz = Math.max(12, effSz * 0.6);
+  } else {
+    clanSz = sz * CLAN_L.scale;
+    otherSz = sz * UP_L.scale;
+    saveSz = sz * SAVE_L.scale;
+    dotsFontSz = Math.max(12, 22 * MORE_L.scale);
+  }
+  // ──────────────────────────────────────────────────────────────────────────
+
   const columnStyle = containerHeight != null
     ? [styles.column, { height: containerHeight, justifyContent: 'space-between' as const }]
-    : [styles.column, { gap: COL.gap }];
+    : [styles.column];
 
   return (
     <View style={styles.root}>
-      {/* ── 7-item column ── */}
+      {/* ── 7-item column: clan / upvote-count / upvote-icon / approval% / downvote+count / save / dots ── */}
       <View style={columnStyle}>
 
         {/* 1. Clan badge */}
         <TouchableOpacity onPress={onClanPress} activeOpacity={0.7}>
-          <View style={{ width: sz * CLAN_L.scale, height: sz * CLAN_L.scale }}>
-            <InsigniaIcon width={sz * CLAN_L.scale} height={sz * CLAN_L.scale} />
+          <View style={{ width: clanSz, height: clanSz }}>
+            <InsigniaIcon width={clanSz} height={clanSz} />
           </View>
         </TouchableOpacity>
 
@@ -130,19 +156,13 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
           {formatCount(upCount)}
         </Text>
 
-        {/* 3. Upvote icon (no count below) */}
+        {/* 3. Upvote icon */}
         <TouchableOpacity onPress={handleUp} activeOpacity={0.7}>
-          <Animated.View
-            style={{
-              width: sz * UP_L.scale,
-              height: sz * UP_L.scale,
-              transform: [{ scale: upBounce.scale }],
-            }}
-          >
+          <Animated.View style={{ width: otherSz, height: otherSz, transform: [{ scale: upBounce.scale }] }}>
             {voted === 'up' ? (
-              <UpvoteActive key="up-a" width={sz * UP_L.scale} height={sz * UP_L.scale} />
+              <UpvoteActive key="up-a" width={otherSz} height={otherSz} />
             ) : (
-              <UpvoteInactive key="up-i" width={sz * UP_L.scale} height={sz * UP_L.scale} />
+              <UpvoteInactive key="up-i" width={otherSz} height={otherSz} />
             )}
           </Animated.View>
         </TouchableOpacity>
@@ -155,17 +175,11 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
         {/* 5. Downvote + count below */}
         <TouchableOpacity onPress={handleDown} activeOpacity={0.7}>
           <View style={styles.iconWithStat}>
-            <Animated.View
-              style={{
-                width: sz * DOWN_L.scale,
-                height: sz * DOWN_L.scale,
-                transform: [{ scale: downBounce.scale }],
-              }}
-            >
+            <Animated.View style={{ width: otherSz, height: otherSz, transform: [{ scale: downBounce.scale }] }}>
               {voted === 'down' ? (
-                <DownvoteActive key="down-a" width={sz * DOWN_L.scale} height={sz * DOWN_L.scale} />
+                <DownvoteActive key="down-a" width={otherSz} height={otherSz} />
               ) : (
-                <DownvoteInactive key="down-i" width={sz * DOWN_L.scale} height={sz * DOWN_L.scale} />
+                <DownvoteInactive key="down-i" width={otherSz} height={otherSz} />
               )}
             </Animated.View>
             <Text style={[styles.statText, { color: voted === 'down' ? DOWN_C.colorActive : DOWN_C.colorInactive }]}>
@@ -176,24 +190,18 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
 
         {/* 6. Save */}
         <TouchableOpacity onPress={handleSave} activeOpacity={0.7}>
-          <Animated.View
-            style={{
-              width: sz * SAVE_L.scale,
-              height: sz * SAVE_L.scale,
-              transform: [{ scale: saveBounce.scale }],
-            }}
-          >
+          <Animated.View style={{ width: saveSz, height: saveSz, transform: [{ scale: saveBounce.scale }] }}>
             {saved ? (
-              <SaveActive key="save-a" width={sz * SAVE_L.scale} height={sz * SAVE_L.scale} />
+              <SaveActive key="save-a" width={saveSz} height={saveSz} />
             ) : (
-              <SaveInactive key="save-i" width={sz * SAVE_L.scale} height={sz * SAVE_L.scale} />
+              <SaveInactive key="save-i" width={saveSz} height={saveSz} />
             )}
           </Animated.View>
         </TouchableOpacity>
 
         {/* 7. More (three dots) */}
         <TouchableOpacity onPress={onMorePress} activeOpacity={0.7} hitSlop={8}>
-          <Text style={[styles.moreDots, { fontSize: 22 * MORE_L.scale }]}>···</Text>
+          <Text style={[styles.moreDots, { fontSize: dotsFontSz }]}>···</Text>
         </TouchableOpacity>
 
       </View>
@@ -201,7 +209,8 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
   );
 }));
 
-const COL_FIXED_WIDTH = COL.iconSize * CLAN_L.scale;
+// Column width = maxClanW always (clan badge fills the full column width).
+const COL_FIXED_WIDTH = COL.maxClanW;
 
 const styles = StyleSheet.create({
   root: {
