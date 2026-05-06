@@ -6,6 +6,13 @@ import {
   saveSidebarFoldersToStorage,
 } from '@evoconn/services/sidebarFoldersStorage';
 
+/** Carpetas que antes venían por defecto (Filosofía / Política); se borran del almacén local. */
+function isLegacyDefaultSidebarFolders(list: SidebarFolder[]): boolean {
+  if (list.length !== 2) return false;
+  const byId = Object.fromEntries(list.map((f) => [f.id, f.name]));
+  return byId.f1 === 'Filosofía' && byId.f2 === 'Política';
+}
+
 type ConversationFoldersContextValue = {
   folders: SidebarFolder[];
   setFolders: React.Dispatch<React.SetStateAction<SidebarFolder[]>>;
@@ -23,7 +30,10 @@ export function ConversationFoldersProvider({ children }: { children: React.Reac
     (async () => {
       const stored = await loadSidebarFoldersFromStorage();
       if (cancelled) return;
-      if (stored.length > 0) {
+      if (isLegacyDefaultSidebarFolders(stored)) {
+        setFolders([]);
+        await saveSidebarFoldersToStorage([]);
+      } else if (stored.length > 0) {
         setFolders(stored);
       }
       hydrated.current = true;

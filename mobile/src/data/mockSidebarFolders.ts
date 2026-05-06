@@ -1,6 +1,4 @@
 import type { SidebarFolder } from '../types';
 
-export const mockSidebarFolders: SidebarFolder[] = [
-  { id: 'f1', name: 'Filosofía' },
-  { id: 'f2', name: 'Política' },
-];
+/** Sin carpetas por defecto: el usuario las crea en la simulación. */
+export const mockSidebarFolders: SidebarFolder[] = [];
