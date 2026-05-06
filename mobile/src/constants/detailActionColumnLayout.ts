@@ -20,40 +20,45 @@ export const DETAIL_ACTION_COLUMN_LAYOUT = {
   iconSize: 28,
 };
 
+// Base scale for all non-clan buttons. Clan is always BASE * CLAN_FACTOR (20% bigger).
+const BASE_SCALE = 2.3;
+const CLAN_FACTOR = 1.2; // clan is 20% bigger than BASE_SCALE
+
 /** Botón CLAN (insignia).
- *  Su scale define también el ancho total de la columna (COL_FIXED_WIDTH). */
+ *  Siempre 20% mayor que BASE_SCALE. Su scale define el ancho total de la
+ *  columna (COL_FIXED_WIDTH = iconSize * scale). */
 export const DETAIL_CLAN_BUTTON_LAYOUT = {
   offsetX: 0,
   offsetY: 0,
-  scale: 2.8,
+  scale: BASE_SCALE * CLAN_FACTOR, // 2.76 ≈ 2.76
 };
 
 /** Botón UPVOTE. */
 export const DETAIL_UPVOTE_BUTTON_LAYOUT = {
   offsetX: 0,
   offsetY: 0,
-  scale: 2.2,
+  scale: BASE_SCALE,
 };
 
 /** Botón DOWNVOTE. */
 export const DETAIL_DOWNVOTE_BUTTON_LAYOUT = {
   offsetX: 0,
   offsetY: 0,
-  scale: 2.2,
+  scale: BASE_SCALE,
 };
 
 /** Botón SAVE (guardar / bookmark). */
 export const DETAIL_SAVE_BUTTON_LAYOUT = {
   offsetX: 0,
   offsetY: 0,
-  scale: 2.0,
+  scale: BASE_SCALE * 0.91, // slightly smaller than up/down
 };
 
 /** Botón MÁS (tres puntitos). */
 export const DETAIL_MORE_BUTTON_LAYOUT = {
   offsetX: 0,
   offsetY: 0,
-  scale: 2.0,
+  scale: BASE_SCALE * 0.91,
 };
 
 /* ──────────────────────────────────────────────
