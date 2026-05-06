@@ -1,21 +1,5 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import {
-  TOP_ROW_PADDING_HORIZONTAL,
-  TOP_ROW_MIN_HEIGHT,
-  POSTS_COUNTER_LAYOUT_WIDTH,
-  POSTS_COUNTER_LAYOUT_HEIGHT,
-  POSTS_COUNTER_OFFSET_X,
-  POSTS_COUNTER_OFFSET_Y,
-  POSTS_COUNTER_SCALE,
-  FOLLOW_STATS_LAYOUT_WIDTH,
-  FOLLOW_STATS_LAYOUT_HEIGHT,
-  FOLLOW_STATS_OFFSET_X,
-  FOLLOW_STATS_OFFSET_Y,
-  FOLLOW_STATS_SCALE,
-} from '@evoconn/constants/personalProfileLayout';
-import { PersonalPostsCounter } from './PersonalPostsCounter';
-import { PersonalFollowStats } from './PersonalFollowStats';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { PersonalNotificationsButton } from './PersonalNotificationsButton';
 
 type Props = {
@@ -24,12 +8,18 @@ type Props = {
   clanId: string | null | undefined;
   followersCount: number;
   followingCount: number;
-  /** Live count derived from the user's actual published posts — must equal the posts display count. */
+  /** Live count derived from the user's actual published posts. */
   totalPosts: number;
   onPostsPress?: () => void;
   onFollowersPress?: () => void;
   onFollowingPress?: () => void;
 };
+
+function formatCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
+}
 
 export const PersonalFollowRow = React.memo(function PersonalFollowRow({
   followersCount,
@@ -40,89 +30,77 @@ export const PersonalFollowRow = React.memo(function PersonalFollowRow({
   onFollowingPress,
 }: Props) {
   return (
-    <View
-      style={[
-        styles.row,
-        { paddingHorizontal: TOP_ROW_PADDING_HORIZONTAL, minHeight: TOP_ROW_MIN_HEIGHT },
-      ]}
-    >
-      <View
-        style={[
-          styles.postsSlot,
-          {
-            width: POSTS_COUNTER_LAYOUT_WIDTH,
-            height: POSTS_COUNTER_LAYOUT_HEIGHT,
-            marginTop: -POSTS_COUNTER_LAYOUT_HEIGHT / 2,
-            transform: [
-              { translateX: POSTS_COUNTER_OFFSET_X },
-              { translateY: POSTS_COUNTER_OFFSET_Y },
-              { scale: POSTS_COUNTER_SCALE },
-            ],
-          },
-        ]}
+    <View style={styles.row}>
+      {/* Publicaciones */}
+      <TouchableOpacity
+        style={styles.stat}
+        onPress={onPostsPress}
+        activeOpacity={onPostsPress ? 0.7 : 1}
+        disabled={!onPostsPress}
       >
-        <PersonalPostsCounter
-          totalPosts={totalPosts}
-          onPress={onPostsPress}
-        />
-      </View>
-      <View
-        style={[
-          styles.statsSlot,
-          {
-            width: FOLLOW_STATS_LAYOUT_WIDTH,
-            height: FOLLOW_STATS_LAYOUT_HEIGHT,
-            marginTop: -FOLLOW_STATS_LAYOUT_HEIGHT / 2,
-            transform: [
-              { translateX: FOLLOW_STATS_OFFSET_X },
-              { translateY: FOLLOW_STATS_OFFSET_Y },
-              { scale: FOLLOW_STATS_SCALE },
-            ],
-          },
-        ]}
+        <Text style={styles.value}>{formatCount(totalPosts)}</Text>
+        <Text style={styles.label}>Publicaciones</Text>
+      </TouchableOpacity>
+
+      <View style={styles.divider} />
+
+      {/* Seguidores */}
+      <TouchableOpacity
+        style={styles.stat}
+        onPress={onFollowersPress}
+        activeOpacity={onFollowersPress ? 0.7 : 1}
+        disabled={!onFollowersPress}
       >
-        <PersonalFollowStats
-          followersCount={followersCount}
-          followingCount={followingCount}
-          onFollowersPress={onFollowersPress}
-          onFollowingPress={onFollowingPress}
-        />
-      </View>
-      <View style={styles.settingsSlot}>
-        <PersonalNotificationsButton />
-      </View>
+        <Text style={styles.value}>{formatCount(followersCount)}</Text>
+        <Text style={styles.label}>Seguidores</Text>
+      </TouchableOpacity>
+
+      <View style={styles.divider} />
+
+      {/* Seguidos */}
+      <TouchableOpacity
+        style={styles.stat}
+        onPress={onFollowingPress}
+        activeOpacity={onFollowingPress ? 0.7 : 1}
+        disabled={!onFollowingPress}
+      >
+        <Text style={styles.value}>{formatCount(followingCount)}</Text>
+        <Text style={styles.label}>Seguidos</Text>
+      </TouchableOpacity>
+
+      {/* Notification bell */}
+      <PersonalNotificationsButton />
     </View>
   );
 });
 
 const styles = StyleSheet.create({
   row: {
-    position: 'relative',
-    overflow: 'visible',
-  },
-  postsSlot: {
-    position: 'absolute',
-    left: 0,
-    top: '50%',
-    zIndex: 2,
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-  },
-  statsSlot: {
-    position: 'absolute',
-    right: 32,
-    top: '50%',
-    zIndex: 2,
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-  },
-  settingsSlot: {
-    position: 'absolute',
-    right: 0,
-    top: '50%',
-    zIndex: 3,
-    justifyContent: 'center',
+    flexDirection: 'row',
     alignItems: 'center',
-    overflow: 'visible',
+    justifyContent: 'space-around',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+  },
+  stat: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  value: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  label: {
+    fontSize: 11,
+    color: '#FFFFFF',
+    marginTop: 2,
+    letterSpacing: 0.4,
+    opacity: 0.7,
+  },
+  divider: {
+    width: 1,
+    height: 28,
+    backgroundColor: 'rgba(255,255,255,0.15)',
   },
 });

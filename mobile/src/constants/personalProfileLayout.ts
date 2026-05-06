@@ -3,6 +3,9 @@
  * Completely independent from otherProfileLayout.ts.
  * Tweak all positions, sizes, and spacing from this single file.
  */
+import { Dimensions } from 'react-native';
+
+const SCREEN_W = Dimensions.get('window').width;
 
 // ── Top row (contenedor; contador de posts y contadores son capas independientes) ─
 export const TOP_ROW_PADDING_HORIZONTAL = 40;
@@ -29,13 +32,13 @@ export const SETTINGS_ICON_OFFSET_X = -20;
 export const SETTINGS_ICON_OFFSET_Y = -28;
 export const SETTINGS_ICON_SCALE = 1.5;
 
-// ── Icono notificaciones (perfil personal, esquina derecha del top row) ─
+// ── Icono notificaciones (perfil personal, dentro del row de contadores) ─
 /** Posición X del icono (px). Positivo = derecha, negativo = izquierda. */
-export const NOTIFICATIONS_ICON_OFFSET_X = -17;
+export const NOTIFICATIONS_ICON_OFFSET_X = 0;
 /** Posición Y del icono (px). Positivo = abajo, negativo = arriba. */
-export const NOTIFICATIONS_ICON_OFFSET_Y = -33;
+export const NOTIFICATIONS_ICON_OFFSET_Y = 0;
 /** Escala del SVG respecto al tamaño base (28 px). */
-export const NOTIFICATIONS_ICON_SCALE = 1.7;
+export const NOTIFICATIONS_ICON_SCALE = 1.2;
 
 // ── Clan shield position + scale ───────────────────────────────────
 export const SHIELD_OFFSET_X = -30;
@@ -177,12 +180,15 @@ export const PERSONAL_LATEST_POSTS_SPACING = -20;
 export const BOTTOM_BLOCKS_CONTAINER_OFFSET_X = 0;
 export const BOTTOM_BLOCKS_CONTAINER_OFFSET_Y = 0;
 /** Espacio horizontal entre cada bloque. */
-export const BOTTOM_BLOCKS_SPACING = 16;
-/** Tamaño (ancho × alto) de cada bloque cuadrado. */
-export const BOTTOM_BLOCK_SIZE = 120;
-export const BOTTOM_BLOCK_BORDER_RADIUS = 18;
-/** Margen horizontal del row de bloques. */
+export const BOTTOM_BLOCKS_SPACING = 12;
+/** Margen horizontal del row de bloques — debe coincidir con RANK_CONTAINER_MARGIN_HORIZONTAL. */
 export const BOTTOM_BLOCKS_MARGIN_HORIZONTAL = 20;
+/** Tamaño (ancho × alto) de cada bloque cuadrado — calculado para que los 3 bloques llenen
+ *  exactamente el ancho disponible entre los márgenes (igual que los rectángulos de arriba). */
+export const BOTTOM_BLOCK_SIZE = Math.floor(
+  (SCREEN_W - 2 * BOTTOM_BLOCKS_MARGIN_HORIZONTAL - 2 * BOTTOM_BLOCKS_SPACING) / 3,
+);
+export const BOTTOM_BLOCK_BORDER_RADIUS = 18;
 /** Margen superior del row de bloques (espaciado interno fijo). */
 export const BOTTOM_BLOCKS_MARGIN_TOP = 10;
 

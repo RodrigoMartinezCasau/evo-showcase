@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getSidebarFooterClanLineColor } from '@evoconn/constants/clanColors';
@@ -35,6 +35,12 @@ function underlineWidthForTab(tabId: TabId): number | null {
 export function BottomCommunityTabs({ activeTab, onTabChange }: BottomCommunityTabsProps) {
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const insets = useSafeAreaInsets();
+  const { width: screenW } = useWindowDimensions();
+  // Scale font down on narrow screens so all labels fit on a single line.
+  const tabFontSize = Math.min(
+    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_TAB_TEXT_SIZE,
+    Math.max(9, Math.floor(screenW / 30)),
+  );
   const selectedColor = getSidebarFooterClanLineColor(activeClan);
   const LupitaIcon = useMemo(() => {
     if (activeTab === 'search') {
@@ -77,7 +83,12 @@ export function BottomCommunityTabs({ activeTab, onTabChange }: BottomCommunityT
                 <LupitaIcon width={lupitaPx} height={lupitaPx} />
               </View>
             ) : (
-              <Text style={[styles.label, isActive && { color: selectedColor }]}>{tab.label}</Text>
+              <Text
+                style={[styles.label, { fontSize: tabFontSize }, isActive && { color: selectedColor }]}
+                numberOfLines={1}
+              >
+                {tab.label}
+              </Text>
             )}
             {isActive && (
               <View

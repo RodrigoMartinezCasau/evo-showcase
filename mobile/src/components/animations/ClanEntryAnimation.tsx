@@ -83,10 +83,7 @@ function StarWithGlow({ size, color, id, children }: {
 // ─── No-clan animation ────────────────────────────────────────────────────────
 function NoClanEntry({ onComplete, runKey = 0 }: { onComplete?: () => void; runKey?: number }) {
   const clan = ANIM_CLANS.none;
-  const BaseStar = clan.StarComponent;
 
-  const baseOp    = useSharedValue(0);
-  const baseScale = useSharedValue(1);
   const starsOp    = useSharedValue(0);
   const starsScale = useSharedValue(0.15);
 
@@ -95,18 +92,12 @@ function NoClanEntry({ onComplete, runKey = 0 }: { onComplete?: () => void; runK
   const rafRef         = useRef<number>(0);
 
   useEffect(() => {
-    baseOp.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.ease) });
+    // Corona aparece directamente desde el inicio
+    starsOp.value    = withTiming(1, { duration: 557 });
+    starsScale.value = withTiming(1, { duration: 435 });
 
+    // Giro empieza justo después de que la corona aparece
     const t1 = setTimeout(() => {
-      cancelAnimation(baseOp); cancelAnimation(baseScale);
-      cancelAnimation(starsOp); cancelAnimation(starsScale);
-      baseOp.value     = withTiming(0, { duration: 800 });
-      baseScale.value  = withTiming(1.6, { duration: 800 });
-      starsOp.value    = withTiming(1, { duration: 557 });
-      starsScale.value = withTiming(1, { duration: 435 });
-    }, 1113);
-
-    const t2 = setTimeout(() => {
       const start = Date.now();
       const spin = () => {
         const elapsed = (Date.now() - start) / 1000;
@@ -124,21 +115,16 @@ function NoClanEntry({ onComplete, runKey = 0 }: { onComplete?: () => void; runK
         }
       };
       rafRef.current = requestAnimationFrame(spin);
-    }, 1809);
+    }, 600);
 
     return () => {
-      clearTimeout(t1); clearTimeout(t2);
+      clearTimeout(t1);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      cancelAnimation(baseOp); cancelAnimation(baseScale);
       cancelAnimation(starsOp); cancelAnimation(starsScale);
       cancelAnimation(circleRot);
     };
   }, [runKey]);
 
-  const baseStyle  = useAnimatedStyle(() => ({
-    opacity: baseOp.value,
-    transform: [{ scale: baseScale.value }],
-  }));
   const starsStyle = useAnimatedStyle(() => ({
     opacity: starsOp.value,
     transform: [{ scale: starsScale.value }],
@@ -156,14 +142,7 @@ function NoClanEntry({ onComplete, runKey = 0 }: { onComplete?: () => void; runK
         <RadialGlow size={460} color={clan.primary} id="nc_base_glow" />
       </View>
 
-      {/* Base star */}
-      <Animated.View style={[styles.center, baseStyle]}>
-        <StarWithGlow size={180} color={clan.primary} id="nc_base_star">
-          <BaseStar width={180} height={180} />
-        </StarWithGlow>
-      </Animated.View>
-
-      {/* 8 clan stars in circle — rotation via shared value */}
+      {/* Corona de 8 estrellas — aparece directamente sin estrella base */}
       <Animated.View style={[styles.center, starsStyle]}>
         <Animated.View style={circleRotStyle}>
           {ANIM_CLAN_IDS.map((id, i) => {

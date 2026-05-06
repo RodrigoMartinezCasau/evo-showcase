@@ -10,7 +10,6 @@ import {
   Easing,
   Keyboard,
   Platform,
-  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -123,8 +122,6 @@ export function SidebarDrawer({
   }, [visible, openProgressProp]);
 
   const insets = useSafeAreaInsets();
-  const { width: screenW } = useWindowDimensions();
-  const isSmallScreen = screenW < 420;
   const StarSvg = getSidebarStarSvgByHouse(user.clanId);
   const communityButtonSource = getCommunityButtonByHouse(user.clanId);
   const newReflectionButtonSource = getNewReflectionButtonByHouse(user.clanId);
@@ -323,7 +320,7 @@ export function SidebarDrawer({
             router.push('/settings');
           }}
         />
-        <View style={[styles.footer, isSmallScreen && styles.footerSmall]} />
+        <View style={[styles.footer, styles.footerSmall]} />
       </Animated.View>
     </View>
   );
