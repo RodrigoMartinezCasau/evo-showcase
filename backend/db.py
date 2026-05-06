@@ -9,14 +9,22 @@ from sqlmodel import Field, Session, SQLModel, create_engine
 
 from schemas import PhysicalSpec
 
-# Vercel serverless: filesystem is read-only except /tmp
-if os.environ.get("VERCEL"):
-    DB_PATH = Path("/tmp") / "physics_copilot.db"
+# Prefer a real PostgreSQL database (Railway injects DATABASE_URL automatically
+# when you add a Postgres plugin to the project). Fall back to SQLite only for
+# local development without a database configured.
+_pg_url = os.environ.get("DATABASE_URL", "").strip()
+if _pg_url:
+    # Railway sometimes provides a postgres:// URL; SQLAlchemy needs postgresql://
+    DATABASE_URL = _pg_url.replace("postgres://", "postgresql://", 1)
+    engine = create_engine(DATABASE_URL)
 else:
-    DB_PATH = Path(__file__).parent / "physics_copilot.db"
-DATABASE_URL = f"sqlite:///{DB_PATH}"
-
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+    # Local dev fallback — SQLite
+    if os.environ.get("VERCEL"):
+        DB_PATH = Path("/tmp") / "physics_copilot.db"
+    else:
+        DB_PATH = Path(__file__).parent / "physics_copilot.db"
+    DATABASE_URL = f"sqlite:///{DB_PATH}"
+    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 
 
 class Conversation(SQLModel, table=True):
