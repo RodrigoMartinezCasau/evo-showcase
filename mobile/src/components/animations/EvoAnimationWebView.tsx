@@ -34,13 +34,14 @@ import { setEntryAnimPlaying } from '../../../mobile/lib/animationState';
 // svg-data.json and written to documentDirectory at runtime.
 // PNG animal files are bundled normally (binary assets).
 
-export type EvoAnimationName = 'streak' | 'clanEntry' | 'clanReveal' | 'rankUp';
+export type EvoAnimationName = 'streak' | 'clanEntry' | 'clanReveal' | 'rankUp' | 'noUses';
 
 const HTML_MODULES: Record<EvoAnimationName, () => number> = {
   streak:     () => require('../../../mobile/assets/animations/streak.html'),
   clanEntry:  () => require('../../../mobile/assets/animations/clan-entry.html'),
   clanReveal: () => require('../../../mobile/assets/animations/clan-reveal.html'),
   rankUp:     () => require('../../../mobile/assets/animations/rank-up.html'),
+  noUses:    () => require('../../../mobile/assets/animations/no-uses.html'),
 };
 
 // SVG data as pre-compiled JSON (avoids the react-native-svg-transformer conflict)
@@ -64,6 +65,7 @@ const HTML_FILENAMES: Record<EvoAnimationName, string> = {
   clanEntry:  'clan-entry.html',
   clanReveal: 'clan-reveal.html',
   rankUp:     'rank-up.html',
+  noUses:    'no-uses.html',
 };
 
 // ─── File system setup ────────────────────────────────────────────────────────
@@ -77,7 +79,7 @@ export async function ensureAnimationAssets(): Promise<void> {
 
   _copyPromise = (async () => {
     const STAMP_FILE = ANIM_DIR + '.stamp';
-    const APP_VERSION = '48';
+    const APP_VERSION = '49';
 
     try {
       const stampInfo = await FileSystem.getInfoAsync(STAMP_FILE);
@@ -351,10 +353,11 @@ export function EvoAnimationWebView({
           break;
         case 'milestone':
           if (enableHaptics) {
-            if (msg.kind === 'year' || msg.kind === 'month')
+            if (msg.kind === 'depleted')
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            else if (msg.kind === 'year' || msg.kind === 'month')
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            else
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           }
           break;
         case 'complete':

@@ -50,6 +50,7 @@ import { useFeedStore, createPhrasePost } from '@evoconn/hooks/useFeedStore';
 import { ProfileDetailPanel } from '@evoconn/components/ProfileDetailPanel';
 import { useDebugStreak } from '../debug/DebugStreakContext';
 import { useDebugStats } from '../debug/DebugStatsContext';
+import { requestNoUsesAnimation } from '@evoconn/components/animations/AppAnimationLayer';
 import { normalizePhraseInnerForPublish } from '@evoconn/utils/phrasePublish';
 import type { SidebarFolder } from '@evoconn/types';
 import { PHRASE_CREATION_STACK_LAYOUT as PHRASE_STACK } from '@evoconn/constants/phraseCreationStackLayout';
@@ -118,7 +119,7 @@ export default function PhraseCreationScreen() {
   const { folders } = useConversationFolders();
   const { publishPost } = useFeedStore();
   const { markStreakActivated } = useDebugStreak();
-  const { decrementUses } = useDebugStats();
+  const { decrementUses, remainingUses } = useDebugStats();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const clanColor = getChatUserAccentColor(activeClan);
   const phraseCursorColor = getClanSecondaryColor(activeClan);
@@ -449,8 +450,12 @@ export default function PhraseCreationScreen() {
         // Phrase created/sent → activate streak and consume one daily use.
         // eslint-disable-next-line no-console
         console.log('[STREAK] Phrase created/sent → marking streak activated.');
+        const justEmptiedDailyUses = remainingUses === 1;
         markStreakActivated();
         decrementUses();
+        if (justEmptiedDailyUses) {
+          requestNoUsesAnimation();
+        }
         // Sync streak + uses to backend (fire-and-forget).
         void recordActivity(mockCurrentUser.id, 'frase').catch(console.error);
         void recordUsesLog(mockCurrentUser.id).catch(console.error);
@@ -506,6 +511,7 @@ export default function PhraseCreationScreen() {
       scrollToEnd,
       markStreakActivated,
       decrementUses,
+      remainingUses,
       requestPhraseIntro,
       recordClassificationInput,
     ],

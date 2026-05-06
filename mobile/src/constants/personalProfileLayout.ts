@@ -79,15 +79,13 @@ export const USERNAME_OFFSET_Y = -5;
 export const USERNAME_FONT_SIZE = 22;
 
 // ── Clan + rank row (whole line together) ──────────────────────────
-/** Scale of the entire clan+rank text line. */
-export const CLAN_ROW_SCALE = 0.9;
-/** Horizontal nudge of the clan+rank row (px). Positive = right, negative = left. */
-export const CLAN_ROW_OFFSET_X = -10;
+export const CLAN_ROW_SCALE = 1;
+export const CLAN_ROW_OFFSET_X = USERNAME_OFFSET_X;
 /** Margin below the clan+rank row — reduces gap with the element below. Negative = closer. */
 export const CLAN_ROW_MARGIN_BOTTOM = 10;
 
 // ── Clan name text ─────────────────────────────────────────────────
-export const CLAN_OFFSET_X = 3;
+export const CLAN_OFFSET_X = 0;
 export const CLAN_OFFSET_Y = -3;
 export const CLAN_FONT_SIZE = 20;
 

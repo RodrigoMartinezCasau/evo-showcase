@@ -10,9 +10,10 @@
  *   - clan assigned (first) → clan-reveal animation (isChange=false)
  *   - clan changes          → clan-reveal animation (isChange=true)
  *   - rank increases        → rank-up animation
+ *   - daily uses exhausted  → no-uses modal (exactly when the last use is consumed)
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { EvoAnimationWebView, ensureAnimationAssets } from './EvoAnimationWebView';
 import { setEntryAnimPlaying } from '../../../mobile/lib/animationState';
 import { useDebugStats } from '@evoconn/debug/DebugStatsContext';
@@ -44,6 +45,22 @@ export function requestEntryAnimation() {
   }
 }
 
+/** Fires once when the user consumes their last daily IA use (→ 0). Queued if layer not ready / blocked by streak animation. */
+let _requestNoUses: (() => void) | null = null;
+let _noUsesQueued = false;
+
+export function requestNoUsesAnimation() {
+  // Run after layout + refs (showStreakRef) sync so we can defer behind streak modal.
+  queueMicrotask(() => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (_requestNoUses) _requestNoUses();
+        else _noUsesQueued = true;
+      });
+    });
+  });
+}
+
 export default function AppAnimationLayer() {
   const { streakDays, statsLoaded, streakTrigger } = useDebugStats();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
@@ -57,11 +74,19 @@ export default function AppAnimationLayer() {
   // If a request was queued before we mounted, remember it
   const pendingEntryRef = useRef(_entryQueued);
 
+  const showEntryRef = useRef(false);
+  const showStreakRef = useRef(false);
+  const pendingNoUsesAfterStreakRef = useRef(false);
+
   useEffect(() => {
     ensureAnimationAssets()
       .then(() => setAssetsReady(true))
       .catch(() => setAssetsReady(true));
   }, []);
+
+  useEffect(() => {
+    showEntryRef.current = showEntry;
+  }, [showEntry]);
 
   // Register the module-level trigger so login/signup screens can replay the
   // entry animation after a successful sign-in.
@@ -121,6 +146,50 @@ export default function AppAnimationLayer() {
     setStreakCount(streakDays);
     if (assetsReady && !showEntry) setShowStreak(true);
   }, [streakTrigger, streakDays, statsLoaded, showEntry, assetsReady]);
+
+  useEffect(() => {
+    showStreakRef.current = showStreak;
+  }, [showStreak]);
+
+  // ── No daily uses left (shows once when consumption hits 0) ────────────
+  const [showNoUses, setShowNoUses] = useState(false);
+
+  useEffect(() => {
+    _requestNoUses = () => {
+      if (!assetsReady) {
+        _noUsesQueued = true;
+        return;
+      }
+      if (showEntryRef.current) return;
+      if (showStreakRef.current) {
+        pendingNoUsesAfterStreakRef.current = true;
+        return;
+      }
+      setShowNoUses(true);
+    };
+    return () => { _requestNoUses = null; };
+  }, [assetsReady]);
+
+  useEffect(() => {
+    if (assetsReady && _noUsesQueued) {
+      _noUsesQueued = false;
+      _requestNoUses?.();
+    }
+  }, [assetsReady]);
+
+  useEffect(() => {
+    if (!showNoUses) return;
+    const t = setTimeout(() => setShowNoUses(false), 120_000);
+    return () => clearTimeout(t);
+  }, [showNoUses]);
+
+  const closeStreakAndMaybeShowNoUses = useCallback(() => {
+    setShowStreak(false);
+    if (pendingNoUsesAfterStreakRef.current) {
+      pendingNoUsesAfterStreakRef.current = false;
+      setShowNoUses(true);
+    }
+  }, []);
 
   // ── Clan reveal / change animation ──────────────────────────────────────
   const [showClanReveal, setShowClanReveal] = useState(false);
@@ -189,8 +258,17 @@ export default function AppAnimationLayer() {
           streakCount,
           previousStreakCount: prevStreakCount,
         }}
-        onComplete={() => setShowStreak(false)}
-        onClose={() => setShowStreak(false)}
+        onComplete={closeStreakAndMaybeShowNoUses}
+        onClose={closeStreakAndMaybeShowNoUses}
+      />
+
+      {/* ── Daily uses depleted ── */}
+      <EvoAnimationWebView
+        visible={showNoUses}
+        name="noUses"
+        params={{ clanId }}
+        onComplete={() => setShowNoUses(false)}
+        onClose={() => setShowNoUses(false)}
       />
 
       {/* ── Clan reveal / change animation ── */}

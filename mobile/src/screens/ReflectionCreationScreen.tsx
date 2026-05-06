@@ -115,6 +115,7 @@ import {
 import { getPublishStarByClan } from '@evoconn/utils/getDebateStarByClan';
 import { useDebugStreak } from '../debug/DebugStreakContext';
 import { useDebugStats } from '../debug/DebugStatsContext';
+import { requestNoUsesAnimation } from '@evoconn/components/animations/AppAnimationLayer';
 import { useQuotes } from '@evoconn/hooks/QuotesContext';
 import { useAISettings } from '@evoconn/hooks/AISettingsContext';
 import { COMMUNITY_DRAWER_EDGE_ZONE_WIDTH } from '@evoconn/constants/communityDrawerGesture';
@@ -146,7 +147,7 @@ export default function ReflectionCreationScreen() {
   const { publishPost } = useFeedStore();
   const publishedRef = useRef<Set<string>>(new Set());
   const { markStreakActivated } = useDebugStreak();
-  const { decrementUses } = useDebugStats();
+  const { decrementUses, remainingUses } = useDebugStats();
   const { selectAndUnlockQuote } = useQuotes();
   const { includeReflectiveQuestion, includePhilosophicalReferences } = useAISettings();
 
@@ -407,8 +408,12 @@ export default function ReflectionCreationScreen() {
         // Reflection sent → activate streak, consume one daily use, select+unlock a KB phrase.
         // eslint-disable-next-line no-console
         console.log('[STREAK] Reflection created/sent → marking streak activated.');
+        const justEmptiedDailyUses = remainingUses === 1;
         markStreakActivated();
         decrementUses();
+        if (justEmptiedDailyUses) {
+          requestNoUsesAnimation();
+        }
         // Sync streak + uses to backend (fire-and-forget).
         void recordActivity(mockCurrentUser.id, 'reflexion').catch(console.error);
         void recordUsesLog(mockCurrentUser.id).catch(console.error);
@@ -492,7 +497,7 @@ export default function ReflectionCreationScreen() {
         setSending(false);
       }
     },
-    [sending, debateId, createThought, updateThought, scrollToEnd, thoughts, markStreakActivated, decrementUses, selectAndUnlockQuote, includeReflectiveQuestion, includePhilosophicalReferences, toPersistedMessage, recordClassificationInput],
+    [sending, debateId, createThought, updateThought, scrollToEnd, thoughts, markStreakActivated, decrementUses, remainingUses, selectAndUnlockQuote, includeReflectiveQuestion, includePhilosophicalReferences, toPersistedMessage, recordClassificationInput],
   );
 
   const conversationItems = useMemo(

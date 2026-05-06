@@ -31,7 +31,7 @@ function getPrevClan(current: AnimClanId): Exclude<AnimClanId, 'none'> {
   return options[0] ?? 'estoico';
 }
 
-type AnimKey = 'entry' | 'assign' | 'change' | 'streak' | 'rank';
+type AnimKey = 'entry' | 'assign' | 'change' | 'streak' | 'rank' | 'noUses';
 
 interface AnimOption {
   key: AnimKey;
@@ -40,11 +40,12 @@ interface AnimOption {
 }
 
 const ANIM_OPTIONS: AnimOption[] = [
-  { key: 'entry',  label: 'Bienvenida',        emoji: '✨' },
-  { key: 'assign', label: 'Asignación de clan', emoji: '🌟' },
-  { key: 'change', label: 'Cambio de clan',     emoji: '🔄' },
-  { key: 'streak', label: 'Aumento de racha',   emoji: '🔥' },
-  { key: 'rank',   label: 'Aumento de rango',   emoji: '🏆' },
+  { key: 'entry',   label: 'Bienvenida',           emoji: '✨' },
+  { key: 'assign',  label: 'Asignación de clan',    emoji: '🌟' },
+  { key: 'change',  label: 'Cambio de clan',       emoji: '🔄' },
+  { key: 'streak',  label: 'Aumento de racha',      emoji: '🔥' },
+  { key: 'rank',    label: 'Aumento de rango',      emoji: '🏆' },
+  { key: 'noUses',  label: 'Sin usos diarios',     emoji: '💔' },
 ];
 
 export function DebugAnimationsPanel() {
@@ -89,6 +90,8 @@ export function DebugAnimationsPanel() {
             rank: { previous: 'aprendiz', current: 'maestro', percentage: 42.5 },
           },
         };
+      case 'noUses':
+        return { name: 'noUses' as const, params: { clanId } };
     }
   }
 
