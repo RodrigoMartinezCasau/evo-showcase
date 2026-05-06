@@ -63,7 +63,7 @@ type DetailActionColumnProps = {
   onClanPress: () => void;
   onMorePress: () => void;
   /**
-   * Android only. When provided the column fills exactly this height using
+   * When provided the column fills exactly this height using
    * `justifyContent: 'space-between'`, anchoring clan icon top to the
    * reflection panel top and three-dots bottom to the panel bottom.
    */

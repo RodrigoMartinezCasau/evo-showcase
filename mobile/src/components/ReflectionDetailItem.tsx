@@ -68,7 +68,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   const [readingMode, setReadingMode] = useState(false);
   const readingModeRef = useRef(false);
 
-  // Android: measure the reflection panel to anchor the action column exactly.
+  // Measure the reflection panel to anchor the action column exactly.
   const [reflPanelLayout, setReflPanelLayout] = useState<{ y: number; height: number } | null>(null);
   const handleReflPanelLayout = useCallback((e: LayoutChangeEvent) => {
     const { y, height } = e.nativeEvent.layout;
@@ -400,7 +400,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   );
 
   const actionColStyle = useMemo(() => {
-    if (Platform.OS === 'android' && reflPanelLayout) {
+    if (reflPanelLayout) {
       // Compute the panel's visual right edge in container coordinates.
       // The panel layout width = content area width = screenW - 2 * paddingH.
       // scaleX(RP.widthScale) shrinks from center → right edge recedes by
@@ -421,6 +421,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
         zIndex: 10,
       };
     }
+    // Fallback while reflPanelLayout hasn't been measured yet.
     return {
       position: 'absolute' as const,
       left: screenW - 70 + COL.offsetX,
@@ -504,7 +505,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
             onTouchMove={handlePanelTouchMove}
             onTouchEnd={handlePanelTouchEnd}
             onTouchCancel={handlePanelTouchCancel}
-            onLayout={Platform.OS === 'android' ? handleReflPanelLayout : undefined}
+            onLayout={handleReflPanelLayout}
             style={[
               styles.reflectionPanel,
               {
@@ -697,11 +698,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
           onSave={handleSave}
           onClanPress={handleClanPressAction}
           onMorePress={handleMorePress}
-          containerHeight={
-            Platform.OS === 'android' && reflPanelLayout
-              ? reflPanelLayout.height
-              : undefined
-          }
+          containerHeight={reflPanelLayout?.height}
         />
       </View>
     </View>
