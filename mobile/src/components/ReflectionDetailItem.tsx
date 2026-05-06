@@ -415,9 +415,9 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
       // so the wider column stays within screen bounds.
       const COL_FIXED_WIDTH = COL.maxClanW;
 
-      // Clan badge protrudes 10% of panel height above the grey box top.
-      // Container height extends 10% upward so the bottom stays at the panel bottom.
-      const overhang = reflPanelLayout.height * 0.1;
+      // Clan badge protrudes 5% of panel height above the grey box top.
+      // Container height extends 5% upward so the bottom stays at the panel bottom.
+      const overhang = reflPanelLayout.height * 0.05;
       return {
         position: 'absolute' as const,
         left: panelVisualRight - COL_FIXED_WIDTH / 2 - COL.columnCenterInset,
@@ -702,7 +702,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
           onSave={handleSave}
           onClanPress={handleClanPressAction}
           onMorePress={handleMorePress}
-          containerHeight={reflPanelLayout ? reflPanelLayout.height * 1.1 : undefined}
+          containerHeight={reflPanelLayout ? reflPanelLayout.height * 1.05 : undefined}
         />
       </View>
     </View>

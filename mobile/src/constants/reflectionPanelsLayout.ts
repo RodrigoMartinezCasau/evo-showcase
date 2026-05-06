@@ -38,10 +38,11 @@ export const PANELS_BOTTOM_RESERVE = 0;
 
 /**
  * Reducción del ancho útil del texto de la reflexión desde la derecha (px).
- * Aumentado a 66 para que el texto no quede bajo la columna de acciones
- * ahora que la columna se centra 20 px dentro del borde del panel (columnCenterInset).
+ * Con columnCenterInset=0 y maxClanW=120, el borde izquierdo de la columna
+ * queda en ≈293 px (pantalla de 393 px). El texto termina en ≈289 px con 50 px
+ * de inset, dejando ~4 px de separación con la columna.
  */
-export const REFLECTION_TEXT_RIGHT_INSET = 66;
+export const REFLECTION_TEXT_RIGHT_INSET = 50;
 
 /** Control del título de la reflexión/frase. */
 export const DETAIL_TITLE_LAYOUT = {

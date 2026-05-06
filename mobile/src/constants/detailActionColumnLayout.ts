@@ -19,16 +19,17 @@ export const DETAIL_ACTION_COLUMN_LAYOUT = {
   /**
    * Ancho máximo del badge de clan (px).
    * Define también el ancho fijo de la columna (COL_FIXED_WIDTH = maxClanW).
-   * Para caber en pantalla con un inset de columnCenterInset:
-   *   panelVisualRight - columnCenterInset + maxClanW/2 ≤ screenW
-   *   ≈ 353 - 20 + 60 = 393 ✓ en un teléfono de 393 px.
+   * Con columnCenterInset=0 el borde derecho de la columna queda en
+   *   panelVisualRight + maxClanW/2 ≈ 353 + 60 = 413 px en un teléfono de 393 px.
+   * Los ~20 px que sobresalen por la derecha son recortados por el borde de pantalla,
+   * lo que es aceptable (el borde derecho del badge apenas se ve).
    */
   maxClanW: 120,
   /**
-   * Cuántos px a la izquierda del borde del panel se centra la columna.
-   * Necesario para que la columna más ancha no sobresalga de la pantalla.
+   * Cuántos px a la izquierda del borde visual del panel se centra la columna.
+   * 0 = centrado exactamente sobre el borde del panel (posición original).
    */
-  columnCenterInset: 20,
+  columnCenterInset: 0,
 };
 
 // Fallback scales (usados antes de que containerHeight esté disponible).
