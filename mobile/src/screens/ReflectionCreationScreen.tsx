@@ -220,6 +220,10 @@ export default function ReflectionCreationScreen() {
     messagesRef.current = messages;
   }, [messages]);
 
+  // Warm up the Railway backend as soon as the screen mounts so it's awake
+  // by the time the user sends their first message.
+  useEffect(() => { debateApi.warmUpBackend(); }, []);
+
   /**
    * Strip transient/UI-only fields from a ChatBubble before persisting so that
    * stored data round-trips cleanly:

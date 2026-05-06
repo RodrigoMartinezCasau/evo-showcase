@@ -51,9 +51,46 @@ async function getApiErrorMessage(res: Response): Promise<string> {
 }
 
 function networkError(msg: string): string {
-  return msg.includes('fetch') || msg.includes('Network')
+  return msg.includes('fetch') || msg.includes('Network') || msg.includes('abort')
     ? 'No se pudo conectar con el servidor. Comprueba que el backend esté en marcha.'
     : msg;
+}
+
+/** Fetch with a timeout. Rejects with AbortError if the deadline is exceeded. */
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs = 60_000,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Fetch with timeout + automatic retry on network/abort errors (not 4xx/5xx). */
+async function fetchWithRetry(
+  url: string,
+  init: RequestInit,
+  { timeoutMs = 60_000, retries = 2 }: { timeoutMs?: number; retries?: number } = {},
+): Promise<Response> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fetchWithTimeout(url, init, timeoutMs);
+    } catch (err) {
+      lastErr = err;
+      const msg = err instanceof Error ? err.message : '';
+      const isNetworkErr = msg.includes('fetch') || msg.includes('Network') || msg.includes('abort');
+      if (!isNetworkErr || attempt === retries) throw err;
+      // Wait before retrying: 2s, 4s, ...
+      await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+    }
+  }
+  throw lastErr;
 }
 
 function mapApiMessage(m: FullDebate['messages'][0]): DebateMessage {
@@ -74,11 +111,19 @@ function mapApiMessage(m: FullDebate['messages'][0]): DebateMessage {
 
 export async function fetchHealth(): Promise<boolean> {
   try {
-    const res = await fetch(`${_apiUrl}/health`, { method: 'GET', ...withApiKey() });
+    const res = await fetchWithTimeout(`${_apiUrl}/health`, { method: 'GET', ...withApiKey() }, 10_000);
     return res.ok;
   } catch {
     return false;
   }
+}
+
+/**
+ * Warm up the Railway server so it's awake before the user sends a message.
+ * Call this when the conversation screen mounts. Fire-and-forget (never throws).
+ */
+export async function warmUpBackend(): Promise<void> {
+  try { await fetchHealth(); } catch { /* ignore */ }
 }
 
 export async function fetchDebates(): Promise<DebateListItem[]> {
@@ -96,7 +141,7 @@ export async function createDebate(
   const url = `${_apiUrl}/debates`;
   let res: Response;
   try {
-    res = await fetch(
+    res = await fetchWithRetry(
       url,
       withApiKey({
         method: 'POST',
@@ -147,7 +192,7 @@ export async function sendMessage(
   if (flags?.includePhilosophicalReferences === false) body.include_philosophical_references = false;
   let res: Response;
   try {
-    res = await fetch(
+    res = await fetchWithRetry(
       url,
       withApiKey({
         method: 'POST',
@@ -155,6 +200,7 @@ export async function sendMessage(
         body: JSON.stringify(body),
         requestId,
       }),
+      { timeoutMs: 90_000, retries: 2 },
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Network error';

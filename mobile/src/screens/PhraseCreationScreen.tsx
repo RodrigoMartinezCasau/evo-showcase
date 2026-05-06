@@ -29,6 +29,7 @@ import {
   computeIntroDurationMs,
 } from '@evoconn/components/aiPhase/AiPhaseAnimations';
 import { generatePhraseIntro } from '@evoconn/services/phraseApi';
+import { warmUpBackend } from '@evoconn/services/debateApi';
 import {
   getChatUserAccentColor,
   CHAT_USER_MESSAGE_LAYOUT,
@@ -180,6 +181,10 @@ export default function PhraseCreationScreen() {
    *  the lifecycle (intro fetch resolving after a remount, etc.) can read the
    *  latest values without depending on stale closures. */
   const messagesRef = useRef<DebateMessage[]>([]);
+
+  // Warm up the Railway backend on mount so it's awake before the user sends a phrase.
+  useEffect(() => { warmUpBackend(); }, []);
+
   /** Per-thread flag: once the typewriter finishes for that thread, we flip
    *  this to true so the phrase tools (Apuntes, Folder) appear. */
   const [introTypewriterDone, setIntroTypewriterDone] = useState<Record<string, boolean>>({});
