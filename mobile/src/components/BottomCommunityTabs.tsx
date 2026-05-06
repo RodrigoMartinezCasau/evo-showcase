@@ -42,6 +42,10 @@ import {
   getNewReflectionPngMenuConfig,
   getNewPhrasePngMenuConfig,
 } from './SidebarPngMenuButton';
+import { getFollowingSortDropdownBackgroundSvg } from '@evoconn/utils/getFollowingSortDropdownBackground';
+
+/** Recorte vertical del asset 600×600 para mostrar solo la banda del rectángulo. */
+const FOLLOWING_SORT_DROPDOWN_VIEWBOX = '0 232 600 92';
 
 const TABS = [
   { id: 'siguiendo', label: 'SIGUIENDO' },
@@ -380,25 +384,58 @@ export function BottomCommunityTabs({
             onPress={() => setFollowingMenuOpen(false)}
             accessibilityRole="button"
           />
-          <View style={[styles.sortMenuCard, { marginBottom: sortMenuBottomOffset }]}>
+          <View
+            style={[
+              styles.sortMenuCard,
+              { marginBottom: sortMenuBottomOffset, width: screenW },
+            ]}
+          >
             {FOLLOWING_SORT_MENU_ORDER.map((opt) => {
               const selected = followingSort === opt;
+              const BgSvg = getFollowingSortDropdownBackgroundSvg(activeClan, opt);
               return (
                 <Pressable
                   key={opt}
                   onPress={() => onPickFollowingSort(opt)}
-                  style={({ pressed }) => [styles.sortMenuRow, pressed && styles.sortMenuRowPressed]}
+                  style={({ pressed }) => [
+                    styles.sortMenuRowPressable,
+                    pressed && styles.sortMenuRowPressablePressed,
+                  ]}
                   accessibilityRole="button"
                   accessibilityLabel={FOLLOWING_SORT_LABELS[opt]}
                 >
-                  <Text
-                    style={[
-                      styles.sortMenuLabel,
-                      selected && { color: selectedColor, fontWeight: '700' as const },
-                    ]}
-                  >
-                    {FOLLOWING_SORT_LABELS[opt]}
-                  </Text>
+                  <View style={styles.sortMenuRowSvgWrap}>
+                    <View style={styles.sortMenuRowSvgBgWrap} pointerEvents="none">
+                      <BgSvg
+                        width="100%"
+                        height="100%"
+                        viewBox={FOLLOWING_SORT_DROPDOWN_VIEWBOX}
+                        preserveAspectRatio="none"
+                      />
+                    </View>
+                    <View
+                      style={[
+                        styles.sortMenuLabelSvgWrap,
+                        {
+                          transform: [
+                            {
+                              translateY: BOTTOM_BAR_LAYOUT.FOLLOWING_SORT_DROPDOWN_TEXT_UNIVERSAL_OFFSET_Y,
+                            },
+                          ],
+                        },
+                      ]}
+                      pointerEvents="none"
+                    >
+                      <Text
+                        style={[
+                          styles.sortMenuLabelSvgText,
+                          selected && { color: selectedColor, fontWeight: '700' as const },
+                        ]}
+                      >
+                        {FOLLOWING_SORT_LABELS[opt]}
+                      </Text>
+                    </View>
+                  </View>
                 </Pressable>
               );
             })}
@@ -550,30 +587,58 @@ const styles = StyleSheet.create({
   sortModalRoot: {
     flex: 1,
     justifyContent: 'flex-end',
-    alignItems: 'center',
-    paddingHorizontal: 20,
+    alignItems: 'stretch',
+    paddingHorizontal: 0,
   },
   sortMenuCard: {
     width: '100%',
-    maxWidth: 400,
-    borderRadius: 14,
-    backgroundColor: evoconnColors.muted,
-    overflow: 'hidden',
+    alignSelf: 'stretch',
     zIndex: 1,
+    backgroundColor: 'transparent',
   },
-  sortMenuRow: {
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(11,11,15,0.35)',
+  sortMenuRowPressable: {
+    width: '100%',
+    marginVertical: 0,
+    marginHorizontal: 0,
+    padding: 0,
   },
-  sortMenuRowPressed: {
-    backgroundColor: 'rgba(11,11,15,0.12)',
+  sortMenuRowPressablePressed: {
+    opacity: 0.88,
   },
-  sortMenuLabel: {
-    color: evoconnColors.background,
-    fontSize: 14,
-    fontWeight: '600',
+  /**
+   * Igual que `bar`: ranura con altura mínima; el contenido se centra en Y dentro del rectángulo
+   * (SVG en absolute detrás). La altura crece con el texto.
+   */
+  sortMenuRowSvgWrap: {
+    width: '100%',
+    minHeight: BOTTOM_BAR_LAYOUT.FOLLOWING_SORT_DROPDOWN_ROW_MIN_HEIGHT,
+    borderRadius: 0,
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: evoconnColors.background,
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'stretch',
+  },
+  sortMenuRowSvgBgWrap: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  sortMenuLabelSvgWrap: {
+    width: '100%',
+    zIndex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sortMenuLabelSvgText: {
+    width: '100%',
     textAlign: 'center',
+    textTransform: 'uppercase',
+    color: 'rgba(255,255,255,0.92)',
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 17,
+    ...(Platform.OS === 'android' ? { includeFontPadding: false } : {}),
   },
 });

@@ -63,4 +63,16 @@ export const BOTTOM_BAR_LAYOUT = {
   BOTTOM_BAR_CREATE_BUTTON_SIZE: 34,
   BOTTOM_BAR_CREATE_BUTTON_BORDER_RADIUS: 10,
   BOTTOM_BAR_CREATE_BUTTON_BORDER_WIDTH: 1.5,
+
+  // ----- Desplegable orden Siguiendo (fila SVG + texto) -----
+  /**
+   * Altura mínima de cada fila; si el texto pide más, la fila crece y el SVG se estira.
+   * El texto se centra en ese rectángulo (misma idea que las tabs: ranura estirada + centro en Y).
+   */
+  FOLLOWING_SORT_DROPDOWN_ROW_MIN_HEIGHT: 52,
+  /**
+   * Desplazamiento en Y del bloque de texto en **todas** las filas (positivo = abajo).
+   * Un solo valor para mantener la misma posición relativa al asset en todos los dispositivos.
+   */
+  FOLLOWING_SORT_DROPDOWN_TEXT_UNIVERSAL_OFFSET_Y: 0,
 } as const;
