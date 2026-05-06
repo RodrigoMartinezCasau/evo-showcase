@@ -5,7 +5,7 @@
  * Layout: standard app shell (AppTopBar + BottomCommunityTabs).
  * Content scrolls between the two fixed bars.
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -65,11 +65,13 @@ import {
   STREAK_STATS_NUMBER_FONT_SIZE,
   STREAK_STATS_UNIT_FONT_SIZE,
   STREAK_FIRE_ICON_SCALE,
-  STREAK_FIRE_ICON_OFFSET_X,
-  STREAK_FIRE_ICON_OFFSET_Y,
-  STREAK_SUMMARY_TEXT_GROUP_OFFSET_X,
-  STREAK_SUMMARY_TEXT_GROUP_OFFSET_Y,
 } from '@evoconn/constants/streakLayout';
+import {
+  HERO_SUMMARY_ROW_GAP,
+  HERO_STREAK_BASE_ICON_SIZE,
+  heroIconSlotSize,
+  heroIconVisualScale,
+} from '@evoconn/constants/heroSummaryCardLayout';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -84,9 +86,14 @@ function weeklyAverage(log: string[], totalDays: number): string {
 export default function StreakScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { height: screenH } = useWindowDimensions();
+  const { height: screenH, width: screenW } = useWindowDimensions();
   const profile = getPersonalProfile();
   const { thoughts } = useThoughts();
+
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [data, setData] = useState<StreakData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const FireIcon   = getTopBarRachaTopByHouse(activeClan); // encendido — clan-specific active fire
@@ -101,7 +108,6 @@ export default function StreakScreen() {
 
   // In debug mode generate a "last N consecutive days" calendar from the
   // simulated streak count; in production use the real activity_log from the API.
-  // useMemo so the array reference only changes when streakDays / data changes.
   const computedActivityLog = React.useMemo(
     () => (IS_DEBUG_STATS_MODE ? generateLastNDays(streakDays) : (data?.activity_log ?? [])),
     [streakDays, data],
@@ -114,11 +120,6 @@ export default function StreakScreen() {
   const prevActiveRef  = useRef<boolean | null>(null);
 
   const today = new Date().toISOString().slice(0, 10);
-
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [data, setData] = useState<StreakData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -241,6 +242,12 @@ export default function StreakScreen() {
 
   const totalDays = data?.activity_log.length ?? 0;
 
+  const iconSlot = useMemo(() => heroIconSlotSize(screenW), [screenW]);
+  const fireVisualScale = useMemo(
+    () => heroIconVisualScale(HERO_STREAK_BASE_ICON_SIZE, iconSlot, STREAK_FIRE_ICON_SCALE),
+    [iconSlot],
+  );
+
   return (
     <View style={styles.container}>
       <AppTopBar
@@ -267,78 +274,62 @@ export default function StreakScreen() {
             </View>
           ) : data ? (
             <>
-              {/* ── Hero: streak count ── */}
-              <View style={[styles.card, styles.heroCard]}>
-                {/* Fire icon — independent, not inside text group.
-                    Two icons are cross-faded: apagado (inactive) ↔ encendido (clan).
-                    Both share the same position/scale editors. */}
-                <View
-                  style={[
-                    styles.fireIconWrap,
-                    {
-                      width: STREAK_COUNT_FONT_SIZE,
-                      height: STREAK_COUNT_FONT_SIZE,
-                      transform: [
-                        { translateX: STREAK_FIRE_ICON_OFFSET_X },
-                        { translateY: STREAK_FIRE_ICON_OFFSET_Y },
-                        { scale: STREAK_FIRE_ICON_SCALE },
-                      ],
-                    },
-                  ]}
-                >
-                  {/* Apagado layer — single shared SVG, fades out on activation */}
-                  <Animated.View
-                    style={[
-                      StyleSheet.absoluteFill,
-                      { opacity: Animated.subtract(1, transitionAnim) },
-                    ]}
-                  >
-                    <FuegoApagadoIcon
-                      width={STREAK_COUNT_FONT_SIZE}
-                      height={STREAK_COUNT_FONT_SIZE}
-                    />
-                  </Animated.View>
-
-                  {/* Encendido layer — fades in + scale-pops when streak is continued today */}
-                  <Animated.View
-                    style={[
-                      StyleSheet.absoluteFill,
-                      {
-                        opacity: transitionAnim,
-                        transform: [{ scale: scaleAnim }],
-                      },
-                    ]}
-                  >
-                    <FireIcon
-                      width={STREAK_COUNT_FONT_SIZE}
-                      height={STREAK_COUNT_FONT_SIZE}
-                    />
-                  </Animated.View>
-                </View>
-
-                {/* Text group — all four texts move together via shared offsets */}
-                <View
-                  style={[
-                    styles.summaryTextGroup,
-                    {
-                      transform: [
-                        { translateX: STREAK_SUMMARY_TEXT_GROUP_OFFSET_X },
-                        { translateY: STREAK_SUMMARY_TEXT_GROUP_OFFSET_Y },
-                      ],
-                    },
-                  ]}
-                >
-                  <Text style={[styles.streakCount, { fontSize: STREAK_COUNT_FONT_SIZE }]}>
-                    {IS_DEBUG_STATS_MODE ? streakDays : data.streak_current}
-                  </Text>
-                  <Text style={styles.streakUnit}>días seguidos</Text>
-                  <Text style={styles.streakSub}>Mantén tu consistencia diaria</Text>
-                  {data.streak_best > 0 && (
-                    <Text style={styles.bestStreak}>
-                      Mejor racha:{' '}
-                      <Text style={{ color: clanColors.tertiary }}>{data.streak_best} días</Text>
-                    </Text>
-                  )}
+              {/* ── Hero: streak count (icon + text centered as one block in the card) ── */}
+              <View style={styles.card}>
+                <View style={styles.heroCenterSlot}>
+                  <View style={[styles.heroBlock, { gap: HERO_SUMMARY_ROW_GAP }]}>
+                    <View style={[styles.iconSlot, { width: iconSlot, height: iconSlot }]}>
+                      <View
+                        style={[
+                          styles.iconScaledInner,
+                          {
+                            width: HERO_STREAK_BASE_ICON_SIZE,
+                            height: HERO_STREAK_BASE_ICON_SIZE,
+                            transform: [{ scale: fireVisualScale }],
+                          },
+                        ]}
+                      >
+                        <Animated.View
+                          style={[
+                            StyleSheet.absoluteFill,
+                            { opacity: Animated.subtract(1, transitionAnim) },
+                          ]}
+                        >
+                          <FuegoApagadoIcon
+                            width={HERO_STREAK_BASE_ICON_SIZE}
+                            height={HERO_STREAK_BASE_ICON_SIZE}
+                          />
+                        </Animated.View>
+                        <Animated.View
+                          style={[
+                            StyleSheet.absoluteFill,
+                            {
+                              opacity: transitionAnim,
+                              transform: [{ scale: scaleAnim }],
+                            },
+                          ]}
+                        >
+                          <FireIcon
+                            width={HERO_STREAK_BASE_ICON_SIZE}
+                            height={HERO_STREAK_BASE_ICON_SIZE}
+                          />
+                        </Animated.View>
+                      </View>
+                    </View>
+                    <View style={styles.summaryTextGroup}>
+                      <Text style={[styles.streakCount, { fontSize: STREAK_COUNT_FONT_SIZE }]}>
+                        {IS_DEBUG_STATS_MODE ? streakDays : data.streak_current}
+                      </Text>
+                      <Text style={styles.streakUnit}>días seguidos</Text>
+                      <Text style={styles.streakSub}>Mantén tu consistencia diaria</Text>
+                      {data.streak_best > 0 && (
+                        <Text style={styles.bestStreak}>
+                          Mejor racha:{' '}
+                          <Text style={{ color: clanColors.tertiary }}>{data.streak_best} días</Text>
+                        </Text>
+                      )}
+                    </View>
+                  </View>
                 </View>
               </View>
 
@@ -472,18 +463,33 @@ const styles = StyleSheet.create({
     paddingVertical: STREAK_CARD_PADDING_V,
     gap: 12,
   },
-  heroCard: {
+  heroCenterSlot: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+  },
+  heroBlock: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    justifyContent: 'center',
+    maxWidth: '100%',
   },
-  fireIconWrap: {
-    // Independent wrapper — transform here never reflows the text group
+  iconSlot: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  iconScaledInner: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   summaryTextGroup: {
     flexDirection: 'column',
     alignItems: 'flex-start',
     gap: 2,
+    flexShrink: 1,
+    minWidth: 0,
   },
   sectionTitle: {
     color: 'rgba(255,255,255,0.5)',

@@ -13,6 +13,7 @@ import {
   Modal,
   TouchableOpacity,
   StyleSheet,
+  useWindowDimensions,
 } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { useRouter } from 'expo-router';
@@ -29,13 +30,12 @@ import { getTopBarLapizByHouse } from '@evoconn/utils/getTopBarLapizByHouse';
 import { getQuotesByDomain } from '@evoconn/data/quotes';
 import { TOTAL_QUOTES_IN_DB } from '@evoconn/logic/quotes/getDomainStats';
 import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
+import { QUOTES_PENCIL_ICON_SCALE } from '@evoconn/constants/streakLayout';
 import {
-  QUOTES_PENCIL_ICON_SCALE,
-  QUOTES_PENCIL_ICON_OFFSET_X,
-  QUOTES_PENCIL_ICON_OFFSET_Y,
-  QUOTES_SUMMARY_TEXT_GROUP_OFFSET_X,
-  QUOTES_SUMMARY_TEXT_GROUP_OFFSET_Y,
-} from '@evoconn/constants/streakLayout';
+  HERO_SUMMARY_ROW_GAP,
+  heroIconSlotSize,
+  heroIconVisualScale,
+} from '@evoconn/constants/heroSummaryCardLayout';
 import { getClanStreakColors } from '@evoconn/constants/clanStreakColors';
 import { IS_DEBUG_STATS_MODE, useDebugStats } from '@evoconn/debug/DebugStatsContext';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
@@ -253,6 +253,7 @@ function DomainCard({ stat, onPress }: DomainCardProps) {
 export default function PhrasesDomainsScreen() {
   const router      = useRouter();
   const insets      = useSafeAreaInsets();
+  const { width: screenW } = useWindowDimensions();
   const { thoughts } = useThoughts();
 
   const activeClan  = useActiveClan(mockCurrentUser.clanId);
@@ -297,6 +298,12 @@ export default function PhrasesDomainsScreen() {
     setDetailDomain(null);
   }, []);
 
+  const iconSlot = useMemo(() => heroIconSlotSize(screenW), [screenW]);
+  const pencilVisualScale = useMemo(
+    () => heroIconVisualScale(PHRASES_COUNT_FONT, iconSlot, QUOTES_PENCIL_ICON_SCALE),
+    [iconSlot],
+  );
+
   return (
     <View style={styles.root}>
       {/* Top bar */}
@@ -316,35 +323,26 @@ export default function PhrasesDomainsScreen() {
       >
         {/* ── Summary card ──────────────────────────────────────────────────── */}
         <View style={styles.summaryCard}>
-          {/* Top row: pencil icon (left) | count + label (right) */}
-          <View style={styles.qHeroRow}>
-            {/* Pencil icon */}
-            <View
-              style={{
-                transform: [
-                  { translateX: QUOTES_PENCIL_ICON_OFFSET_X },
-                  { translateY: QUOTES_PENCIL_ICON_OFFSET_Y },
-                  { scale:      QUOTES_PENCIL_ICON_SCALE     },
-                ],
-              }}
-            >
-              <LapizIcon width={PHRASES_COUNT_FONT} height={PHRASES_COUNT_FONT} />
-            </View>
-
-            {/* Number + label — grouped, offsets move them together */}
-            <View
-              style={[
-                styles.qRightBlock,
-                {
-                  transform: [
-                    { translateX: QUOTES_SUMMARY_TEXT_GROUP_OFFSET_X },
-                    { translateY: QUOTES_SUMMARY_TEXT_GROUP_OFFSET_Y },
-                  ],
-                },
-              ]}
-            >
-              <Text style={styles.summaryCount}>{computedUnlocked}</Text>
-              <Text style={styles.summaryLabel}>FRASES DESBLOQUEADAS</Text>
+          <View style={styles.heroCenterSlot}>
+            <View style={[styles.heroBlock, { gap: HERO_SUMMARY_ROW_GAP }]}>
+              <View style={[styles.iconSlot, { width: iconSlot, height: iconSlot }]}>
+                <View
+                  style={[
+                    styles.iconScaledInner,
+                    {
+                      width: PHRASES_COUNT_FONT,
+                      height: PHRASES_COUNT_FONT,
+                      transform: [{ scale: pencilVisualScale }],
+                    },
+                  ]}
+                >
+                  <LapizIcon width={PHRASES_COUNT_FONT} height={PHRASES_COUNT_FONT} />
+                </View>
+              </View>
+              <View style={styles.qRightBlock}>
+                <Text style={styles.summaryCount}>{computedUnlocked}</Text>
+                <Text style={styles.summaryLabel}>FRASES DESBLOQUEADAS</Text>
+              </View>
             </View>
           </View>
 
@@ -459,18 +457,34 @@ const styles = StyleSheet.create({
     marginBottom: PHRASES_SECTION_GAP + 4,
     gap: 10,
   },
-  // Main row: two flex columns side by side (mirrors DailyUsesScreen heroRow)
-  qHeroRow: {
+  heroCenterSlot: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 4,
+  },
+  heroBlock: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    justifyContent: 'center',
+    maxWidth: '100%',
+  },
+  iconSlot: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  iconScaledInner: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   // RIGHT block: big number + label
   qRightBlock: {
-    flex: 1,
     flexDirection: 'column',
     alignItems: 'flex-start',
     gap: 4,
+    flexShrink: 1,
+    minWidth: 0,
   },
   summaryCount: {
     color: evoconnColors.text,

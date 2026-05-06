@@ -5,7 +5,7 @@
  * Layout: standard app shell (AppTopBar + BottomCommunityTabs).
  * Content scrolls between the two fixed bars.
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -48,11 +48,13 @@ import {
   USES_CALENDAR_OFFSET_X,
   USES_CALENDAR_OFFSET_Y,
   USAGE_HEART_ICON_SCALE,
-  USAGE_HEART_ICON_OFFSET_X,
-  USAGE_HEART_ICON_OFFSET_Y,
-  USAGE_SUMMARY_TEXT_GROUP_OFFSET_X,
-  USAGE_SUMMARY_TEXT_GROUP_OFFSET_Y,
 } from '@evoconn/constants/streakLayout';
+import {
+  HERO_SUMMARY_ROW_GAP,
+  HERO_STREAK_BASE_ICON_SIZE,
+  heroIconSlotSize,
+  heroIconVisualScale,
+} from '@evoconn/constants/heroSummaryCardLayout';
 
 const DAILY_LIMIT     = DAILY_USES_LIMIT;
 const MAX_MONTHS_BACK = 12;
@@ -300,7 +302,7 @@ function UsesCalendarGrid({ log, limit }: { log: UsesLogData; limit: number }) {
 export default function DailyUsesScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { height: screenH } = useWindowDimensions();
+  const { height: screenH, width: screenW } = useWindowDimensions();
   const profile = getPersonalProfile();
   const { thoughts } = useThoughts();
 
@@ -374,6 +376,12 @@ export default function DailyUsesScreen() {
     ? { ...log, [today]: computedUsedToday }
     : log;
 
+  const iconSlot = useMemo(() => heroIconSlotSize(screenW), [screenW]);
+  const heartVisualScale = useMemo(
+    () => heroIconVisualScale(HERO_STREAK_BASE_ICON_SIZE, iconSlot, USAGE_HEART_ICON_SCALE),
+    [iconSlot],
+  );
+
   return (
     <View style={styles.container}>
       <AppTopBar
@@ -400,53 +408,36 @@ export default function DailyUsesScreen() {
             </View>
           ) : (
             <>
-              {/* ── Hero: uses count ── */}
-              <View style={[styles.card, styles.heroCard]}>
-                {/* Top row: heart icon + grouped text block */}
-                <View style={styles.heroRow}>
-
-                  {/* Heart icon — independent; transform never reflows the text group */}
-                  <View
-                    style={[
-                      styles.heartIconWrap,
-                      {
-                        width: STREAK_COUNT_FONT_SIZE,
-                        height: STREAK_COUNT_FONT_SIZE,
-                        transform: [
-                          { translateX: USAGE_HEART_ICON_OFFSET_X },
-                          { translateY: USAGE_HEART_ICON_OFFSET_Y },
-                          { scale: USAGE_HEART_ICON_SCALE },
-                        ],
-                      },
-                    ]}
-                  >
-                    <HeartIcon
-                      width={STREAK_COUNT_FONT_SIZE}
-                      height={STREAK_COUNT_FONT_SIZE}
-                    />
-                  </View>
-
-                  {/* Text group — all three lines move together via shared offsets */}
-                  <View
-                    style={[
-                      styles.summaryTextGroup,
-                      {
-                        transform: [
-                          { translateX: USAGE_SUMMARY_TEXT_GROUP_OFFSET_X },
-                          { translateY: USAGE_SUMMARY_TEXT_GROUP_OFFSET_Y },
-                        ],
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.usesCount, { fontSize: STREAK_COUNT_FONT_SIZE }]}>
-                      {computedRemaining}
-                    </Text>
-                    <Text style={styles.usesUnit}>usos restantes hoy</Text>
-                    <Text style={styles.usesSub}>{computedUsedToday} / {DAILY_LIMIT} usados</Text>
+              {/* ── Hero: uses count (icon + text centered as one block) ── */}
+              <View style={styles.card}>
+                <View style={styles.heroCenterSlot}>
+                  <View style={[styles.heroBlock, { gap: HERO_SUMMARY_ROW_GAP }]}>
+                    <View style={[styles.iconSlot, { width: iconSlot, height: iconSlot }]}>
+                      <View
+                        style={[
+                          styles.iconScaledInner,
+                          {
+                            width: HERO_STREAK_BASE_ICON_SIZE,
+                            height: HERO_STREAK_BASE_ICON_SIZE,
+                            transform: [{ scale: heartVisualScale }],
+                          },
+                        ]}
+                      >
+                        <HeartIcon
+                          width={HERO_STREAK_BASE_ICON_SIZE}
+                          height={HERO_STREAK_BASE_ICON_SIZE}
+                        />
+                      </View>
+                    </View>
+                    <View style={styles.summaryTextGroup}>
+                      <Text style={[styles.usesCount, { fontSize: STREAK_COUNT_FONT_SIZE }]}>
+                        {computedRemaining}
+                      </Text>
+                      <Text style={styles.usesUnit}>usos restantes hoy</Text>
+                      <Text style={styles.usesSub}>{computedUsedToday} / {DAILY_LIMIT} usados</Text>
+                    </View>
                   </View>
                 </View>
-
-                {/* Progress bar — spans full card width below the row */}
                 <View style={styles.barWrap}>
                   <GradBar used={computedUsedToday} limit={DAILY_LIMIT} clanColor={barClanColor} />
                 </View>
@@ -530,22 +521,33 @@ const styles = StyleSheet.create({
     paddingVertical: STREAK_CARD_PADDING_V,
     gap: 12,
   },
-  heroCard: {
-    flexDirection: 'column',
-    gap: 12,
+  heroCenterSlot: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
   },
-  heroRow: {
+  heroBlock: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    justifyContent: 'center',
+    maxWidth: '100%',
   },
-  heartIconWrap: {
-    // Independent wrapper — transform here never reflows the text group
+  iconSlot: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  iconScaledInner: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   summaryTextGroup: {
     flexDirection: 'column',
     alignItems: 'flex-start',
     gap: 2,
+    flexShrink: 1,
+    minWidth: 0,
   },
   barWrap: {
     width: '100%',

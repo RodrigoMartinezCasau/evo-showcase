@@ -8,7 +8,6 @@ import {
   useWindowDimensions,
   Modal,
   Pressable,
-  ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, usePathname } from 'expo-router';
@@ -27,25 +26,23 @@ import {
   BOTTOM_BAR_DEFAULT_LUPITA,
   getBottomBarLupitaByHouse,
 } from '@evoconn/utils/getBottomBarLupitaByHouse';
-import { getNewReflectionButtonByHouse } from '@evoconn/utils/getSidebarNewReflectionButton';
 import {
-  getNewReflectionPlusIconByHouse,
-  getNewReflectionPlusLayoutByHouse,
-} from '@evoconn/utils/getSidebarNewReflectionPlusIcon';
-import { getNewPhraseButtonByHouse } from '@evoconn/utils/getSidebarNewPhraseButton';
-import {
-  getNewPhrasePlusIconByHouse,
-  getNewPhrasePlusLayoutByHouse,
-} from '@evoconn/utils/getSidebarNewPhrasePlusIcon';
-import {
-  SidebarPngMenuButton,
-  getNewReflectionPngMenuConfig,
-  getNewPhrasePngMenuConfig,
-} from './SidebarPngMenuButton';
-import { getFollowingSortDropdownBackgroundSvg } from '@evoconn/utils/getFollowingSortDropdownBackground';
+  type BottomBarCreateMenuRow,
+  getBottomBarCreateMenuBackgroundSvg,
+  getFollowingSortDropdownBackgroundSvg,
+} from '@evoconn/utils/getFollowingSortDropdownBackground';
 
 /** Recorte vertical del asset 600×600 para mostrar solo la banda del rectángulo. */
 const FOLLOWING_SORT_DROPDOWN_VIEWBOX = '0 232 600 92';
+
+const CREATE_MENU_ROWS: readonly {
+  row: BottomBarCreateMenuRow;
+  label: string;
+  a11y: string;
+}[] = [
+  { row: 'phrase', label: 'NUEVA FRASE', a11y: 'Nueva frase' },
+  { row: 'reflection', label: 'NUEVA REFLEXIÓN', a11y: 'Nueva reflexión' },
+];
 
 const TABS = [
   { id: 'siguiendo', label: 'SIGUIENDO' },
@@ -134,38 +131,6 @@ export function BottomCommunityTabs({
     return BOTTOM_BAR_DEFAULT_LUPITA;
   }, [activeTab, activeClan]);
 
-  const newReflectionButtonSource = useMemo(
-    () => getNewReflectionButtonByHouse(activeClan),
-    [activeClan],
-  );
-  const newReflectionPlusSource = useMemo(
-    () => getNewReflectionPlusIconByHouse(activeClan),
-    [activeClan],
-  );
-  const newReflectionPlusLayout = useMemo(
-    () => getNewReflectionPlusLayoutByHouse(activeClan),
-    [activeClan],
-  );
-  const newPhraseButtonSource = useMemo(() => getNewPhraseButtonByHouse(activeClan), [activeClan]);
-  const newPhrasePlusSource = useMemo(() => getNewPhrasePlusIconByHouse(activeClan), [activeClan]);
-  const newPhrasePlusLayout = useMemo(
-    () => getNewPhrasePlusLayoutByHouse(activeClan),
-    [activeClan],
-  );
-
-  /** Sidebar PNGs use negative blockOffsetY for drawer layout; in modal that clips — neutralize offsets. */
-  const reflectionModalConfig = useMemo(
-    () => ({ ...getNewReflectionPngMenuConfig(), blockOffsetX: 0, blockOffsetY: 0 }),
-    [],
-  );
-  const phraseModalConfig = useMemo(
-    () => ({ ...getNewPhrasePngMenuConfig(), blockOffsetX: 0, blockOffsetY: 0 }),
-    [],
-  );
-
-  /** Full width minus safe padding; cap for tablets. PNG row ~268 px wide. */
-  const createModalWidth = useMemo(() => Math.min(screenW - 24, 420), [screenW]);
-
   const closeCreate = useCallback(() => setCreateOpen(false), []);
 
   const onNewReflection = useCallback(() => {
@@ -179,6 +144,7 @@ export function BottomCommunityTabs({
   }, [closeCreate, router]);
 
   const createSz = BOTTOM_BAR_LAYOUT.BOTTOM_BAR_CREATE_BUTTON_SIZE;
+  const createButtonColor = createOpen ? selectedColor : evoconnColors.muted;
 
   const sortMenuBottomOffset =
     BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
@@ -258,11 +224,11 @@ export function BottomCommunityTabs({
                       height: createSz,
                       borderRadius: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_CREATE_BUTTON_BORDER_RADIUS,
                       borderWidth: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_CREATE_BUTTON_BORDER_WIDTH,
-                      borderColor: selectedColor,
+                      borderColor: createButtonColor,
                     },
                   ]}
                 >
-                  <Text style={[styles.createPlus, { color: selectedColor }]}>+</Text>
+                  <Text style={[styles.createPlus, { color: createButtonColor }]}>+</Text>
                 </TouchableOpacity>
               </View>
             );
@@ -450,51 +416,59 @@ export function BottomCommunityTabs({
         statusBarTranslucent
         onRequestClose={closeCreate}
       >
-        <View style={styles.modalRoot} pointerEvents="box-none">
+        <View style={styles.sortModalRoot} pointerEvents="box-none">
           <Pressable style={styles.modalBackdrop} onPress={closeCreate} accessibilityRole="button" />
           <View
-            style={[styles.modalCard, { width: createModalWidth }]}
-            pointerEvents="box-none"
+            style={[
+              styles.sortMenuCard,
+              { marginBottom: sortMenuBottomOffset, width: screenW },
+            ]}
           >
-            <View style={styles.modalCardInner}>
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                bounces={false}
-                contentContainerStyle={styles.modalScrollInner}
-              >
-                <SidebarPngMenuButton
-                  config={reflectionModalConfig}
-                  source={newReflectionButtonSource}
-                  label="NUEVA REFLEXIÓN"
-                  accessibilityLabel="Nueva reflexión"
-                  menuRowStyle={styles.createMenuRow}
-                  textAdjustsFontSizeToFit={false}
-                  leftOverlay={{
-                    source: newReflectionPlusSource,
-                    x: newReflectionPlusLayout.x,
-                    y: newReflectionPlusLayout.y,
-                    width: newReflectionPlusLayout.width,
-                    height: newReflectionPlusLayout.height,
-                  }}
-                  onPress={onNewReflection}
-                />
-                <SidebarPngMenuButton
-                  config={phraseModalConfig}
-                  source={newPhraseButtonSource}
-                  label="NUEVA FRASE"
-                  accessibilityLabel="Nueva frase"
-                  menuRowStyle={[styles.createMenuRow, styles.createMenuRowOverlap]}
-                  leftOverlay={{
-                    source: newPhrasePlusSource,
-                    x: newPhrasePlusLayout.x,
-                    y: newPhrasePlusLayout.y,
-                    width: newPhrasePlusLayout.width,
-                    height: newPhrasePlusLayout.height,
-                  }}
-                  onPress={onNewPhrase}
-                />
-              </ScrollView>
-            </View>
+            {CREATE_MENU_ROWS.map(({ row, label, a11y }) => {
+              const BgSvg = getBottomBarCreateMenuBackgroundSvg(activeClan, row);
+              const onPress = row === 'reflection' ? onNewReflection : onNewPhrase;
+              return (
+                <Pressable
+                  key={row}
+                  onPress={onPress}
+                  style={({ pressed }) => [
+                    styles.sortMenuRowPressable,
+                    pressed && styles.sortMenuRowPressablePressed,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={a11y}
+                >
+                  <View style={styles.sortMenuRowSvgWrap}>
+                    <View style={styles.sortMenuRowSvgBgWrap} pointerEvents="none">
+                      <BgSvg
+                        width="100%"
+                        height="100%"
+                        viewBox={FOLLOWING_SORT_DROPDOWN_VIEWBOX}
+                        preserveAspectRatio="none"
+                      />
+                    </View>
+                    <View
+                      style={[
+                        styles.sortMenuLabelSvgWrap,
+                        {
+                          transform: [
+                            {
+                              translateY: BOTTOM_BAR_LAYOUT.FOLLOWING_SORT_DROPDOWN_TEXT_UNIVERSAL_OFFSET_Y,
+                            },
+                          ],
+                        },
+                      ]}
+                      pointerEvents="none"
+                    >
+                      <View style={styles.createMenuLabelRow}>
+                        <Text style={styles.createMenuPlusGlyph}>+</Text>
+                        <Text style={styles.createMenuTitleText}>{label}</Text>
+                      </View>
+                    </View>
+                  </View>
+                </Pressable>
+              );
+            })}
           </View>
         </View>
       </Modal>
@@ -545,44 +519,33 @@ const styles = StyleSheet.create({
     lineHeight: 28,
     textAlign: 'center',
   },
-  modalRoot: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-  },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.55)',
   },
-  modalCard: {
-    zIndex: 1,
-    maxWidth: '100%',
-    alignSelf: 'center',
-  },
-  modalCardInner: {
-    backgroundColor: evoconnColors.background,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    overflow: 'hidden',
-    maxHeight: '78%',
-  },
-  modalScrollInner: {
-    alignItems: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-  },
-  createMenuRow: {
-    width: '100%',
-    paddingVertical: 0,
-    paddingHorizontal: 8,
+  createMenuLabelRow: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 0,
+    maxWidth: '100%',
   },
-  createMenuRowOverlap: {
-    marginTop: -14,
+  createMenuPlusGlyph: {
+    marginRight: 10,
+    fontSize: 32,
+    fontWeight: '200',
+    lineHeight: 36,
+    color: 'rgba(255,255,255,0.95)',
+    ...(Platform.OS === 'android' ? { includeFontPadding: false } : {}),
+  },
+  createMenuTitleText: {
+    flexShrink: 1,
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    color: 'rgba(255,255,255,0.92)',
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 17,
+    ...(Platform.OS === 'android' ? { includeFontPadding: false } : {}),
   },
   sortModalRoot: {
     flex: 1,

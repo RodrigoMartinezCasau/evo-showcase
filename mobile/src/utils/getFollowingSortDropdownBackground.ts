@@ -109,3 +109,14 @@ export function getFollowingSortDropdownBackgroundSvg(
   if (sort === 'votadas_24h') return SECUNDARIO[key];
   return TERCIARIO[key];
 }
+
+/** Fila del menú + de la barra inferior (mismos assets que principal / secundario del sort Siguiendo). */
+export type BottomBarCreateMenuRow = 'reflection' | 'phrase';
+
+export function getBottomBarCreateMenuBackgroundSvg(
+  clanId: string | null | undefined,
+  row: BottomBarCreateMenuRow,
+): FC<FollowingSortDropdownSvgProps> {
+  const key = normalizeClanKey(clanId);
+  return row === 'reflection' ? PRINCIPAL[key] : SECUNDARIO[key];
+}

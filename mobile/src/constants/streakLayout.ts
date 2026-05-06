@@ -52,39 +52,21 @@ export const STREAK_CALENDAR_OFFSET_X = 0;
 export const STREAK_CALENDAR_OFFSET_Y = 0;
 
 // ─── Streak fire icon (hero card) ────────────────────────────────────────────
+// Icon + text share one centered row; scale is capped by heroIconSlotSize().
 
-/**
- * Scale of the clan-based fire SVG shown in the top summary card.
- * 1 = default size. Increasing makes the icon larger; does not affect card or text.
- */
+/** Max visual scale of the fire SVG (actual scale = min(this, fit inside slot)). */
 export const STREAK_FIRE_ICON_SCALE = 2.1;
 
-/**
- * Horizontal offset (px) of the fire icon inside the hero card.
- * Positive = right, negative = left. Does not reflow surrounding text.
- */
-export const STREAK_FIRE_ICON_OFFSET_X = 70;
-
-/**
- * Vertical offset (px) of the fire icon inside the hero card.
- * Positive = down, negative = up. Does not reflow surrounding text.
- */
+/** @deprecated Layout is centered; kept at 0 for any legacy references. */
+export const STREAK_FIRE_ICON_OFFSET_X = 0;
+/** @deprecated */
 export const STREAK_FIRE_ICON_OFFSET_Y = 0;
 
 // ─── Streak summary text group (hero card) ───────────────────────────────────
 
-/**
- * Horizontal offset (px) of the full text group (number + labels) to the right
- * of the fire icon inside the top summary card.
- * Positive = right, negative = left. Moves ALL texts together; fire icon unchanged.
- */
-export const STREAK_SUMMARY_TEXT_GROUP_OFFSET_X = 80;
-
-/**
- * Vertical offset (px) of the full text group (number + labels) to the right
- * of the fire icon inside the top summary card.
- * Positive = down, negative = up. Moves ALL texts together; fire icon unchanged.
- */
+/** @deprecated Centered with icon in one block. */
+export const STREAK_SUMMARY_TEXT_GROUP_OFFSET_X = 0;
+/** @deprecated */
 export const STREAK_SUMMARY_TEXT_GROUP_OFFSET_Y = 0;
 
 // ─── Stats block ─────────────────────────────────────────────────────────────
@@ -134,68 +116,31 @@ export const USES_CALENDAR_OFFSET_Y = 0;
 
 // ─── Usage heart icon (hero card) ────────────────────────────────────────────
 
-/**
- * Scale of the clan-based heart SVG shown in the top usage summary card.
- * 1 = default size. Increasing makes the icon larger; does not affect card or text.
- */
+/** Max visual scale of the heart SVG inside the bounded icon slot. */
 export const USAGE_HEART_ICON_SCALE = 2.0;
 
-/**
- * Horizontal offset (px) of the heart icon inside the usage hero card.
- * Positive = right, negative = left. Does not reflow the text group.
- */
-export const USAGE_HEART_ICON_OFFSET_X = 90;
-
-/**
- * Vertical offset (px) of the heart icon inside the usage hero card.
- * Positive = down, negative = up. Does not reflow the text group.
- */
-export const USAGE_HEART_ICON_OFFSET_Y = -2;
+/** @deprecated */
+export const USAGE_HEART_ICON_OFFSET_X = 0;
+/** @deprecated */
+export const USAGE_HEART_ICON_OFFSET_Y = 0;
 
 // ─── Usage summary text group (hero card) ────────────────────────────────────
 
-/**
- * Horizontal offset (px) of the full text group (number + labels) to the right
- * of the heart icon inside the top usage summary card.
- * Positive = right, negative = left. Moves ALL texts together; heart icon unchanged.
- */
-export const USAGE_SUMMARY_TEXT_GROUP_OFFSET_X = 110;
-
-/**
- * Vertical offset (px) of the full text group (number + labels) to the right
- * of the heart icon inside the top usage summary card.
- * Positive = down, negative = up. Moves ALL texts together; heart icon unchanged.
- */
+/** @deprecated */
+export const USAGE_SUMMARY_TEXT_GROUP_OFFSET_X = 0;
+/** @deprecated */
 export const USAGE_SUMMARY_TEXT_GROUP_OFFSET_Y = 0;
 
-// ─── Quotes pencil icon (left block of PhrasesDomainsScreen hero card) ───────
+// ─── Quotes pencil icon (PhrasesDomainsScreen hero card) ─────────────────────
 
-/**
- * Scale of the clan-based pencil SVG in the left block of the Frases summary card.
- * 1 = native size (PHRASES_COUNT_FONT px). Does not affect layout — visual only.
- */
-export const QUOTES_PENCIL_ICON_SCALE = 1.4 ;
+/** Max visual scale of the pencil SVG inside the bounded icon slot. */
+export const QUOTES_PENCIL_ICON_SCALE = 1.4;
 
-/**
- * Fine-tune horizontal offset (px) of the pencil icon inside the left block.
- * Positive = right, negative = left. Does not reflow the progress bar or text.
- */
-export const QUOTES_PENCIL_ICON_OFFSET_X = 70;
-
-/**
- * Fine-tune vertical offset (px) of the pencil icon inside the left block.
- * Positive = down, negative = up.
- */
-export const QUOTES_PENCIL_ICON_OFFSET_Y = -5;
-
-/**
- * Fine-tune horizontal offset (px) of the right-side text group (count + label).
- * Positive = right, negative = left. Moves ALL texts together; left block unchanged.
- */
-export const QUOTES_SUMMARY_TEXT_GROUP_OFFSET_X = 80;
-
-/**
- * Fine-tune vertical offset (px) of the right-side text group.
- * Positive = down, negative = up.
- */
-export const QUOTES_SUMMARY_TEXT_GROUP_OFFSET_Y = -5;
+/** @deprecated */
+export const QUOTES_PENCIL_ICON_OFFSET_X = 0;
+/** @deprecated */
+export const QUOTES_PENCIL_ICON_OFFSET_Y = 0;
+/** @deprecated */
+export const QUOTES_SUMMARY_TEXT_GROUP_OFFSET_X = 0;
+/** @deprecated */
+export const QUOTES_SUMMARY_TEXT_GROUP_OFFSET_Y = 0;
