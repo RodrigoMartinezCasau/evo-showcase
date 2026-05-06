@@ -28,4 +28,23 @@ export const muerteQuotes: Quote[] = [
     domain: 'muerte',
     difficulty: 'beginner',
   },
+  {
+    id: 'muerte-4',
+    text: 'Mamá murió, creo que ayer, no lo sé.',
+    author: 'Albert Camus',
+    sourceBook: 'El Extranjero',
+    tags: ['muerte', 'indiferencia', 'existencia', 'absurdo', 'duelo'],
+    themes: ['absurdismo', 'indiferencia ante la muerte'],
+    domain: 'muerte',
+    difficulty: 'advanced',
+  },
+  {
+    id: 'muerte-5',
+    text: 'El horror vuelve inútil la tarea del verdugo.',
+    author: 'Montaigne',
+    tags: ['muerte', 'horror', 'violencia', 'poder', 'inutilidad'],
+    themes: ['futilidad de la violencia', 'horror como límite'],
+    domain: 'muerte',
+    difficulty: 'advanced',
+  },
 ];

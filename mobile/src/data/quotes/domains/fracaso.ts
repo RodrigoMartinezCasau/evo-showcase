@@ -28,4 +28,13 @@ export const fracasoQuotes: Quote[] = [
     domain: 'fracaso',
     difficulty: 'intermediate',
   },
+  {
+    id: 'fracaso-4',
+    text: 'Si no conocen la victoria, al menos se libran de conocer la derrota.',
+    author: 'Oscar Wilde',
+    tags: ['victoria', 'derrota', 'fracaso', 'protección', 'conformismo'],
+    themes: ['precio de no intentarlo', 'seguridad vs riesgo'],
+    domain: 'fracaso',
+    difficulty: 'intermediate',
+  },
 ];

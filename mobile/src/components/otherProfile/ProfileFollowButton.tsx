@@ -91,14 +91,14 @@ const styles = StyleSheet.create({
   button: {
     position: 'relative',
     overflow: 'visible',
-    paddingHorizontal: 28,
-    paddingVertical: 12,
-    borderRadius: 26,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 14,
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.2)',
     backgroundColor: 'rgba(0,0,0,0.4)',
     minWidth: 120,
-    minHeight: 52,
+    minHeight: 44,
   },
   inner: {
     ...StyleSheet.absoluteFillObject,

@@ -37,4 +37,13 @@ export const libertadQuotes: Quote[] = [
     domain: 'libertad',
     difficulty: 'intermediate',
   },
+  {
+    id: 'libertad-5',
+    text: 'Cuanto menos quieran que fuera, más claro estaba que iba a ir.',
+    author: 'Dostoyevski',
+    tags: ['rebeldía', 'determinación', 'libertad', 'resistencia', 'voluntad'],
+    themes: ['libertad como rebeldía', 'determinación propia'],
+    domain: 'libertad',
+    difficulty: 'intermediate',
+  },
 ];

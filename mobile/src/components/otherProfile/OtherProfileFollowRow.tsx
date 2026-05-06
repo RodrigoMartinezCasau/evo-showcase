@@ -1,22 +1,6 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import {
-  FOLLOW_ROW_PADDING_HORIZONTAL,
-  FOLLOW_ROW_MIN_HEIGHT,
-  FOLLOW_BUTTON_LAYOUT_WIDTH,
-  FOLLOW_BUTTON_LAYOUT_HEIGHT,
-  FOLLOW_BUTTON_OFFSET_X,
-  FOLLOW_BUTTON_OFFSET_Y,
-  FOLLOW_BUTTON_SCALE,
-  FOLLOW_STATS_LAYOUT_WIDTH,
-  FOLLOW_STATS_LAYOUT_HEIGHT,
-  FOLLOW_STATS_OFFSET_X,
-  FOLLOW_STATS_OFFSET_Y,
-  FOLLOW_STATS_SCALE,
-  THREE_DOTS_SIZE,
-} from '@evoconn/constants/otherProfileLayout';
+import { View, Text, StyleSheet } from 'react-native';
 import { ProfileFollowButton } from './ProfileFollowButton';
-import { UserFollowStats } from './UserFollowStats';
 import { ProfileMoreMenu } from './ProfileMoreMenu';
 
 type Props = {
@@ -27,7 +11,11 @@ type Props = {
   followingCount: number;
 };
 
-const THREE_DOTS_HIT = Math.max(44, THREE_DOTS_SIZE + 16);
+function formatCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
+}
 
 export const OtherProfileFollowRow = React.memo(function OtherProfileFollowRow({
   userId,
@@ -37,81 +25,59 @@ export const OtherProfileFollowRow = React.memo(function OtherProfileFollowRow({
   followingCount,
 }: Props) {
   return (
-    <View
-      style={[
-        styles.row,
-        { paddingHorizontal: FOLLOW_ROW_PADDING_HORIZONTAL, minHeight: FOLLOW_ROW_MIN_HEIGHT },
-      ]}
-    >
-      <View
-        style={[
-          styles.followSlot,
-          {
-            width: FOLLOW_BUTTON_LAYOUT_WIDTH,
-            height: FOLLOW_BUTTON_LAYOUT_HEIGHT,
-            marginTop: -FOLLOW_BUTTON_LAYOUT_HEIGHT / 2,
-            transform: [
-              { translateX: FOLLOW_BUTTON_OFFSET_X },
-              { translateY: FOLLOW_BUTTON_OFFSET_Y },
-              { scale: FOLLOW_BUTTON_SCALE },
-            ],
-          },
-        ]}
-      >
-        <ProfileFollowButton userId={userId} clanId={clanId} />
+    <View style={styles.row}>
+      {/* Seguir / Siguiendo button */}
+      <ProfileFollowButton userId={userId} clanId={clanId} />
+
+      <View style={styles.divider} />
+
+      {/* Seguidores */}
+      <View style={styles.stat}>
+        <Text style={styles.value}>{formatCount(followersCount)}</Text>
+        <Text style={styles.label}>Seguidores</Text>
       </View>
-      <View
-        style={[
-          styles.statsSlot,
-          {
-            width: FOLLOW_STATS_LAYOUT_WIDTH,
-            height: FOLLOW_STATS_LAYOUT_HEIGHT,
-            marginTop: -FOLLOW_STATS_LAYOUT_HEIGHT / 2,
-            transform: [
-              { translateX: FOLLOW_STATS_OFFSET_X },
-              { translateY: FOLLOW_STATS_OFFSET_Y },
-              { scale: FOLLOW_STATS_SCALE },
-            ],
-          },
-        ]}
-      >
-        <UserFollowStats followersCount={followersCount} followingCount={followingCount} />
+
+      <View style={styles.divider} />
+
+      {/* Seguidos */}
+      <View style={styles.stat}>
+        <Text style={styles.value}>{formatCount(followingCount)}</Text>
+        <Text style={styles.label}>Seguidos</Text>
       </View>
-      <View style={[styles.moreSlot, { marginTop: -THREE_DOTS_HIT / 2 }]}>
-        <ProfileMoreMenu userId={userId} username={username} />
-      </View>
+
+      {/* Three-dots menu */}
+      <ProfileMoreMenu userId={userId} username={username} />
     </View>
   );
 });
 
 const styles = StyleSheet.create({
   row: {
-    position: 'relative',
-    overflow: 'visible',
-  },
-  followSlot: {
-    position: 'absolute',
-    left: 0,
-    top: '50%',
-    zIndex: 2,
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-  },
-  statsSlot: {
-    position: 'absolute',
-    right: 32,
-    top: '50%',
-    zIndex: 2,
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-  },
-  moreSlot: {
-    position: 'absolute',
-    right: 0,
-    top: '50%',
-    zIndex: 3,
-    justifyContent: 'center',
+    flexDirection: 'row',
     alignItems: 'center',
-    overflow: 'visible',
+    justifyContent: 'space-around',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
+  stat: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  value: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  label: {
+    fontSize: 11,
+    color: '#FFFFFF',
+    marginTop: 2,
+    letterSpacing: 0.4,
+    opacity: 0.7,
+  },
+  divider: {
+    width: 1,
+    height: 28,
+    backgroundColor: 'rgba(255,255,255,0.15)',
   },
 });

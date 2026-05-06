@@ -32,50 +32,24 @@ export const FOLLOW_STATS_OFFSET_X = -70;
 export const FOLLOW_STATS_OFFSET_Y = 0;
 export const FOLLOW_STATS_SCALE = 1.2;
 
-// ── Clan shield position + scale ───────────────────────────────────
-export const SHIELD_OFFSET_X = -30;
-export const SHIELD_OFFSET_Y = 28;
-export const SHIELD_SCALE = 2.3;
-export const SHIELD_BASE_SIZE = 62;
-
 // ── Insignia phrase box dimensions ─────────────────────────────────
 export const INSIGNIA_BOX_MARGIN_HORIZONTAL = 70; // recorta el ancho: más alto = más estrecha
 export const INSIGNIA_BOX_HEIGHT: number | undefined = undefined; // undefined = auto (wrap content)
 export const INSIGNIA_BOX_OFFSET_X = -50;
-export const INSIGNIA_BOX_OFFSET_Y = -15;
+export const INSIGNIA_BOX_OFFSET_Y = 0;
 
 // ── Panel porcentajes filosóficos ("Pensamiento filosófico") ───────
 export const PHILOSOPHY_PERCENTAGES_PANEL_OFFSET_X = 0;
-export const PHILOSOPHY_PERCENTAGES_PANEL_OFFSET_Y = -10;
+export const PHILOSOPHY_PERCENTAGES_PANEL_OFFSET_Y = 0;
 /** undefined = ancho automático (márgenes laterales como hasta ahora) */
 export const PHILOSOPHY_PERCENTAGES_PANEL_WIDTH: number | undefined = undefined;
 /** undefined = alto automático según el contenido */
 export const PHILOSOPHY_PERCENTAGES_PANEL_HEIGHT: number | undefined = undefined;
 
-// ── Username text ──────────────────────────────────────────────────
-export const USERNAME_OFFSET_X = 3;
-export const USERNAME_OFFSET_Y = -5;
-export const USERNAME_FONT_SIZE = 22;
-
-// ── Clan name text ─────────────────────────────────────────────────
-export const CLAN_OFFSET_X = 3;
-export const CLAN_OFFSET_Y = -3;
-export const CLAN_FONT_SIZE = 20;
-
-// ── Rank text ──────────────────────────────────────────────────────
-export const RANK_OFFSET_X = -6;
-export const RANK_OFFSET_Y = -3;
-export const RANK_FONT_SIZE = 20;
-
 // ── Botón 3-puntos (acciones avanzadas) ────────────────────────────
-export const THREE_DOTS_OFFSET_X = -5;
-export const THREE_DOTS_OFFSET_Y = 5;
-export const THREE_DOTS_SIZE = 50;
-
-// ── Botón compartir (junto al username) ────────────────────────────
-export const SHARE_BUTTON_OFFSET_X = -7;
-export const SHARE_BUTTON_OFFSET_Y = -5;
-export const SHARE_BUTTON_SIZE = 28;
+export const THREE_DOTS_OFFSET_X = 0;
+export const THREE_DOTS_OFFSET_Y = 0;
+export const THREE_DOTS_SIZE = 39;
 
 // ── Card background opacities (0 = transparente, 1 = sólido) ───────────────
 /**

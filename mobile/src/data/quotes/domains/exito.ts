@@ -28,4 +28,22 @@ export const exitoQuotes: Quote[] = [
     domain: 'exito',
     difficulty: 'intermediate',
   },
+  {
+    id: 'exito-4',
+    text: 'Vine, vi, vencí.',
+    author: 'Julio César',
+    tags: ['victoria', 'éxito', 'acción', 'rapidez', 'determinación'],
+    themes: ['acción decisiva', 'victoria rápida'],
+    domain: 'exito',
+    difficulty: 'beginner',
+  },
+  {
+    id: 'exito-5',
+    text: 'Después de una gran batalla siempre queda un lugar donde crece la bondad y la felicidad.',
+    author: 'Vegetta777',
+    tags: ['batalla', 'bondad', 'felicidad', 'éxito', 'esperanza'],
+    themes: ['esperanza tras el esfuerzo', 'recompensa del sacrificio'],
+    domain: 'exito',
+    difficulty: 'beginner',
+  },
 ];

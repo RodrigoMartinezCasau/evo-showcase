@@ -36,6 +36,10 @@ const styles = StyleSheet.create({
     backgroundColor: `rgba(0,0,0,${OTHER_INSIGNIA_CARD_OPACITY})`,
     borderRadius: 12,
     paddingRight: 14,
+    // Always reserve height for 2 lines so the clan badge never shifts when
+    // the phrase is short (1 line). 2 × lineHeight(20) + 2 × paddingVertical(14)
+    minHeight: 68,
+    justifyContent: 'center',
   },
   text: {
     color: '#FFFFFF',

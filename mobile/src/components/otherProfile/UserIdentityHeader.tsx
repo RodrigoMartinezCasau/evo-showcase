@@ -5,6 +5,8 @@ import type { Rank } from '@evoconn/types';
 import {
   SHIELD_OFFSET_X,
   SHIELD_OFFSET_Y,
+  SHIELD_RELATIVE_OFFSET_X,
+  SHIELD_RELATIVE_OFFSET_Y,
   SHIELD_SCALE,
   SHIELD_BASE_SIZE,
   USERNAME_OFFSET_X,
@@ -13,19 +15,34 @@ import {
   CLAN_OFFSET_X,
   CLAN_OFFSET_Y,
   CLAN_FONT_SIZE,
-  RANK_OFFSET_X,
-  RANK_OFFSET_Y,
   RANK_FONT_SIZE,
-  SHARE_BUTTON_OFFSET_X,
-  SHARE_BUTTON_OFFSET_Y,
-  SHARE_BUTTON_SIZE,
-} from '@evoconn/constants/otherProfileLayout';
+  CLAN_ROW_SCALE,
+  CLAN_ROW_OFFSET_X,
+  CLAN_ROW_MARGIN_BOTTOM,
+} from '@evoconn/constants/personalProfileLayout';
 
 const RANK_LABELS: Record<Rank, string> = {
   aprendiz: 'Aprendiz',
   maestro: 'Maestro',
   filosofo: 'Filósofo',
 };
+
+const USERNAME_LINE_HEIGHT = Math.ceil(USERNAME_FONT_SIZE * 1.3);
+const CLAN_LINE_HEIGHT = Math.ceil(CLAN_FONT_SIZE * 1.3);
+const RANK_LINE_HEIGHT = Math.ceil(RANK_FONT_SIZE * 1.3);
+
+const USERNAME_ROW_HEIGHT = USERNAME_LINE_HEIGHT;
+const USERNAME_ROW_MARGIN_BOTTOM = 4;
+const CLAN_ROW_HEIGHT = Math.max(CLAN_LINE_HEIGHT, RANK_LINE_HEIGHT + 6);
+const CONTAINER_HEIGHT = USERNAME_ROW_HEIGHT + USERNAME_ROW_MARGIN_BOTTOM + CLAN_ROW_HEIGHT;
+const TEXT_BADGE_SAFE_GAP = 14;
+const TEXT_MIN_WIDTH = 165;
+const BADGE_MIN_SIZE = 86;
+const MIN_RESERVED_RIGHT_SPACE = 96;
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
 
 type Props = {
   username: string;
@@ -42,12 +59,22 @@ export const UserIdentityHeader = React.memo(function UserIdentityHeader({
 }: Props) {
   const { width: screenW } = useWindowDimensions();
   const ShieldSvg = useMemo(() => getTopBarInsigniaByHouse(clanId), [clanId]);
-  const usernameMaxWidth = screenW - 20 * 2 - SHARE_BUTTON_SIZE - 10;
 
-  // Render at true display size so the SVG is not GPU-upscaled from a small
-  // rasterisation layer. See PersonalIdentityHeader for full explanation.
-  const shieldDisplaySize = Math.round(SHIELD_BASE_SIZE * SHIELD_SCALE);
-  const shieldPositionCorrection = (shieldDisplaySize - SHIELD_BASE_SIZE) / 2;
+  const preferredShieldSize = Math.round(SHIELD_BASE_SIZE * SHIELD_SCALE);
+  const maxShieldSizeByWidth = Math.max(
+    BADGE_MIN_SIZE,
+    screenW - 20 * 2 - TEXT_MIN_WIDTH - TEXT_BADGE_SAFE_GAP,
+  );
+  const shieldDisplaySize = Math.min(preferredShieldSize, maxShieldSizeByWidth);
+  const maxLeftShift = Math.max(0, screenW - 20 * 2 - TEXT_MIN_WIDTH - shieldDisplaySize);
+  const combinedShieldOffsetX = SHIELD_OFFSET_X + SHIELD_RELATIVE_OFFSET_X;
+  const clampedShieldOffsetX = clamp(combinedShieldOffsetX, -maxLeftShift, 24);
+  const reservedRightSpace = Math.max(
+    MIN_RESERVED_RIGHT_SPACE,
+    shieldDisplaySize + TEXT_BADGE_SAFE_GAP + Math.max(0, -clampedShieldOffsetX),
+  );
+  const usernameMaxWidth = screenW - 20 * 2 - 28;
+  const containerHeight = CONTAINER_HEIGHT;
   const clanLabel = clanId
     ? `Clan ${clanId.charAt(0).toUpperCase() + clanId.slice(1)}`
     : 'Sin clan';
@@ -60,63 +87,73 @@ export const UserIdentityHeader = React.memo(function UserIdentityHeader({
   }, [username]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { height: containerHeight }]}>
       <View style={styles.textBlock}>
-        <View style={styles.usernameRow}>
+        <TouchableOpacity
+          onPress={handleShare}
+          hitSlop={8}
+          activeOpacity={0.6}
+          style={[
+            styles.usernameRow,
+            {
+              height: USERNAME_ROW_HEIGHT,
+              marginBottom: USERNAME_ROW_MARGIN_BOTTOM,
+              transform: [{ translateX: USERNAME_OFFSET_X }, { translateY: USERNAME_OFFSET_Y }],
+            },
+          ]}
+        >
           <Text
             style={[
               styles.username,
               {
                 fontSize: USERNAME_FONT_SIZE,
+                lineHeight: USERNAME_LINE_HEIGHT,
                 maxWidth: usernameMaxWidth,
-                transform: [{ translateX: USERNAME_OFFSET_X }, { translateY: USERNAME_OFFSET_Y }],
               },
             ]}
             numberOfLines={1}
+            ellipsizeMode="clip"
             adjustsFontSizeToFit
             minimumFontScale={0.25}
           >
             {username}
           </Text>
-          <TouchableOpacity
-            onPress={handleShare}
-            hitSlop={10}
-            activeOpacity={0.6}
-            style={[
-              styles.shareButton,
-              {
-                transform: [
-                  { translateX: SHARE_BUTTON_OFFSET_X },
-                  { translateY: SHARE_BUTTON_OFFSET_Y },
-                ],
-              },
-            ]}
-          >
-            <ShareIcon size={SHARE_BUTTON_SIZE} />
-          </TouchableOpacity>
-        </View>
-        <View style={[styles.clanRankRow, { paddingRight: SHIELD_BASE_SIZE + 20 }]}>
+          <Text style={styles.shareInline}>↗</Text>
+        </TouchableOpacity>
+
+        <View
+          style={[
+            styles.clanRankRow,
+            {
+              paddingRight: reservedRightSpace,
+              marginBottom: CLAN_ROW_MARGIN_BOTTOM,
+              transform: [{ translateX: CLAN_ROW_OFFSET_X }, { scale: CLAN_ROW_SCALE }],
+            },
+          ]}
+        >
           <Text
             style={[
               styles.clanName,
               {
                 fontSize: CLAN_FONT_SIZE,
+                lineHeight: CLAN_LINE_HEIGHT,
                 transform: [{ translateX: CLAN_OFFSET_X }, { translateY: CLAN_OFFSET_Y }],
               },
             ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}
           >
             {clanLabel}
+            {'  '}
+            <Text style={[styles.rankInline, { fontSize: RANK_FONT_SIZE, lineHeight: RANK_LINE_HEIGHT }]}>
+              {'— '}
+              {RANK_LABELS[rank]}
+            </Text>
           </Text>
-          <View
-            style={[
-              styles.rankPill,
-              { transform: [{ translateX: RANK_OFFSET_X }, { translateY: RANK_OFFSET_Y }] },
-            ]}
-          >
-            <Text style={[styles.rankText, { fontSize: RANK_FONT_SIZE }]}>{RANK_LABELS[rank]}</Text>
-          </View>
         </View>
       </View>
+
       <TouchableOpacity
         activeOpacity={onShieldPress ? 0.7 : 1}
         onPress={onShieldPress}
@@ -127,11 +164,9 @@ export const UserIdentityHeader = React.memo(function UserIdentityHeader({
           {
             width: shieldDisplaySize,
             height: shieldDisplaySize,
-            marginTop: -shieldDisplaySize / 2,
-            transform: [
-              { translateX: SHIELD_OFFSET_X + shieldPositionCorrection },
-              { translateY: SHIELD_OFFSET_Y },
-            ],
+            right: -clampedShieldOffsetX,
+            top: '50%',
+            marginTop: -shieldDisplaySize / 2 + SHIELD_OFFSET_Y + SHIELD_RELATIVE_OFFSET_Y,
           },
         ]}
       >
@@ -140,14 +175,6 @@ export const UserIdentityHeader = React.memo(function UserIdentityHeader({
     </View>
   );
 });
-
-function ShareIcon({ size }: { size: number }) {
-  return (
-    <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
-      <Text style={{ fontSize: size * 0.85, color: '#FFFFFF', opacity: 0.85 }}>↗</Text>
-    </View>
-  );
-}
 
 const styles = StyleSheet.create({
   container: {
@@ -158,8 +185,6 @@ const styles = StyleSheet.create({
   usernameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 4,
     overflow: 'visible',
     zIndex: 3,
   },
@@ -169,9 +194,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     flexShrink: 1,
   },
-  shareButton: {
-    justifyContent: 'center',
-    alignItems: 'center',
+  shareInline: {
+    fontSize: USERNAME_FONT_SIZE * 0.75,
+    color: 'rgba(255,255,255,0.85)',
+    fontWeight: '500',
+    marginLeft: 5,
     flexShrink: 0,
     zIndex: 10,
     elevation: 10,
@@ -179,24 +206,15 @@ const styles = StyleSheet.create({
   clanRankRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
   },
   clanName: {
     fontWeight: '600',
     letterSpacing: 0.3,
     color: '#FFFFFF',
   },
-  rankPill: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    marginLeft: 4,
-  },
-  rankText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    opacity: 0.7,
+  rankInline: {
+    color: 'rgba(255,255,255,0.75)',
+    fontWeight: '500',
   },
   shieldWrap: {
     position: 'absolute',

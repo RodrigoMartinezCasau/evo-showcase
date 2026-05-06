@@ -58,7 +58,7 @@ export const SHIELD_RELATIVE_OFFSET_Y = 0;
 export const INSIGNIA_BOX_MARGIN_HORIZONTAL = 70;
 export const INSIGNIA_BOX_HEIGHT: number | undefined = undefined;
 export const INSIGNIA_BOX_OFFSET_X = -50;
-export const INSIGNIA_BOX_OFFSET_Y = -15;
+export const INSIGNIA_BOX_OFFSET_Y = 0;
 
 // ── Insignia phrase edit (pencil) icon ─────────────────────────────
 export const INSIGNIA_EDIT_ICON_OFFSET_X = -5;
@@ -69,7 +69,7 @@ export const INSIGNIA_EDIT_ICON_SAFE_PADDING = -18;
 
 // ── Panel porcentajes filosóficos ──────────────────────────────────
 export const PHILOSOPHY_PERCENTAGES_PANEL_OFFSET_X = 0;
-export const PHILOSOPHY_PERCENTAGES_PANEL_OFFSET_Y = -10;
+export const PHILOSOPHY_PERCENTAGES_PANEL_OFFSET_Y = 0;
 export const PHILOSOPHY_PERCENTAGES_PANEL_WIDTH: number | undefined = undefined;
 export const PHILOSOPHY_PERCENTAGES_PANEL_HEIGHT: number | undefined = undefined;
 
@@ -106,7 +106,7 @@ export const SHARE_BUTTON_SIZE = 28;
 export const RANK_BLOCK_OFFSET_X = 0;
 export const RANK_BLOCK_OFFSET_Y = 0;
 /** Margen superior del bloque — negativo para acercarlo al elemento de arriba. */
-export const RANK_BLOCK_MARGIN_TOP = -25;
+export const RANK_BLOCK_MARGIN_TOP = 0;
 /** Margen inferior del bloque — negativo para acercarlo al elemento de abajo. */
 export const RANK_BLOCK_MARGIN_BOTTOM = 0;
 export const RANK_BLOCK_SCALE = 1;
@@ -170,7 +170,7 @@ export const POSTS_SECTION_PADDING_TOP = 0;
 /** Espacio vertical ENTRE el panel de porcentajes filosóficos y "Últimas publicaciones".
  *  Reducir → acerca la sección al panel. Aumentar → separa más.
  *  No afecta a ningún otro espaciado del perfil. */
-export const PERSONAL_LATEST_POSTS_SPACING = -20;
+export const PERSONAL_LATEST_POSTS_SPACING = 0;
 
 // ═══════════════════════════════════════════════════════════════════
 // ── Bottom blocks (3 squares: icon switch, friends, saved posts) ──
