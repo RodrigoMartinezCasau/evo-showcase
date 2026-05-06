@@ -26,6 +26,7 @@ import { Asset } from 'expo-asset';
 import * as Haptics from 'expo-haptics';
 import StarFieldBackground from './StarFieldBackground';
 import { setEntryAnimPlaying } from '../../../mobile/lib/animationState';
+import { useEvoPreferences } from '@evoconn/hooks/EvoPreferencesContext';
 
 // ─── Asset map ─────────────────────────────────────────────────────────────────
 // HTML files are bundled as raw assets (assetExts includes 'html').
@@ -79,7 +80,7 @@ export async function ensureAnimationAssets(): Promise<void> {
 
   _copyPromise = (async () => {
     const STAMP_FILE = ANIM_DIR + '.stamp';
-    const APP_VERSION = '49';
+    const APP_VERSION = '51';
 
     try {
       const stampInfo = await FileSystem.getInfoAsync(STAMP_FILE);
@@ -259,6 +260,58 @@ export function EvoAnimationWebView({
   const webRef = useRef<WebView>(null);
   const [htmlContent, setHtmlContent] = useState<string | null>(null);
 
+  // Preferences: combine prop flag with user preference
+  const { hapticsEnabled: prefHaptics, soundsEnabled: prefSounds } = useEvoPreferences();
+  const effectiveHaptics = enableHaptics && prefHaptics;
+
+  // ── Prolonged-haptic loop ─────────────────────────────────────────────────
+  const hapticLoopRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopHapticLoop = useCallback(() => {
+    if (hapticLoopRef.current !== null) {
+      clearInterval(hapticLoopRef.current);
+      hapticLoopRef.current = null;
+    }
+  }, []);
+
+  /** Start a sustained haptic that fires every 55ms for `durationMs`.
+   *  When `progressive` is true, intensity ramps Light→Medium→Heavy. */
+  const startHapticLoop = useCallback((durationMs: number, progressive = false) => {
+    stopHapticLoop();
+    if (!effectiveHaptics) return;
+    const INTERVAL = 55;
+    let elapsed = 0;
+    hapticLoopRef.current = setInterval(() => {
+      elapsed += INTERVAL;
+      if (elapsed >= durationMs) { stopHapticLoop(); return; }
+      const progress = elapsed / durationMs;
+      const style = progressive
+        ? progress < 0.4  ? Haptics.ImpactFeedbackStyle.Light
+        : progress < 0.75 ? Haptics.ImpactFeedbackStyle.Medium
+        :                   Haptics.ImpactFeedbackStyle.Heavy
+        : Haptics.ImpactFeedbackStyle.Medium;
+      Haptics.impactAsync(style).catch(() => {});
+    }, INTERVAL);
+  }, [effectiveHaptics, stopHapticLoop]);
+
+  // Stop haptic loop when the animation is hidden / unmounted
+  useEffect(() => {
+    if (!visible) stopHapticLoop();
+    return () => stopHapticLoop();
+  }, [visible, stopHapticLoop]);
+
+  // ── Tap / phase tracking for clan-reveal sound differentiation ────────────
+  const tapCountRef    = useRef(0);
+  const currentPhaseRef = useRef('');
+
+  // Reset tap counter when a new animation becomes visible
+  useEffect(() => {
+    if (visible) {
+      tapCountRef.current = 0;
+      currentPhaseRef.current = '';
+    }
+  }, [visible]);
+
   // Opacity of the WebView layer: 0 on mount, fades to 1 on first paint.
   const webOpacity = useRef(new Animated.Value(0)).current;
 
@@ -321,9 +374,10 @@ export function EvoAnimationWebView({
   const { width: winW, height: winH } = useWindowDimensions();
 
   // Inject props + real screen dimensions before the page loads.
+  // Merge soundsEnabled so HTML animations can gate their Web Audio synthesis.
   const injectedBeforeLoad = useMemo(
-    () => `window.EVO_PROPS = ${JSON.stringify(params)}; window.EVO_SCREEN_WIDTH = ${winW}; window.EVO_SCREEN_HEIGHT = ${winH}; true;`,
-    [params, winW, winH],
+    () => `window.EVO_PROPS = ${JSON.stringify({ ...params, soundsEnabled: prefSounds })}; window.EVO_SCREEN_WIDTH = ${winW}; window.EVO_SCREEN_HEIGHT = ${winH}; true;`,
+    [params, winW, winH, prefSounds],
   );
 
   const onMessage = useCallback(
@@ -337,22 +391,52 @@ export function EvoAnimationWebView({
       switch (msg.type) {
         case 'ready':
           break;
-        case 'phase':
-          onPhase?.(msg.phase ?? '');
-          // 'exit' (no-clan path) and 'zoom_fill' (with-clan path) are fired
-          // when the final flash appears — ~500ms before Bridge.complete().
-          // Dropping the entry guard here pre-renders the community screen
-          // behind the still-opaque modal so that by the time the fade-out
-          // starts it dissolves into community, not into the star background.
-          if (msg.phase === 'exit' || msg.phase === 'zoom_fill') {
+
+        case 'phase': {
+          const phase = msg.phase ?? '';
+          onPhase?.(phase);
+          currentPhaseRef.current = phase;
+
+          // Reset tap counter when entering the tapping phase (clan-reveal)
+          if (phase === 'fadein' || phase === 'tapping') {
+            tapCountRef.current = 0;
+          }
+
+          // Pre-render community screen on flash start (existing logic)
+          if (phase === 'exit' || phase === 'zoom_fill') {
             setEntryAnimPlaying(false);
           }
+
+          // Stop any ongoing haptic loop on transition phases
+          if (['flash', 'fire', 'reveal', 'exit', 'final', 'zoom_fill'].includes(phase)) {
+            stopHapticLoop();
+          }
+
+          // ── Prolonged haptic: streak star spin (2 000ms) ─────────────────
+          // Fires on `phase('star')`, the same moment the spin begins.
+          if (phase === 'star' && name === 'streak') {
+            startHapticLoop(2000, false);
+          }
+
+          // ── Prolonged progressive haptic: clan spinning ring (3 000ms) ───
+          // Only fires on clanReveal (3-tap reveal). clanEntry (app intro) is excluded.
+          if (phase === 'spinning' && name === 'clanReveal') {
+            startHapticLoop(3000, true);
+          }
           break;
+        }
+
         case 'tap':
-          if (enableHaptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          // Always fire the Light tap haptic
+          if (effectiveHaptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          // Track tap count for clan-reveal (sounds handled in HTML via Web Audio)
+          if (name === 'clanReveal' && currentPhaseRef.current === 'tapping') {
+            tapCountRef.current = Math.min(tapCountRef.current + 1, 3);
+          }
           break;
+
         case 'milestone':
-          if (enableHaptics) {
+          if (effectiveHaptics) {
             if (msg.kind === 'depleted')
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
             else if (msg.kind === 'year' || msg.kind === 'month')
@@ -360,21 +444,24 @@ export function EvoAnimationWebView({
             else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           }
           break;
+
         case 'complete':
-          // The HTML flash is still at opacity 1 when this fires — it acts as
-          // the visual wipe. Close immediately so the community appears as the
-          // flash covers the transition.
+          stopHapticLoop();
           closeAndCall(onComplete, msg);
           break;
+
         case 'close':
+          stopHapticLoop();
           closeAndCall(onClose);
           break;
+
         case 'error':
           if (__DEV__) console.warn('[EvoAnimation:' + name + ']', msg.message);
           break;
       }
     },
-    [enableHaptics, closeAndCall, name, onComplete, onClose, onPhase],
+    [effectiveHaptics, closeAndCall, name, onComplete, onClose, onPhase,
+     startHapticLoop, stopHapticLoop],
   );
 
   if (!visible) return null;

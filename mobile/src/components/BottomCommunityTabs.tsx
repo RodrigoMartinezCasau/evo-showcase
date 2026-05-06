@@ -198,7 +198,7 @@ export function BottomCommunityTabs({
     [onFollowingSortChange],
   );
 
-  const profileIconSize = Math.min(26, Math.round(tabFontSize + 10));
+  const profileIconSize = Math.min(30, Math.round(tabFontSize + 20));
 
   return (
     <>
@@ -468,15 +468,29 @@ export function BottomCommunityTabs({
 const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
+    /** Stretch columns to one height, then each slot centers its content on Y. */
+    alignItems: 'stretch',
+    minHeight: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT,
     borderTopWidth: 1,
     borderTopColor: evoconnColors.background,
     backgroundColor: evoconnColors.background,
-    paddingVertical: 8,
+    /** Asimétrico: menos arriba para acercar el bloque al borde superior de la barra. */
+    paddingTop: 0,
+    paddingBottom: 16,
   },
-  tab: { flex: 1, alignItems: 'center', paddingVertical: 6, position: 'relative' },
-  tabUnderline: { position: 'absolute', bottom: 0 },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  /** `bottom` negativo baja la raya sin `transform` (así no choca con translateX de la lupa). */
+  tabUnderline: {
+    position: 'absolute',
+    bottom: -BOTTOM_BAR_LAYOUT.BOTTOM_BAR_UNDERLINE_TRANSLATE_Y,
+  },
   siguendoRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', maxWidth: '100%' },
-  siguendoChevron: { marginLeft: 2, marginTop: 1 },
+  siguendoChevron: { marginLeft: 2 },
   label: {
     color: evoconnColors.muted,
     fontSize: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_TAB_TEXT_SIZE,
@@ -493,7 +507,6 @@ const styles = StyleSheet.create({
     fontWeight: '300',
     lineHeight: 28,
     textAlign: 'center',
-    marginTop: -2,
   },
   modalRoot: {
     flex: 1,

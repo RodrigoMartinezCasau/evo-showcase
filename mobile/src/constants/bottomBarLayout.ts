@@ -21,6 +21,8 @@ export const BOTTOM_BAR_LAYOUT = {
   // ----- Línea bajo tab activa -----
   /** Grosor de la línea (px). */
   BOTTOM_BAR_UNDERLINE_THICKNESS: 2,
+  /** Separación extra hacia abajo respecto al borde inferior del slot (px). */
+  BOTTOM_BAR_UNDERLINE_TRANSLATE_Y: 5,
   /**
    * Largo de la línea (px). `null` = todo el ancho de la columna de esa tab (como hasta ahora).
    * Solo afecta a SIGUIENDO / MÁS VOTADAS / PARA TI.
@@ -30,11 +32,11 @@ export const BOTTOM_BAR_LAYOUT = {
    * Largo de la línea bajo la lupa (px). `null` = ancho completo de la columna.
    * Pon un valor cercano al tamaño del icono (p. ej. 20–28) para que no sobresalga.
    */
-  BOTTOM_BAR_UNDERLINE_WIDTH_SEARCH: 60,
+  BOTTOM_BAR_UNDERLINE_WIDTH_SEARCH: 64,
 
   // ----- Icono búsqueda (lupa, SVG por clan) -----
   /** Tamaño base (px) del marco de la lupa; se multiplica por SEARCH_ICON_FRAME_SCALE y por `BOTTOM_BAR_LUPITA_EDITOR.scale`. */
-  BOTTOM_BAR_SEARCH_ICON_SIZE: 20,
+  BOTTOM_BAR_SEARCH_ICON_SIZE: 26,
 
   /** Escala base del asset (padding transparente del SVG). */
   SEARCH_ICON_FRAME_SCALE: 1.0,
@@ -45,7 +47,7 @@ export const BOTTOM_BAR_LAYOUT = {
    */
   BOTTOM_BAR_LUPITA_EDITOR: {
     offsetX: -10,
-    offsetY: -2,
+    offsetY: 0,
     scale: 1,
   },
 

@@ -12,7 +12,7 @@ import type { CommunityPost } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getReflectionCardTier } from '@evoconn/utils/getCardSizeFromText';
 import { formatNumber } from '@evoconn/utils/formatNumber';
-import { getSmallClanBannerAsset } from '@evoconn/assets/cards/smallClanBanners';
+import { getSmallClanBannerAsset, type BannerAsset } from '@evoconn/assets/cards/smallClanBanners';
 import { getMediumClanBannerAsset } from '@evoconn/assets/cards/mediumClanBanners';
 import { getQuoteClanBannerAsset } from '@evoconn/assets/cards/quoteClanBanners';
 import { getSmallClanBackgroundSvg } from '@evoconn/assets/cards/smallClanBackgroundsSvg';
@@ -220,7 +220,9 @@ export function CommunityPostCard({
           {renderFeedStats()}
         </View>
 
-        {/* Banner (estandarte) — top-right corner, square PNG rendered at BANNER_SIZE */}
+        {/* Banner (estandarte) — top-right corner.
+            PNG clans → <Image source={number}>.
+            Sin-clan → SVG component rendered directly. */}
         {bannerAsset ? (
           <View
             pointerEvents="none"
@@ -232,11 +234,16 @@ export function CommunityPostCard({
               height: V.BANNER_SIZE,
             }}
           >
-            <Image
-              source={bannerAsset}
-              resizeMode="contain"
-              style={{ width: V.BANNER_SIZE, height: V.BANNER_SIZE }}
-            />
+            {typeof bannerAsset === 'function' ? (() => {
+                const BannerSvg = bannerAsset as React.ComponentType<{ width?: number; height?: number }>;
+                return <BannerSvg width={V.BANNER_SIZE} height={V.BANNER_SIZE} />;
+              })() : (
+              <Image
+                source={bannerAsset as number}
+                resizeMode="contain"
+                style={{ width: V.BANNER_SIZE, height: V.BANNER_SIZE }}
+              />
+            )}
           </View>
         ) : null}
       </View>

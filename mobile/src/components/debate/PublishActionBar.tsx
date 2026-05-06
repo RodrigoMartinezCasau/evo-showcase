@@ -8,6 +8,7 @@ import {
   Easing,
 } from 'react-native';
 import { AI_SPECIAL_BLOCK_LAYOUT as SB } from '@evoconn/constants/debateResponseLayout';
+import { useEvoPreferences } from '@evoconn/hooks/EvoPreferencesContext';
 
 const BAR = SB.publishActionBar;
 const TXT = SB.publishActionBarText;
@@ -41,6 +42,7 @@ export const PublishActionBar = React.memo(function PublishActionBar({
   const [percent, setPercent] = useState(0);
   const progressAnim = useRef(new Animated.Value(0)).current;
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { triggerHaptic, playSound } = useEvoPreferences();
 
   const cleanup = useCallback(() => {
     if (timerRef.current) {
@@ -88,7 +90,10 @@ export const PublishActionBar = React.memo(function PublishActionBar({
     }
 
     setState('published');
-  }, [state, disabled, onPublish, progressAnim, cleanup]);
+    // Haptic + sound feedback on successful publish
+    triggerHaptic('success');
+    playSound('star-soft');
+  }, [state, disabled, onPublish, progressAnim, cleanup, triggerHaptic, playSound]);
 
   const iconSize = ICO.size * ICO.scale;
 

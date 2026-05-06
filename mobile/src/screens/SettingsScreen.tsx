@@ -28,6 +28,7 @@ import { getClanProfileByHouse } from '@evoconn/utils/getClanProfileByHouse';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import { CLAN_TO_COLOR } from '@evoconn/constants/clanColors';
 import { useDebugStats } from '@evoconn/debug/DebugStatsContext';
+import { useEvoPreferences } from '@evoconn/hooks/EvoPreferencesContext';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -73,7 +74,7 @@ interface SettingRow {
   type:         RowType;
   value?:       string;
   checked?:     boolean;
-  onToggleKey?: 'notifications';
+  onToggleKey?: 'notifications' | 'haptics' | 'sounds';
   onPress?:     () => void;
 }
 
@@ -94,13 +95,17 @@ function IconInner({ name, color = '#ffffff' }: { name: React.ComponentProps<typ
 }
 
 interface RowProps {
-  row:              SettingRow;
-  isFirst:          boolean;
-  notifEnabled:     boolean;
-  onNotifToggle:    (val: boolean) => void;
+  row:               SettingRow;
+  isFirst:           boolean;
+  notifEnabled:      boolean;
+  onNotifToggle:     (val: boolean) => void;
+  hapticsEnabled:    boolean;
+  onHapticsToggle:   (val: boolean) => void;
+  soundsEnabled:     boolean;
+  onSoundsToggle:    (val: boolean) => void;
 }
 
-function SettingsRow({ row, isFirst, notifEnabled, onNotifToggle }: RowProps) {
+function SettingsRow({ row, isFirst, notifEnabled, onNotifToggle, hapticsEnabled, onHapticsToggle, soundsEnabled, onSoundsToggle }: RowProps) {
   const isToggle  = row.type === 'toggle';
   const isInfo    = row.type === 'info';
   const isDanger  = row.type === 'danger';
@@ -143,7 +148,15 @@ function SettingsRow({ row, isFirst, notifEnabled, onNotifToggle }: RowProps) {
     );
   }
 
-  const toggleValue = row.onToggleKey === 'notifications' ? notifEnabled : false;
+  const toggleValue = row.onToggleKey === 'notifications' ? notifEnabled
+    : row.onToggleKey === 'haptics' ? hapticsEnabled
+    : row.onToggleKey === 'sounds'  ? soundsEnabled
+    : false;
+
+  const handleToggleChange = row.onToggleKey === 'notifications' ? onNotifToggle
+    : row.onToggleKey === 'haptics' ? onHapticsToggle
+    : row.onToggleKey === 'sounds'  ? onSoundsToggle
+    : undefined;
 
   return (
     <>
@@ -164,7 +177,7 @@ function SettingsRow({ row, isFirst, notifEnabled, onNotifToggle }: RowProps) {
         {isToggle && row.onToggleKey ? (
           <Switch
             value={toggleValue}
-            onValueChange={row.onToggleKey === 'notifications' ? onNotifToggle : undefined}
+            onValueChange={handleToggleChange}
             trackColor={{ false: 'rgba(255,255,255,0.12)', true: evoconnColors.neonGreen }}
             thumbColor="#ffffff"
             ios_backgroundColor="rgba(255,255,255,0.12)"
@@ -183,11 +196,15 @@ function SettingsRow({ row, isFirst, notifEnabled, onNotifToggle }: RowProps) {
 }
 
 function SettingsSection({
-  section, notifEnabled, onNotifToggle,
+  section, notifEnabled, onNotifToggle, hapticsEnabled, onHapticsToggle, soundsEnabled, onSoundsToggle,
 }: {
   section: SettingSection;
   notifEnabled: boolean;
   onNotifToggle: (val: boolean) => void;
+  hapticsEnabled: boolean;
+  onHapticsToggle: (val: boolean) => void;
+  soundsEnabled: boolean;
+  onSoundsToggle: (val: boolean) => void;
 }) {
   return (
     <View style={styles.sectionWrap}>
@@ -200,6 +217,10 @@ function SettingsSection({
             isFirst={idx === 0}
             notifEnabled={notifEnabled}
             onNotifToggle={onNotifToggle}
+            hapticsEnabled={hapticsEnabled}
+            onHapticsToggle={onHapticsToggle}
+            soundsEnabled={soundsEnabled}
+            onSoundsToggle={onSoundsToggle}
           />
         ))}
       </View>
@@ -276,6 +297,14 @@ export default function SettingsScreen({
     AsyncStorage.setItem(NOTIFS_KEY, String(val)).catch(console.error);
   }, []);
 
+  // ── Haptics + Sounds toggles (persisted via EvoPreferencesContext) ────────
+  const {
+    hapticsEnabled,
+    soundsEnabled,
+    setHapticsEnabled,
+    setSoundsEnabled,
+  } = useEvoPreferences();
+
   const handleBottomTabChange = useCallback(
     (tab: TabId) => { router.replace({ pathname: '/(tabs)', params: { tab } }); },
     [router],
@@ -323,6 +352,30 @@ export default function SettingsScreen({
       rows: [
         { id: 'lang',   label: 'Idioma',        value: 'Español', icon: 'globe-outline',         iconBg: IC.cyan, type: 'info' },
         { id: 'notifs', label: 'Notificaciones',                  icon: 'notifications-outline', iconBg: IC.pink, type: 'toggle', onToggleKey: 'notifications' },
+      ],
+    },
+    {
+      id: 'experience',
+      title: 'EXPERIENCIA',
+      rows: [
+        {
+          id: 'haptics',
+          label: 'Vibraciones',
+          subtitle: 'Feedback táctil en animaciones y acciones',
+          icon: 'phone-portrait-outline',
+          iconBg: IC.purple,
+          type: 'toggle',
+          onToggleKey: 'haptics',
+        },
+        {
+          id: 'sounds',
+          label: 'Sonidos',
+          subtitle: 'Efectos de sonido en estrellas y animaciones',
+          icon: 'musical-notes-outline',
+          iconBg: IC.teal,
+          type: 'toggle',
+          onToggleKey: 'sounds',
+        },
       ],
     },
     {
@@ -376,6 +429,9 @@ export default function SettingsScreen({
     },
   ], [remainingUses, userEmail, deletingAccount, confirmDeleteAccount, showSubscriptionAlert, router]);
 
+  const handleHapticsToggle = useCallback((val: boolean) => setHapticsEnabled(val), [setHapticsEnabled]);
+  const handleSoundsToggle  = useCallback((val: boolean) => setSoundsEnabled(val),  [setSoundsEnabled]);
+
   return (
     <View style={styles.container}>
       <AppTopBar onMenuPress={() => setSidebarOpen(true)} onClanPress={() => router.back()} />
@@ -393,6 +449,10 @@ export default function SettingsScreen({
               section={section}
               notifEnabled={notifsEnabled}
               onNotifToggle={handleNotifToggle}
+              hapticsEnabled={hapticsEnabled}
+              onHapticsToggle={handleHapticsToggle}
+              soundsEnabled={soundsEnabled}
+              onSoundsToggle={handleSoundsToggle}
             />
           ))}
           <View style={styles.logoutWrap}>

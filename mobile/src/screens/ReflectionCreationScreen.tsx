@@ -43,6 +43,7 @@ import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { incrementProfileStat } from '@evoconn/services/supabaseSocial';
 import { recordActivity, recordUsesLog } from '@evoconn/services/streakApi';
 import { AI_TEXT_SCALE } from '@evoconn/constants/textScale';
+import { useEvoPreferences } from '@evoconn/hooks/EvoPreferencesContext';
 import { getClanColor } from '@evoconn/constants/clanColors';
 import { getChatSendButtonByHouse } from '@evoconn/utils/getChatSendButtonByHouse';
 import {
@@ -133,6 +134,7 @@ export default function ReflectionCreationScreen() {
   const { recordInput: recordClassificationInput } = useClassification();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const clanColor = getChatUserAccentColor(activeClan);
+  const { triggerHaptic, playSound } = useEvoPreferences();
   // Island: each clan uses its primary color; Sin clan uses neon lime with dark text
   const islandBgColor = activeClan ? getClanColor(activeClan) : '#c7ff02';
   const islandFgColor = activeClan ? '#FFFFFF' : '#000000';
@@ -455,6 +457,9 @@ export default function ReflectionCreationScreen() {
           copy[copy.length - 1] = assistantMsg;
           return copy;
         });
+        // Haptic + sound when AI output appears on screen
+        triggerHaptic('light');
+        playSound('star-soft');
         scrollToEnd();
 
         if (introLen > 0) {
@@ -497,7 +502,7 @@ export default function ReflectionCreationScreen() {
         setSending(false);
       }
     },
-    [sending, debateId, createThought, updateThought, scrollToEnd, thoughts, markStreakActivated, decrementUses, remainingUses, selectAndUnlockQuote, includeReflectiveQuestion, includePhilosophicalReferences, toPersistedMessage, recordClassificationInput],
+    [sending, debateId, createThought, updateThought, scrollToEnd, thoughts, markStreakActivated, decrementUses, remainingUses, selectAndUnlockQuote, includeReflectiveQuestion, includePhilosophicalReferences, toPersistedMessage, recordClassificationInput, triggerHaptic, playSound],
   );
 
   const conversationItems = useMemo(
