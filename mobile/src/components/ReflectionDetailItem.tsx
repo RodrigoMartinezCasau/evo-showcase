@@ -414,10 +414,13 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
       // Half the column width so the icon centers sit exactly on the panel edge.
       const COL_FIXED_WIDTH = COL.iconSize * CLAN_L.scale;
 
+      // Clan badge protrudes 10% of panel height above the grey box top.
+      // Container height extends 10% upward so the bottom stays at the panel bottom.
+      const overhang = reflPanelLayout.height * 0.1;
       return {
         position: 'absolute' as const,
         left: panelVisualRight - COL_FIXED_WIDTH / 2,
-        top: reflPanelLayout.y,
+        top: reflPanelLayout.y - overhang,
         zIndex: 10,
       };
     }
@@ -698,7 +701,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
           onSave={handleSave}
           onClanPress={handleClanPressAction}
           onMorePress={handleMorePress}
-          containerHeight={reflPanelLayout?.height}
+          containerHeight={reflPanelLayout ? reflPanelLayout.height * 1.1 : undefined}
         />
       </View>
     </View>

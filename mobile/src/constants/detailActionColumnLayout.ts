@@ -20,12 +20,13 @@ export const DETAIL_ACTION_COLUMN_LAYOUT = {
   iconSize: 28,
 };
 
-// Clan is 70% bigger than other icons. Column width = iconSize * clan scale.
+// Clan is 120% bigger than other icons (clan = other × 2.2).
+// Column width = iconSize * clan scale.
 // Screen constraint: clan scale ≤ 80/28 ≈ 2.86 on a 393px phone.
 const _CLAN_SCALE = 2.8;         // max safe value that stays within screen
-const _OTHER_SCALE = _CLAN_SCALE / 1.7; // ≈ 1.65 — other icons are 70% smaller
+const _OTHER_SCALE = _CLAN_SCALE / 2.2; // ≈ 1.27 — other icons are 120% smaller
 
-/** Botón CLAN (insignia) — 70% más grande que los otros iconos.
+/** Botón CLAN (insignia) — 120% más grande que los otros iconos.
  *  Su scale define el ancho total de la columna (COL_FIXED_WIDTH). */
 export const DETAIL_CLAN_BUTTON_LAYOUT = {
   offsetX: 0,
