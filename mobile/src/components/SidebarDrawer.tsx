@@ -37,10 +37,12 @@ import EstrellaComunidadSvg from '../assets/sidebar/estrellaComunidadSvg/estrell
 import { SidebarSearchBar } from './SidebarSearchBar';
 import { SidebarConversationsPanel } from './SidebarConversationsPanel';
 import { SidebarClanButton } from './SidebarClanButton';
-import { SidebarClanInsignia } from './SidebarClanInsignia';
-import { SidebarFooterProfileText } from './SidebarFooterProfileText';
-import { SidebarSettingsIcon } from './SidebarSettingsIcon';
 import { FrasesButton } from './FrasesButton';
+import { getClanInsigniaByHouse } from '@evoconn/utils/getSidebarClanInsigniaByHouse';
+import SettingsSvg from '../assets/sidebar/settingsIconSvg/settings.svg';
+import { getSidebarFooterClanLineColor } from '@evoconn/constants/clanColors';
+import { INRIA_SERIF_FONT_FAMILY } from '@evoconn/constants/inriaSerifFontFamily';
+import type { Rank } from '@evoconn/types';
 import { RachaButton } from './RachaButton';
 import type { ConversationItem as ConvItem } from '@evoconn/types';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
@@ -122,6 +124,16 @@ export function SidebarDrawer({
   }, [visible, openProgressProp]);
 
   const insets = useSafeAreaInsets();
+
+  // Footer row: insignia, text, settings
+  const FooterInsignia = useMemo(() => getClanInsigniaByHouse(user.clanId), [user.clanId]);
+  const footerClanColor = useMemo(() => getSidebarFooterClanLineColor(user.clanId), [user.clanId]);
+  const footerClanLine = user.clanId?.trim()
+    ? `CLAN ${user.clanId.trim().toUpperCase()}`
+    : 'CLAN POR DEFINIR';
+  const RANK_LABELS: Record<Rank, string> = { aprendiz: 'APRENDIZ', maestro: 'MAESTRO', filosofo: 'FILOSOFO' };
+  const footerRankLine = RANK_LABELS[user.rank as Rank] ?? user.rank.toUpperCase();
+
   const StarSvg = getSidebarStarSvgByHouse(user.clanId);
   const communityButtonSource = getCommunityButtonByHouse(user.clanId);
   const newReflectionButtonSource = getNewReflectionButtonByHouse(user.clanId);
@@ -294,33 +306,48 @@ export function SidebarDrawer({
             router.push('/notifications');
           }}
         />
-        <SidebarClanInsignia
-          clanId={user.clanId}
-          onPress={() => {
-            onClose();
-            router.push('/my-profile');
-          }}
-        />
-        <SidebarFooterProfileText
-          username={user.username}
-          clanId={user.clanId}
-          rank={user.rank}
-          onPressProfile={() => {
-            onClose();
-            router.push('/my-profile');
-          }}
-          onPressClan={() => {
-            onClose();
-            router.push(`/clan/${clanRouteSlug}`);
-          }}
-        />
-        <SidebarSettingsIcon
-          onPress={() => {
-            onClose();
-            router.push('/settings');
-          }}
-        />
-        <View style={[styles.footer, styles.footerSmall]} />
+        {/* ── Footer row: profile icon | text | settings ── */}
+        <View style={styles.footerRow}>
+          {/* Profile insignia — left edge aligns with conversations panel */}
+          <TouchableOpacity
+            onPress={() => { onClose(); router.push('/my-profile'); }}
+            activeOpacity={0.88}
+            accessibilityRole="button"
+            accessibilityLabel="Perfil"
+          >
+            <FooterInsignia width={styles.footerInsignia.width} height={styles.footerInsignia.height} />
+          </TouchableOpacity>
+
+          {/* Text block — vertically centered within the insignia */}
+          <View style={styles.footerTextBlock}>
+            <TouchableOpacity onPress={() => { onClose(); router.push('/my-profile'); }} hitSlop={6} activeOpacity={0.85}>
+              <Text style={styles.footerUsername} numberOfLines={1}>
+                {user.username.toUpperCase()}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => { onClose(); router.push(`/clan/${clanRouteSlug}`); }} hitSlop={6} activeOpacity={0.85}>
+              <Text style={[styles.footerClanLine, { color: footerClanColor }]} numberOfLines={1}>
+                {footerClanLine}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => { onClose(); router.push('/my-profile'); }} hitSlop={6} activeOpacity={0.85}>
+              <Text style={styles.footerRankLine} numberOfLines={1}>
+                {footerRankLine}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Settings icon — right edge aligns with conversations panel */}
+          <TouchableOpacity
+            onPress={() => { onClose(); router.push('/settings'); }}
+            activeOpacity={0.88}
+            accessibilityRole="button"
+            accessibilityLabel="Ajustes"
+            hitSlop={4}
+          >
+            <SettingsSvg width={styles.footerSettings.width} height={styles.footerSettings.height} />
+          </TouchableOpacity>
+        </View>
       </Animated.View>
     </View>
   );
@@ -368,11 +395,45 @@ const styles = StyleSheet.create({
   },
   searchBarLayer: { zIndex: 25, marginTop: 8, paddingHorizontal: 10 },
   sidebarLowerBlock: { flex: 1, minHeight: 0, paddingHorizontal: 10 },
-  footer: {},
-  footerSmall: {
-    // Espacio para que el panel de conversaciones no tape la sección de perfil
-    // (clan insignia + nombre + ajustes) absolutamente posicionada al fondo.
-    // Aplica en pantallas estrechas (< 420 pt): iPhone 15 / SE y Android pequeños.
-    height: 160,
+
+  // Footer row — replaces the three absolute-positioned components.
+  // paddingHorizontal: 10 aligns left/right edges with the conversations panel.
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingTop: 8,
+    paddingBottom: 14,
+  },
+  footerInsignia: {
+    width: 68,
+    height: 68,
+  },
+  footerTextBlock: {
+    flex: 1,
+    marginHorizontal: 8,
+  },
+  footerUsername: {
+    color: '#B8BCC6',
+    fontSize: 12,
+    fontWeight: '700' as const,
+    letterSpacing: 0.3,
+  },
+  footerClanLine: {
+    fontSize: 10,
+    letterSpacing: 0.4,
+    fontFamily: INRIA_SERIF_FONT_FAMILY,
+    marginTop: 3,
+  },
+  footerRankLine: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    letterSpacing: 0.4,
+    fontFamily: INRIA_SERIF_FONT_FAMILY,
+    marginTop: 3,
+  },
+  footerSettings: {
+    width: 34,
+    height: 34,
   },
 });
