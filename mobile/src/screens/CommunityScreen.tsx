@@ -31,16 +31,18 @@ import { SearchScreen } from '@evoconn/components/SearchScreen';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
 import { ProfileRevealPanel } from '@evoconn/components/otherProfile';
+import {
+  sortFollowingPosts,
+  type FollowingSortOption,
+} from '@evoconn/constants/followingFeedSort';
 
-type TabId = 'siguiendo' | 'mas-votadas' | 'para-ti' | 'search';
-type FeedMode = 'following' | 'top' | 'foryou';
+type TabId = 'siguiendo' | 'para-ti' | 'search';
+type FeedMode = 'following' | 'foryou';
 
 function tabToFeedMode(tab: TabId): FeedMode {
   switch (tab) {
     case 'siguiendo':
       return 'following';
-    case 'mas-votadas':
-      return 'top';
     default:
       return 'foryou';
   }
@@ -73,15 +75,16 @@ function getDataForMode(
   followingSet?: Set<string>,
   viewerClanId?: string | null,
   viewerUserId?: string,
+  followingSort: FollowingSortOption = 'recientes',
 ): CommunityPost[] {
   switch (mode) {
-    case 'following':
-      if (followingSet && followingSet.size > 0) {
-        return allPosts.filter((p) => followingSet.has(p.author.id));
-      }
-      return allPosts;
-    case 'top':
-      return [...allPosts].sort((a, b) => b.voteStats.up - a.voteStats.up);
+    case 'following': {
+      const pool =
+        followingSet && followingSet.size > 0
+          ? allPosts.filter((p) => followingSet.has(p.author.id))
+          : [...allPosts];
+      return sortFollowingPosts(pool, followingSort);
+    }
     case 'foryou': {
       // Exclude own posts from discovery.
       const others = viewerUserId
@@ -101,12 +104,11 @@ const RIGHT_EDGE_ZONE_WIDTH = 28;
 
 const TAB_INDEX: Record<TabId, number> = {
   'siguiendo': 0,
-  'mas-votadas': 1,
-  'para-ti': 2,
-  'search': 3,
+  'para-ti': 1,
+  'search': 2,
 };
 
-const VALID_TAB_IDS: TabId[] = ['siguiendo', 'mas-votadas', 'para-ti', 'search'];
+const VALID_TAB_IDS: TabId[] = ['siguiendo', 'para-ti', 'search'];
 
 export default function CommunityScreen() {
   const router = useRouter();
@@ -120,27 +122,13 @@ export default function CommunityScreen() {
   const drawerOpenProgress = useRef(new Animated.Value(0)).current;
   const gestureCommittingRef = useRef(false);
   const [activeTab, setActiveTab] = useState<TabId>('siguiendo');
+  const [followingSort, setFollowingSort] = useState<FollowingSortOption>('recientes');
 
   // Track which tabParam value we have already reacted to so we never
   // re-trigger the same navigation when openDetailFeed's reference changes
   // (it depends on allPosts / followingSet which can update after mount).
   const consumedTabParamRef = useRef<string | undefined>(undefined);
 
-  useEffect(() => {
-    if (!tabParam || !VALID_TAB_IDS.includes(tabParam as TabId)) return;
-    if (consumedTabParamRef.current === tabParam) return;
-    consumedTabParamRef.current = tabParam;
-
-    const tab = tabParam as TabId;
-    if (tab === 'para-ti') {
-      // "Para Ti" must always open the full-screen swipeable detail feed.
-      // If postIdParam is present (e.g. from a notification tap), open directly at that post.
-      const pid = typeof postIdParam === 'string' ? postIdParam : undefined;
-      openDetailFeed('foryou', pid);
-    } else {
-      setActiveTab(tab);
-    }
-  }, [tabParam, postIdParam, openDetailFeed]);
   const [searchQuery, setSearchQuery] = useState('');
   const [feedScrollEnabled, setFeedScrollEnabled] = useState(true);
 
@@ -163,7 +151,14 @@ export default function CommunityScreen() {
 
   const openDetailFeed = useCallback(
     (mode: FeedMode, postId?: string) => {
-      const data = getDataForMode(mode, allPosts, followingSet, mockCurrentUser.clanId, mockCurrentUser.id);
+      const data = getDataForMode(
+        mode,
+        allPosts,
+        followingSet,
+        mockCurrentUser.clanId,
+        mockCurrentUser.id,
+        followingSort,
+      );
       let initialIndex = 0;
       if (postId) {
         const idx = data.findIndex((p) => p.id === postId);
@@ -180,8 +175,25 @@ export default function CommunityScreen() {
         }).start();
       });
     },
-    [slideAnim, allPosts, followingSet],
+    [slideAnim, allPosts, followingSet, followingSort],
   );
+
+  useEffect(() => {
+    if (!tabParam) return;
+    const normalized =
+      tabParam === 'mas-votadas' ? 'para-ti' : (tabParam as TabId);
+    if (!VALID_TAB_IDS.includes(normalized)) return;
+    if (consumedTabParamRef.current === tabParam) return;
+    consumedTabParamRef.current = tabParam;
+
+    const tab = normalized;
+    if (tab === 'para-ti') {
+      const pid = typeof postIdParam === 'string' ? postIdParam : undefined;
+      openDetailFeed('foryou', pid);
+    } else {
+      setActiveTab(tab);
+    }
+  }, [tabParam, postIdParam, openDetailFeed]);
 
   const closeDetailFeed = useCallback(() => {
     Animated.timing(slideAnim, {
@@ -298,16 +310,31 @@ export default function CommunityScreen() {
   const feedItemHeight = screenH - topBarHeight - bottomBarHeight;
 
   const listData = useMemo(
-    () => getDataForMode(tabToFeedMode(activeTab), allPosts, followingSet, mockCurrentUser.clanId, mockCurrentUser.id),
-    [activeTab, allPosts, followingSet],
+    () =>
+      getDataForMode(
+        tabToFeedMode(activeTab),
+        allPosts,
+        followingSet,
+        mockCurrentUser.clanId,
+        mockCurrentUser.id,
+        followingSort,
+      ),
+    [activeTab, allPosts, followingSet, followingSort],
   );
 
   const transitionData = useMemo(
     () =>
       transitionTab && transitionTab !== 'search' && transitionTab !== 'para-ti'
-        ? getDataForMode(tabToFeedMode(transitionTab), allPosts, followingSet, mockCurrentUser.clanId, mockCurrentUser.id)
+        ? getDataForMode(
+            tabToFeedMode(transitionTab),
+            allPosts,
+            followingSet,
+            mockCurrentUser.clanId,
+            mockCurrentUser.id,
+            followingSort,
+          )
         : [],
-    [transitionTab, allPosts, followingSet],
+    [transitionTab, allPosts, followingSet, followingSort],
   );
 
   const renderMainListItem = useCallback(
@@ -317,7 +344,10 @@ export default function CommunityScreen() {
         showPhraseAuthor={activeTab === 'para-ti'}
         onPress={() => handlePostPress(item)}
         onAuthorPress={() => handleAuthorPress(item.author.id)}
-        onClanPress={() => handleClanPress(item.author.clanId)}
+        onClanPress={() => {
+          const cid = item.author.clanId;
+          if (cid) handleClanPress(cid);
+        }}
       />
     ),
     [activeTab, handlePostPress, handleAuthorPress, handleClanPress],
@@ -330,7 +360,10 @@ export default function CommunityScreen() {
         showPhraseAuthor={false}
         onPress={() => handlePostPress(item)}
         onAuthorPress={() => handleAuthorPress(item.author.id)}
-        onClanPress={() => handleClanPress(item.author.clanId)}
+        onClanPress={() => {
+          const cid = item.author.clanId;
+          if (cid) handleClanPress(cid);
+        }}
       />
     ),
     [handlePostPress, handleAuthorPress, handleClanPress],
@@ -359,7 +392,7 @@ export default function CommunityScreen() {
   );
 
   const displayTab = detailFeed
-    ? (detailFeed.mode === 'foryou' ? 'para-ti' : detailFeed.mode === 'top' ? 'mas-votadas' : 'siguiendo') as TabId
+    ? ((detailFeed.mode === 'foryou' ? 'para-ti' : 'siguiendo') as TabId)
     : activeTab;
 
   // ── Sidebar open/close animation ──────────────────────────────────
@@ -576,7 +609,6 @@ export default function CommunityScreen() {
     <View style={styles.container}>
       <AppTopBar
         onMenuPress={() => setSidebarOpen(true)}
-        onClanPress={() => router.push('/my-profile')}
       />
 
       <View style={[styles.contentArea, { height: feedItemHeight }]}>
@@ -717,6 +749,8 @@ export default function CommunityScreen() {
         <BottomCommunityTabs
           activeTab={displayTab}
           onTabChange={handleTabChange}
+          followingSort={followingSort}
+          onFollowingSortChange={setFollowingSort}
         />
       </View>
 

@@ -14,7 +14,7 @@ export const BOTTOM_BAR_LAYOUT = {
   /** Extra px on top of safe-area bottom inset. */
   BOTTOM_BAR_SAFE_AREA_COMPENSATION: 0,
 
-  // ----- Texto: SIGUIENDO, MAS VOTADAS, PARA TI -----
+  // ----- Texto: SIGUIENDO, PARA TI (+ icono perfil y búsqueda) -----
   /** Tamaño de fuente de las 3 pestañas de texto (activa e inactiva). */
   BOTTOM_BAR_TAB_TEXT_SIZE: 14,
 

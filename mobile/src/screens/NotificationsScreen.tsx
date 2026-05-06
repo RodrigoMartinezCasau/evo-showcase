@@ -155,7 +155,6 @@ export default function NotificationsScreen() {
   const { users } = useSimulation();
   const { thoughts } = useThoughts();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeTab] = useState<TabId>('feed');
 
   const handleTabChange = useCallback(
     (tab: TabId) => {
@@ -257,7 +256,7 @@ export default function NotificationsScreen() {
           },
         ]}
       >
-        <BottomCommunityTabs activeTab={activeTab} onTabChange={handleTabChange} />
+        <BottomCommunityTabs activeTab={null} onTabChange={handleTabChange} />
       </View>
 
       <SidebarDrawer

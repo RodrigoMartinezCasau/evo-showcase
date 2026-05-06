@@ -24,8 +24,12 @@ import {
   COMMUNITY_DRAWER_GESTURE_RANGE_X,
 } from '@evoconn/constants/communityDrawerGesture';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
+import {
+  sortFollowingPosts,
+  parseFollowingSortParam,
+} from '@evoconn/constants/followingFeedSort';
 
-type FeedMode = 'following' | 'top' | 'foryou';
+type FeedMode = 'following' | 'foryou';
 
 function shuffled<T>(arr: T[]): T[] {
   const copy = [...arr];
@@ -36,15 +40,21 @@ function shuffled<T>(arr: T[]): T[] {
   return copy;
 }
 
-function getDataForMode(mode: FeedMode, allPosts: CommunityPost[], followingSet?: Set<string>): CommunityPost[] {
+function getDataForMode(
+  mode: FeedMode,
+  allPosts: CommunityPost[],
+  followingSet?: Set<string>,
+  followingSortKey = 'recientes',
+): CommunityPost[] {
+  const followingSort = parseFollowingSortParam(followingSortKey);
   switch (mode) {
-    case 'following':
-      if (followingSet && followingSet.size > 0) {
-        return allPosts.filter((p) => followingSet.has(p.author.id));
-      }
-      return allPosts;
-    case 'top':
-      return [...allPosts].sort((a, b) => b.voteStats.up - a.voteStats.up);
+    case 'following': {
+      const pool =
+        followingSet && followingSet.size > 0
+          ? allPosts.filter((p) => followingSet.has(p.author.id))
+          : [...allPosts];
+      return sortFollowingPosts(pool, followingSort);
+    }
     case 'foryou':
       return shuffled(allPosts);
   }
@@ -54,21 +64,30 @@ function modeToTab(mode: FeedMode): string {
   switch (mode) {
     case 'following':
       return 'siguiendo';
-    case 'top':
-      return 'mas-votadas';
     case 'foryou':
       return 'para-ti';
   }
+}
+
+function normalizeFeedMode(raw: string): FeedMode {
+  if (raw === 'top' || raw === 'mas-votadas') return 'foryou';
+  return raw === 'following' ? 'following' : 'foryou';
 }
 
 export default function DetailFeedScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { height: screenH } = useWindowDimensions();
-  const params = useLocalSearchParams<{ mode?: string; initialIndex?: string; postId?: string }>();
+  const params = useLocalSearchParams<{
+    mode?: string;
+    initialIndex?: string;
+    postId?: string;
+    followingSort?: string;
+  }>();
 
-  const mode = (params.mode ?? 'foryou') as FeedMode;
+  const mode = normalizeFeedMode(params.mode ?? 'foryou');
   const postId = typeof params.postId === 'string' ? params.postId : undefined;
+  const followingSortParam = params.followingSort;
 
   const { followingSet } = useFollowState();
   const { thoughts } = useThoughts();
@@ -76,11 +95,11 @@ export default function DetailFeedScreen() {
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const drawerOpenProgress = useRef(new Animated.Value(0)).current;
   const gestureCommittingRef = useRef(false);
-  const activeTab = modeToTab(mode) as 'siguiendo' | 'mas-votadas' | 'para-ti' | 'search';
+  const activeTab = modeToTab(mode) as 'siguiendo' | 'para-ti' | 'search';
 
   // When a specific postId is requested, put that post first so initialIndex=0 lands on it.
   const data = useMemo(() => {
-    const base = getDataForMode(mode, allPosts, followingSet);
+    const base = getDataForMode(mode, allPosts, followingSet, followingSortParam);
     if (!postId) return base;
     const targetIdx = base.findIndex((p) => p.id === postId);
     if (targetIdx <= 0) return base;
@@ -88,7 +107,7 @@ export default function DetailFeedScreen() {
     const [target] = reordered.splice(targetIdx, 1);
     reordered.unshift(target);
     return reordered;
-  }, [mode, allPosts, followingSet, postId]);
+  }, [mode, allPosts, followingSet, postId, followingSortParam]);
 
   // If postId was passed via params, always start at index 0 (target is first).
   // Otherwise honour the explicit initialIndex param.
@@ -152,10 +171,9 @@ export default function DetailFeedScreen() {
         router.replace('/(tabs)');
         return;
       }
-      const newMode: FeedMode =
-        tab === 'siguiendo' ? 'following' : tab === 'mas-votadas' ? 'top' : 'foryou';
+      const newMode: FeedMode = tab === 'siguiendo' ? 'following' : 'foryou';
 
-      if (tab === 'siguiendo' || tab === 'mas-votadas') {
+      if (tab === 'siguiendo') {
         router.replace('/(tabs)');
         return;
       }
@@ -240,7 +258,6 @@ export default function DetailFeedScreen() {
     <View style={styles.container}>
       <AppTopBar
         onMenuPress={() => setSidebarOpen(true)}
-        onClanPress={() => router.push('/my-profile')}
       />
 
       <FlatList

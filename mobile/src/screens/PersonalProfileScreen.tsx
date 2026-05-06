@@ -203,7 +203,6 @@ export default function PersonalProfileScreen() {
     <View style={styles.container}>
       <AppTopBar
         onMenuPress={() => setSidebarOpen(true)}
-        onClanPress={() => {/* already on personal profile */}}
       />
 
       <View style={[styles.profileWrap, { height: contentHeight }]} onLayout={onProfileWrapLayout}>

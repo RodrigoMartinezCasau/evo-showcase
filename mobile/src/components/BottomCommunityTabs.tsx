@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,12 +11,18 @@ import {
   ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, usePathname } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getSidebarFooterClanLineColor } from '@evoconn/constants/clanColors';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
+import {
+  FOLLOWING_SORT_LABELS,
+  FOLLOWING_SORT_MENU_ORDER,
+  type FollowingSortOption,
+} from '@evoconn/constants/followingFeedSort';
 import {
   BOTTOM_BAR_DEFAULT_LUPITA,
   getBottomBarLupitaByHouse,
@@ -39,7 +45,6 @@ import {
 
 const TABS = [
   { id: 'siguiendo', label: 'SIGUIENDO' },
-  { id: 'mas-votadas', label: 'MAS VOTADAS' },
   { id: 'para-ti', label: 'PARA TI' },
   { id: 'search', label: 'SEARCH' },
 ] as const;
@@ -50,13 +55,19 @@ type BottomCommunityTabsProps = {
   /** Pass null to show no tab as active (e.g. on profile / clan screens). */
   activeTab: TabId | null;
   onTabChange: (tab: TabId) => void;
+  /** Orden del feed Siguiendo (comunidad). */
+  followingSort?: FollowingSortOption;
+  onFollowingSortChange?: (sort: FollowingSortOption) => void;
 };
 
-type BarSlot = { kind: 'tab'; id: TabId } | { kind: 'create' };
+type BarSlot =
+  | { kind: 'profile' }
+  | { kind: 'tab'; id: TabId; variant?: 'siguiendo' }
+  | { kind: 'create' };
 
 const BAR_SLOTS: BarSlot[] = [
-  { kind: 'tab', id: 'siguiendo' },
-  { kind: 'tab', id: 'mas-votadas' },
+  { kind: 'profile' },
+  { kind: 'tab', id: 'siguiendo', variant: 'siguiendo' },
   { kind: 'create' },
   { kind: 'tab', id: 'para-ti' },
   { kind: 'tab', id: 'search' },
@@ -68,18 +79,37 @@ function underlineWidthForTab(tabId: TabId): number | null {
     : BOTTOM_BAR_LAYOUT.BOTTOM_BAR_UNDERLINE_WIDTH_TEXT;
 }
 
+const PROFILE_ICON_UNDERLINE = 28;
+
 function tabMeta(id: TabId) {
   const t = TABS.find((x) => x.id === id);
   if (!t) throw new Error(`Unknown tab ${id}`);
   return t;
 }
 
-export function BottomCommunityTabs({ activeTab, onTabChange }: BottomCommunityTabsProps) {
+export function BottomCommunityTabs({
+  activeTab,
+  onTabChange,
+  followingSort = 'recientes',
+  onFollowingSortChange,
+}: BottomCommunityTabsProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const insets = useSafeAreaInsets();
   const { width: screenW } = useWindowDimensions();
   const [createOpen, setCreateOpen] = useState(false);
+  const [followingMenuOpen, setFollowingMenuOpen] = useState(false);
+
+  const profileRouteActive = pathname === '/my-profile' || pathname?.endsWith('/my-profile') === true;
+
+  useEffect(() => {
+    setFollowingMenuOpen(false);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (createOpen) setFollowingMenuOpen(false);
+  }, [createOpen]);
 
   const tabFontSize = Math.min(
     BOTTOM_BAR_LAYOUT.BOTTOM_BAR_TAB_TEXT_SIZE,
@@ -146,10 +176,69 @@ export function BottomCommunityTabs({ activeTab, onTabChange }: BottomCommunityT
 
   const createSz = BOTTOM_BAR_LAYOUT.BOTTOM_BAR_CREATE_BUTTON_SIZE;
 
+  const sortMenuBottomOffset =
+    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
+    insets.bottom +
+    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
+    16;
+
+  const onSiguiendoPress = useCallback(() => {
+    if (activeTab === 'siguiendo') {
+      setFollowingMenuOpen((o) => !o);
+      return;
+    }
+    onTabChange('siguiendo');
+  }, [activeTab, onTabChange]);
+
+  const onPickFollowingSort = useCallback(
+    (sort: FollowingSortOption) => {
+      onFollowingSortChange?.(sort);
+      setFollowingMenuOpen(false);
+    },
+    [onFollowingSortChange],
+  );
+
+  const profileIconSize = Math.min(26, Math.round(tabFontSize + 10));
+
   return (
     <>
       <View style={[styles.bar, Platform.OS === 'android' && { paddingBottom: insets.bottom }]}>
         {BAR_SLOTS.map((slot) => {
+          if (slot.kind === 'profile') {
+            const th = BOTTOM_BAR_LAYOUT.BOTTOM_BAR_UNDERLINE_THICKNESS;
+            const uw = PROFILE_ICON_UNDERLINE;
+            return (
+              <TouchableOpacity
+                key="profile"
+                onPress={() => router.push('/my-profile')}
+                style={styles.tab}
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel="Mi perfil"
+              >
+                <Ionicons
+                  name="person"
+                  size={profileIconSize}
+                  color={profileRouteActive ? selectedColor : evoconnColors.muted}
+                />
+                {profileRouteActive ? (
+                  <View
+                    style={[
+                      styles.tabUnderline,
+                      {
+                        width: uw,
+                        height: th,
+                        backgroundColor: selectedColor,
+                        left: '50%',
+                        marginLeft: -uw / 2,
+                      },
+                    ]}
+                  />
+                ) : null}
+              </TouchableOpacity>
+            );
+          }
+
           if (slot.kind === 'create') {
             return (
               <View key="create" style={styles.tab}>
@@ -182,6 +271,49 @@ export function BottomCommunityTabs({ activeTab, onTabChange }: BottomCommunityT
           const th = BOTTOM_BAR_LAYOUT.BOTTOM_BAR_UNDERLINE_THICKNESS;
           const lupUnderlineShiftX =
             id === 'search' ? BOTTOM_BAR_LAYOUT.BOTTOM_BAR_LUPITA_UNDERLINE_EDITOR.offsetX : 0;
+          const chevronColor = isActive ? selectedColor : evoconnColors.muted;
+
+          if (slot.variant === 'siguiendo') {
+            return (
+              <TouchableOpacity key={id} onPress={onSiguiendoPress} style={styles.tab}>
+                <View style={styles.siguendoRow}>
+                  <Text
+                    style={[styles.label, { fontSize: tabFontSize }, isActive && { color: selectedColor }]}
+                    numberOfLines={1}
+                  >
+                    {label}
+                  </Text>
+                  <Ionicons
+                    name={followingMenuOpen ? 'chevron-up' : 'chevron-down'}
+                    size={12}
+                    color={chevronColor}
+                    style={styles.siguendoChevron}
+                  />
+                </View>
+                {isActive ? (
+                  <View
+                    style={[
+                      styles.tabUnderline,
+                      uw == null
+                        ? {
+                            left: 0,
+                            right: 0,
+                            backgroundColor: selectedColor,
+                            height: th,
+                          }
+                        : {
+                            width: uw,
+                            height: th,
+                            backgroundColor: selectedColor,
+                            left: '50%',
+                            marginLeft: -uw / 2,
+                          },
+                    ]}
+                  />
+                ) : null}
+              </TouchableOpacity>
+            );
+          }
 
           return (
             <TouchableOpacity key={id} onPress={() => onTabChange(id)} style={styles.tab}>
@@ -234,6 +366,45 @@ export function BottomCommunityTabs({ activeTab, onTabChange }: BottomCommunityT
           );
         })}
       </View>
+
+      <Modal
+        visible={followingMenuOpen}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setFollowingMenuOpen(false)}
+      >
+        <View style={styles.sortModalRoot} pointerEvents="box-none">
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setFollowingMenuOpen(false)}
+            accessibilityRole="button"
+          />
+          <View style={[styles.sortMenuCard, { marginBottom: sortMenuBottomOffset }]}>
+            {FOLLOWING_SORT_MENU_ORDER.map((opt) => {
+              const selected = followingSort === opt;
+              return (
+                <Pressable
+                  key={opt}
+                  onPress={() => onPickFollowingSort(opt)}
+                  style={({ pressed }) => [styles.sortMenuRow, pressed && styles.sortMenuRowPressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel={FOLLOWING_SORT_LABELS[opt]}
+                >
+                  <Text
+                    style={[
+                      styles.sortMenuLabel,
+                      selected && { color: selectedColor, fontWeight: '700' as const },
+                    ]}
+                  >
+                    {FOLLOWING_SORT_LABELS[opt]}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={createOpen}
@@ -304,6 +475,8 @@ const styles = StyleSheet.create({
   },
   tab: { flex: 1, alignItems: 'center', paddingVertical: 6, position: 'relative' },
   tabUnderline: { position: 'absolute', bottom: 0 },
+  siguendoRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', maxWidth: '100%' },
+  siguendoChevron: { marginLeft: 2, marginTop: 1 },
   label: {
     color: evoconnColors.muted,
     fontSize: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_TAB_TEXT_SIZE,
@@ -360,5 +533,34 @@ const styles = StyleSheet.create({
   },
   createMenuRowOverlap: {
     marginTop: -14,
+  },
+  sortModalRoot: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  sortMenuCard: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: 14,
+    backgroundColor: evoconnColors.muted,
+    overflow: 'hidden',
+    zIndex: 1,
+  },
+  sortMenuRow: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(11,11,15,0.35)',
+  },
+  sortMenuRowPressed: {
+    backgroundColor: 'rgba(11,11,15,0.12)',
+  },
+  sortMenuLabel: {
+    color: evoconnColors.background,
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

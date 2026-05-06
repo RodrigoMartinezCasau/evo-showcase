@@ -83,7 +83,6 @@ export default function PersonalFollowingScreen() {
   const insets = useSafeAreaInsets();
   const { thoughts } = useThoughts();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
-  const [activeTab] = React.useState<TabId>('feed');
 
   const { following, unfollowUser } = usePersonalProfile();
 
@@ -150,7 +149,7 @@ export default function PersonalFollowingScreen() {
           },
         ]}
       >
-        <BottomCommunityTabs activeTab={activeTab} onTabChange={handleTabChange} />
+        <BottomCommunityTabs activeTab={null} onTabChange={handleTabChange} />
       </View>
 
       <SidebarDrawer

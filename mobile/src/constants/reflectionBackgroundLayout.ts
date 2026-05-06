@@ -1,5 +1,5 @@
 /**
- * Fondo SVG del display de reflexión (shared: Para ti / Siguiendo / Más votadas).
+ * Fondo SVG del display de reflexión (shared: Para ti / Siguiendo).
  * Ajustar scale y offsets para encuadrar el asset sin tocar el layout del contenido.
  */
 export const REFLECTION_BACKGROUND_LAYOUT = {

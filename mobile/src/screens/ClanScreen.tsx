@@ -32,7 +32,6 @@ export default function ClanScreen() {
     <View style={styles.container}>
       <AppTopBar
         onMenuPress={() => setSidebarOpen(true)}
-        onClanPress={() => router.push('/my-profile')}
       />
 
       <View style={styles.content}>

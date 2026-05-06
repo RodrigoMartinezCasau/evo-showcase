@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Share, Keyboard, Platform, Animated, useWindowDimensions, InteractionManager, type LayoutChangeEvent } from 'react-native';
 import type { CommunityPost, Comment } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
-import { getClanColor } from '@evoconn/constants/clanColors';
+import { getClanColor, NO_CLAN_COMMUNITY_POST_FRAME_COLOR } from '@evoconn/constants/clanColors';
 import { ReflectionBackground } from './ReflectionBackground';
 import { DETAIL_HEADER_ROW_OFFSET_Y } from '@evoconn/constants/reflectionDetailRankBadgeLayout';
 import { DetailActionColumn } from './DetailActionColumn';
@@ -54,6 +54,10 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   onReadingModeChange,
 }: ReflectionDetailItemProps) {
   const clanColor = getClanColor(post.author.clanId);
+  const reflectionPanelBorderColor =
+    post.author.clanId == null || String(post.author.clanId).trim() === ''
+      ? NO_CLAN_COMMUNITY_POST_FRAME_COLOR
+      : clanColor;
   const actionColRef = useRef<DetailActionColumnHandle>(null);
   const { updatePostVote, updatePostSaveToggle, getPostById, getMyVote } = useFeedStore();
   const { savePost, unsavePost, isSaved } = usePersonalProfile();
@@ -518,7 +522,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                 backgroundColor: RP.backgroundColor,
                 paddingHorizontal: RP.paddingHorizontal,
                 paddingVertical: RP.paddingVertical,
-                borderLeftColor: clanColor,
+                borderLeftColor: reflectionPanelBorderColor,
                 transform: [
                   { translateX: RP.offsetX },
                   { translateY: RP.offsetY },

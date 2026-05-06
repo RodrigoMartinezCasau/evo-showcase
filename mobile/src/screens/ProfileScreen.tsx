@@ -50,7 +50,7 @@ function OwnProfileView() {
 
   return (
     <View style={styles.container}>
-      <AppTopBar onMenuPress={() => {}} onClanPress={() => {/* already on profile */}} />
+      <AppTopBar onMenuPress={() => {}} />
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Text style={styles.username}>{user.username}</Text>
@@ -313,7 +313,6 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
     <View style={styles.container}>
       <AppTopBar
         onMenuPress={() => setSidebarOpen(true)}
-        onClanPress={() => router.push('/my-profile')}
       />
 
       <View style={[styles.otherProfileWrap, { height: contentHeight }]}>

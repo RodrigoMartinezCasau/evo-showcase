@@ -49,7 +49,6 @@ export default function PersonalPostsScreen() {
   const { posts, isHidden, toggleHidePost, deletePost } = usePersonalProfile();
 
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
-  const [activeTab, setActiveTab] = React.useState<TabId>('feed');
 
   // ─── Detail feed overlay ──────────────────────────────────────────
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -97,8 +96,6 @@ export default function PersonalPostsScreen() {
 
   const handleTabChange = useCallback(
     (tab: TabId) => {
-      setActiveTab(tab);
-      // Navigate away — this unmounts the screen (and any open detail overlay).
       router.replace({ pathname: '/(tabs)', params: { tab } });
     },
     [router],
@@ -195,7 +192,7 @@ export default function PersonalPostsScreen() {
           },
         ]}
       >
-        <BottomCommunityTabs activeTab={activeTab} onTabChange={handleTabChange} />
+        <BottomCommunityTabs activeTab={null} onTabChange={handleTabChange} />
       </View>
 
       <SidebarDrawer

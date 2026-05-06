@@ -51,7 +51,6 @@ export default function PersonalSavedPostsScreen() {
   const { savedPosts, unsavePost } = usePersonalProfile();
 
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
-  const [activeTab, setActiveTab] = React.useState<TabId>('feed');
 
   // ─── Detail feed overlay ──────────────────────────────────────────
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -98,7 +97,6 @@ export default function PersonalSavedPostsScreen() {
 
   const handleTabChange = useCallback(
     (tab: TabId) => {
-      setActiveTab(tab);
       router.replace({ pathname: '/(tabs)', params: { tab } });
     },
     [router],
@@ -193,7 +191,7 @@ export default function PersonalSavedPostsScreen() {
           },
         ]}
       >
-        <BottomCommunityTabs activeTab={activeTab} onTabChange={handleTabChange} />
+        <BottomCommunityTabs activeTab={null} onTabChange={handleTabChange} />
       </View>
 
       <SidebarDrawer

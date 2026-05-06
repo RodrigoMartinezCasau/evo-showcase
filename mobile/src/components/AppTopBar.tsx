@@ -78,7 +78,19 @@ export function AppTopBar({
   // activeClan ya incorpora previewClanId cuando el modo preview está activo
   // (resuelto en useActiveClan → DebugClanContext). Se usa como alias claro.
   const effectiveClan = activeClan;
-  const handleClanPress = () => (onClanPress ? onClanPress() : router.push('/my-profile'));
+  const handleClanPress = () => {
+    if (onClanPress) {
+      onClanPress();
+      return;
+    }
+    // Misma regla que SidebarDrawer: slug del clan visible o `indefinido` (= pantalla "Sin clan").
+    const clanRouteSlug =
+      effectiveClan != null && String(effectiveClan).trim() !== ''
+        ? String(effectiveClan).trim().toLowerCase()
+        : 'indefinido';
+    router.push(`/clan/${clanRouteSlug}`);
+  };
+
   const clanLabel =
     clanShortLabel ??
     (isPreviewActive ? 'MOD' : (effectiveClan ? effectiveClan.slice(0, 2).toUpperCase() : '??'));

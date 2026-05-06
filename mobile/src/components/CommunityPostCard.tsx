@@ -36,7 +36,7 @@ type CommunityPostCardProps = {
   onAuthorPress: () => void;
   onClanPress: () => void;
   /**
-   * Solo en PARA TI (lista compacta). Siguiendo / Más votadas: false.
+   * Solo en PARA TI (lista compacta). Siguiendo: false.
    * Vistas ampliadas usan `ReflectionDetailItem`, no esta tarjeta.
    */
   showPhraseAuthor?: boolean;

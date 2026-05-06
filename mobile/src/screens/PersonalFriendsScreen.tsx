@@ -83,7 +83,6 @@ export default function PersonalFriendsScreen() {
   const insets = useSafeAreaInsets();
   const { thoughts } = useThoughts();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
-  const [activeTab] = React.useState<TabId>('feed');
 
   const { friends, unfollowUser } = usePersonalProfile();
 
@@ -150,7 +149,7 @@ export default function PersonalFriendsScreen() {
           },
         ]}
       >
-        <BottomCommunityTabs activeTab={activeTab} onTabChange={handleTabChange} />
+        <BottomCommunityTabs activeTab={null} onTabChange={handleTabChange} />
       </View>
 
       <SidebarDrawer
