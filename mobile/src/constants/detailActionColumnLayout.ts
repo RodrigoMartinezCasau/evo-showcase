@@ -20,40 +20,45 @@ export const DETAIL_ACTION_COLUMN_LAYOUT = {
   iconSize: 28,
 };
 
-/** Botón CLAN (insignia) — 20% más grande que los otros botones.
+// Clan is 70% bigger than other icons. Column width = iconSize * clan scale.
+// Screen constraint: clan scale ≤ 80/28 ≈ 2.86 on a 393px phone.
+const _CLAN_SCALE = 2.8;         // max safe value that stays within screen
+const _OTHER_SCALE = _CLAN_SCALE / 1.7; // ≈ 1.65 — other icons are 70% smaller
+
+/** Botón CLAN (insignia) — 70% más grande que los otros iconos.
  *  Su scale define el ancho total de la columna (COL_FIXED_WIDTH). */
 export const DETAIL_CLAN_BUTTON_LAYOUT = {
   offsetX: 0,
   offsetY: 0,
-  scale: 2.2 * 1.2, // = 2.64 (20% bigger than up/down/save/more)
+  scale: _CLAN_SCALE,
 };
 
 /** Botón UPVOTE. */
 export const DETAIL_UPVOTE_BUTTON_LAYOUT = {
   offsetX: 0,
   offsetY: 0,
-  scale: 2.2,
+  scale: _OTHER_SCALE,
 };
 
 /** Botón DOWNVOTE. */
 export const DETAIL_DOWNVOTE_BUTTON_LAYOUT = {
   offsetX: 0,
   offsetY: 0,
-  scale: 2.2,
+  scale: _OTHER_SCALE,
 };
 
 /** Botón SAVE (guardar / bookmark). */
 export const DETAIL_SAVE_BUTTON_LAYOUT = {
   offsetX: 0,
   offsetY: 0,
-  scale: 2.0,
+  scale: _OTHER_SCALE * 0.92,
 };
 
 /** Botón MÁS (tres puntitos). */
 export const DETAIL_MORE_BUTTON_LAYOUT = {
   offsetX: 0,
   offsetY: 0,
-  scale: 2.0,
+  scale: _OTHER_SCALE * 0.92,
 };
 
 /* ──────────────────────────────────────────────

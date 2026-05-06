@@ -107,51 +107,52 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
   const total = upCount + downCount;
   const approvalPct = total > 0 ? Math.round((upCount / total) * 100) : 100;
 
-  // Measurement-based layout: fill panel height with space-between (6 items).
+  // Measurement-based layout: fill panel height with space-between (7 items).
+  // Item order: clan / upvote-count / upvote-icon / approval% / downvote+count / save / dots
   const columnStyle = containerHeight != null
     ? [styles.column, { height: containerHeight, justifyContent: 'space-between' as const }]
     : [styles.column, { gap: COL.gap }];
 
   return (
     <View style={styles.root}>
-      {/* ── 6-item column: clan / upvote+count / approval% / downvote+count / save / dots ── */}
+      {/* ── 7-item column ── */}
       <View style={columnStyle}>
 
-        {/* 1. Clan */}
+        {/* 1. Clan badge */}
         <TouchableOpacity onPress={onClanPress} activeOpacity={0.7}>
           <View style={{ width: sz * CLAN_L.scale, height: sz * CLAN_L.scale }}>
             <InsigniaIcon width={sz * CLAN_L.scale} height={sz * CLAN_L.scale} />
           </View>
         </TouchableOpacity>
 
-        {/* 2. Upvote + count below */}
+        {/* 2. Upvote count (standalone — between clan and upvote icon) */}
+        <Text style={[styles.statText, { color: voted === 'up' ? UP_C.colorActive : UP_C.colorInactive }]}>
+          {formatCount(upCount)}
+        </Text>
+
+        {/* 3. Upvote icon (no count below) */}
         <TouchableOpacity onPress={handleUp} activeOpacity={0.7}>
-          <View style={styles.iconWithStat}>
-            <Animated.View
-              style={{
-                width: sz * UP_L.scale,
-                height: sz * UP_L.scale,
-                transform: [{ scale: upBounce.scale }],
-              }}
-            >
-              {voted === 'up' ? (
-                <UpvoteActive key="up-a" width={sz * UP_L.scale} height={sz * UP_L.scale} />
-              ) : (
-                <UpvoteInactive key="up-i" width={sz * UP_L.scale} height={sz * UP_L.scale} />
-              )}
-            </Animated.View>
-            <Text style={[styles.statText, { color: voted === 'up' ? UP_C.colorActive : UP_C.colorInactive }]}>
-              {formatCount(upCount)}
-            </Text>
-          </View>
+          <Animated.View
+            style={{
+              width: sz * UP_L.scale,
+              height: sz * UP_L.scale,
+              transform: [{ scale: upBounce.scale }],
+            }}
+          >
+            {voted === 'up' ? (
+              <UpvoteActive key="up-a" width={sz * UP_L.scale} height={sz * UP_L.scale} />
+            ) : (
+              <UpvoteInactive key="up-i" width={sz * UP_L.scale} height={sz * UP_L.scale} />
+            )}
+          </Animated.View>
         </TouchableOpacity>
 
-        {/* 3. Approval % */}
+        {/* 4. Approval % */}
         <Text style={[styles.approvalText, { color: getApprovalColor(approvalPct) }]}>
           {approvalPct}%
         </Text>
 
-        {/* 4. Downvote + count below */}
+        {/* 5. Downvote + count below */}
         <TouchableOpacity onPress={handleDown} activeOpacity={0.7}>
           <View style={styles.iconWithStat}>
             <Animated.View
@@ -173,7 +174,7 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
           </View>
         </TouchableOpacity>
 
-        {/* 5. Save */}
+        {/* 6. Save */}
         <TouchableOpacity onPress={handleSave} activeOpacity={0.7}>
           <Animated.View
             style={{
@@ -190,7 +191,7 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
           </Animated.View>
         </TouchableOpacity>
 
-        {/* 6. More (three dots) */}
+        {/* 7. More (three dots) */}
         <TouchableOpacity onPress={onMorePress} activeOpacity={0.7} hitSlop={8}>
           <Text style={[styles.moreDots, { fontSize: 22 * MORE_L.scale }]}>···</Text>
         </TouchableOpacity>
