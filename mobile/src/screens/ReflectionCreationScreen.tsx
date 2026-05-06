@@ -382,10 +382,28 @@ export default function ReflectionCreationScreen() {
         setMessages((prev) => [...prev, placeholder]);
         scrollToEnd();
 
-        const resp = await debateApi.sendMessage(id, text, undefined, {
-          includeReflectiveQuestion,
-          includePhilosophicalReferences,
-        });
+        let resp: Awaited<ReturnType<typeof debateApi.sendMessage>>;
+        try {
+          resp = await debateApi.sendMessage(id, text, undefined, {
+            includeReflectiveQuestion,
+            includePhilosophicalReferences,
+          });
+        } catch (sendErr) {
+          // Railway wipes the SQLite DB on cold-start → the saved debate_id no
+          // longer exists. Auto-recover: create a fresh debate and retry once.
+          const errMsg = sendErr instanceof Error ? sendErr.message : '';
+          if (errMsg.includes('Debate not found') || errMsg.includes('404')) {
+            const freshId = await createThought(text);
+            setDebateId(freshId);
+            id = freshId;
+            resp = await debateApi.sendMessage(freshId, text, undefined, {
+              includeReflectiveQuestion,
+              includePhilosophicalReferences,
+            });
+          } else {
+            throw sendErr;
+          }
+        }
         // Reflection sent → activate streak, consume one daily use, select+unlock a KB phrase.
         // eslint-disable-next-line no-console
         console.log('[STREAK] Reflection created/sent → marking streak activated.');
