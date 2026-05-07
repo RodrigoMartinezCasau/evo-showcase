@@ -23,6 +23,8 @@ import { useFeedStore } from '@evoconn/hooks/useFeedStore';
 import { usePersonalProfile } from '@evoconn/hooks/PersonalProfileContext';
 import { formatPhraseBodyForDisplay } from '@evoconn/utils/phrasePublish';
 import {
+  computeCommunityFeedCardContentLayout,
+  computeFeedCardTextContentBottomY,
   computeSvgCardLayout,
   getBodyMaxLines,
   SVG_CARD_VISUAL,
@@ -95,10 +97,44 @@ export function CommunityPostCard({
     [cardTier, cardWidth]
   );
 
+  const feedContent = useMemo(
+    () => computeCommunityFeedCardContentLayout(cardWidth, cardTier),
+    [cardWidth, cardTier],
+  );
+
   const bodyMaxLines = getBodyMaxLines(cardTier);
   const smallUpvoted = myVote === 'up';
   const feedUpvoteIcon = smallUpvoted ? smallStatsIcons.upvoteActive : smallStatsIcons.upvoteInactive;
   const feedSaveIcon = isPostSaved ? smallStatsIcons.saveActive : smallStatsIcons.saveInactive;
+
+  const statsIcon = Math.max(20, Math.round(V.STATS_ICON_SIZE * Math.max(0.92, feedContent.textScale)));
+
+  const statsRowHeight = useMemo(
+    () => Math.max(statsIcon, feedContent.statsCountFontSize + 3) + 2,
+    [statsIcon, feedContent.statsCountFontSize],
+  );
+
+  const textContentBottomY = useMemo(
+    () =>
+      computeFeedCardTextContentBottomY({
+        cardHeight: layout.cardHeight,
+        blackTopPx: layout.blackTopPx,
+        blackBottomPx: layout.blackBottomPx,
+        paddingTop: feedContent.paddingTop,
+        paddingBottom: feedContent.paddingBottom,
+        statsBottom: V.STATS_BOTTOM,
+        statsRowHeight,
+        clearanceAboveStats: V.STATS_TEXT_CLEARANCE_ABOVE_CHIP,
+      }),
+    [
+      layout.cardHeight,
+      layout.blackTopPx,
+      layout.blackBottomPx,
+      feedContent.paddingTop,
+      feedContent.paddingBottom,
+      statsRowHeight,
+    ],
+  );
 
   const renderFeedStats = () => (
     <View style={styles.feedStatsRow}>
@@ -107,10 +143,10 @@ export function CommunityPostCard({
           <Image
             source={feedUpvoteIcon}
             resizeMode="contain"
-            style={{ width: V.STATS_ICON_SIZE, height: V.STATS_ICON_SIZE }}
+            style={{ width: statsIcon, height: statsIcon }}
           />
         </TouchableOpacity>
-        <Text style={styles.feedStatCount}>
+        <Text style={[styles.feedStatCount, { fontSize: feedContent.statsCountFontSize }]}>
           {isQuoteCard ? formatNumber(post.voteStats.up) : post.voteStats.up}
         </Text>
       </View>
@@ -119,10 +155,10 @@ export function CommunityPostCard({
           <Image
             source={feedSaveIcon}
             resizeMode="contain"
-            style={{ width: V.STATS_ICON_SIZE, height: V.STATS_ICON_SIZE }}
+            style={{ width: statsIcon, height: statsIcon }}
           />
         </TouchableOpacity>
-        <Text style={styles.feedStatCount}>
+        <Text style={[styles.feedStatCount, { fontSize: feedContent.statsCountFontSize }]}>
           {isQuoteCard ? formatNumber(post.voteStats.save) : post.voteStats.save}
         </Text>
       </View>
@@ -161,12 +197,15 @@ export function CommunityPostCard({
             styles.topStrip,
             {
               height: layout.blackTopPx,
-              paddingHorizontal: V.TOP_STRIP_PADDING_X,
+              paddingHorizontal: feedContent.topStripPaddingX,
             },
           ]}
         >
-          <TouchableOpacity onPress={onAuthorPress} hitSlop={6}>
-            <Text style={styles.usernameHeader} numberOfLines={1}>
+          <TouchableOpacity onPress={onAuthorPress} hitSlop={6} style={styles.usernameHit}>
+            <Text
+              style={[styles.usernameHeader, { fontSize: feedContent.usernameFontSize }]}
+              numberOfLines={1}
+            >
               {post.author.username}
             </Text>
           </TouchableOpacity>
@@ -181,21 +220,35 @@ export function CommunityPostCard({
         <View
           style={{
             position: 'absolute',
-            top: layout.blackTopPx + V.CONTENT_PADDING_TOP,
-            left: layout.blackLeftPx + V.CONTENT_PADDING_X,
-            right: layout.blackRightPx + V.CONTENT_PADDING_X,
-            bottom: layout.cardHeight - layout.blackBottomPx + V.CONTENT_PADDING_BOTTOM,
+            top: layout.blackTopPx + feedContent.paddingTop,
+            left: layout.blackLeftPx + feedContent.paddingLeft,
+            right: layout.blackRightPx + feedContent.paddingRight,
+            bottom: layout.cardHeight - textContentBottomY,
             overflow: 'hidden',
           }}
         >
           {post.title ? (
-            <Text style={styles.title} numberOfLines={V.TITLE_MAX_LINES}>
+            <Text
+              style={[
+                styles.title,
+                {
+                  fontSize: feedContent.titleFontSize,
+                  marginBottom: feedContent.titleMarginBottom,
+                  lineHeight: Math.round(feedContent.titleFontSize * 1.2),
+                },
+              ]}
+              numberOfLines={V.TITLE_MAX_LINES}
+            >
               {post.title}
             </Text>
           ) : null}
           <Text
             style={[
               styles.bodyInner,
+              {
+                fontSize: feedContent.bodyFontSize,
+                lineHeight: feedContent.bodyLineHeight,
+              },
               isQuoteCard && { fontWeight: '700' as const, fontStyle: 'italic' as const },
             ]}
             numberOfLines={bodyMaxLines}
@@ -203,7 +256,16 @@ export function CommunityPostCard({
             {isQuoteCard ? formatPhraseBodyForDisplay(post.body) : post.body}
           </Text>
           {isQuoteCard && showPhraseAuthor && post.quoteAuthor ? (
-            <Text style={styles.phraseQuoteAuthorInFeed} numberOfLines={2}>
+            <Text
+              style={[
+                styles.phraseQuoteAuthorInFeed,
+                {
+                  fontSize: feedContent.phraseAuthorFontSize,
+                  lineHeight: Math.round(feedContent.phraseAuthorFontSize * 1.25),
+                },
+              ]}
+              numberOfLines={2}
+            >
               {post.quoteAuthor}
             </Text>
           ) : null}
@@ -228,20 +290,22 @@ export function CommunityPostCard({
             pointerEvents="none"
             style={{
               position: 'absolute',
-              top: V.BANNER_TOP,
-              right: V.BANNER_RIGHT,
-              width: V.BANNER_SIZE,
-              height: V.BANNER_SIZE,
+              top: feedContent.bannerTop,
+              right: feedContent.bannerRight,
+              width: feedContent.bannerSize,
+              height: feedContent.bannerSize,
             }}
           >
             {typeof bannerAsset === 'function' ? (() => {
                 const BannerSvg = bannerAsset as React.ComponentType<{ width?: number; height?: number }>;
-                return <BannerSvg width={V.BANNER_SIZE} height={V.BANNER_SIZE} />;
+                return (
+                  <BannerSvg width={feedContent.bannerSize} height={feedContent.bannerSize} />
+                );
               })() : (
               <Image
                 source={bannerAsset as number}
                 resizeMode="contain"
-                style={{ width: V.BANNER_SIZE, height: V.BANNER_SIZE }}
+                style={{ width: feedContent.bannerSize, height: feedContent.bannerSize }}
               />
             )}
           </View>
@@ -266,11 +330,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    overflow: 'hidden',
+  },
+  usernameHit: {
+    flex: 1,
+    minWidth: 0,
+    marginRight: 4,
   },
   usernameHeader: {
     color: evoconnColors.text,
     fontWeight: '800',
-    fontSize: 14,
     letterSpacing: 0.5,
     textShadowColor: '#000000',
     textShadowOffset: { width: 1, height: 1 },
@@ -279,17 +348,12 @@ const styles = StyleSheet.create({
   title: {
     color: evoconnColors.text,
     fontWeight: '800',
-    fontSize: 18,
-    marginBottom: 6,
   },
   bodyInner: {
     color: evoconnColors.text,
-    fontSize: 14,
-    lineHeight: 20,
   },
   phraseQuoteAuthorInFeed: {
     color: evoconnColors.muted,
-    fontSize: 13,
     fontWeight: '600',
     marginTop: 6,
   },
@@ -309,7 +373,6 @@ const styles = StyleSheet.create({
   },
   feedStatCount: {
     color: evoconnColors.text,
-    fontSize: 12,
     fontWeight: '600',
   },
 });
