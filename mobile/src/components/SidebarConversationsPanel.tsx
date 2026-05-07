@@ -486,7 +486,8 @@ export function SidebarConversationsPanel({
                       ]}
                     >
                       <Text
-                        numberOfLines={2}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
                         style={[
                           styles.rowTitle,
                           {

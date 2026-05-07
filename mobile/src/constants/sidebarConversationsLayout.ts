@@ -15,7 +15,7 @@ export const SIDEBAR_CONVERSATIONS_LAYOUT = {
 
   /** Marco redondeado (View) — aproxima el grosor del borde de los SVG. */
   SIDEBAR_CONVERSATIONS_FRAME_BORDER_WIDTH: 3,
-  SIDEBAR_CONVERSATIONS_FRAME_CORNER_RADIUS: 20,
+  SIDEBAR_CONVERSATIONS_FRAME_CORNER_RADIUS: 14,
   SIDEBAR_CONVERSATIONS_FRAME_FILL_COLOR: '#0b0b0f',
 
   /**
@@ -37,7 +37,7 @@ export const SIDEBAR_CONVERSATIONS_LAYOUT = {
    * Hueco vertical entre la fila de filtros (fuera del marco) y el borde superior
    * del cuadro de conversaciones; también bajo «Resultados» en búsqueda.
    */
-  SIDEBAR_CONVERSATIONS_SECTIONS_TO_LIST_GAP_Y: 10,
+  SIDEBAR_CONVERSATIONS_SECTIONS_TO_LIST_GAP_Y: 16,
 
   /** FAVORITOS — independientes (no derivan de otros layouts). */
   SIDEBAR_FAVORITES_OFFSET_X: 2,
@@ -80,11 +80,11 @@ export const SIDEBAR_CONVERSATIONS_LAYOUT = {
   SIDEBAR_CONVERSATIONS_ITEM_OFFSET_Y: 4,
   /** Separación vertical entre filas de conversación. */
   SIDEBAR_CONVERSATIONS_ITEM_GAP_Y: 0,
-  SIDEBAR_CONVERSATIONS_ITEM_TEXT_FONT_SIZE: 15,
+  SIDEBAR_CONVERSATIONS_ITEM_TEXT_FONT_SIZE: 13,
   SIDEBAR_CONVERSATIONS_ITEM_TITLE_COLOR: '#E8EAEF',
-  SIDEBAR_CONVERSATIONS_ITEM_TEXT_LINE_HEIGHT: 20,
-  /** Altura mínima de la zona de título (2 líneas cómodas). */
-  SIDEBAR_CONVERSATIONS_ITEM_TEXT_MIN_HEIGHT: 40,
+  SIDEBAR_CONVERSATIONS_ITEM_TEXT_LINE_HEIGHT: 18,
+  /** Una sola línea en lista; título corto p. ej. ~3 palabras (resto con «…»). */
+  SIDEBAR_CONVERSATIONS_ITEM_TEXT_MIN_HEIGHT: 18,
 
   SIDEBAR_CONVERSATIONS_TITLE_ICONS_GAP_X: 8,
   /** Franja de iconos: menos margen al borde derecho del marco (lista más ancha). */
