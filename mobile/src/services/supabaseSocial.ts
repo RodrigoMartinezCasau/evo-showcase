@@ -81,7 +81,10 @@ export async function fetchCommentsForPost(postId: string): Promise<SimComment[]
 export async function insertComment(comment: SimComment): Promise<void> {
   if (!isRealUserId(comment.authorId)) return;
   const { error } = await supabase.from('comments').upsert(simCommentToDbRow(comment), { onConflict: 'id' });
-  if (error) console.error('[Social] insertComment:', error.message);
+  if (error) {
+    console.error('[Social] insertComment:', error.message);
+    throw new Error(error.message);
+  }
 }
 
 // ─── Votes ────────────────────────────────────────────────────────────────────

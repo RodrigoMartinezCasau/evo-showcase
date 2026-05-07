@@ -2,9 +2,10 @@
 claude_classifier.py
 ====================
 
-Llama a Claude Haiku para clasificar una reflexión filosófica en los 8 clanes.
+Llama a Claude para clasificar texto del usuario (reflexión o frase) en los 8 clanes.
 
-Usado exclusivamente por el endpoint POST /classify/reflection de main.py.
+Usado por el endpoint POST /classify/reflection de main.py (campo `texto`; mismo
+scorer para reflexiones y frases en la app móvil).
 La API key nunca sale del backend; el cliente solo llama al endpoint FastAPI.
 
 Retorna zeros en cualquier error para no romper el flujo del clasificador híbrido.

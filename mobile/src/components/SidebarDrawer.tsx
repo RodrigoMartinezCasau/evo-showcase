@@ -9,6 +9,7 @@ import {
   Animated,
   Easing,
   Keyboard,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -52,6 +53,20 @@ import {
   SIDEBAR_PNG_MENU_BUTTON_LAYOUT_WIDTH_PX,
 } from '@evoconn/constants/sidebarPngMenuAlignment';
 import { SIDEBAR_CONVERSATIONS_AFTER_SEARCH_MARGIN_TOP_PX } from '@evoconn/constants/sidebarSearchBarLayout';
+import {
+  SIDEBAR_DRAWER_FOOTER_INSIGNIA_SIZE,
+  SIDEBAR_DRAWER_FOOTER_SETTINGS_SIZE,
+  SIDEBAR_DRAWER_FOOTER_USERNAME_FONT_SIZE,
+  SIDEBAR_DRAWER_FOOTER_CLAN_FONT_SIZE,
+  SIDEBAR_DRAWER_FOOTER_RANK_FONT_SIZE,
+  SIDEBAR_DRAWER_FOOTER_LINE_HEIGHT_FACTOR_USERNAME,
+  SIDEBAR_DRAWER_FOOTER_LINE_HEIGHT_FACTOR_CLAN,
+  SIDEBAR_DRAWER_FOOTER_LINE_HEIGHT_FACTOR_RANK,
+  SIDEBAR_DRAWER_FOOTER_USERNAME_TOP_OFFSET_RATIO,
+  SIDEBAR_DRAWER_FOOTER_USERNAME_TOP_EXTRA_INSET_PX,
+  SIDEBAR_DRAWER_FOOTER_RANK_BOTTOM_INSET_PX,
+  SIDEBAR_DRAWER_FOOTER_RANK_OPTICAL_NUDGE_Y,
+} from '@evoconn/constants/sidebarDrawerFooterLayout';
 
 type SidebarDrawerProps = {
   visible: boolean;
@@ -309,44 +324,104 @@ export function SidebarDrawer({
             activeOpacity={0.88}
             accessibilityRole="button"
             accessibilityLabel="Perfil"
+            style={styles.footerInsigniaHit}
           >
-            <FooterInsignia width={styles.footerInsignia.width} height={styles.footerInsignia.height} />
+            <FooterInsignia
+              width={SIDEBAR_DRAWER_FOOTER_INSIGNIA_SIZE}
+              height={SIDEBAR_DRAWER_FOOTER_INSIGNIA_SIZE}
+            />
           </TouchableOpacity>
 
-          {/* Text block — vertically centered within the insignia */}
+          {/*
+           * Texto en capas absolutas dentro de 68px = caja del SVG.
+           * Nombre: top = ratio × alto insignia (15% por defecto) + EXTRA_INSET_PX.
+           * Rango: franja con bottom + flex-end (sin cambios). Ajusta RANK_BOTTOM_INSET_PX si hace falta.
+           */}
           <View style={styles.footerTextBlock}>
-            <TouchableOpacity onPress={() => { onClose(); router.push('/my-profile'); }} hitSlop={6} activeOpacity={0.85}>
-              <Text style={styles.footerUsername} numberOfLines={1}>
-                {user.username.toUpperCase()}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => { onClose(); router.push(`/clan/${clanRouteSlug}`); }} hitSlop={6} activeOpacity={0.85}>
-              <Text style={[styles.footerClanLine, { color: footerClanColor }]} numberOfLines={1}>
-                {footerClanLine}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => { onClose(); router.push('/my-profile'); }} hitSlop={6} activeOpacity={0.85}>
-              <Text style={styles.footerRankLine} numberOfLines={1}>
-                {footerRankLine}
-              </Text>
-            </TouchableOpacity>
+            <View
+              style={[
+                styles.footerUserStrip,
+                { top: FOOTER_USERNAME_TOP_PX },
+              ]}
+            >
+              <TouchableOpacity onPress={() => { onClose(); router.push('/my-profile'); }} hitSlop={6} activeOpacity={0.85}>
+                <Text style={styles.footerUsername} numberOfLines={1}>
+                  {user.username.toUpperCase()}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <View
+              style={[
+                styles.footerClanStrip,
+                {
+                  top: FOOTER_USERNAME_TOP_PX + FOOTER_LH_USER,
+                  bottom: FOOTER_CLAN_STRIP_BOTTOM_PX,
+                },
+              ]}
+            >
+              <TouchableOpacity onPress={() => { onClose(); router.push(`/clan/${clanRouteSlug}`); }} hitSlop={6} activeOpacity={0.85}>
+                <Text style={[styles.footerClanLine, { color: footerClanColor }]} numberOfLines={1}>
+                  {footerClanLine}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <View
+              style={[
+                styles.footerRankStrip,
+                { bottom: SIDEBAR_DRAWER_FOOTER_RANK_BOTTOM_INSET_PX },
+              ]}
+            >
+              <TouchableOpacity
+                onPress={() => { onClose(); router.push('/my-profile'); }}
+                hitSlop={6}
+                activeOpacity={0.85}
+                style={styles.footerRankHit}
+              >
+                <Text style={styles.footerRankLine} numberOfLines={1}>
+                  {footerRankLine}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
-          {/* Settings icon — right edge aligns with conversations panel */}
+          {/* Settings — centrado en vertical respecto al bloque 68px del icono */}
           <TouchableOpacity
+            style={styles.footerSettingsHit}
             onPress={() => { onClose(); router.push('/settings'); }}
             activeOpacity={0.88}
             accessibilityRole="button"
             accessibilityLabel="Ajustes"
             hitSlop={4}
           >
-            <SettingsSvg width={styles.footerSettings.width} height={styles.footerSettings.height} />
+            <SettingsSvg
+              width={SIDEBAR_DRAWER_FOOTER_SETTINGS_SIZE}
+              height={SIDEBAR_DRAWER_FOOTER_SETTINGS_SIZE}
+            />
           </TouchableOpacity>
         </View>
       </Animated.View>
     </View>
   );
 }
+
+const FOOTER_LH_USER = Math.round(
+  SIDEBAR_DRAWER_FOOTER_USERNAME_FONT_SIZE * SIDEBAR_DRAWER_FOOTER_LINE_HEIGHT_FACTOR_USERNAME,
+);
+const FOOTER_LH_CLAN = Math.round(
+  SIDEBAR_DRAWER_FOOTER_CLAN_FONT_SIZE * SIDEBAR_DRAWER_FOOTER_LINE_HEIGHT_FACTOR_CLAN,
+);
+const FOOTER_LH_RANK = Math.round(
+  SIDEBAR_DRAWER_FOOTER_RANK_FONT_SIZE * SIDEBAR_DRAWER_FOOTER_LINE_HEIGHT_FACTOR_RANK,
+);
+
+/** Nombre: debajo del borde superior del bloque = ratio × alto insignia (+ px extra). No toca el rango. */
+const FOOTER_USERNAME_TOP_PX =
+  Math.round(SIDEBAR_DRAWER_FOOTER_INSIGNIA_SIZE * SIDEBAR_DRAWER_FOOTER_USERNAME_TOP_OFFSET_RATIO) +
+  SIDEBAR_DRAWER_FOOTER_USERNAME_TOP_EXTRA_INSET_PX;
+
+/** Borde inferior de la franja del clan = encima de la franja del rango + inset opcional. */
+const FOOTER_CLAN_STRIP_BOTTOM_PX =
+  SIDEBAR_DRAWER_FOOTER_RANK_BOTTOM_INSET_PX + FOOTER_LH_RANK;
 
 const styles = StyleSheet.create({
   overlayRoot: {
@@ -373,6 +448,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
+    overflow: 'visible',
   },
   headerLeftCluster: {
     flexDirection: 'row',
@@ -428,40 +504,78 @@ const styles = StyleSheet.create({
   // paddingHorizontal: 10 aligns left/right edges with the conversations panel.
   footerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingHorizontal: 10,
     paddingTop: 8,
     paddingBottom: 14,
   },
-  footerInsignia: {
-    width: 68,
-    height: 68,
+  /** Misma caja 68×68 que el SVG del escudo (referencia Y común). */
+  footerInsigniaHit: {
+    width: SIDEBAR_DRAWER_FOOTER_INSIGNIA_SIZE,
+    height: SIDEBAR_DRAWER_FOOTER_INSIGNIA_SIZE,
   },
   footerTextBlock: {
     flex: 1,
     marginHorizontal: 8,
+    height: SIDEBAR_DRAWER_FOOTER_INSIGNIA_SIZE,
+    position: 'relative',
+  },
+  /** Franja del nombre: altura = lineHeight; top = inset (borde superior del escudo visible). */
+  footerUserStrip: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: FOOTER_LH_USER,
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
+  },
+  /** Hueco entre usuario y rango; el clan centrado en vertical en esa banda. */
+  footerClanStrip: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    justifyContent: 'center',
+    minHeight: 0,
+  },
+  /** Franja de altura fija = lineHeight del rango, pegada al borde inferior del bloque. */
+  footerRankStrip: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: FOOTER_LH_RANK,
+    justifyContent: 'flex-end',
+    alignItems: 'flex-start',
+  },
+  footerRankHit: {
+    justifyContent: 'flex-end',
+  },
+  footerSettingsHit: {
+    alignSelf: 'center',
   },
   footerUsername: {
     color: '#B8BCC6',
-    fontSize: 12,
+    fontSize: SIDEBAR_DRAWER_FOOTER_USERNAME_FONT_SIZE,
+    lineHeight: FOOTER_LH_USER,
     fontWeight: '700' as const,
     letterSpacing: 0.3,
+    ...(Platform.OS === 'android'
+      ? { includeFontPadding: false, textAlignVertical: 'top' as const }
+      : {}),
   },
   footerClanLine: {
-    fontSize: 10,
+    fontSize: SIDEBAR_DRAWER_FOOTER_CLAN_FONT_SIZE,
+    lineHeight: FOOTER_LH_CLAN,
     letterSpacing: 0.4,
     fontFamily: INRIA_SERIF_FONT_FAMILY,
-    marginTop: 3,
+    ...(Platform.OS === 'android' ? { includeFontPadding: false, textAlignVertical: 'center' as const } : {}),
   },
   footerRankLine: {
     color: '#FFFFFF',
-    fontSize: 10,
+    fontSize: SIDEBAR_DRAWER_FOOTER_RANK_FONT_SIZE,
+    lineHeight: FOOTER_LH_RANK,
     letterSpacing: 0.4,
     fontFamily: INRIA_SERIF_FONT_FAMILY,
-    marginTop: 3,
-  },
-  footerSettings: {
-    width: 34,
-    height: 34,
+    transform: [{ translateY: SIDEBAR_DRAWER_FOOTER_RANK_OPTICAL_NUDGE_Y }],
+    ...(Platform.OS === 'android' ? { includeFontPadding: false, textAlignVertical: 'center' as const } : {}),
   },
 });

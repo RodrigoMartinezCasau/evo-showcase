@@ -159,31 +159,34 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
 
   const { addNotification } = useNotifications();
 
-  const handleAddComment = useCallback((text: string) => {
-    const newId = `co-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    const simComment: SimComment = {
-      id: newId,
-      postId: post.id,
-      authorId: mockCurrentUser.id,
-      // Snapshot so the username survives restarts and is visible to other users.
-      authorUsername: mockCurrentUser.username,
-      authorClanId: mockCurrentUser.clanId,
-      authorRank: mockCurrentUser.rank,
-      body: text,
-      upCount: 0,
-      createdAt: new Date().toISOString(),
-    };
-    addSimComment(simComment);
-    addNotification({
-      recipientUserId: post.author.id,
-      type: 'comment',
-      fromUserId: mockCurrentUser.id,
-      fromUsername: mockCurrentUser.username,
-      targetPostId: post.id,
-      targetCommentId: newId,
-      textPreview: text.trim().slice(0, 80),
-    });
-  }, [addSimComment, addNotification, post.author.id, post.id]);
+  const handleAddComment = useCallback(
+    async (text: string) => {
+      const newId = `co-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const simComment: SimComment = {
+        id: newId,
+        postId: post.id,
+        authorId: mockCurrentUser.id,
+        // Snapshot so the username survives restarts and is visible to other users.
+        authorUsername: mockCurrentUser.username,
+        authorClanId: mockCurrentUser.clanId,
+        authorRank: mockCurrentUser.rank,
+        body: text,
+        upCount: 0,
+        createdAt: new Date().toISOString(),
+      };
+      await addSimComment(simComment);
+      addNotification({
+        recipientUserId: post.author.id,
+        type: 'comment',
+        fromUserId: mockCurrentUser.id,
+        fromUsername: mockCurrentUser.username,
+        targetPostId: post.id,
+        targetCommentId: newId,
+        textPreview: text.trim().slice(0, 80),
+      });
+    },
+    [addSimComment, addNotification, post.author.id, post.id],
+  );
 
   const { isFollowing: checkFollowing, toggleFollow } = useFollowState();
 

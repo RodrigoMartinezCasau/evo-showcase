@@ -43,16 +43,19 @@ const PROGRESSION_SVGS: Record<number, FC<ProgressionSvgProps>> = {
 
 const PROGRESSION_MIN = 36;
 const PROGRESSION_MAX = 50;
-const PROGRESSION_STEP = 2; // reflexiones por tramo
+const PROGRESSION_STEP = 2; // inputs (reflexión o frase) por tramo
 
 /**
- * Devuelve el SVG de progresión correspondiente a las reflexiones enviadas.
+ * Devuelve el SVG de progresión según reflexiones + frases enviadas (misma escala que antes solo con refs).
  * índice = clamp(36 + floor(total / 2), 36, 50)
  */
-export function getProgressionIcon(totalReflections: number): FC<ProgressionSvgProps> {
+export function getProgressionIcon(totalReflectionAndPhraseInputs: number): FC<ProgressionSvgProps> {
   const idx = Math.min(
     PROGRESSION_MAX,
-    Math.max(PROGRESSION_MIN, PROGRESSION_MIN + Math.floor(totalReflections / PROGRESSION_STEP)),
+    Math.max(
+      PROGRESSION_MIN,
+      PROGRESSION_MIN + Math.floor(totalReflectionAndPhraseInputs / PROGRESSION_STEP),
+    ),
   );
   return PROGRESSION_SVGS[idx] ?? Svg36;
 }

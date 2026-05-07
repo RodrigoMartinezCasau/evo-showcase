@@ -10,6 +10,6 @@ export { PersonalRecentPostCard } from './PersonalRecentPostCard';
 export { PersonalRecentPostsSlider } from './PersonalRecentPostsSlider';
 export { PersonalRankProgression } from './PersonalRankProgression';
 export { PersonalBottomBlocks } from './PersonalBottomBlocks';
-export { PersonalIconSwitchBlock } from './PersonalIconSwitchBlock';
+export { PersonalDailyPhraseWidgetBlock } from './PersonalDailyPhraseWidgetBlock';
 export { PersonalFriendsBlock } from './PersonalFriendsBlock';
 export { PersonalSavedPostsBlock } from './PersonalSavedPostsBlock';

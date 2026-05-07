@@ -11,7 +11,7 @@
  *   - Accumulated percentages per clan (sorted desc, top clan highlighted)
  *   - Raw scores of the last classified input
  *   - Last input text (truncated)
- *   - Reflection counter vs. reveal threshold
+ *   - Reflection + phrase counts vs. reveal thresholds
  *   - Current visible clan status
  */
 import React, { useState, useCallback, useMemo } from 'react';
@@ -30,7 +30,12 @@ import {
   CLAN_LABELS,
   type ClanScoreId,
 } from '@evoconn/services/clanClassifier';
-import { REVEAL_REFLECTION_THRESHOLD, REVEAL_PCT_THRESHOLD } from '@evoconn/hooks/ClassificationContext';
+import {
+  REVEAL_MIN_REFLECTIONS,
+  REVEAL_TOTAL_INPUTS_THRESHOLD,
+  REVEAL_PCT_THRESHOLD,
+  REVEAL_LEAD_OVER_SECOND_PP,
+} from '@evoconn/hooks/ClassificationContext';
 
 // ─── Colour palette ──────────────────────────────────────────────────────────
 
@@ -95,6 +100,8 @@ export function ClassificationDebugPanel() {
   const userState = classification.getUserState(userId);
   const percentages = classification.getPercentages(userId);
   const reflections = classification.getReflectionCount(userId);
+  const phrases = classification.getPhraseCount(userId);
+  const totalInputs = reflections + phrases;
   const visibleClan = classification.getVisibleClanId(userId);
 
   // Build a pct lookup for the bar fill, including zero clans.
@@ -130,8 +137,8 @@ export function ClassificationDebugPanel() {
       .sort((a, b) => b.pct - a.pct),
   [pctMap]);
 
-  const progressLabel = `${reflections} / ${REVEAL_REFLECTION_THRESHOLD} refs`;
-  const progressRatio = Math.min(reflections / REVEAL_REFLECTION_THRESHOLD, 1);
+  const progressLabel = `${totalInputs} / ${REVEAL_TOTAL_INPUTS_THRESHOLD} total (${reflections} ref · ${phrases} frases)`;
+  const progressRatio = Math.min(totalInputs / REVEAL_TOTAL_INPUTS_THRESHOLD, 1);
 
   return (
     <View style={styles.container} pointerEvents="box-none">
@@ -161,7 +168,7 @@ export function ClassificationDebugPanel() {
 
           {/* Reflection progress bar */}
           <View style={styles.statusRow}>
-            <Text style={styles.statusLabel}>Reflexiones:</Text>
+            <Text style={styles.statusLabel}>Inputs revelación:</Text>
             <Text style={styles.statusValue}>{progressLabel}</Text>
           </View>
           <View style={styles.progressTrack}>
@@ -169,7 +176,8 @@ export function ClassificationDebugPanel() {
             <View style={[styles.progressThreshold]} />
           </View>
           <Text style={styles.thresholdNote}>
-            Necesitas ≥{REVEAL_REFLECTION_THRESHOLD} refs + ≥{REVEAL_PCT_THRESHOLD}% en un clan
+            ≥{REVEAL_MIN_REFLECTIONS} ref, ≥{REVEAL_TOTAL_INPUTS_THRESHOLD} total, líder ≥{REVEAL_PCT_THRESHOLD}%
+            y +{REVEAL_LEAD_OVER_SECOND_PP} pp sobre el 2.º
           </Text>
 
           <View style={styles.divider} />

@@ -1,16 +1,8 @@
 import React from 'react';
-import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import IcoNotificacionesSvg from '../assets/personalProfile/icono notificaciones.svg';
-import { useNotifications } from '@evoconn/hooks/NotificationsContext';
-import { getClanSecondaryColor } from '@evoconn/constants/clanColors';
-import { useActiveClan } from '@evoconn/debug/DebugClanContext';
-import { mockCurrentUser } from '@evoconn/data/mockUser';
+import { NotificationsBellButton } from './NotificationsBellButton';
 import { SIDEBAR_HEADER_LAYOUT as SH } from '@evoconn/constants/sidebarHeaderLayout';
-import { NOTIFICATIONS_ICON_SCALE } from '@evoconn/constants/personalProfileLayout';
-
-/** Misma base que `PersonalNotificationsButton` (perfil). */
-const PROFILE_NOTIFICATIONS_ICON_BASE = 28;
 
 type Props = {
   /** Cierra el drawer antes de navegar (p. ej. `onClose`). */
@@ -18,17 +10,13 @@ type Props = {
 };
 
 /**
- * Misma campana SVG que el perfil + badge; columna con altura del bloque de la estrella
- * y el mismo `translateY` base que la estrella (+ un nudge fino en layout si hace falta).
+ * Misma campana + contador que `PersonalNotificationsButton` (`NotificationsBellButton`).
+ * Columna con altura del bloque de la estrella + translateY compartido con el cluster.
  */
 export const SidebarHeaderNotificationsButton = React.memo(function SidebarHeaderNotificationsButton({
   onBeforeNavigate,
 }: Props) {
   const router = useRouter();
-  const { unreadCount } = useNotifications();
-  const activeClan = useActiveClan(mockCurrentUser.clanId);
-  const badgeColor = getClanSecondaryColor(activeClan);
-  const iconSize = PROFILE_NOTIFICATIONS_ICON_BASE * NOTIFICATIONS_ICON_SCALE;
 
   return (
     <View
@@ -44,26 +32,14 @@ export const SidebarHeaderNotificationsButton = React.memo(function SidebarHeade
         },
       ]}
     >
-      <TouchableOpacity
+      <NotificationsBellButton
         onPress={() => {
           onBeforeNavigate?.();
           router.push('/notifications');
         }}
         hitSlop={10}
         activeOpacity={0.65}
-        accessibilityRole="button"
-        accessibilityLabel="Notificaciones"
-        style={styles.touch}
-      >
-        <IcoNotificacionesSvg width={iconSize} height={iconSize} />
-        {unreadCount > 0 && (
-          <View style={[styles.badge, { backgroundColor: badgeColor }]}>
-            <Text style={styles.badgeText}>
-              {unreadCount > 99 ? '+99' : String(unreadCount)}
-            </Text>
-          </View>
-        )}
-      </TouchableOpacity>
+      />
     </View>
   );
 });
@@ -75,29 +51,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     alignSelf: 'center',
-  },
-  touch: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    minWidth: 44,
-    minHeight: 44,
     overflow: 'visible',
-  },
-  badge: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 3,
-  },
-  badgeText: {
-    color: '#000000',
-    fontSize: 9,
-    fontWeight: '800',
-    includeFontPadding: false,
   },
 });

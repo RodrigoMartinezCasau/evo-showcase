@@ -143,7 +143,7 @@ export type SimulationContextValue = {
   deletePost: (authorId: string, postId: string) => void;
   toggleHidePost: (userId: string, postId: string) => void;
   publishPost: (post: SimPost) => void;
-  addComment: (comment: SimComment) => void;
+  addComment: (comment: SimComment) => Promise<void>;
   /** Lazily fetch fresh comments from Supabase for a specific post. */
   ensureCommentsForPost: (postId: string) => Promise<void>;
 };
@@ -155,18 +155,27 @@ const SimCtx = createContext<SimulationContextValue | null>(null);
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function SimulationProvider({ children }: { children: ReactNode }) {
-  const { profile: authProfile } = useAuth();
+  const { profile: authProfile, session, loading: authLoading } = useAuth();
   const [activeUserId, setActiveUserIdRaw] = useState('u1');
 
   // When a real Supabase user is authenticated (UUID not in the 9-user sim),
   // make activeUserId equal to their UUID. This ensures ALL sim-backed features
   // (saves, follow graph, posts filter, notifications) use the correct key.
+  //
+  // Use session.user.id as fallback when profile is still loading or failed:
+  // otherwise activeUserId stays 'u1' and fetchMyNotifications never runs for
+  // the real account (empty notification list despite rows in Supabase).
   useEffect(() => {
-    const id = authProfile?.id;
+    if (authLoading) return;
+    if (!session?.user) {
+      setActiveUserIdRaw('u1');
+      return;
+    }
+    const id = authProfile?.id ?? session.user.id;
     if (id && !SIM_USERS_BY_ID[id]) {
       setActiveUserIdRaw(id);
     }
-  }, [authProfile?.id]);
+  }, [authProfile?.id, session?.user, authLoading]);
 
   // ── Posts ─────────────────────────────────────────────────────────────────
   const [posts, setPosts] = useState<SimPost[]>(() => SIM_POSTS.map(p => ({ ...p })));
@@ -657,8 +666,12 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // ── Comments ─────────────────────────────────────────────────────────────
-  const addComment = useCallback((comment: SimComment) => {
-    insertComment(comment); // persist to Supabase (no-op for sim users)
+  const addComment = useCallback(async (comment: SimComment) => {
+    try {
+      await insertComment(comment); // must finish before notification insert (FK on comment_id)
+    } catch {
+      return;
+    }
     setCommentsMap(prev => ({
       ...prev,
       [comment.postId]: [...(prev[comment.postId] ?? []), comment],

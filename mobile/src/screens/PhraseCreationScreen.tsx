@@ -497,9 +497,9 @@ export default function PhraseCreationScreen() {
         void recordUsesLog(mockCurrentUser.id).catch(console.error);
         // Increment total_quotes in Supabase profiles.
         void incrementProfileStat(mockCurrentUser.id, 'total_quotes').catch(console.error);
-        // ── Real philosophical-clan classification ─────────────────────
-        // Phrases contribute to the user's clan score totals (but NOT
-        // to the 30-reflection reveal threshold — that is reflection-only).
+        // ── Real philosophical-clan classification (same hybrid as reflections) ──
+        // Phrases count toward the 30-input reveal gate together with reflections
+        // (minimum 10 must be reflections).
         void recordClassificationInput(t, 'phrase', id);
         // Build the initial thread snapshot. We persist this to disk
         // IMMEDIATELY (alongside setting it in memory) so that even if the

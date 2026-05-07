@@ -71,9 +71,11 @@ export function AppTopBar({
   const insets = useSafeAreaInsets();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const { isPreviewActive, previewClanId } = usePreviewMode();
-  const { getVisibleClanId, getReflectionCount } = useClassification();
+  const { getVisibleClanId, getReflectionCount, getPhraseCount } = useClassification();
   const visibleClanId     = getVisibleClanId();
   const totalReflections  = getReflectionCount();
+  const totalPhrases      = getPhraseCount();
+  const progressionInputs = totalReflections + totalPhrases;
 
   // activeClan ya incorpora previewClanId cuando el modo preview está activo
   // (resuelto en useActiveClan → DebugClanContext). Se usa como alias claro.
@@ -112,8 +114,8 @@ export function AppTopBar({
   const InsigniaIcon = useMemo(
     () => (isPreviewActive || visibleClanId)
       ? getTopBarInsigniaByHouse(effectiveClan)
-      : getProgressionIcon(totalReflections),
-    [effectiveClan, isPreviewActive, visibleClanId, totalReflections],
+      : getProgressionIcon(progressionInputs),
+    [effectiveClan, isPreviewActive, visibleClanId, progressionInputs],
   );
 
   // ─── Top-bar fire icon animation (grey → clan on first send of the day) ────

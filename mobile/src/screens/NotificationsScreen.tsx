@@ -10,6 +10,7 @@
  * Tapping a notification navigates to the relevant content.
  */
 import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -151,7 +152,7 @@ function EmptyState() {
 export default function NotificationsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { notifications, markAllRead } = useNotifications();
+  const { notifications, markAllRead, refreshNotifications } = useNotifications();
   const { users } = useSimulation();
   const { thoughts } = useThoughts();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -168,6 +169,13 @@ export default function NotificationsScreen() {
     insets.bottom +
     BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
     20;
+
+  // Fresh data when opening the screen (fixes stale empty state if activeUserId was late).
+  useFocusEffect(
+    useCallback(() => {
+      refreshNotifications();
+    }, [refreshNotifications]),
+  );
 
   // Mark all as read when the screen is opened.
   useEffect(() => {

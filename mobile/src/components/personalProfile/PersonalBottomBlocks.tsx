@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import type { CommunityPost } from '@evoconn/types';
 import type { FriendEntry } from '@evoconn/data/mockPersonalProfile';
-import { PersonalIconSwitchBlock } from './PersonalIconSwitchBlock';
+import { PersonalDailyPhraseWidgetBlock } from './PersonalDailyPhraseWidgetBlock';
 import { PersonalFriendsBlock } from './PersonalFriendsBlock';
 import { PersonalSavedPostsBlock } from './PersonalSavedPostsBlock';
 import {
@@ -42,7 +42,7 @@ export const PersonalBottomBlocks = React.memo(function PersonalBottomBlocks({
         },
       ]}
     >
-      <PersonalIconSwitchBlock clanId={clanId} />
+      <PersonalDailyPhraseWidgetBlock clanId={clanId} />
       <PersonalFriendsBlock friends={friends} clanId={clanId} />
       <PersonalSavedPostsBlock savedPosts={savedPosts} clanId={clanId} onPostPress={onSavedPostPress} />
     </View>

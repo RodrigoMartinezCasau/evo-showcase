@@ -61,7 +61,23 @@ export type NotificationsContextValue = {
   addNotification: (args: AddNotificationArgs) => void;
   /** Mark all active user's notifications as read (call on screen open). */
   markAllRead: () => void;
+  /** Reload from Supabase / AsyncStorage (e.g. when opening the notifications screen). */
+  refreshNotifications: () => void;
 };
+
+function mapDbRowsToAppNotifications(rows: Awaited<ReturnType<typeof fetchMyNotifications>>): AppNotification[] {
+  return rows.map((r) => ({
+    id: r.id,
+    type: r.type as NotificationType,
+    fromUserId: r.from_user_id ?? '',
+    fromUsername: r.from_username,
+    targetPostId: r.post_id,
+    targetCommentId: r.comment_id,
+    textPreview: r.text_preview,
+    createdAt: r.created_at,
+    read: r.read,
+  }));
+}
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 
@@ -79,28 +95,21 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     dbRef.current = db;
   }, [db]);
 
-  // Load notifications — Supabase for real users, AsyncStorage for sim users.
-  useEffect(() => {
+  const refreshNotifications = useCallback(() => {
     if (isRealUserId(activeUserId)) {
       fetchMyNotifications(activeUserId).then((rows) => {
-        const notifs: AppNotification[] = rows.map((r) => ({
-          id: r.id,
-          type: r.type as NotificationType,
-          fromUserId: r.from_user_id ?? '',
-          fromUsername: r.from_username,
-          targetPostId: r.post_id,
-          targetCommentId: r.comment_id,
-          textPreview: r.text_preview,
-          createdAt: r.created_at,
-          read: r.read,
-        }));
-        setDb((prev) => ({ ...prev, [activeUserId]: notifs }));
+        setDb((prev) => ({ ...prev, [activeUserId]: mapDbRowsToAppNotifications(rows) }));
       });
     } else {
       loadNotificationsDB()
         .then((loaded) => setDb(loaded))
         .catch(() => {});
     }
+  }, [activeUserId]);
+
+  // Load notifications — Supabase for real users, AsyncStorage for sim users.
+  useEffect(() => {
+    refreshNotifications();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeUserId]);
 
@@ -227,8 +236,8 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<NotificationsContextValue>(
-    () => ({ notifications, unreadCount, addNotification, markAllRead }),
-    [notifications, unreadCount, addNotification, markAllRead],
+    () => ({ notifications, unreadCount, addNotification, markAllRead, refreshNotifications }),
+    [notifications, unreadCount, addNotification, markAllRead, refreshNotifications],
   );
 
   return <NotificationsCtx.Provider value={value}>{children}</NotificationsCtx.Provider>;

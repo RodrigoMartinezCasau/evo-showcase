@@ -7,20 +7,22 @@
  *   - recordInput(text, type)           → analyse, accumulate, persist
  *   - getPercentages(userId)            → ClanPct[] for the philosophy panel
  *   - getVisibleClanId(userId)          → 'Sin clan' (null) until reveal rules pass
- *   - getReflectionCount(userId)        → counter used by the reveal threshold
+ *   - getReflectionCount(userId)        → reflections sent
+ *   - getPhraseCount(userId)            → phrases (quotes) sent
  *
  * Rules (from spec):
  *   - every reflection/phrase is scored against the 8 clans
  *   - scores accumulate per user, percentages always sum to 100%
  *   - all users start visibly as "Sin clan"
- *   - clan is revealed only when BOTH:
- *       totalReflectionsSent >= REVEAL_REFLECTION_THRESHOLD (30)
- *       AND any clan reaches REVEAL_PCT_THRESHOLD (30%)
- *   - phrases contribute to scores but NOT to the reflection counter
+ *   - clan is revealed only when ALL of:
+ *       totalReflectionsSent >= REVEAL_MIN_REFLECTIONS (10)
+ *       (totalReflectionsSent + totalPhrasesSent) >= REVEAL_TOTAL_INPUTS_THRESHOLD (30)
+ *       AND the top clan has ≥ REVEAL_PCT_THRESHOLD (25%)
+ *       AND leads the runner-up by ≥ REVEAL_LEAD_OVER_SECOND_PP (5 pp)
+ *   - phrases use the same hybrid scoring (semantic + ML + Claude) as reflections
  *   - after reveal, new inputs are dampened (POST_REVEAL_WEIGHT)
- *   - after first reveal, clan switches require the new top clan to beat the
- *     current visible clan by SWITCH_MARGIN percentage points. The first-reveal
- *     percentage threshold does NOT apply to later reallocations.
+ *   - clan switches use the same clarity rule: new #1 must be ≥25% and ≥5 pp
+ *     ahead of #2 (not “vs previous visible clan”).
  *   - rank badges do not downgrade inside the same clan once Maestro/Filósofo
  *     has been reached; a clan switch resets the badge path for the new clan.
  *   - after 7 inactive days (no reflection or phrase), the visible badge is
@@ -77,6 +79,7 @@ async function _fetchClaudeScores(text: string): Promise<ClanScores | null> {
   const controller = new AbortController();
   const tid = setTimeout(() => controller.abort(), 5000);
   try {
+    // Same backend scorer for reflection and phrase text (`texto` is generic clan scoring).
     const res = await fetch(`${_getApiBaseUrl()}/classify/reflection`, {
       method: 'POST',
       headers: mergeApiHeaders({ 'Content-Type': 'application/json' }),
@@ -99,11 +102,17 @@ async function _fetchClaudeScores(text: string): Promise<ClanScores | null> {
 
 // ─── Tunable rules ──────────────────────────────────────────────────────────
 
-/** Number of reflections required before any clan can be revealed. */
-export const REVEAL_REFLECTION_THRESHOLD = 30;
+/** Minimum reflections before any clan can be revealed (quotes alone never unlock). */
+export const REVEAL_MIN_REFLECTIONS = 10;
 
-/** Minimum percentage one clan must hit to be revealed. */
-export const REVEAL_PCT_THRESHOLD = 30;
+/** Reflections + phrases must reach this total for reveal (with min reflections above). */
+export const REVEAL_TOTAL_INPUTS_THRESHOLD = 30;
+
+/** Minimum percentage for the leading clan (reveal + switch). */
+export const REVEAL_PCT_THRESHOLD = 25;
+
+/** Leader must lead the second-place clan by at least this many percentage points. */
+export const REVEAL_LEAD_OVER_SECOND_PP = 5;
 
 /** Score weight for a new input BEFORE the user has a revealed clan. */
 const PRE_REVEAL_WEIGHT = 1.0;
@@ -112,9 +121,8 @@ const PRE_REVEAL_WEIGHT = 1.0;
  *  (introduces the inertia required by spec PART 15). */
 const POST_REVEAL_WEIGHT = 0.35;
 
-/** A new top clan must beat the current visible clan by at least this many
- *  percentage points before we switch after the first assignment. */
-export const SWITCH_MARGIN = 5;
+/** @deprecated Alias of REVEAL_LEAD_OVER_SECOND_PP (switch uses lead over 2nd, not vs previous). */
+export const SWITCH_MARGIN = REVEAL_LEAD_OVER_SECOND_PP;
 
 /** Inactive users temporarily show Aprendiz until they send a new input again. */
 const INACTIVITY_RANK_DOWNGRADE_DAYS = 7;
@@ -157,6 +165,9 @@ export type ClassificationContextValue = {
 
   /** Total reflections sent by a user. Defaults to active user. */
   getReflectionCount: (userId?: string) => number;
+
+  /** Total phrases (quotes) sent by a user. Defaults to active user. */
+  getPhraseCount: (userId?: string) => number;
 
   /** Highest rank ever reached per clan. Defaults to active user. */
   getClanRankHistory: (userId?: string) => Partial<Record<ClanScoreId, Rank>>;
@@ -231,16 +242,14 @@ function computeMomentumBoosts(
   return boosts;
 }
 
-function pickTopClan(pcts: Record<ClanScoreId, number>): { id: ClanScoreId; pct: number } {
-  let topId: ClanScoreId = ALL_CLAN_IDS[0];
-  let topPct = -1;
-  for (const c of ALL_CLAN_IDS) {
-    if (pcts[c] > topPct) {
-      topPct = pcts[c];
-      topId = c;
-    }
-  }
-  return { id: topId, pct: topPct };
+function pickTopTwo(pcts: Record<ClanScoreId, number>): {
+  first: { id: ClanScoreId; pct: number };
+  second: { id: ClanScoreId; pct: number };
+} {
+  const sorted = ([...ALL_CLAN_IDS] as ClanScoreId[])
+    .map((id) => ({ id, pct: pcts[id] }))
+    .sort((a, b) => b.pct - a.pct);
+  return { first: sorted[0], second: sorted[1] };
 }
 
 const RANK_VALUE: Record<Rank, number> = {
@@ -299,6 +308,7 @@ function deriveVisibleClan(
   prev: UserClassificationState,
   newTotals: ClanScores,
   totalReflectionsSent: number,
+  totalPhrasesSent: number,
   nowIso: string,
 ): {
   visibleClanId: ClanScoreId | null;
@@ -306,14 +316,18 @@ function deriveVisibleClan(
   lastSwitchAt: string | null;
 } {
   const pcts = totalsToPercentages(newTotals);
-  const top = pickTopClan(pcts);
+  const { first: top, second: runnerUp } = pickTopTwo(pcts);
 
-  const meetsCount = totalReflectionsSent >= REVEAL_REFLECTION_THRESHOLD;
+  const totalInputs = totalReflectionsSent + totalPhrasesSent;
+  const meetsCount =
+    totalReflectionsSent >= REVEAL_MIN_REFLECTIONS &&
+    totalInputs >= REVEAL_TOTAL_INPUTS_THRESHOLD;
   const meetsTopPct = top.pct >= REVEAL_PCT_THRESHOLD;
+  const meetsLeadOverSecond = top.pct - runnerUp.pct >= REVEAL_LEAD_OVER_SECOND_PP;
 
   // Not yet revealed.
   if (prev.visibleClanId == null) {
-    if (meetsCount && meetsTopPct) {
+    if (meetsCount && meetsTopPct && meetsLeadOverSecond) {
       return {
         visibleClanId: top.id,
         revealedAt: nowIso,
@@ -327,12 +341,10 @@ function deriveVisibleClan(
     };
   }
 
-  // Already revealed → consider switching.
-  const currentPct = pcts[prev.visibleClanId];
+  // Already revealed → switch only if a new #1 is clear vs #2 (same rule as first reveal).
   const topIsDifferent = top.id !== prev.visibleClanId;
-  const beatsByMargin = top.pct - currentPct >= SWITCH_MARGIN;
 
-  if (topIsDifferent && beatsByMargin) {
+  if (topIsDifferent && meetsTopPct && meetsLeadOverSecond) {
     return {
       visibleClanId: top.id,
       revealedAt: prev.revealedAt,
@@ -413,6 +425,13 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
   const getReflectionCount = useCallback(
     (userId?: string): number => {
       return getUserStateInternal(userId).totalReflectionsSent;
+    },
+    [getUserStateInternal],
+  );
+
+  const getPhraseCount = useCallback(
+    (userId?: string): number => {
+      return getUserStateInternal(userId).totalPhrasesSent;
     },
     [getUserStateInternal],
   );
@@ -506,7 +525,13 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
         const totalPhrasesSent =
           prevState.totalPhrasesSent + (type === 'phrase' ? 1 : 0);
 
-        const reveal = deriveVisibleClan(prevState, newTotals, totalReflectionsSent, nowIso);
+        const reveal = deriveVisibleClan(
+          prevState,
+          newTotals,
+          totalReflectionsSent,
+          totalPhrasesSent,
+          nowIso,
+        );
         const pcts = totalsToPercentages(newTotals);
         const switchedClan =
           prevState.visibleClanId !== null &&
@@ -559,6 +584,7 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
       getPercentages,
       getVisibleClanId,
       getReflectionCount,
+      getPhraseCount,
       getClanRankHistory,
       getDisplayRank,
       getUserState: getUserStateInternal,
@@ -569,6 +595,7 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
       getPercentages,
       getVisibleClanId,
       getReflectionCount,
+      getPhraseCount,
       getClanRankHistory,
       getDisplayRank,
       getUserStateInternal,
