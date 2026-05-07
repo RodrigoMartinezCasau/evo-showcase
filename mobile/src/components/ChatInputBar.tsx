@@ -92,7 +92,7 @@ function formatTime(s: number): string {
  * Returns an Animated.Value that tracks the keyboard height smoothly,
  * synced to the keyboard's own animation duration so the bar moves with it.
  */
-function useKeyboardAnim() {
+export function useKeyboardAnim() {
   const anim = useRef(new Animated.Value(0)).current;
   const keyboardHeightRef = useRef(0);
 

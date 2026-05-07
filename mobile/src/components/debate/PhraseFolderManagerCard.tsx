@@ -143,6 +143,7 @@ export const PhraseFolderManagerCard = React.memo(function PhraseFolderManagerCa
 
   const innerMarginLeft = IC.offsetX + L.contentOffsetX + L.content.offsetX;
   const innerMarginTop = IC.offsetY + L.contentOffsetY + L.content.offsetY;
+  const compactEmpty = folders.length === 0;
 
   const onCreateFolder = useCallback(
     (name: string) => {
@@ -160,11 +161,12 @@ export const PhraseFolderManagerCard = React.memo(function PhraseFolderManagerCa
           // stripe on each folder row (`borderLeftWidth`) is preserved.
           backgroundColor,
           paddingHorizontal: SB.outerPaddingH,
-          paddingVertical: SB.outerPaddingV,
+          paddingTop: SB.outerPaddingV,
+          paddingBottom: compactEmpty ? 6 : SB.outerPaddingV,
         },
       ]}
     >
-      <View style={styles.header}>
+      <View style={[styles.header, compactEmpty && styles.headerCompactEmpty]}>
         <View style={starBoxStyle}>
           <WhiteStar width={STAR_SZ} height={STAR_SZ} />
         </View>
@@ -221,12 +223,13 @@ export const PhraseFolderManagerCard = React.memo(function PhraseFolderManagerCa
           styles.innerCard,
           {
             marginLeft: innerMarginLeft,
-            marginTop: innerMarginTop,
-            height: L.height,
+            marginTop: folders.length === 0 ? 0 : innerMarginTop,
+            height: folders.length === 0 ? 0 : L.height,
+            minHeight: folders.length === 0 ? 0 : undefined,
             overflow: 'hidden',
             backgroundColor: 'transparent',
           },
-          IC.widthScale * L.content.widthScale < 1
+          IC.widthScale * L.content.widthScale < 1 && folders.length > 0
             ? {
                 alignSelf: 'center' as const,
                 width: `${IC.widthScale * L.content.widthScale * 100}%` as unknown as number,
@@ -234,13 +237,7 @@ export const PhraseFolderManagerCard = React.memo(function PhraseFolderManagerCa
             : undefined,
         ]}
       >
-        {folders.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyHint}>
-              Crea carpetas desde el menú lateral (Pensamientos → Carpetas).
-            </Text>
-          </View>
-        ) : (
+        {folders.length === 0 ? null : (
           <ScrollView
             nestedScrollEnabled
             keyboardShouldPersistTaps="handled"
@@ -273,6 +270,9 @@ const styles = StyleSheet.create({
     marginBottom: SB.headerMarginBottom,
     position: 'relative',
   },
+  headerCompactEmpty: {
+    marginBottom: 0,
+  },
   headerTitleRow: {
     position: 'absolute',
     top: 0,
@@ -293,20 +293,11 @@ const styles = StyleSheet.create({
     color: HDR.titleColor,
   },
   innerCard: {},
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-  },
   scrollFill: {
     flex: 1,
   },
   scrollContent: {
     paddingBottom: 4,
-  },
-  emptyHint: {
-    color: evoconnColors.muted,
-    fontSize: 13,
-    lineHeight: 18,
   },
   folderCard: {},
   folderCardRow: {

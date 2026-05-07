@@ -1,109 +1,102 @@
 /**
- * Contenedor de conversaciones del sidebar (marco PNG por clan + viewport + lista).
- * Parámetros independientes.
+ * Contenedor de conversaciones del sidebar: marco con borde de clan + lista.
+ * Los SVG de «Nuevas barras conversaciones» llevan clipPaths anidados que
+ * react-native-svg a menudo no compone bien; el marco visible es un View nativo
+ * con los mismos colores que el arte (`getClanColor`).
  */
 export const SIDEBAR_CONVERSATIONS_LAYOUT = {
-  SIDEBAR_CONVERSATIONS_BLOCK_OFFSET_X: -155,
-  SIDEBAR_CONVERSATIONS_BLOCK_OFFSET_Y: -143,
+  /** El panel usa ancho completo del drawer; sin márgenes negativos legacy. */
+  SIDEBAR_CONVERSATIONS_BLOCK_OFFSET_X: 0,
+  SIDEBAR_CONVERSATIONS_BLOCK_OFFSET_Y: 0,
   SIDEBAR_CONVERSATIONS_BLOCK_SCALE: 1,
 
-  SIDEBAR_CONVERSATIONS_IMAGE_WIDTH: 270,
-  SIDEBAR_CONVERSATIONS_IMAGE_HEIGHT: 444,
   SIDEBAR_CONVERSATIONS_OFFSET_X: 0,
   SIDEBAR_CONVERSATIONS_OFFSET_Y: 0,
 
-  SIDEBAR_CONVERSATIONS_CROP_TOP: 0,
-  SIDEBAR_CONVERSATIONS_CROP_BOTTOM: 0,
-  SIDEBAR_CONVERSATIONS_CROP_LEFT: 0,
-  SIDEBAR_CONVERSATIONS_CROP_RIGHT: 0,
-
-  SIDEBAR_CONVERSATIONS_HORIZONTAL_STRETCH: 1,
-
-  SIDEBAR_CONVERSATIONS_VIEWPORT_WIDTH: 160,
-  SIDEBAR_CONVERSATIONS_VIEWPORT_HEIGHT: 425,
-  SIDEBAR_CONVERSATIONS_VIEWPORT_OFFSET_X: 75,
-  SIDEBAR_CONVERSATIONS_VIEWPORT_OFFSET_Y: 16,
-
-  /** Espacio vertical entre las tres pestañas de sección (FAVORITOS / CARPETAS / PENSAMIENTOS). */
-  SIDEBAR_CONVERSATIONS_SECTION_GAP_Y: 20,
+  /** Marco redondeado (View) — aproxima el grosor del borde de los SVG. */
+  SIDEBAR_CONVERSATIONS_FRAME_BORDER_WIDTH: 3,
+  SIDEBAR_CONVERSATIONS_FRAME_CORNER_RADIUS: 20,
+  SIDEBAR_CONVERSATIONS_FRAME_FILL_COLOR: '#0b0b0f',
 
   /**
-   * Hueco entre el bloque de cabeceras (tras “PENSAMIENTOS”) y el inicio de la lista de conversaciones.
-   * Sube el valor para separar más el texto PENSAMIENTOS de la primera fila (p. ej. “Dios”).
+   * Inset del contenido (pestañas + lista) respecto al borde del marco.
+   * Porcentajes respecto al contenedor del marco.
    */
-  SIDEBAR_CONVERSATIONS_SECTIONS_TO_LIST_GAP_Y: 11,
+  SIDEBAR_CONVERSATIONS_INSET_LEFT_PCT: '5.5%',
+  SIDEBAR_CONVERSATIONS_INSET_RIGHT_PCT: '5.5%',
+  SIDEBAR_CONVERSATIONS_INSET_TOP_PCT: '2.5%',
+  SIDEBAR_CONVERSATIONS_INSET_BOTTOM_PCT: '3%',
+
+  /** Espacio vertical entre las tres pestañas de sección (FAVORITOS / CARPETAS / PENSAMIENTOS). */
+  SIDEBAR_CONVERSATIONS_SECTION_GAP_Y: 14,
+
+  /** Hueco horizontal entre los botones FAVORITOS y CARPETAS (agrupados a la izquierda). */
+  SIDEBAR_FAVORITES_FOLDERS_ROW_GAP_X: 22,
+
+  /**
+   * Hueco vertical entre la fila de filtros (fuera del marco) y el borde superior
+   * del cuadro de conversaciones; también bajo «Resultados» en búsqueda.
+   */
+  SIDEBAR_CONVERSATIONS_SECTIONS_TO_LIST_GAP_Y: 10,
 
   /** FAVORITOS — independientes (no derivan de otros layouts). */
-  SIDEBAR_FAVORITES_OFFSET_X: 4,
-  SIDEBAR_FAVORITES_OFFSET_Y: 4,
-  SIDEBAR_FAVORITES_FONT_SIZE: 10,
+  SIDEBAR_FAVORITES_OFFSET_X: 2,
+  SIDEBAR_FAVORITES_OFFSET_Y: 2,
+  SIDEBAR_FAVORITES_FONT_SIZE: 11,
   SIDEBAR_FAVORITES_SCALE: 1,
-  SIDEBAR_FAVORITES_LETTER_SPACING: 0.5,
+  SIDEBAR_FAVORITES_LETTER_SPACING: 0.6,
   /** Hueco horizontal entre icono PNG y etiqueta FAVORITOS. */
   FAVORITES_ICON_TEXT_GAP_X: 6,
-  /** Icono estrella (PNG) a la izquierda del texto; independiente del bloque de texto. */
   FAVORITES_ICON_OFFSET_X: 0,
   FAVORITES_ICON_OFFSET_Y: 0,
   FAVORITES_ICON_SCALE: 1.8,
-  /** Tamaño base (ancho/alto) del PNG antes de aplicar FAVORITES_ICON_SCALE. */
   FAVORITES_ICON_BASE_SIZE: 18,
 
   /** CARPETAS */
-  SIDEBAR_FOLDERS_OFFSET_X: 4,
+  SIDEBAR_FOLDERS_OFFSET_X: 2,
   SIDEBAR_FOLDERS_OFFSET_Y: 0,
-  SIDEBAR_FOLDERS_FONT_SIZE: 10,
+  SIDEBAR_FOLDERS_FONT_SIZE: 11,
   SIDEBAR_FOLDERS_SCALE: 1,
-  SIDEBAR_FOLDERS_LETTER_SPACING: 0.5,
+  SIDEBAR_FOLDERS_LETTER_SPACING: 0.6,
   FOLDERS_ICON_TEXT_GAP_X: 6,
   FOLDERS_ICON_OFFSET_X: 0,
   FOLDERS_ICON_OFFSET_Y: 0,
   FOLDERS_ICON_SCALE: 1.5,
   FOLDERS_ICON_BASE_SIZE: 18,
 
-  /** PENSAMIENTOS (antes “TUS PENSAMIENTOS”) */
-  SIDEBAR_THOUGHTS_OFFSET_X: 4,
+  /** PENSAMIENTOS */
+  SIDEBAR_THOUGHTS_OFFSET_X: 2,
   SIDEBAR_THOUGHTS_OFFSET_Y: 0,
-  SIDEBAR_THOUGHTS_FONT_SIZE: 10,
+  SIDEBAR_THOUGHTS_FONT_SIZE: 11,
   SIDEBAR_THOUGHTS_SCALE: 1,
-  SIDEBAR_THOUGHTS_LETTER_SPACING: 0.5,
+  SIDEBAR_THOUGHTS_LETTER_SPACING: 0.6,
   THOUGHTS_ICON_TEXT_GAP_X: 6,
   THOUGHTS_ICON_OFFSET_X: 0,
   THOUGHTS_ICON_OFFSET_Y: 0,
   THOUGHTS_ICON_SCALE: 1.5,
   THOUGHTS_ICON_BASE_SIZE: 18,
 
-  SIDEBAR_CONVERSATIONS_ITEM_OFFSET_X: 8,
-  SIDEBAR_CONVERSATIONS_ITEM_OFFSET_Y: 8,
-  /** Separación vertical entre filas de conversación (solo `marginBottom` del contenedor de cada item). */
-  SIDEBAR_CONVERSATIONS_ITEM_GAP_Y: -8,
-  SIDEBAR_CONVERSATIONS_ITEM_TEXT_FONT_SIZE: 10,
-  /** Color del título de cada conversación (antes el gris de la línea Reflexión/Frase). */
-  SIDEBAR_CONVERSATIONS_ITEM_TITLE_COLOR: '#6B7280',
-  SIDEBAR_CONVERSATIONS_ITEM_TEXT_WIDTH: 130,
-  SIDEBAR_CONVERSATIONS_ITEM_TEXT_HEIGHT: 36,
+  SIDEBAR_CONVERSATIONS_ITEM_OFFSET_X: 4,
+  SIDEBAR_CONVERSATIONS_ITEM_OFFSET_Y: 4,
+  /** Separación vertical entre filas de conversación. */
+  SIDEBAR_CONVERSATIONS_ITEM_GAP_Y: 0,
+  SIDEBAR_CONVERSATIONS_ITEM_TEXT_FONT_SIZE: 15,
+  SIDEBAR_CONVERSATIONS_ITEM_TITLE_COLOR: '#E8EAEF',
+  SIDEBAR_CONVERSATIONS_ITEM_TEXT_LINE_HEIGHT: 20,
+  /** Altura mínima de la zona de título (2 líneas cómodas). */
+  SIDEBAR_CONVERSATIONS_ITEM_TEXT_MIN_HEIGHT: 40,
 
-  /** Hueco horizontal entre el título y la franja de iconos (fila flex). */
-  SIDEBAR_CONVERSATIONS_TITLE_ICONS_GAP_X: 6,
-  /**
-   * Desplaza la franja del lápiz hacia la izquierda respecto al borde derecho de la fila.
-   * Valores mayores = más a la izquierda (más hueco respecto al borde del viewport).
-   */
-  SIDEBAR_CONVERSATIONS_ICONS_STRIP_MARGIN_END: 34,
-  /** Reservado; la fila solo muestra el lápiz (favorito va en su menú). */
+  SIDEBAR_CONVERSATIONS_TITLE_ICONS_GAP_X: 8,
+  /** Franja de iconos: menos margen al borde derecho del marco (lista más ancha). */
+  SIDEBAR_CONVERSATIONS_ICONS_STRIP_MARGIN_END: 8,
   SIDEBAR_CONVERSATIONS_ICONS_INNER_GAP_X: -2,
 
-  /** Referencia histórica (estrella retirada de la fila). */
   SIDEBAR_CONVERSATIONS_STAR_OFFSET_Y: -4,
-  /** Ajuste vertical fino del lápiz respecto al título (fila flex). */
-  SIDEBAR_CONVERSATIONS_PENCIL_OFFSET_Y: -5,
+  SIDEBAR_CONVERSATIONS_PENCIL_OFFSET_Y: -2,
 
-  /** Referencia histórica (estrella retirada de la fila). */
   SIDEBAR_CONVERSATIONS_STAR_SIZE: 20,
-  SIDEBAR_CONVERSATIONS_PENCIL_SIZE: 23,
+  SIDEBAR_CONVERSATIONS_PENCIL_SIZE: 24,
 
-  /**
-   * Referencia histórica (layout absoluto). La lista usa fila flex; no se leen en `SidebarConversationsPanel`.
-   */
   SIDEBAR_CONVERSATIONS_STAR_OFFSET_X: 89,
   SIDEBAR_CONVERSATIONS_PENCIL_OFFSET_X: 106,
 } as const;

@@ -3,6 +3,9 @@ import type { ImageSourcePropType } from 'react-native';
 import type { ClanId } from '@evoconn/constants/clanColors';
 
 /**
+ * @deprecated El sidebar usa SVG por clan (`getSidebarConversationsBarSvgByHouse`).
+ * Se mantiene por si hace falta el PNG en otro flujo.
+ *
  * Marco PNG del contenedor de conversaciones (borde = clan; interior negro).
  *
  * Asignación explícita por clan (no inferir por orden de archivos):

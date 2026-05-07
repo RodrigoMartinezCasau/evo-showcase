@@ -3,7 +3,7 @@
  */
 export const SIDEBAR_SEARCH_BAR_LAYOUT = {
   SEARCH_BAR_BLOCK_OFFSET_X: -5,
-  SEARCH_BAR_BLOCK_OFFSET_Y: -146,
+  SEARCH_BAR_BLOCK_OFFSET_Y: -142,
   SEARCH_BAR_BLOCK_SCALE: 1,
 
   SEARCH_BAR_IMAGE_WIDTH: 290,
@@ -29,4 +29,16 @@ export const SIDEBAR_SEARCH_BAR_LAYOUT = {
   SEARCH_BAR_PLACEHOLDER_COLOR: '#6B7280',
   SEARCH_BAR_TEXT_COLOR: '#FFFFFF',
   SEARCH_BAR_TEXT_MAX_CHARS: 42,
+
+  /**
+   * Separación visual mínima entre el PNG de búsqueda (ya desplazado con BLOCK_OFFSET_Y)
+   * y el marco de conversaciones. El translateY no reduce el hueco de layout: el bloque
+   * inferior usa marginTop negativo = BLOCK_OFFSET_Y + este valor.
+   */
+  SIDEBAR_SEARCH_TO_CONVERSATIONS_GAP_PX: 6,
 } as const;
+
+/** marginTop del bloque de conversaciones respecto al layout “sin transformar” de la búsqueda */
+export const SIDEBAR_CONVERSATIONS_AFTER_SEARCH_MARGIN_TOP_PX =
+  SIDEBAR_SEARCH_BAR_LAYOUT.SEARCH_BAR_BLOCK_OFFSET_Y +
+  SIDEBAR_SEARCH_BAR_LAYOUT.SIDEBAR_SEARCH_TO_CONVERSATIONS_GAP_PX;

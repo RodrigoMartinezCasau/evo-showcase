@@ -12,7 +12,7 @@ import {
   Pressable,
 } from 'react-native';
 import { SIDEBAR_CONVERSATIONS_LAYOUT as L } from '@evoconn/constants/sidebarConversationsLayout';
-import { getConversationsFrameByHouse } from '@evoconn/utils/getSidebarConversationsFrameByHouse';
+import { getClanColor } from '@evoconn/constants/clanColors';
 import { getSidebarFolderColors } from '@evoconn/constants/sidebarFolderColors';
 import {
   getSidebarClanTabColorRow,
@@ -25,9 +25,9 @@ import { SIDEBAR_FOLDER_ITEM_LAYOUT as FIL } from '@evoconn/constants/sidebarFol
 
 const SECTION_ICON_FAVORITES = require('../assets/sidebar/conversationsSections/section_favorites_star.png');
 const SECTION_ICON_FOLDERS = require('../assets/sidebar/conversationsSections/section_folders_folder.png');
-const SECTION_ICON_THOUGHTS = require('../assets/sidebar/conversationsSections/section_thoughts_triangle.png');
 
-type TabId = 'favorites' | 'folders' | 'thoughts';
+/** null = todas las conversaciones; los filtros se apagan al pulsar de nuevo el mismo botón */
+type ActiveFilter = null | 'favorites' | 'folders';
 
 type SidebarConversationsPanelProps = {
   clanId: string | null;
@@ -48,7 +48,7 @@ export function SidebarConversationsPanel({
   drawerSearch,
   onConversationPress,
 }: SidebarConversationsPanelProps) {
-  const [activeTab, setActiveTab] = useState<TabId>('thoughts');
+  const [activeFilter, setActiveFilter] = useState<ActiveFilter>(null);
   const [foldersBrowseId, setFoldersBrowseId] = useState<string | null>(null);
   const [renameTarget, setRenameTarget] = useState<ConversationItem | null>(null);
   const [renameText, setRenameText] = useState('');
@@ -58,7 +58,7 @@ export function SidebarConversationsPanel({
   const [renameFolderId, setRenameFolderId] = useState<string | null>(null);
   const [renameFolderText, setRenameFolderText] = useState('');
 
-  const frameSource = useMemo(() => getConversationsFrameByHouse(clanId), [clanId]);
+  const frameBorderColor = useMemo(() => getClanColor(clanId), [clanId]);
   const folderColors = useMemo(() => getSidebarFolderColors(clanId), [clanId]);
   const clanTabColors = useMemo(() => getSidebarClanTabColorRow(clanId), [clanId]);
   const browsedFolderName = useMemo(
@@ -66,37 +66,31 @@ export function SidebarConversationsPanel({
     [foldersBrowseId, folders],
   );
 
-  const imgW = L.SIDEBAR_CONVERSATIONS_IMAGE_WIDTH;
-  const imgH = L.SIDEBAR_CONVERSATIONS_IMAGE_HEIGHT;
-  const cropL = L.SIDEBAR_CONVERSATIONS_CROP_LEFT;
-  const cropR = L.SIDEBAR_CONVERSATIONS_CROP_RIGHT;
-  const cropT = L.SIDEBAR_CONVERSATIONS_CROP_TOP;
-  const cropB = L.SIDEBAR_CONVERSATIONS_CROP_BOTTOM;
-  const visibleW = Math.max(1, imgW - cropL - cropR);
-  const visibleH = Math.max(1, imgH - cropT - cropB);
-  const stretchH = L.SIDEBAR_CONVERSATIONS_HORIZONTAL_STRETCH;
-  const layoutW = Math.max(1, visibleW * stretchH);
-
   const q = drawerSearch.trim().toLowerCase();
 
   const listConversations = useMemo(() => {
     if (q) {
       return conversations.filter((c) => c.title.toLowerCase().includes(q));
     }
-    if (activeTab === 'favorites') {
+    if (activeFilter === 'favorites') {
       return conversations.filter((c) => c.isFavorite);
     }
-    if (activeTab === 'folders') {
+    if (activeFilter === 'folders') {
       if (foldersBrowseId) {
         return conversations.filter((c) => c.folderId === foldersBrowseId);
       }
       return [];
     }
     return conversations;
-  }, [conversations, activeTab, q, foldersBrowseId]);
+  }, [conversations, activeFilter, q, foldersBrowseId]);
 
-  const onTab = useCallback((t: TabId) => {
-    setActiveTab(t);
+  const toggleFavorites = useCallback(() => {
+    setActiveFilter((prev) => (prev === 'favorites' ? null : 'favorites'));
+    setFoldersBrowseId(null);
+  }, []);
+
+  const toggleFolders = useCallback(() => {
+    setActiveFilter((prev) => (prev === 'folders' ? null : 'folders'));
     setFoldersBrowseId(null);
   }, []);
 
@@ -257,7 +251,7 @@ export function SidebarConversationsPanel({
   const sectionHeaderText = { color: '#FFFFFF' as const, fontWeight: '700' as const };
 
   const rowH = Math.max(
-    L.SIDEBAR_CONVERSATIONS_ITEM_TEXT_HEIGHT,
+    L.SIDEBAR_CONVERSATIONS_ITEM_TEXT_MIN_HEIGHT,
     L.SIDEBAR_CONVERSATIONS_PENCIL_SIZE + L.SIDEBAR_CONVERSATIONS_PENCIL_OFFSET_Y
   );
 
@@ -266,266 +260,179 @@ export function SidebarConversationsPanel({
       style={{
         flex: 1,
         minHeight: 0,
-        // Use margin instead of transform so the layout/hit-test position matches
-        // the visual position. transform shifts only pixels on the GPU; margin
-        // shifts both the rendered position AND the touch-target bounds.
-        marginLeft: L.SIDEBAR_CONVERSATIONS_BLOCK_OFFSET_X,
-        marginTop: L.SIDEBAR_CONVERSATIONS_BLOCK_OFFSET_Y,
-        // SIDEBAR_CONVERSATIONS_BLOCK_SCALE is always 1 — no-op; omitted.
+        marginLeft: L.SIDEBAR_CONVERSATIONS_BLOCK_OFFSET_X + L.SIDEBAR_CONVERSATIONS_OFFSET_X,
+        marginTop: L.SIDEBAR_CONVERSATIONS_BLOCK_OFFSET_Y + L.SIDEBAR_CONVERSATIONS_OFFSET_Y,
       }}
     >
-      <View
-        style={{
-          // SIDEBAR_CONVERSATIONS_OFFSET_X/Y are 0 — no-op; kept as margin for
-          // future tweaking without reintroducing the transform hitbox bug.
-          marginLeft: L.SIDEBAR_CONVERSATIONS_OFFSET_X,
-          marginTop: L.SIDEBAR_CONVERSATIONS_OFFSET_Y,
-        }}
-      >
-        <View style={{ position: 'relative', width: layoutW, height: visibleH, alignSelf: 'center' }}>
-          <View
+      {!q ? (
+        <View
+          pointerEvents="box-none"
+          style={{
+            flexShrink: 0,
+            alignSelf: 'stretch',
+            marginBottom: L.SIDEBAR_CONVERSATIONS_SECTIONS_TO_LIST_GAP_Y,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'flex-start',
+            gap: L.SIDEBAR_FAVORITES_FOLDERS_ROW_GAP_X,
+            backgroundColor: 'transparent',
+          }}
+        >
+          <TouchableOpacity
+            activeOpacity={0.7}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            onPress={toggleFavorites}
+            accessibilityRole="button"
+            accessibilityState={{ selected: activeFilter === 'favorites' }}
             style={{
-              position: 'absolute',
-              left: 0,
-              top: 0,
-              width: layoutW,
-              height: visibleH,
-              overflow: 'hidden',
+              flexDirection: 'row',
+              alignItems: 'center',
+              flexShrink: 1,
+              marginLeft: L.SIDEBAR_FAVORITES_OFFSET_X,
+              marginTop: L.SIDEBAR_FAVORITES_OFFSET_Y,
+              transform: [{ scale: L.SIDEBAR_FAVORITES_SCALE }],
             }}
           >
             <View
               style={{
-                width: visibleW,
-                height: visibleH,
-                transform: [{ scaleX: stretchH }],
+                marginLeft: L.FAVORITES_ICON_OFFSET_X,
+                marginTop: L.FAVORITES_ICON_OFFSET_Y,
+                transform: [{ scale: L.FAVORITES_ICON_SCALE }],
               }}
             >
-              <View
+              <Image
+                source={SECTION_ICON_FAVORITES}
                 style={{
-                  position: 'absolute',
-                  left: 0,
-                  top: 0,
-                  width: visibleW,
-                  height: visibleH,
-                  overflow: 'hidden',
+                  width: L.FAVORITES_ICON_BASE_SIZE,
+                  height: L.FAVORITES_ICON_BASE_SIZE,
+                  tintColor:
+                    activeFilter === 'favorites'
+                      ? sidebarTabIconTint(clanTabColors.favorites.icon)
+                      : undefined,
                 }}
-              >
-                <View
-                  style={{
-                    position: 'absolute',
-                    left: -cropL,
-                    top: -cropT,
-                    width: imgW,
-                    height: imgH,
-                  }}
-                >
-                  <Image
-                    source={frameSource}
-                    style={{ width: imgW, height: imgH }}
-                    resizeMode="stretch"
-                  />
-                </View>
-              </View>
+                resizeMode="contain"
+              />
             </View>
-          </View>
+            <Text
+              style={[
+                styles.sectionLabel,
+                sectionHeaderText,
+                {
+                  marginLeft: L.FAVORITES_ICON_TEXT_GAP_X,
+                  fontSize: L.SIDEBAR_FAVORITES_FONT_SIZE,
+                  letterSpacing: L.SIDEBAR_FAVORITES_LETTER_SPACING,
+                  color: activeFilter === 'favorites' ? clanTabColors.favorites.label : '#FFFFFF',
+                },
+              ]}
+              numberOfLines={1}
+            >
+              FAVORITOS
+            </Text>
+          </TouchableOpacity>
 
-          <View
+          <TouchableOpacity
+            activeOpacity={0.7}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            onPress={toggleFolders}
+            accessibilityRole="button"
+            accessibilityState={{ selected: activeFilter === 'folders' }}
             style={{
-              position: 'absolute',
-              left: L.SIDEBAR_CONVERSATIONS_VIEWPORT_OFFSET_X,
-              top: L.SIDEBAR_CONVERSATIONS_VIEWPORT_OFFSET_Y,
-              width: L.SIDEBAR_CONVERSATIONS_VIEWPORT_WIDTH,
-              height: L.SIDEBAR_CONVERSATIONS_VIEWPORT_HEIGHT,
-              flexDirection: 'column',
+              flexDirection: 'row',
+              alignItems: 'center',
+              flexShrink: 1,
+              marginTop: L.SIDEBAR_FOLDERS_OFFSET_Y,
+              transform: [{ scale: L.SIDEBAR_FOLDERS_SCALE }],
             }}
           >
-            {!q ? (
-              /*
-               * pointerEvents="box-none": the wrapper View itself never captures
-               * touches — only the actual tab buttons inside do. Without this, the
-               * View's layout area (including its paddingBottom and the stacking
-               * context created by zIndex:10 + position:'relative') was intercepting
-               * taps meant for the first row of the scroll view directly below it.
-               */
-              <View
-                pointerEvents="box-none"
-                style={{ paddingBottom: L.SIDEBAR_CONVERSATIONS_SECTIONS_TO_LIST_GAP_Y, zIndex: 10, position: 'relative' }}
-              >
-                {/* ── FAVORITOS ── */}
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  hitSlop={{ top: 6, bottom: 0, left: 6, right: 6 }}
-                  onPress={() => onTab('favorites')}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    marginLeft: L.SIDEBAR_FAVORITES_OFFSET_X,
-                    marginTop: L.SIDEBAR_FAVORITES_OFFSET_Y,
-                    marginBottom: L.SIDEBAR_CONVERSATIONS_SECTION_GAP_Y,
-                    transform: [{ scale: L.SIDEBAR_FAVORITES_SCALE }],
-                  }}
-                >
-                  <View
-                    style={{
-                      marginLeft: L.FAVORITES_ICON_OFFSET_X,
-                      marginTop: L.FAVORITES_ICON_OFFSET_Y,
-                      transform: [{ scale: L.FAVORITES_ICON_SCALE }],
-                    }}
-                  >
-                    <Image
-                      source={SECTION_ICON_FAVORITES}
-                      style={{
-                        width: L.FAVORITES_ICON_BASE_SIZE,
-                        height: L.FAVORITES_ICON_BASE_SIZE,
-                        tintColor:
-                          activeTab === 'favorites'
-                            ? sidebarTabIconTint(clanTabColors.favorites.icon)
-                            : undefined,
-                      }}
-                      resizeMode="contain"
-                    />
-                  </View>
-                  <Text
-                    style={[
-                      styles.sectionLabel,
-                      sectionHeaderText,
-                      {
-                        marginLeft: L.FAVORITES_ICON_TEXT_GAP_X,
-                        fontSize: L.SIDEBAR_FAVORITES_FONT_SIZE,
-                        letterSpacing: L.SIDEBAR_FAVORITES_LETTER_SPACING,
-                        color: activeTab === 'favorites' ? clanTabColors.favorites.label : '#FFFFFF',
-                      },
-                    ]}
-                  >
-                    FAVORITOS
-                  </Text>
-                </TouchableOpacity>
-
-                {/* ── CARPETAS ── */}
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  hitSlop={{ top: 6, bottom: 0, left: 6, right: 6 }}
-                  onPress={() => onTab('folders')}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    marginLeft: L.SIDEBAR_FOLDERS_OFFSET_X,
-                    marginTop: L.SIDEBAR_FOLDERS_OFFSET_Y,
-                    marginBottom: L.SIDEBAR_CONVERSATIONS_SECTION_GAP_Y,
-                    transform: [{ scale: L.SIDEBAR_FOLDERS_SCALE }],
-                  }}
-                >
-                  <View
-                    style={{
-                      marginLeft: L.FOLDERS_ICON_OFFSET_X,
-                      marginTop: L.FOLDERS_ICON_OFFSET_Y,
-                      transform: [{ scale: L.FOLDERS_ICON_SCALE }],
-                    }}
-                  >
-                    <Image
-                      source={SECTION_ICON_FOLDERS}
-                      style={{
-                        width: L.FOLDERS_ICON_BASE_SIZE,
-                        height: L.FOLDERS_ICON_BASE_SIZE,
-                        tintColor:
-                          activeTab === 'folders'
-                            ? sidebarTabIconTint(clanTabColors.folders.icon)
-                            : undefined,
-                      }}
-                      resizeMode="contain"
-                    />
-                  </View>
-                  <Text
-                    style={[
-                      styles.sectionLabel,
-                      sectionHeaderText,
-                      {
-                        marginLeft: L.FOLDERS_ICON_TEXT_GAP_X,
-                        fontSize: L.SIDEBAR_FOLDERS_FONT_SIZE,
-                        letterSpacing: L.SIDEBAR_FOLDERS_LETTER_SPACING,
-                        color: activeTab === 'folders' ? clanTabColors.folders.label : '#FFFFFF',
-                      },
-                    ]}
-                  >
-                    CARPETAS
-                  </Text>
-                </TouchableOpacity>
-
-                {/* ── PENSAMIENTOS ── */}
-                <Pressable
-                  hitSlop={{ top: 6, bottom: 0, left: 6, right: 6 }}
-                  onPress={() => onTab('thoughts')}
-                  style={({ pressed }) => ({
-                    flexDirection: 'row' as const,
-                    alignItems: 'center' as const,
-                    marginLeft: L.SIDEBAR_THOUGHTS_OFFSET_X,
-                    marginTop: L.SIDEBAR_THOUGHTS_OFFSET_Y,
-                    opacity: pressed ? 0.7 : 1,
-                    transform: [{ scale: L.SIDEBAR_THOUGHTS_SCALE }],
-                  })}
-                >
-                  <View
-                    style={{
-                      marginLeft: L.THOUGHTS_ICON_OFFSET_X,
-                      marginTop: L.THOUGHTS_ICON_OFFSET_Y,
-                      transform: [{ scale: L.THOUGHTS_ICON_SCALE }],
-                    }}
-                  >
-                    <Image
-                      source={SECTION_ICON_THOUGHTS}
-                      style={{
-                        width: L.THOUGHTS_ICON_BASE_SIZE,
-                        height: L.THOUGHTS_ICON_BASE_SIZE,
-                        tintColor:
-                          activeTab === 'thoughts'
-                            ? sidebarTabIconTint(clanTabColors.thoughts.icon)
-                            : undefined,
-                      }}
-                      resizeMode="contain"
-                    />
-                  </View>
-                  <Text
-                    style={[
-                      styles.sectionLabel,
-                      sectionHeaderText,
-                      {
-                        marginLeft: L.THOUGHTS_ICON_TEXT_GAP_X,
-                        fontSize: L.SIDEBAR_THOUGHTS_FONT_SIZE,
-                        letterSpacing: L.SIDEBAR_THOUGHTS_LETTER_SPACING,
-                        color: activeTab === 'thoughts' ? clanTabColors.thoughts.label : '#FFFFFF',
-                      },
-                    ]}
-                  >
-                    PENSAMIENTOS
-                  </Text>
-                </Pressable>
-              </View>
-            ) : (
-              <View
-                style={{
-                  paddingLeft: 4,
-                  paddingTop: 4,
-                  marginBottom: L.SIDEBAR_CONVERSATIONS_SECTIONS_TO_LIST_GAP_Y,
-                }}
-              >
-                <Text style={styles.searchHint}>Resultados</Text>
-              </View>
-            )}
-
-            <ScrollView
-              style={[styles.scroll, { zIndex: 0 }]}
-              contentContainerStyle={{
-                paddingTop: 0,
-                paddingBottom: 8,
-                paddingLeft: L.SIDEBAR_CONVERSATIONS_ITEM_OFFSET_X,
-                paddingRight: 4,
-                alignItems: 'stretch',
+            <View
+              style={{
+                marginLeft: L.FOLDERS_ICON_OFFSET_X,
+                marginTop: L.FOLDERS_ICON_OFFSET_Y,
+                transform: [{ scale: L.FOLDERS_ICON_SCALE }],
               }}
+            >
+              <Image
+                source={SECTION_ICON_FOLDERS}
+                style={{
+                  width: L.FOLDERS_ICON_BASE_SIZE,
+                  height: L.FOLDERS_ICON_BASE_SIZE,
+                  tintColor:
+                    activeFilter === 'folders'
+                      ? sidebarTabIconTint(clanTabColors.folders.icon)
+                      : undefined,
+                }}
+                resizeMode="contain"
+              />
+            </View>
+            <Text
+              style={[
+                styles.sectionLabel,
+                sectionHeaderText,
+                {
+                  marginLeft: L.FOLDERS_ICON_TEXT_GAP_X,
+                  fontSize: L.SIDEBAR_FOLDERS_FONT_SIZE,
+                  letterSpacing: L.SIDEBAR_FOLDERS_LETTER_SPACING,
+                  color: activeFilter === 'folders' ? clanTabColors.folders.label : '#FFFFFF',
+                },
+              ]}
+              numberOfLines={1}
+            >
+              CARPETAS
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View
+          style={{
+            flexShrink: 0,
+            alignSelf: 'stretch',
+            paddingLeft: 4,
+            paddingTop: 2,
+            marginBottom: L.SIDEBAR_CONVERSATIONS_SECTIONS_TO_LIST_GAP_Y,
+            backgroundColor: 'transparent',
+          }}
+        >
+          <Text style={styles.searchHint}>Resultados</Text>
+        </View>
+      )}
+
+      {/*
+       * `barFill` flex:1 + minHeight:0; el marco es absoluteFill. Los filtros van
+       * fuera, entre la búsqueda del drawer y este bloque.
+       */}
+      <View style={styles.barFill}>
+          <View
+            pointerEvents="none"
+            style={[
+              styles.barFrameLayer,
+              {
+                borderColor: frameBorderColor,
+                borderWidth: L.SIDEBAR_CONVERSATIONS_FRAME_BORDER_WIDTH,
+                borderRadius: L.SIDEBAR_CONVERSATIONS_FRAME_CORNER_RADIUS,
+                backgroundColor: L.SIDEBAR_CONVERSATIONS_FRAME_FILL_COLOR,
+              },
+            ]}
+          />
+
+          <View
+            style={[
+              styles.barContentInset,
+              {
+                paddingLeft: L.SIDEBAR_CONVERSATIONS_INSET_LEFT_PCT,
+                paddingRight: L.SIDEBAR_CONVERSATIONS_INSET_RIGHT_PCT,
+                paddingTop: L.SIDEBAR_CONVERSATIONS_INSET_TOP_PCT,
+                paddingBottom: L.SIDEBAR_CONVERSATIONS_INSET_BOTTOM_PCT,
+              },
+            ]}
+          >
+            <ScrollView
+              style={styles.scroll}
+              contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator
               keyboardShouldPersistTaps="always"
               keyboardDismissMode="on-drag"
             >
-              {activeTab === 'folders' && !q && !foldersBrowseId ? (
+              {activeFilter === 'folders' && !q && !foldersBrowseId ? (
                 <View
                   style={{
                     alignSelf: 'stretch',
@@ -548,7 +455,7 @@ export function SidebarConversationsPanel({
                 </View>
               ) : null}
 
-              {activeTab === 'folders' && !q && foldersBrowseId ? (
+              {activeFilter === 'folders' && !q && foldersBrowseId ? (
                 <SidebarFolderViewHeader
                   folderName={browsedFolderName}
                   primaryColor={folderColors.primary}
@@ -556,7 +463,7 @@ export function SidebarConversationsPanel({
                 />
               ) : null}
 
-              {(q || activeTab !== 'folders' || foldersBrowseId) &&
+              {(q || activeFilter !== 'folders' || foldersBrowseId) &&
                 listConversations.map((item) => (
                   <View
                     key={item.id}
@@ -584,8 +491,9 @@ export function SidebarConversationsPanel({
                           styles.rowTitle,
                           {
                             fontSize: L.SIDEBAR_CONVERSATIONS_ITEM_TEXT_FONT_SIZE,
+                            lineHeight: L.SIDEBAR_CONVERSATIONS_ITEM_TEXT_LINE_HEIGHT,
                             color: L.SIDEBAR_CONVERSATIONS_ITEM_TITLE_COLOR,
-                            minHeight: L.SIDEBAR_CONVERSATIONS_ITEM_TEXT_HEIGHT,
+                            minHeight: L.SIDEBAR_CONVERSATIONS_ITEM_TEXT_MIN_HEIGHT,
                           },
                         ]}
                       >
@@ -628,13 +536,12 @@ export function SidebarConversationsPanel({
                 ))}
 
               {listConversations.length === 0 &&
-              (q || activeTab === 'favorites' || (activeTab === 'folders' && foldersBrowseId)) ? (
+              (q || activeFilter === 'favorites' || (activeFilter === 'folders' && foldersBrowseId)) ? (
                 <Text style={styles.empty}>Nada que mostrar</Text>
               ) : null}
             </ScrollView>
           </View>
         </View>
-      </View>
 
       <Modal visible={renameTarget != null} transparent animationType="fade">
         <Pressable style={styles.modalBackdrop} onPress={() => setRenameTarget(null)}>
@@ -717,10 +624,44 @@ export function SidebarConversationsPanel({
 }
 
 const styles = StyleSheet.create({
+  barFill: {
+    flex: 1,
+    minHeight: 0,
+    width: '100%',
+    position: 'relative',
+    backgroundColor: 'transparent',
+  },
+  barFrameLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
+    overflow: 'hidden',
+  },
+  barContentInset: {
+    flex: 1,
+    minHeight: 0,
+    flexDirection: 'column',
+    zIndex: 1,
+    backgroundColor: 'transparent',
+  },
   sectionLabel: { textTransform: 'uppercase' },
   searchHint: { color: '#9CA3AF', fontSize: 11, fontWeight: '600' },
-  scroll: { flex: 1, minHeight: 0, marginTop: 0 },
-  rowTitle: { fontWeight: '600', color: '#F3F4F6' },
+  scroll: {
+    flex: 1,
+    minHeight: 0,
+    marginTop: 0,
+    zIndex: 0,
+    backgroundColor: 'transparent',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingTop: 0,
+    paddingBottom: 8,
+    paddingLeft: L.SIDEBAR_CONVERSATIONS_ITEM_OFFSET_X,
+    paddingRight: 4,
+    alignItems: 'stretch',
+    backgroundColor: 'transparent',
+  },
+  rowTitle: { fontWeight: '700', letterSpacing: -0.2 },
   convRow: {
     flexDirection: 'row',
     alignSelf: 'stretch',

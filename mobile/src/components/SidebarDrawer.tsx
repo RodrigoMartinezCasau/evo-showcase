@@ -9,7 +9,6 @@ import {
   Animated,
   Easing,
   Keyboard,
-  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -36,19 +35,23 @@ import {
 import EstrellaComunidadSvg from '../assets/sidebar/estrellaComunidadSvg/estrellaComunidad.svg';
 import { SidebarSearchBar } from './SidebarSearchBar';
 import { SidebarConversationsPanel } from './SidebarConversationsPanel';
-import { SidebarClanButton } from './SidebarClanButton';
-import { FrasesButton } from './FrasesButton';
+import { SidebarHeaderNotificationsButton } from './SidebarHeaderNotificationsButton';
 import { getClanInsigniaByHouse } from '@evoconn/utils/getSidebarClanInsigniaByHouse';
 import SettingsSvg from '../assets/sidebar/settingsIconSvg/settings.svg';
 import { getSidebarFooterClanLineColor } from '@evoconn/constants/clanColors';
 import { INRIA_SERIF_FONT_FAMILY } from '@evoconn/constants/inriaSerifFontFamily';
 import type { Rank } from '@evoconn/types';
-import { RachaButton } from './RachaButton';
 import type { ConversationItem as ConvItem } from '@evoconn/types';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { useConversationFolders } from '@evoconn/hooks/ConversationFoldersContext';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { SIDEBAR_DRAWER_OFFSCREEN_TRANSLATE_X } from '@evoconn/constants/communityDrawerGesture';
+import {
+  SIDEBAR_PNG_MENU_ROW_PADDING_HORIZONTAL,
+  SIDEBAR_PNG_MENU_BLOCK_OFFSET_X,
+  SIDEBAR_PNG_MENU_BUTTON_LAYOUT_WIDTH_PX,
+} from '@evoconn/constants/sidebarPngMenuAlignment';
+import { SIDEBAR_CONVERSATIONS_AFTER_SEARCH_MARGIN_TOP_PX } from '@evoconn/constants/sidebarSearchBarLayout';
 
 type SidebarDrawerProps = {
   visible: boolean;
@@ -170,48 +173,53 @@ export function SidebarDrawer({
             {
               paddingTop: SH.SIDEBAR_HEADER_PADDING_TOP,
               paddingLeft: SH.SIDEBAR_HEADER_PADDING_LEFT,
+              paddingRight: SH.SIDEBAR_HEADER_PADDING_RIGHT,
               minHeight: SH.SIDEBAR_HEADER_HEIGHT,
             },
           ]}
         >
-          <TouchableOpacity onPress={closeSidebar} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Cerrar menú">
+          <View style={styles.headerLeftCluster}>
+            <TouchableOpacity onPress={closeSidebar} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Cerrar menú">
+              <View
+                style={{
+                  width: SH.SIDEBAR_STAR_SIZE,
+                  height: SH.SIDEBAR_STAR_SIZE,
+                  transform: [
+                    { translateX: SH.SIDEBAR_STAR_OFFSET_X },
+                    { translateY: SH.SIDEBAR_STAR_OFFSET_Y },
+                    { scale: SH.SIDEBAR_STAR_SCALE },
+                  ],
+                }}
+              >
+                <StarSvg width={SH.SIDEBAR_STAR_SIZE} height={SH.SIDEBAR_STAR_SIZE} />
+              </View>
+            </TouchableOpacity>
             <View
-              style={{
-                width: SH.SIDEBAR_STAR_SIZE,
-                height: SH.SIDEBAR_STAR_SIZE,
-                transform: [
-                  { translateX: SH.SIDEBAR_STAR_OFFSET_X },
-                  { translateY: SH.SIDEBAR_STAR_OFFSET_Y },
-                  { scale: SH.SIDEBAR_STAR_SCALE },
-                ],
-              }}
-            >
-              <StarSvg width={SH.SIDEBAR_STAR_SIZE} height={SH.SIDEBAR_STAR_SIZE} />
-            </View>
-          </TouchableOpacity>
-          <View
-            style={[
-              styles.sidebarHeaderTextRow,
-              {
-                transform: [
-                  { translateX: SH.SIDEBAR_TEXT_OFFSET_X },
-                  { translateY: SH.SIDEBAR_TEXT_OFFSET_Y },
-                ],
-              },
-            ]}
-          >
-            <Text
               style={[
-                styles.sidebarHeaderTitle,
-                { fontSize: SH.SIDEBAR_TITLE_FONT_SIZE, marginRight: SH.SIDEBAR_TEXT_GAP },
+                styles.sidebarHeaderTextRow,
+                {
+                  transform: [
+                    { translateX: SH.SIDEBAR_TEXT_OFFSET_X },
+                    { translateY: SH.SIDEBAR_TEXT_OFFSET_Y },
+                  ],
+                },
               ]}
             >
-              {SH.SIDEBAR_TITLE_TEXT}
-            </Text>
-            <Text style={[styles.sidebarHeaderVersion, { fontSize: SH.SIDEBAR_VERSION_FONT_SIZE }]}>
-              {SH.SIDEBAR_VERSION_TEXT}
-            </Text>
+              <Text
+                style={[
+                  styles.sidebarHeaderTitle,
+                  { fontSize: SH.SIDEBAR_TITLE_FONT_SIZE, marginRight: SH.SIDEBAR_TEXT_GAP },
+                ]}
+              >
+                {SH.SIDEBAR_TITLE_TEXT}
+              </Text>
+              <Text style={[styles.sidebarHeaderVersion, { fontSize: SH.SIDEBAR_VERSION_FONT_SIZE }]}>
+                {SH.SIDEBAR_VERSION_TEXT}
+              </Text>
+            </View>
           </View>
+          <View style={styles.headerTitleSpacer} />
+          <SidebarHeaderNotificationsButton onBeforeNavigate={closeSidebar} />
         </View>
         <SidebarPngMenuButton
           config={getCommunityPngMenuConfig()}
@@ -272,40 +280,27 @@ export function SidebarDrawer({
           <SidebarSearchBar ref={searchInputRef} value={drawerSearch} onChangeText={setDrawerSearch} />
         </View>
         <View style={styles.sidebarLowerBlock} onStartShouldSetResponder={() => true}>
-          <SidebarConversationsPanel
-            clanId={user.clanId}
-            conversations={convState}
-            onConversationsChange={setConvState}
-            folders={folderState}
-            onFoldersChange={setFolderState}
-            drawerSearch={drawerSearch}
-            onConversationPress={(id) => {
-              onClose();
-              onConversationPress(id);
-            }}
-          />
+          {/*
+           * Misma columna X que SidebarPngMenuButton: padding 16, −5 px (margin, no transform),
+           * ancho fijo del PNG (290). Evita transform + flex:1 (puede colapsar altura en RN).
+           */}
+          <View style={styles.sidebarConversationsMenuAlign}>
+            <View style={styles.sidebarConversationsFixedColumn}>
+              <SidebarConversationsPanel
+                clanId={user.clanId}
+                conversations={convState}
+                onConversationsChange={setConvState}
+                folders={folderState}
+                onFoldersChange={setFolderState}
+                drawerSearch={drawerSearch}
+                onConversationPress={(id) => {
+                  onClose();
+                  onConversationPress(id);
+                }}
+              />
+            </View>
+          </View>
         </View>
-        <SidebarClanButton
-          clanId={user.clanId}
-          onPress={() => {
-            onClose();
-            router.push(`/clan/${clanRouteSlug}`);
-          }}
-        />
-        <FrasesButton
-          clanId={user.clanId}
-          onPress={() => {
-            onClose();
-            router.push('/frases');
-          }}
-        />
-        <RachaButton
-          clanId={user.clanId}
-          onPress={() => {
-            onClose();
-            router.push('/notifications');
-          }}
-        />
         {/* ── Footer row: profile icon | text | settings ── */}
         <View style={styles.footerRow}>
           {/* Profile insignia — left edge aligns with conversations panel */}
@@ -369,6 +364,8 @@ const styles = StyleSheet.create({
     maxWidth: 320,
     backgroundColor: '#000000',
     flex: 1,
+    flexDirection: 'column',
+    height: '100%',
     paddingTop: 48,
     overflow: 'visible',
   },
@@ -376,6 +373,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
+  },
+  headerLeftCluster: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  headerTitleSpacer: {
+    flex: 1,
+    minWidth: 0,
   },
   sidebarHeaderTextRow: {
     flexDirection: 'row',
@@ -390,11 +396,33 @@ const styles = StyleSheet.create({
   },
   communityMenuRow: {
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: SIDEBAR_PNG_MENU_ROW_PADDING_HORIZONTAL,
     alignItems: 'center',
   },
-  searchBarLayer: { zIndex: 25, marginTop: 8, paddingHorizontal: 10 },
-  sidebarLowerBlock: { flex: 1, minHeight: 0, paddingHorizontal: 10 },
+  /** Mismo eje X que los botones PNG (16, no 10). */
+  searchBarLayer: {
+    zIndex: 25,
+    marginTop: 4,
+    paddingHorizontal: SIDEBAR_PNG_MENU_ROW_PADDING_HORIZONTAL,
+  },
+  sidebarLowerBlock: {
+    flex: 1,
+    minHeight: 0,
+    marginTop: SIDEBAR_CONVERSATIONS_AFTER_SEARCH_MARGIN_TOP_PX,
+  },
+  sidebarConversationsMenuAlign: {
+    flex: 1,
+    minHeight: 0,
+    paddingHorizontal: SIDEBAR_PNG_MENU_ROW_PADDING_HORIZONTAL,
+    alignItems: 'center',
+  },
+  sidebarConversationsFixedColumn: {
+    flex: 1,
+    minHeight: 0,
+    width: SIDEBAR_PNG_MENU_BUTTON_LAYOUT_WIDTH_PX,
+    alignSelf: 'center',
+    marginLeft: SIDEBAR_PNG_MENU_BLOCK_OFFSET_X,
+  },
 
   // Footer row — replaces the three absolute-positioned components.
   // paddingHorizontal: 10 aligns left/right edges with the conversations panel.

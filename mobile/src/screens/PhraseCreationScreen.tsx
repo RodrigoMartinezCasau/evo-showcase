@@ -1,7 +1,18 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Keyboard, Alert, Animated, useWindowDimensions } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  ActivityIndicator,
+  Keyboard,
+  Alert,
+  Animated,
+  useWindowDimensions,
+  Platform,
+} from 'react-native';
 import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
-import { AppTopBar, ChatInputBar, SidebarDrawer } from '@evoconn/components';
+import { AppTopBar, ChatInputBar, SidebarDrawer, useKeyboardAnim } from '@evoconn/components';
 import { PublishBlock, PhraseNotesCard, PhraseFolderManagerCard } from '@evoconn/components/debate';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
@@ -17,12 +28,7 @@ import { incrementProfileStat } from '@evoconn/services/supabaseSocial';
 import { recordActivity, recordUsesLog } from '@evoconn/services/streakApi';
 import { getPhraseSendButtonByHouse } from '@evoconn/utils/getPhraseSendButtonByHouse';
 import { getClanSecondaryColor } from '@evoconn/constants/clanColors';
-import {
-  CHAT_SEND_BUTTON_LAYOUT,
-  CHAT_BOTTOM_AREA_LAYOUT as CHAT_BOTTOM_AREA,
-  CHAT_INPUT_LAYOUT as CHAT_INPUT,
-  CHAT_INPUT_ISLAND_LAYOUT,
-} from '@evoconn/constants/chatInputBarLayout';
+import { CHAT_SEND_BUTTON_LAYOUT } from '@evoconn/constants/chatInputBarLayout';
 import {
   ThinkingStar,
   IntroTypewriter,
@@ -53,8 +59,15 @@ import { useDebugStats } from '../debug/DebugStatsContext';
 import { requestNoUsesAnimation } from '@evoconn/components/animations/AppAnimationLayer';
 import { normalizePhraseInnerForPublish } from '@evoconn/utils/phrasePublish';
 import type { SidebarFolder } from '@evoconn/types';
-import { PHRASE_CREATION_STACK_LAYOUT as PHRASE_STACK } from '@evoconn/constants/phraseCreationStackLayout';
+import {
+  PHRASE_CREATION_STACK_LAYOUT as PHRASE_STACK,
+  phraseCreationScrollBottomInset,
+} from '@evoconn/constants/phraseCreationStackLayout';
 import { PHRASE_PUBLISH_HINT_LAYOUT as PHRASE_PUBLISH_LAYOUT } from '@evoconn/constants/phrasePublishHintLayout';
+import {
+  PHRASE_MAX_PUBLISH_CHARS,
+  PHRASE_TOO_LONG_FOR_PUBLISH_MESSAGE,
+} from '@evoconn/constants/phrasePublishLimits';
 
 const PUBLISH_AUTHOR_PLACEHOLDER = 'AÑADE EL AUTOR...';
 const PUBLISH_AUTHOR_MAX_LEN = 40;
@@ -168,6 +181,28 @@ export default function PhraseCreationScreen() {
 
   const scrollRef = useRef<ScrollView>(null);
   const publishAuthorRef = useRef('');
+  const keyboardAnim = useKeyboardAnim();
+  const authorLift = useRef(new Animated.Value(0)).current;
+  const [publishAuthorFocused, setPublishAuthorFocused] = useState(false);
+
+  const scrollKeyboardLift = useMemo(
+    () => Animated.multiply(keyboardAnim, Animated.multiply(authorLift, -1)),
+    [keyboardAnim, authorLift],
+  );
+
+  useEffect(() => {
+    Animated.timing(authorLift, {
+      toValue: publishAuthorFocused ? 1 : 0,
+      duration: 140,
+      useNativeDriver: true,
+    }).start();
+  }, [publishAuthorFocused, authorLift]);
+
+  useEffect(() => {
+    if (!publishAuthorFocused) return;
+    const t = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 160);
+    return () => clearTimeout(t);
+  }, [publishAuthorFocused]);
   const publishedRef = useRef<Set<string>>(new Set());
   const notesDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Tracks which threads have already had the intro fetch fired (prevents
@@ -321,6 +356,7 @@ export default function PhraseCreationScreen() {
 
   const handlePhrasePublish = useCallback(
     async (threadId: string, rawPhraseFromUser: string) => {
+      if (rawPhraseFromUser.length > PHRASE_MAX_PUBLISH_CHARS) return;
       const authorName = publishAuthorRef.current.trim();
       if (!authorName) return;
       const sourceId = `${threadId}_phrase_pub`;
@@ -618,18 +654,14 @@ export default function PhraseCreationScreen() {
           <Text style={styles.loadingText}>Cargando frase…</Text>
         </View>
       ) : (
+        <Animated.View style={[styles.scrollLiftWrap, { transform: [{ translateY: scrollKeyboardLift }] }]}>
         <ScrollView
           ref={scrollRef}
           style={styles.scroll}
           contentContainerStyle={{
             paddingHorizontal: PHRASE_STACK.scrollPaddingHorizontal,
             paddingTop: PHRASE_STACK.scrollPaddingTop,
-            paddingBottom:
-              PHRASE_STACK.scrollPaddingBottom +
-              CHAT_INPUT_ISLAND_LAYOUT.gradientHeight +
-              CHAT_BOTTOM_AREA.paddingTop +
-              CHAT_INPUT.minHeight +
-              CHAT_BOTTOM_AREA.paddingBottom,
+            paddingBottom: phraseCreationScrollBottomInset(),
           }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
@@ -649,7 +681,14 @@ export default function PhraseCreationScreen() {
                     },
                   ]}
                 >
-                  <Text style={styles.userText}>{msg.content}</Text>
+                  <Text
+                    style={styles.userText}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={Platform.OS === 'ios' ? 0.45 : 0.5}
+                  >
+                    {msg.content}
+                  </Text>
                 </View>
               );
             }
@@ -663,6 +702,10 @@ export default function PhraseCreationScreen() {
             const userPhrase =
               displayMessages[i - 1]?.role === 'user' ? displayMessages[i - 1].content : '';
             const published = pubUi.status === 'published';
+            const phraseTooLong = !published && userPhrase.length > PHRASE_MAX_PUBLISH_CHARS;
+            const phraseHintOverride = phraseTooLong
+              ? { text: PHRASE_TOO_LONG_FOR_PUBLISH_MESSAGE, blockPublish: true as const }
+              : null;
             const introText = (msg.phraseIntro ?? '').trim();
             const typewriterDone = !!introTypewriterDone[effectiveThreadId];
             // `introLoading` reflects an active /phrase/intro request.  On
@@ -732,7 +775,7 @@ export default function PhraseCreationScreen() {
 
                 {/* 4. Publicar — at the very bottom, below all phrase tools. */}
                 {showTools && (
-                  <View style={{ marginTop: PHRASE_STACK.publishTopGapPx, marginBottom: PHRASE_STACK.publishBottomGapPx }}>
+                  <View style={{ marginTop: PHRASE_STACK.sectionGapPx, marginBottom: PHRASE_STACK.publishBottomGapPx }}>
                     <PublishBlock
                       borderColor={getBlockBorderColor('publish', activeClan)}
                       borderWidth={BW.publish}
@@ -741,6 +784,8 @@ export default function PhraseCreationScreen() {
                       titleOutlineColor={getPublishTitleOutlineColor(activeClan)}
                       actionBarColor={getPublishTitleOutlineColor(activeClan)}
                       showPhraseFormatHint
+                      phraseHintOverride={phraseHintOverride}
+                      onAuthorFocusChange={published ? undefined : setPublishAuthorFocused}
                       actionBarInnerPaddingHorizontal={
                         PHRASE_PUBLISH_LAYOUT.publishActionBarInnerPaddingH
                       }
@@ -767,6 +812,7 @@ export default function PhraseCreationScreen() {
             );
           })}
         </ScrollView>
+        </Animated.View>
       )}
 
       <ChatInputBar
@@ -835,6 +881,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   edgeHitStrip: { position: 'absolute', left: 0, bottom: 0, zIndex: 250 },
   loadingText: { color: evoconnColors.muted, marginTop: 12, fontSize: 14 },
+  scrollLiftWrap: { flex: 1 },
   scroll: { flex: 1 },
   phraseWelcomeAboveInput: {
     alignItems: 'center',
@@ -873,7 +920,7 @@ const styles = StyleSheet.create({
     maxWidth: '92%',
     borderBottomRightRadius: 4,
   },
-  userText: { color: evoconnColors.text, fontSize: 15, lineHeight: 22 },
+  userText: { color: evoconnColors.text, fontSize: 15, lineHeight: 22, width: '100%' },
   introStaticText: {
     color: evoconnColors.text,
     fontSize: 15,

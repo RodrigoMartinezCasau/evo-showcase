@@ -40,6 +40,12 @@ type Props = {
    */
   showPhraseFormatHint?: boolean;
   /**
+   * Si se define, sustituye el texto del aviso y puede bloquear publicar (p. ej. frase >120 caracteres).
+   */
+  phraseHintOverride?: { text: string; blockPublish: boolean } | null;
+  /** Llamado cuando el campo autor recibe/pierde foco (para subir el scroll con el teclado). */
+  onAuthorFocusChange?: (focused: boolean) => void;
+  /**
    * Padding horizontal dentro del botón PUBLICAR. Solo frases suelen pasar un valor > 0;
    * reflexiones omiten y queda 0.
    */
@@ -62,6 +68,8 @@ export const PublishBlock = React.memo(function PublishBlock({
   published = false,
   initialAuthorValue = '',
   showPhraseFormatHint = false,
+  phraseHintOverride = null,
+  onAuthorFocusChange,
   actionBarInnerPaddingHorizontal = 0,
 }: Props) {
   const [title, setTitle] = useState(() =>
@@ -114,11 +122,11 @@ export const PublishBlock = React.memo(function PublishBlock({
               {
                 fontSize: PHRASE_HINT.hintFontSize,
                 lineHeight: PHRASE_HINT.hintLineHeight,
-                color: PHRASE_HINT.hintTextColor,
+                color: phraseHintOverride?.blockPublish ? '#c24141' : PHRASE_HINT.hintTextColor,
               },
             ]}
           >
-            {PHRASE_PUBLISH_FORMAT_HINT}
+            {phraseHintOverride?.text ?? PHRASE_PUBLISH_FORMAT_HINT}
           </Text>
         </View>
       ) : null}
@@ -144,11 +152,18 @@ export const PublishBlock = React.memo(function PublishBlock({
         placeholderTextColor={SB.publishInputPlaceholderColor}
         maxLength={inputMaxLength}
         editable={!published}
+        onFocus={() => onAuthorFocusChange?.(true)}
+        onBlur={() => onAuthorFocusChange?.(false)}
       />
 
       <PublishActionBar
         barColor={actionBarColor ?? borderColor}
-        disabled={published || !onPublish || title.trim().length === 0}
+        disabled={
+          published ||
+          !onPublish ||
+          title.trim().length === 0 ||
+          !!phraseHintOverride?.blockPublish
+        }
         onPublish={published ? undefined : onPublish}
         externallyPublished={published}
         innerPaddingHorizontal={actionBarInnerPaddingHorizontal}

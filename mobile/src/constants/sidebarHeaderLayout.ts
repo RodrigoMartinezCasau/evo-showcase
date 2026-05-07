@@ -15,7 +15,12 @@ export const SIDEBAR_HEADER_LAYOUT = {
 
   SIDEBAR_HEADER_PADDING_TOP: 0,
   SIDEBAR_HEADER_PADDING_LEFT: 16,
+  /** Inset derecho del header (campana pegada al borde interior del drawer). */
+  SIDEBAR_HEADER_PADDING_RIGHT: 16,
   SIDEBAR_HEADER_HEIGHT: 44,
+
+  /** Campana de notificaciones (Ionicons, blanca) en la cabecera. */
+  SIDEBAR_HEADER_NOTIFY_ICON_PX: 24,
 
   /** Tamaño base del contenedor de la estrella (px). */
   SIDEBAR_STAR_SIZE: 90,
