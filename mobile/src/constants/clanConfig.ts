@@ -114,9 +114,21 @@ export const CLAN_CONFIG: Record<string, ClanConfigEntry> = {
       { name: 'Plotino', initials: 'P', svgKey: 'fuller' },
     ],
   },
+  /** Pantalla “Sin clan” (`clanId` indefinido / sin casa asignada). */
+  indefinido: {
+    phrase: 'Ser o no ser \nesa es la cuestión',
+    description:
+      'Los Sin Clan aún no juraron lealtad a ningún estandarte: van probando ideas como quien prueba el menú entero. Si les preguntas qué piensan, suelen responder “depende del día” no es evasión, es beta filosófica. Su ventaja: mezclar sin drama hasta elegir con criterio.',
+    philosophers: [
+      { name: 'Prólogo pendiente', initials: '?' },
+      { name: 'Modo multisabor', initials: '…' },
+      { name: 'Comité “lo veo y te digo”', initials: 'C' },
+      { name: 'Equipo por asignar', initials: 'E' },
+    ],
+  },
 };
 
-const FALLBACK_CONFIG: ClanConfigEntry = CLAN_CONFIG.estoico;
+const FALLBACK_CONFIG: ClanConfigEntry = CLAN_CONFIG.indefinido;
 
 export function getClanConfig(clanId: string): ClanConfigEntry {
   return CLAN_CONFIG[clanId.toLowerCase().trim()] ?? FALLBACK_CONFIG;
