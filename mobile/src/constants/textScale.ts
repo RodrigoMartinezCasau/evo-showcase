@@ -39,10 +39,10 @@ export const AI_TEXT_SCALE = {
   // ── Pregunta reflexiva y cita filosófica ──────────────────────
 
   /** Texto de la pregunta reflexiva */
-  questionFontSize: 17,
-  questionLineHeight: 18,
+  questionFontSize: 15,
+  questionLineHeight: 23,
 
   /** Texto de la cita filosófica */
-  quoteFontSize: 17,
-  quoteLineHeight: 18,
+  quoteFontSize: 15,
+  quoteLineHeight: 23,
 } as const;

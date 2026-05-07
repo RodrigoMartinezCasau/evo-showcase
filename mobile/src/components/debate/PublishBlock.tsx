@@ -122,7 +122,7 @@ export const PublishBlock = React.memo(function PublishBlock({
               {
                 fontSize: PHRASE_HINT.hintFontSize,
                 lineHeight: PHRASE_HINT.hintLineHeight,
-                color: phraseHintOverride?.blockPublish ? '#c24141' : PHRASE_HINT.hintTextColor,
+                color: PHRASE_HINT.hintTextColor,
               },
             ]}
           >

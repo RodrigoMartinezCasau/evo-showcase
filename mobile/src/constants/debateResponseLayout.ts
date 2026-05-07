@@ -360,7 +360,7 @@ export const AI_SPECIAL_BLOCK_LAYOUT = {
   /* ── A2) Outer card padding ── */
   outerPaddingH: 14,
   outerPaddingV: 14,
-  headerMarginBottom: 10,
+  headerMarginBottom: 12,
 
   /* ── B) Inner cards (left-accent-only) ── */
   questionCard: {
@@ -368,8 +368,8 @@ export const AI_SPECIAL_BLOCK_LAYOUT = {
     offsetY: 0,
     widthScale: 1,
     borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     backgroundColor: '#171717',
     accentColor: '#FFFFFF',
     accentWidth: 4,
@@ -379,8 +379,8 @@ export const AI_SPECIAL_BLOCK_LAYOUT = {
     offsetY: 0,
     widthScale: 1,
     borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: '#171717',
     accentColorFallback: '#C93A3A',
     accentWidth: 4,
@@ -391,7 +391,7 @@ export const AI_SPECIAL_BLOCK_LAYOUT = {
 
   /* ── D) Text editors — Cita Textual ── */
   quoteText:        { offsetX: 0, offsetY: 0, fontSize: AI_TEXT_SCALE.quoteFontSize, lineHeight: AI_TEXT_SCALE.quoteLineHeight, color: '#FFFFFF' },
-  quoteAuthor:      { offsetX: 0, offsetY: 0, fontSize: 11, lineHeight: 0,  color: '#808080' },
+  quoteAuthor:      { offsetX: 0, offsetY: 0, fontSize: 11, lineHeight: 15,  color: '#808080' },
   unlockedLabel:    { offsetX: 0, offsetY: 0, fontSize: 9,  lineHeight: 0,  color: '#C7FF02' },
   widgetButtonText: { offsetX: 0, offsetY: 0, fontSize: 10, lineHeight: 0,  color: '#C7FF02' },
   widgetButtonBorder: '#C7FF02',

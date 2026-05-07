@@ -56,7 +56,7 @@ const authorBaseStyle = {
   fontSize: QAut.fontSize,
   color: QAut.color,
   ...(QAut.lineHeight > 0 ? { lineHeight: QAut.lineHeight } : {}),
-  marginTop: 4 + QAut.offsetY,
+  marginTop: 10 + QAut.offsetY,
   marginLeft: QAut.offsetX,
 };
 
