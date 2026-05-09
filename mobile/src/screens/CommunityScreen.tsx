@@ -839,7 +839,7 @@ export default function CommunityScreen() {
               initialNumToRender={COMMUNITY_DETAIL_PREFETCH_POSTS}
               maxToRenderPerBatch={COMMUNITY_DETAIL_PREFETCH_POSTS}
               windowSize={COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE}
-              removeClippedSubviews
+              removeClippedSubviews={false}
               style={styles.panelInner}
               viewabilityConfig={detailViewabilityConfig}
               onViewableItemsChanged={onDetailViewableItemsChanged}

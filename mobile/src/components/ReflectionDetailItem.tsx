@@ -13,7 +13,6 @@ import {
   useWindowDimensions,
   InteractionManager,
   type LayoutChangeEvent,
-  type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
 import type { CommunityPost, Comment } from '@evoconn/types';
@@ -54,8 +53,8 @@ import { blockUser, insertReport, isRealUserId } from '@evoconn/services/supabas
 import { useAuth } from '../../mobile/lib/AuthContext';
 import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
 
-const READING_SCROLLBAR_TRACK_W = 4;
-const READING_SCROLLBAR_GAP = 10;
+/** Matches `styles.content` horizontal padding — used until the reflection panel is measured. */
+const REFLECTION_DETAIL_CONTENT_PAD_H = 16;
 
 type ReflectionDetailItemProps = {
   post: CommunityPost;
@@ -377,6 +376,22 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
 
   const { width: screenW } = useWindowDimensions();
 
+  /**
+   * The reflection panel uses `transform: [{ scaleX: widthScale }]`. Layout still uses the unscaled
+   * width, so `Text` wraps with fewer lines than what you see — "Ver más" never triggers. Constrain
+   * the text column to the scaled width so `onTextLayout` matches the real wrap.
+   */
+  const reflectionTextColumnWidth = useMemo(() => {
+    const inner =
+      reflPanelLayout && reflPanelLayout.width > 0
+        ? Math.max(1, reflPanelLayout.width - 2 * RP.paddingHorizontal)
+        : Math.max(
+            1,
+            screenW - 2 * REFLECTION_DETAIL_CONTENT_PAD_H - 2 * RP.paddingHorizontal,
+          );
+    return Math.max(1, (inner - REFLECTION_TEXT_RIGHT_INSET) * RP.widthScale);
+  }, [screenW, reflPanelLayout]);
+
   const headerHeight = 52;
   const panelsAvailable =
     itemHeight - headerHeight - PANELS_BOTTOM_RESERVE - PANELS_GAP - 16;
@@ -397,11 +412,6 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   const isLongTextRef = useRef(false);
   const reflectionScrollLayoutH = useRef(0);
   const reflectionContentH = useRef(0);
-  const [reflectScrollMetrics, setReflectScrollMetrics] = useState({
-    scrollY: 0,
-    viewportH: 0,
-    contentH: 0,
-  });
 
   /** Bumps when scroll viewport height is first measured so body Text re-runs onTextLayout with a reliable budget. */
   const [bodyLayoutKey, setBodyLayoutKey] = useState(0);
@@ -416,7 +426,6 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     readingModeRef.current = false;
     setReadingMode(false);
     setBodyLayoutKey(0);
-    setReflectScrollMetrics({ scrollY: 0, viewportH: 0, contentH: 0 });
     onReadingModeChange?.(false);
   }, [post.id, onReadingModeChange]);
 
@@ -424,17 +433,22 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     if (isLongTextRef.current) return;
     const containerH = reflectionScrollLayoutH.current;
     const contentH = reflectionContentH.current;
-    if (containerH > 0 && contentH > containerH + 1) {
+    if (containerH > 0 && contentH > containerH + 0.5) {
       isLongTextRef.current = true;
       setIsLongText(true);
     }
   }, []);
 
+  useEffect(() => {
+    if (isPhrase) return;
+    const task = InteractionManager.runAfterInteractions(() => checkOverflow());
+    return () => task.cancel();
+  }, [post.body, post.id, reflectionH, isPhrase, checkOverflow]);
+
   const handleReflectionScrollLayout = useCallback((e: any) => {
     const h = e.nativeEvent.layout.height;
     if (h <= 0) return;
     reflectionScrollLayoutH.current = h;
-    setReflectScrollMetrics(prev => ({ ...prev, viewportH: h }));
     checkOverflow();
   }, [checkOverflow]);
 
@@ -444,7 +458,6 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
       const h = e.nativeEvent.layout.height;
       if (h <= 0) return;
       reflectionScrollLayoutH.current = h;
-      setReflectScrollMetrics(prev => ({ ...prev, viewportH: h }));
       if (!scrollViewportReadyRef.current) {
         scrollViewportReadyRef.current = true;
         setBodyLayoutKey(k => k + 1);
@@ -456,24 +469,8 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
 
   const handleReflectionContentSize = useCallback((_w: number, h: number) => {
     reflectionContentH.current = h;
-    setReflectScrollMetrics(prev => ({ ...prev, contentH: h }));
     checkOverflow();
   }, [checkOverflow]);
-
-  const readingModeScrollRef = useRef(readingMode);
-  readingModeScrollRef.current = readingMode;
-  const isLongTextScrollRef = useRef(isLongText);
-  isLongTextScrollRef.current = isLongText;
-
-  const handleReflectionScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (!readingModeScrollRef.current || !isLongTextScrollRef.current) return;
-    const y = e.nativeEvent?.contentOffset?.y;
-    if (typeof y !== 'number' || !Number.isFinite(y)) return;
-    setReflectScrollMetrics(prev => ({
-      ...prev,
-      scrollY: y,
-    }));
-  }, []);
 
   type BodyTextLayoutEvent = NativeSyntheticEvent<{ lines: Array<{ y: number; height: number }> }>;
 
@@ -483,7 +480,32 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
       const lines = e.nativeEvent?.lines;
       if (!lines?.length) return;
 
+      const titleBlockH = post.title ? titleOccupied + 10 : 0;
+      const viewportBudget =
+        reflectionScrollLayoutH.current > 0
+          ? Math.max(1, reflectionScrollLayoutH.current - titleBlockH)
+          : bodyAvailableH;
+
+      const approxCharsPerLine = Math.max(
+        14,
+        Math.floor(reflectionTextColumnWidth / (BODY_LINE_HEIGHT * 0.45)),
+      );
+      const bodyLen = post.body.trim().length;
+      const newlineBlocks = post.body.split(/\n/).length;
+
       if (lines.length > maxBodyLines) {
+        isLongTextRef.current = true;
+        setIsLongText(true);
+        return;
+      }
+
+      if (newlineBlocks > maxBodyLines) {
+        isLongTextRef.current = true;
+        setIsLongText(true);
+        return;
+      }
+
+      if (lines.length >= maxBodyLines && bodyLen > approxCharsPerLine * (maxBodyLines - 0.4)) {
         isLongTextRef.current = true;
         setIsLongText(true);
         return;
@@ -491,17 +513,19 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
 
       const last = lines[lines.length - 1]!;
       const lastBottom = last.y + (last.height > 0 ? last.height : BODY_LINE_HEIGHT);
-      const titleBlockH = post.title ? titleOccupied + 10 : 0;
-      const viewportBudget =
-        reflectionScrollLayoutH.current > 0
-          ? Math.max(1, reflectionScrollLayoutH.current - titleBlockH)
-          : bodyAvailableH;
       if (lastBottom > viewportBudget - 1) {
         isLongTextRef.current = true;
         setIsLongText(true);
       }
     },
-    [maxBodyLines, bodyAvailableH, post.title, titleOccupied],
+    [
+      maxBodyLines,
+      bodyAvailableH,
+      post.title,
+      titleOccupied,
+      post.body,
+      reflectionTextColumnWidth,
+    ],
   );
 
   const visibleComments = useMemo(
@@ -685,28 +709,6 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
               </ScrollView>
             ) : (
               <View style={styles.reflectionScrollRow} onLayout={handleReflectionScrollRowLayout}>
-                {readingMode &&
-                isLongText &&
-                reflectScrollMetrics.contentH > reflectScrollMetrics.viewportH + 2 ? (
-                  <View style={styles.readingScrollTrack}>
-                    {(() => {
-                      const { scrollY, viewportH, contentH } = reflectScrollMetrics;
-                      const range = Math.max(1, contentH - viewportH);
-                      const thumbH = Math.max(
-                        20,
-                        Math.min(viewportH * 0.85, (viewportH / contentH) * viewportH),
-                      );
-                      const maxTop = Math.max(0, viewportH - thumbH);
-                      const thumbTop = Math.min(maxTop, Math.max(0, (scrollY / range) * maxTop));
-                      return (
-                        <View
-                          pointerEvents="none"
-                          style={[styles.readingScrollThumb, { height: thumbH, top: thumbTop }]}
-                        />
-                      );
-                    })()}
-                  </View>
-                ) : null}
                 <ScrollView
                   style={[styles.reflectionScroll, styles.reflectionScrollFlex]}
                   scrollEnabled={readingMode && isLongText}
@@ -714,42 +716,44 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                   nestedScrollEnabled
                   bounces={readingMode && isLongText}
                   keyboardShouldPersistTaps="handled"
-                  scrollEventThrottle={16}
-                  onScroll={handleReflectionScroll}
-                  contentContainerStyle={{ paddingRight: REFLECTION_TEXT_RIGHT_INSET }}
+                  contentContainerStyle={styles.reflectionScrollContent}
                   onLayout={handleReflectionScrollLayout}
                   onContentSizeChange={handleReflectionContentSize}
                 >
-                  {post.title ? (
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        styles.title,
-                        {
-                          transform: [
-                            { translateX: TL.offsetX },
-                            { translateY: TL.offsetY },
-                            { scale: TL.scale },
-                          ],
-                        },
-                      ]}
-                    >
-                      {post.title.length > TL.maxCharacters
-                        ? post.title.slice(0, TL.maxCharacters) + '…'
-                        : post.title}
-                    </Text>
-                  ) : null}
-                  <Text
-                    key={bodyLayoutKey}
-                    style={styles.bodyText}
-                    numberOfLines={!readingMode && isLongText ? maxBodyLines : undefined}
-                    onTextLayout={handleBodyTextLayout}
-                  >
-                    {post.body}
-                  </Text>
-                  {!readingMode && isLongText ? (
-                    <Text style={styles.readMoreLabel}>Ver más...</Text>
-                  ) : null}
+                  <View style={styles.reflectionScrollTextOuter}>
+                    <View style={{ width: reflectionTextColumnWidth }}>
+                      {post.title ? (
+                        <Text
+                          numberOfLines={1}
+                          style={[
+                            styles.title,
+                            {
+                              transform: [
+                                { translateX: TL.offsetX },
+                                { translateY: TL.offsetY },
+                                { scale: TL.scale },
+                              ],
+                            },
+                          ]}
+                        >
+                          {post.title.length > TL.maxCharacters
+                            ? post.title.slice(0, TL.maxCharacters) + '…'
+                            : post.title}
+                        </Text>
+                      ) : null}
+                      <Text
+                        key={bodyLayoutKey}
+                        style={styles.bodyText}
+                        numberOfLines={!readingMode && isLongText ? maxBodyLines : undefined}
+                        onTextLayout={handleBodyTextLayout}
+                      >
+                        {post.body}
+                      </Text>
+                      {!readingMode && isLongText ? (
+                        <Text style={styles.readMoreLabel}>Ver más...</Text>
+                      ) : null}
+                    </View>
+                  </View>
                 </ScrollView>
               </View>
             )}
@@ -885,22 +889,16 @@ const styles = StyleSheet.create({
   },
   reflectionScrollRow: {
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'stretch',
   },
-  readingScrollTrack: {
-    width: READING_SCROLLBAR_TRACK_W,
-    marginRight: READING_SCROLLBAR_GAP,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    overflow: 'hidden',
+  reflectionScrollContent: {
+    flexGrow: 1,
+    width: '100%',
   },
-  readingScrollThumb: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.38)',
+  /** Full width so the inner column can stay left-aligned; a narrow-only child made the strip hug the wrong edge. */
+  reflectionScrollTextOuter: {
+    width: '100%',
+    alignItems: 'flex-start',
   },
   reflectionScroll: {
     flex: 1,

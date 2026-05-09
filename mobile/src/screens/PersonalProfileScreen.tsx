@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
   View,
   ScrollView,
@@ -12,6 +12,8 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -39,6 +41,7 @@ import { ProfileDetailPanel } from '@evoconn/components/ProfileDetailPanel';
 import { usePersonalProfile } from '@evoconn/hooks/PersonalProfileContext';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { useAuth } from '../../mobile/lib/AuthContext';
+import { supabase } from '../../mobile/lib/supabase';
 import type { CommunityPost } from '@evoconn/types';
 
 const ANIM_DURATION = 200;
@@ -47,7 +50,7 @@ export default function PersonalProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width: screenW, height: screenH } = useWindowDimensions();
-  const { profile: authProfile } = useAuth();
+  const { profile: authProfile, session, refreshProfile } = useAuth();
   const { activeFollowersCount, activeFollowingCount } = useSimulation();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -73,23 +76,65 @@ export default function PersonalProfileScreen() {
   // ─── Personal profile shared state ────────────────────────────────
   const { posts, isHidden, toggleHidePost, deletePost, friends, savedPosts } = usePersonalProfile();
 
-  // ─── Insignia phrase local state (ready for backend integration) ──
+  // ─── Insignia phrase: Supabase `profiles.insignia_phrase` + UI state ──
   const [insigniaPhrase, setInsigniaPhrase] = useState(profileWithClan.insigniaPhrase);
   const [phraseEditorOpen, setPhraseEditorOpen] = useState(false);
   const [phraseEditDraft, setPhraseEditDraft] = useState('');
+  const [phraseSaving, setPhraseSaving] = useState(false);
+
+  useEffect(() => {
+    if (phraseEditorOpen) return;
+    setInsigniaPhrase(authProfile?.insignia_phrase ?? profile.insigniaPhrase);
+  }, [phraseEditorOpen, authProfile?.insignia_phrase, authProfile?.id, profile.insigniaPhrase]);
 
   const handlePhraseEditOpen = useCallback(() => {
     setPhraseEditDraft(insigniaPhrase);
     setPhraseEditorOpen(true);
   }, [insigniaPhrase]);
 
-  const handlePhraseEditSave = useCallback(() => {
+  const handlePhraseEditSave = useCallback(async () => {
     const trimmed = phraseEditDraft.trim();
-    if (trimmed.length > 0) {
-      setInsigniaPhrase(trimmed);
+    if (trimmed.length === 0) {
+      setPhraseEditorOpen(false);
+      return;
     }
-    setPhraseEditorOpen(false);
-  }, [phraseEditDraft]);
+
+    const userId = session?.user?.id;
+    if (!userId) {
+      setInsigniaPhrase(trimmed);
+      setPhraseEditorOpen(false);
+      return;
+    }
+
+    setPhraseSaving(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ insignia_phrase: trimmed })
+        .eq('id', userId)
+        .select('insignia_phrase')
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (!data) {
+        Alert.alert(
+          'No se guardó',
+          'No se pudo actualizar la frase. Revisa que exista la política RLS de actualización en la tabla profiles (ver supabase_profiles_username_rls.sql).',
+        );
+        return;
+      }
+
+      setInsigniaPhrase(trimmed);
+      await refreshProfile();
+      setPhraseEditorOpen(false);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'No se pudo guardar la frase.';
+      Alert.alert('Error', msg);
+    } finally {
+      setPhraseSaving(false);
+    }
+  }, [phraseEditDraft, session?.user?.id, refreshProfile]);
 
   const handlePhraseEditCancel = useCallback(() => {
     setPhraseEditorOpen(false);
@@ -288,7 +333,9 @@ export default function PersonalProfileScreen() {
         visible={phraseEditorOpen}
         transparent
         animationType="fade"
-        onRequestClose={handlePhraseEditCancel}
+        onRequestClose={() => {
+          if (!phraseSaving) handlePhraseEditCancel();
+        }}
       >
         <KeyboardAvoidingView
           style={editorStyles.backdrop}
@@ -297,7 +344,9 @@ export default function PersonalProfileScreen() {
           <TouchableOpacity
             style={editorStyles.backdropTap}
             activeOpacity={1}
-            onPress={handlePhraseEditCancel}
+            onPress={() => {
+              if (!phraseSaving) handlePhraseEditCancel();
+            }}
           />
           <View style={editorStyles.sheet}>
             <Text style={editorStyles.title}>Editar frase insignia</Text>
@@ -314,11 +363,23 @@ export default function PersonalProfileScreen() {
             />
             <Text style={editorStyles.counter}>{phraseEditDraft.length}/80</Text>
             <View style={editorStyles.buttons}>
-              <TouchableOpacity style={editorStyles.cancelBtn} onPress={handlePhraseEditCancel}>
+              <TouchableOpacity
+                style={editorStyles.cancelBtn}
+                onPress={handlePhraseEditCancel}
+                disabled={phraseSaving}
+              >
                 <Text style={editorStyles.cancelTxt}>Cancelar</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={editorStyles.saveBtn} onPress={handlePhraseEditSave}>
-                <Text style={editorStyles.saveTxt}>Guardar</Text>
+              <TouchableOpacity
+                style={[editorStyles.saveBtn, phraseSaving && editorStyles.saveBtnDisabled]}
+                onPress={() => void handlePhraseEditSave()}
+                disabled={phraseSaving}
+              >
+                {phraseSaving ? (
+                  <ActivityIndicator color="#000" />
+                ) : (
+                  <Text style={editorStyles.saveTxt}>Guardar</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -395,6 +456,9 @@ const editorStyles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
+  },
+  saveBtnDisabled: {
+    opacity: 0.55,
   },
   saveTxt: {
     color: '#000000',
