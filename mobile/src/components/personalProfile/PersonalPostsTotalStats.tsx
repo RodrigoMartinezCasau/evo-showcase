@@ -32,8 +32,12 @@ import {
 } from '@evoconn/constants/personalProfileLayout';
 
 // Same SVGs used in PersonalRecentPostCard
-import UpvoteIcon   from '../../assets/detailActions/32.svg';
+import UpvoteIcon from '../../assets/detailActions/32.svg';
 import DownvoteIcon from '../../assets/detailActions/30.svg';
+import {
+  VOTE_RATIO_HIGH_COLOR,
+  VOTE_RATIO_LOW_COLOR,
+} from '@evoconn/constants/voteButtonAppearance';
 import SavedIcon    from '../../assets/detailActions/34.svg';
 import FlechaIcon   from '../../assets/detailActions/flecha.svg';
 
@@ -48,9 +52,9 @@ function compactCount(n: number): string {
 
 /** Vote-ratio color (mirrors flechaColor in PersonalRecentPostCard). */
 function ratioColor(pct: number): string {
-  if (pct >= 90) return '#89D957';
+  if (pct >= 90) return VOTE_RATIO_HIGH_COLOR;
   if (pct >= 50) return '#ffde59';
-  return '#ff4a31';
+  return VOTE_RATIO_LOW_COLOR;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────

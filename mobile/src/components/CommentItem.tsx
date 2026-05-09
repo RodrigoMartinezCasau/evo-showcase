@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import type { Comment } from '@evoconn/types';
 import { getClanCardColor } from '@evoconn/theme/theme';
 import { evoconnColors } from '@evoconn/theme/colors';
+import { VOTE_UP_COUNT_ACTIVE_COLOR } from '@evoconn/constants/voteButtonAppearance';
 
 type CommentItemProps = {
   comment: Comment;
@@ -41,7 +42,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   username: { color: evoconnColors.text, fontWeight: '600', fontSize: 12 },
   upRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  arrow: { color: evoconnColors.neonGreen, fontSize: 12 },
+  arrow: { color: VOTE_UP_COUNT_ACTIVE_COLOR, fontSize: 12 },
   count: { color: evoconnColors.muted, fontSize: 12 },
   body: { color: evoconnColors.muted, fontSize: 14, lineHeight: 20 },
 });

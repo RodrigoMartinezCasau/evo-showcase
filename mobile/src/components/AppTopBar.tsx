@@ -159,7 +159,11 @@ export function AppTopBar({
 
   const starFrame = iconFrame(TOP_BAR_LAYOUT.STAR_SIZE, topBarIconFrameScale.evoStar);
   const shieldFrame = iconFrame(TOP_BAR_LAYOUT.SHIELD_SIZE, topBarIconFrameScale.shield);
-  const counterIconFrame = iconFrame(TOP_BAR_LAYOUT.COUNTER_ICON_SIZE, 1);
+  const rightClusterScale = TOP_BAR_LAYOUT.RIGHT_CLUSTER_UNIVERSAL_SCALE;
+  const counterIconFrame = iconFrame(TOP_BAR_LAYOUT.COUNTER_ICON_SIZE * rightClusterScale, 1);
+  const counterTextSize = TOP_BAR_LAYOUT.COUNTER_TEXT_SIZE * rightClusterScale;
+  const counterPairGap = TOP_BAR_LAYOUT.COUNTER_PAIR_GAP * rightClusterScale;
+  const counterNumMinW = 22 * rightClusterScale;
   const menuSize = TOP_BAR_LAYOUT.MENU_SIZE;
 
   const previewClanLabel = isPreviewActive
@@ -235,48 +239,60 @@ export function AppTopBar({
           </TouchableOpacity>
         )}
 
-        {/* Group 3 — pencil */}
-        <TouchableOpacity onPress={() => router.push('/phrases-domains')} style={styles.counterBtn} hitSlop={14}>
-          <View style={[styles.iconFrame, counterIconFrame, topBarIconEditorStyle('pencilIcon', 'pencilIcon')]}>
-            <LapizIcon width={counterIconFrame.width} height={counterIconFrame.height} />
-          </View>
-          {showCounters && (
-            <View style={[styles.textBox, { height: counterIconFrame.height }, topBarIconEditorStyle('pencilText', 'pencilText')]}>
-              <Text style={[styles.counterText, { fontSize: TOP_BAR_LAYOUT.COUNTER_TEXT_SIZE }]}>{pencilCount}</Text>
+        {/* Groups 3–5 — contadores ~5% más compactos (layout real, no solo scale) */}
+        <View style={styles.rightCluster}>
+          <TouchableOpacity
+            onPress={() => router.push('/phrases-domains')}
+            style={[styles.counterBtn, { gap: counterPairGap }]}
+            hitSlop={14}
+          >
+            <View style={[styles.iconFrame, counterIconFrame, topBarIconEditorStyle('pencilIcon', 'pencilIcon')]}>
+              <LapizIcon width={counterIconFrame.width} height={counterIconFrame.height} />
             </View>
-          )}
-        </TouchableOpacity>
+            {showCounters && (
+              <View style={[styles.textBox, { height: counterIconFrame.height }, topBarIconEditorStyle('pencilText', 'pencilText')]}>
+                <Text style={[styles.counterText, { fontSize: counterTextSize, minWidth: counterNumMinW }]}>{pencilCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
 
-        {/* Group 4 — fire */}
-        <TouchableOpacity onPress={() => router.push('/streak')} style={styles.counterBtn} hitSlop={14}>
-          <View style={[styles.iconFrame, counterIconFrame, topBarIconEditorStyle('fireIcon', 'fireIcon')]}>
-            <>
-              <Animated.View style={[StyleSheet.absoluteFill, { opacity: Animated.subtract(1, fireAnim) }]}>
-                <FuegoApagadoIcon width={counterIconFrame.width} height={counterIconFrame.height} />
-              </Animated.View>
-              <Animated.View style={[StyleSheet.absoluteFill, { opacity: fireAnim }]}>
-                <RachaIcon width={counterIconFrame.width} height={counterIconFrame.height} />
-              </Animated.View>
-            </>
-          </View>
-          {showCounters && (
-            <View style={[styles.textBox, { height: counterIconFrame.height }, topBarIconEditorStyle('fireText', 'fireText')]}>
-              <Text style={[styles.counterText, { fontSize: TOP_BAR_LAYOUT.COUNTER_TEXT_SIZE }]}>{fireCount}</Text>
+          <TouchableOpacity
+            onPress={() => router.push('/streak')}
+            style={[styles.counterBtn, { gap: counterPairGap }]}
+            hitSlop={14}
+          >
+            <View style={[styles.iconFrame, counterIconFrame, topBarIconEditorStyle('fireIcon', 'fireIcon')]}>
+              <>
+                <Animated.View style={[StyleSheet.absoluteFill, { opacity: Animated.subtract(1, fireAnim) }]}>
+                  <FuegoApagadoIcon width={counterIconFrame.width} height={counterIconFrame.height} />
+                </Animated.View>
+                <Animated.View style={[StyleSheet.absoluteFill, { opacity: fireAnim }]}>
+                  <RachaIcon width={counterIconFrame.width} height={counterIconFrame.height} />
+                </Animated.View>
+              </>
             </View>
-          )}
-        </TouchableOpacity>
+            {showCounters && (
+              <View style={[styles.textBox, { height: counterIconFrame.height }, topBarIconEditorStyle('fireText', 'fireText')]}>
+                <Text style={[styles.counterText, { fontSize: counterTextSize, minWidth: counterNumMinW }]}>{fireCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
 
-        {/* Group 5 — heart */}
-        <TouchableOpacity onPress={() => router.push('/daily-uses')} style={styles.counterBtn} hitSlop={14}>
-          <View style={[styles.iconFrame, counterIconFrame, topBarIconEditorStyle('heartIcon', 'heartIcon')]}>
-            <UsosIcon width={counterIconFrame.width} height={counterIconFrame.height} />
-          </View>
-          {showCounters && (
-            <View style={[styles.textBox, { height: counterIconFrame.height }, topBarIconEditorStyle('heartText', 'heartText')]}>
-              <Text style={[styles.counterText, { fontSize: TOP_BAR_LAYOUT.COUNTER_TEXT_SIZE }]}>{heartCount}</Text>
+          <TouchableOpacity
+            onPress={() => router.push('/daily-uses')}
+            style={[styles.counterBtn, { gap: counterPairGap }]}
+            hitSlop={14}
+          >
+            <View style={[styles.iconFrame, counterIconFrame, topBarIconEditorStyle('heartIcon', 'heartIcon')]}>
+              <UsosIcon width={counterIconFrame.width} height={counterIconFrame.height} />
             </View>
-          )}
-        </TouchableOpacity>
+            {showCounters && (
+              <View style={[styles.textBox, { height: counterIconFrame.height }, topBarIconEditorStyle('heartText', 'heartText')]}>
+                <Text style={[styles.counterText, { fontSize: counterTextSize, minWidth: counterNumMinW }]}>{heartCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
 
@@ -307,13 +323,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
   },
   leftCluster: { flexDirection: 'row', alignItems: 'flex-end' },
+  rightCluster: { flexDirection: 'row', alignItems: 'flex-end' },
   iconBtn: { paddingVertical: 6, paddingHorizontal: 6 },
   counterBtn: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     paddingVertical: 6,
     paddingHorizontal: 6,
-    gap: TOP_BAR_LAYOUT.COUNTER_PAIR_GAP,
   },
   textBox: {
     justifyContent: 'center',
@@ -340,7 +356,6 @@ const styles = StyleSheet.create({
   counterText: {
     color: evoconnColors.text,
     fontWeight: '800',
-    minWidth: 22,
     textAlign: 'left',
     includeFontPadding: false,
   },

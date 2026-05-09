@@ -41,6 +41,4 @@ export const COMMENT_UPVOTE_LAYOUT = {
   scale: 0.9,
   /** Tamaño del texto del contador. */
   countFontSize: 14,
-  colorActive: '#A3FF3B',
-  colorInactive: '#999999',
 } as const;

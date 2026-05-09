@@ -8,4 +8,4 @@
  *
  * Cambia a `false` y guarda (⌘S) para ocultarlos mientras desarrollas.
  */
-export const DEBUG_FLOATING_BUTTONS_ENABLED = false;
+export const DEBUG_FLOATING_BUTTONS_ENABLED = true;

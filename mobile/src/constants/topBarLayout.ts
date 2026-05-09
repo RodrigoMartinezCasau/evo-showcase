@@ -43,6 +43,12 @@ export const TOP_BAR_LAYOUT = {
   CENTER_CLUSTER_GAP: 0,
   RIGHT_CLUSTER_GAP: 0,
 
+  /**
+   * Escala del bloque derecho (lápiz, racha, usos + números). Valores por debajo
+   * de 1 acercan el conjunto al centro y evitan recortes en pantallas estrechas.
+   */
+  RIGHT_CLUSTER_UNIVERSAL_SCALE: 0.85,
+
   // Counter pair spacing (icon ↔ number)
   COUNTER_PAIR_GAP: 8,
 

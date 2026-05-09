@@ -7,9 +7,6 @@ import {
   DETAIL_DOWNVOTE_BUTTON_LAYOUT as DOWN_L,
   DETAIL_SAVE_BUTTON_LAYOUT as SAVE_L,
   DETAIL_MORE_BUTTON_LAYOUT as MORE_L,
-  DETAIL_UPVOTE_COUNT_LAYOUT as UP_C,
-  DETAIL_DOWNVOTE_COUNT_LAYOUT as DOWN_C,
-  DETAIL_APPROVAL_PERCENT_LAYOUT as APPR,
 } from '@evoconn/constants/detailActionColumnLayout';
 import { getTopBarInsigniaByHouse } from '@evoconn/utils/getTopBarInsigniaByHouse';
 
@@ -32,16 +29,6 @@ function useBounce() {
     }).start();
   }, [scale]);
   return { scale, trigger };
-}
-
-function getApprovalColor(pct: number): string {
-  if (pct < 10) return APPR.colorBelow10;
-  if (pct < 50) return APPR.colorBelow50;
-  if (pct > 95) return APPR.colorAbove95;
-  if (pct > 90) return APPR.colorAbove90;
-  if (pct > 80) return APPR.colorAbove80;
-  if (pct > 70) return APPR.colorAbove70;
-  return APPR.colorAbove50;
 }
 
 function formatCount(n: number): string {
@@ -152,9 +139,7 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
         </TouchableOpacity>
 
         {/* 2. Upvote count (standalone — between clan and upvote icon) */}
-        <Text style={[styles.statText, { color: voted === 'up' ? UP_C.colorActive : UP_C.colorInactive }]}>
-          {formatCount(upCount)}
-        </Text>
+        <Text style={styles.statText}>{formatCount(upCount)}</Text>
 
         {/* 3. Upvote icon */}
         <TouchableOpacity onPress={handleUp} activeOpacity={0.7}>
@@ -168,7 +153,7 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
         </TouchableOpacity>
 
         {/* 4. Approval % */}
-        <Text style={[styles.approvalText, { color: getApprovalColor(approvalPct) }]}>
+        <Text style={styles.approvalText}>
           {approvalPct}%
         </Text>
 
@@ -182,9 +167,7 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
                 <DownvoteInactive key="down-i" width={otherSz} height={otherSz} />
               )}
             </Animated.View>
-            <Text style={[styles.statText, { color: voted === 'down' ? DOWN_C.colorActive : DOWN_C.colorInactive }]}>
-              {formatCount(downCount)}
-            </Text>
+            <Text style={styles.statText}>{formatCount(downCount)}</Text>
           </View>
         </TouchableOpacity>
 
@@ -235,6 +218,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     textAlign: 'center',
+    color: '#FFFFFF',
   },
   moreDots: {
     color: '#FFFFFF',

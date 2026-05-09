@@ -2,6 +2,10 @@ import React from 'react';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import type { VoteStats } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
+import {
+  VOTE_DOWN_COUNT_ACTIVE_COLOR,
+  VOTE_UP_COUNT_ACTIVE_COLOR,
+} from '@evoconn/constants/voteButtonAppearance';
 
 type VoteWidgetProps = {
   stats: VoteStats;
@@ -37,9 +41,9 @@ const styles = StyleSheet.create({
   compact: { gap: 4 },
   btn: { flexDirection: 'row', alignItems: 'center', padding: 4 },
   arrow: { color: evoconnColors.muted, fontSize: 14, marginRight: 2 },
-  arrowActive: { color: evoconnColors.neonGreen },
+  arrowActive: { color: VOTE_UP_COUNT_ACTIVE_COLOR },
   arrowDown: { color: evoconnColors.muted, fontSize: 14, marginRight: 2 },
-  arrowDownActive: { color: '#ff4d4d' },
+  arrowDownActive: { color: VOTE_DOWN_COUNT_ACTIVE_COLOR },
   save: { color: evoconnColors.save, fontSize: 14, marginRight: 2 },
   count: { color: evoconnColors.muted, fontSize: 12 },
 });

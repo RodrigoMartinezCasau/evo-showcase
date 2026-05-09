@@ -123,7 +123,6 @@ export const CommentCard = React.memo(function CommentCard({
   }, [handleUpvote, isLong, isFullyExpanded]);
 
   const iconSz = 24 * UP.scale;
-  const upColor = isUpvoted ? UP.colorActive : UP.colorInactive;
 
   return (
     <View style={styles.wrapper}>
@@ -178,9 +177,7 @@ export const CommentCard = React.memo(function CommentCard({
             ) : (
               <UpvoteInactive key="c-up-i" width={iconSz} height={iconSz} />
             )}
-            <Text style={[styles.upCount, { color: upColor, fontSize: UP.countFontSize }]}>
-              {upvotes}
-            </Text>
+            <Text style={[styles.upCount, { fontSize: UP.countFontSize }]}>{upvotes}</Text>
           </Animated.View>
         </TouchableOpacity>
       </View>
@@ -219,5 +216,6 @@ const styles = StyleSheet.create({
   upCount: {
     fontWeight: '700',
     marginTop: 2,
+    color: '#FFFFFF',
   },
 });

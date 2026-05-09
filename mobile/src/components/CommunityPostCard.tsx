@@ -19,6 +19,8 @@ import { getSmallClanBackgroundSvg } from '@evoconn/assets/cards/smallClanBackgr
 import { getMediumClanBackgroundSvg } from '@evoconn/assets/cards/mediumClanBackgroundsSvg';
 import { getQuoteClanBackgroundSvg } from '@evoconn/assets/cards/quoteClanBackgroundsSvg';
 import { smallStatsIcons } from '@evoconn/assets/icons/smallStats';
+import UpvoteInactiveSvg from '../assets/detailActions/31.svg';
+import UpvoteActiveSvg from '../assets/detailActions/32.svg';
 import { useFeedStore } from '@evoconn/hooks/useFeedStore';
 import { usePersonalProfile } from '@evoconn/hooks/PersonalProfileContext';
 import { formatPhraseBodyForDisplay } from '@evoconn/utils/phrasePublish';
@@ -104,7 +106,6 @@ export function CommunityPostCard({
 
   const bodyMaxLines = getBodyMaxLines(cardTier);
   const smallUpvoted = myVote === 'up';
-  const feedUpvoteIcon = smallUpvoted ? smallStatsIcons.upvoteActive : smallStatsIcons.upvoteInactive;
   const feedSaveIcon = isPostSaved ? smallStatsIcons.saveActive : smallStatsIcons.saveInactive;
 
   const statsIcon = Math.max(20, Math.round(V.STATS_ICON_SIZE * Math.max(0.92, feedContent.textScale)));
@@ -140,11 +141,13 @@ export function CommunityPostCard({
     <View style={styles.feedStatsRow}>
       <View style={styles.feedStatItem}>
         <TouchableOpacity onPress={handleSmallUp} hitSlop={8} style={styles.feedStatPress}>
-          <Image
-            source={feedUpvoteIcon}
-            resizeMode="contain"
-            style={{ width: statsIcon, height: statsIcon }}
-          />
+          <View style={{ width: statsIcon, height: statsIcon }}>
+            {smallUpvoted ? (
+              <UpvoteActiveSvg width={statsIcon} height={statsIcon} />
+            ) : (
+              <UpvoteInactiveSvg width={statsIcon} height={statsIcon} />
+            )}
+          </View>
         </TouchableOpacity>
         <Text style={[styles.feedStatCount, { fontSize: feedContent.statsCountFontSize }]}>
           {isQuoteCard ? formatNumber(post.voteStats.up) : post.voteStats.up}
@@ -372,7 +375,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   feedStatCount: {
-    color: evoconnColors.text,
+    color: '#FFFFFF',
     fontWeight: '600',
   },
 });

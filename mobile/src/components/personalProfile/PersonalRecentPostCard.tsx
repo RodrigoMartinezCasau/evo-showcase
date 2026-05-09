@@ -10,8 +10,12 @@ import {
 } from '@evoconn/constants/personalProfileLayout';
 
 // Active (colored) versions — same assets as "Para ti" active state
-import UpvoteIcon from '../../assets/detailActions/32.svg';   // green  #89D957
-import DownvoteIcon from '../../assets/detailActions/30.svg'; // red    #ff4a31
+import UpvoteIcon from '../../assets/detailActions/32.svg';
+import DownvoteIcon from '../../assets/detailActions/30.svg';
+import {
+  VOTE_RATIO_HIGH_COLOR,
+  VOTE_RATIO_LOW_COLOR,
+} from '@evoconn/constants/voteButtonAppearance';
 import SavedIcon from '../../assets/detailActions/34.svg';    // yellow #ffde59
 import FlechaIcon from '../../assets/detailActions/flecha.svg'; // currentColor → computed from %
 
@@ -48,9 +52,9 @@ function voteRatioPct(up: number, down: number): number {
 
 /** Color for the flecha/percentage icon, mirroring the "Para ti" active palette. */
 function flechaColor(pct: number): string {
-  if (pct >= 90) return '#89D957';
+  if (pct >= 90) return VOTE_RATIO_HIGH_COLOR;
   if (pct >= 50) return '#ffde59';
-  return '#ff4a31';
+  return VOTE_RATIO_LOW_COLOR;
 }
 
 /**

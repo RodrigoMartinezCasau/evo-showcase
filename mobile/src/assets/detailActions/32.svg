@@ -1,1 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="800" viewBox="0 0 600 600" height="800" preserveAspectRatio="xMidYMid meet"><path d="M 300 0 L 0 300 L 150 300 L 150 600 L 450 600 L 450 300 L 600 300 Z" fill="#89D957"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="800" viewBox="0 0 600 600" height="800" preserveAspectRatio="xMidYMid meet">
+  <defs>
+    <linearGradient id="evoUpvoteActiveGrad" x1="0" y1="1" x2="0" y2="0" gradientUnits="objectBoundingBox">
+      <stop offset="0%" stop-color="#488b1e"/>
+      <stop offset="100%" stop-color="#b7d63c"/>
+    </linearGradient>
+  </defs>
+  <path d="M 300 0 L 0 300 L 150 300 L 150 600 L 450 600 L 450 300 L 600 300 Z" fill="url(#evoUpvoteActiveGrad)"/>
+</svg>
