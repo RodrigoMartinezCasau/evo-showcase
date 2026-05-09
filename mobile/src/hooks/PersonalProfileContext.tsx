@@ -22,7 +22,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import type { CommunityPost, User } from '@evoconn/types';
+import type { CommunityPost, Rank, User } from '@evoconn/types';
 import type { FollowerEntry, FollowingEntry } from '@evoconn/data/mockPersonalProfile';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import {
@@ -41,12 +41,37 @@ function simUserToUser(u: SimUser): User {
   return { id: u.id, username: u.username, clanId: u.clanId, rank: u.rank };
 }
 
-function simPostToCommunityPost(p: SimPost, users: Record<string, SimUser>): CommunityPost {
+function simPostToCommunityPost(
+  p: SimPost,
+  users: Record<string, SimUser>,
+  profileCache: Record<string, BasicProfile>,
+): CommunityPost {
   const author = users[p.authorId];
+  let userAuthor: User;
+  if (author) {
+    userAuthor = simUserToUser(author);
+  } else {
+    const cached = profileCache[p.authorId];
+    if (cached) {
+      userAuthor = {
+        id: cached.id,
+        username: cached.username,
+        clanId: cached.clanId,
+        rank: cached.rank as Rank,
+      };
+    } else {
+      userAuthor = {
+        id: p.authorId,
+        username: p.authorUsername ?? '?',
+        clanId: p.authorClanId ?? null,
+        rank: (p.authorRank as Rank | undefined) ?? 'aprendiz',
+      };
+    }
+  }
   return {
     id: p.id,
     type: p.type,
-    author: author ? simUserToUser(author) : { id: p.authorId, username: '?', clanId: null, rank: 'aprendiz' },
+    author: userAuthor,
     title: p.title,
     body: p.body,
     quoteAuthor: p.quoteAuthor,
@@ -151,6 +176,16 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
     fetchMissingProfiles([...allUids]);
   }, [followGraph, activeUserId, users, fetchMissingProfiles]);
 
+  // Authors of saved posts (often real users not in the 9-user sim) → fill `profileCache` for usernames.
+  useLayoutEffect(() => {
+    const ids: string[] = [];
+    savedMap[activeUserId]?.forEach(postId => {
+      const sp = simPosts.find(p => p.id === postId);
+      if (sp && !users[sp.authorId] && !SIM_USERS_BY_ID[sp.authorId]) ids.push(sp.authorId);
+    });
+    fetchMissingProfiles(ids);
+  }, [savedMap, activeUserId, simPosts, users, fetchMissingProfiles]);
+
   useEffect(() => {
     registerFollowProfilePrimer(fetchMissingProfiles);
     return () => registerFollowProfilePrimer(null);
@@ -160,8 +195,8 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
   const posts = useMemo<CommunityPost[]>(
     () => simPosts
       .filter(p => p.authorId === activeUserId)
-      .map(p => simPostToCommunityPost(p, users)),
-    [simPosts, activeUserId, users],
+      .map(p => simPostToCommunityPost(p, users, profileCache)),
+    [simPosts, activeUserId, users, profileCache],
   );
 
   const hiddenPostIds = useMemo<Set<string>>(
@@ -260,8 +295,8 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
     () => [...savedPostIds]
       .map(postId => simPosts.find(p => p.id === postId))
       .filter((p): p is SimPost => p !== undefined)
-      .map(p => simPostToCommunityPost(p, users)),
-    [savedPostIds, simPosts, users],
+      .map(p => simPostToCommunityPost(p, users, profileCache)),
+    [savedPostIds, simPosts, users, profileCache],
   );
 
   const savePost = useCallback(

@@ -27,6 +27,7 @@ import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-ha
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppTopBar, ChatInputBar, SidebarDrawer } from '@evoconn/components';
+import { getAppTopBarLayoutHeight } from '@evoconn/constants/topBarLayout';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
@@ -168,7 +169,7 @@ export default function ReflectionCreationScreen() {
   );
 
   const insets = useSafeAreaInsets();
-  const topBarHeight = 60 + insets.top;
+  const topBarHeight = getAppTopBarLayoutHeight(insets.top);
   const { width: screenW, height: screenH } = useWindowDimensions();
 
   // ── Post-publish preview overlay ──────────────────────────────────────────

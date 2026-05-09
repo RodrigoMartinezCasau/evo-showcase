@@ -19,7 +19,7 @@ import {
 } from '@evoconn/constants/clanColors';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
-import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
+import { BOTTOM_BAR_LAYOUT, getBottomBarViewportReserveBottom } from '@evoconn/constants/bottomBarLayout';
 import {
   FOLLOWING_SORT_LABELS,
   FOLLOWING_SORT_MENU_ORDER,
@@ -149,11 +149,7 @@ export function BottomCommunityTabs({
   const createSz = BOTTOM_BAR_LAYOUT.BOTTOM_BAR_CREATE_BUTTON_SIZE;
   const createButtonColor = createOpen ? selectedColor : evoconnColors.muted;
 
-  const sortMenuBottomOffset =
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
-    insets.bottom +
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
-    16;
+  const sortMenuBottomOffset = getBottomBarViewportReserveBottom(insets.bottom);
 
   const onSiguiendoPress = useCallback(() => {
     if (activeTab === 'siguiendo') {
@@ -175,7 +171,7 @@ export function BottomCommunityTabs({
 
   return (
     <>
-      <View style={[styles.bar, Platform.OS === 'android' && { paddingBottom: insets.bottom }]}>
+      <View style={styles.bar}>
         {BAR_SLOTS.map((slot) => {
           if (slot.kind === 'profile') {
             const th = BOTTOM_BAR_LAYOUT.BOTTOM_BAR_UNDERLINE_THICKNESS;

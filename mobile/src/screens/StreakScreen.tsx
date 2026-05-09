@@ -21,14 +21,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getPersonalProfile } from '@evoconn/data/mockPersonalProfile';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
-import { AppTopBar, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
+import { AppTopBar, AppShellBottomTabsWrap, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
-import {
-  BOTTOM_BAR_LAYOUT,
-  getBottomBarViewportReserveBottom,
-} from '@evoconn/constants/bottomBarLayout';
+import { getAppShellScrollableBodyHeight } from '@evoconn/constants/appShellLayout';
 import { fetchStreak, type StreakData } from '@evoconn/services/streakApi';
 import { CalendarGrid } from '@evoconn/components/shared/CalendarGrid';
 import { getTopBarRachaTopByHouse } from '@evoconn/utils/getTopBarRachaTopByHouse';
@@ -234,10 +231,8 @@ export default function StreakScreen() {
     [router],
   );
 
-  // ─── Layout heights (same pattern as PersonalPhilosophyDetailScreen) ────────
-  const topBarHeight = 60 + insets.top;
-  const bottomBarHeight = getBottomBarViewportReserveBottom(insets.bottom);
-  const contentHeight = screenH - topBarHeight - bottomBarHeight;
+  // ─── Layout heights (shell unificado con Para Ti) ────────
+  const contentHeight = getAppShellScrollableBodyHeight(screenH, insets.top, insets.bottom);
 
   const totalDays = data?.activity_log.length ?? 0;
 
@@ -409,19 +404,9 @@ export default function StreakScreen() {
         </ScrollView>
       </View>
 
-      <View
-        style={[
-          styles.bottomTabsWrap,
-          {
-            paddingBottom: insets.bottom + BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION,
-            paddingHorizontal: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HORIZONTAL_PADDING,
-            bottom: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_BOTTOM_OFFSET,
-            borderRadius: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_BORDER_RADIUS,
-          },
-        ]}
-      >
+      <AppShellBottomTabsWrap>
         <BottomCommunityTabs activeTab={null} onTabChange={handleBottomTabChange} />
-      </View>
+      </AppShellBottomTabsWrap>
 
       <SidebarDrawer
         visible={sidebarOpen}
@@ -563,14 +548,5 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: 24,
-  },
-  bottomTabsWrap: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: evoconnColors.background,
-    borderTopWidth: 1,
-    borderTopColor: evoconnColors.background,
   },
 });

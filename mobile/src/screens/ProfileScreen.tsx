@@ -8,7 +8,7 @@ import { getOtherUserProfile } from '@evoconn/data/mockOtherUsers';
 import type { OtherUserProfile } from '@evoconn/data/mockOtherUsers';
 import { supabase } from '../../mobile/lib/supabase';
 import { fetchFollowCounts, fetchPostsByUser, isRealUserId } from '@evoconn/services/supabaseSocial';
-import { AppTopBar, RankBadge, ClanBanner, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
+import { AppTopBar, AppShellBottomTabsWrap, RankBadge, ClanBanner, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
@@ -17,10 +17,7 @@ import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import { getClanCardColor } from '@evoconn/theme/theme';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
-import {
-  BOTTOM_BAR_LAYOUT,
-  getBottomBarViewportReserveBottom,
-} from '@evoconn/constants/bottomBarLayout';
+import { getAppShellScrollableBodyHeight } from '@evoconn/constants/appShellLayout';
 import {
   OtherProfileFollowRow,
   UserIdentityHeader,
@@ -282,9 +279,7 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { thoughts } = useThoughts();
 
-  const topBarHeight = 60 + insets.top;
-  const bottomBarHeight = getBottomBarViewportReserveBottom(insets.bottom);
-  const contentHeight = screenH - topBarHeight - bottomBarHeight;
+  const contentHeight = getAppShellScrollableBodyHeight(screenH, insets.top, insets.bottom);
 
   // ─── Expanded post detail panel ────────────────────────────────────
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -409,19 +404,9 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
         )}
       </View>
 
-      <View
-        style={[
-          styles.bottomTabsWrap,
-          {
-            paddingBottom: insets.bottom + BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION,
-            paddingHorizontal: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HORIZONTAL_PADDING,
-            bottom: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_BOTTOM_OFFSET,
-            borderRadius: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_BORDER_RADIUS,
-          },
-        ]}
-      >
+      <AppShellBottomTabsWrap>
         <BottomCommunityTabs activeTab={null} onTabChange={handleBottomTabChange} />
-      </View>
+      </AppShellBottomTabsWrap>
 
       <SidebarDrawer
         visible={sidebarOpen}
@@ -464,14 +449,5 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: 20,
-  },
-  bottomTabsWrap: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: evoconnColors.background,
-    borderTopWidth: 1,
-    borderTopColor: evoconnColors.background,
   },
 });

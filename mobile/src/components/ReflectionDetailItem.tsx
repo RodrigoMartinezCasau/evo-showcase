@@ -1,5 +1,21 @@
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Share, Keyboard, Platform, Animated, useWindowDimensions, InteractionManager, type LayoutChangeEvent } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  Share,
+  Keyboard,
+  Platform,
+  Animated,
+  useWindowDimensions,
+  InteractionManager,
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 import type { CommunityPost, Comment } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getClanColor, NO_CLAN_COMMUNITY_POST_FRAME_COLOR } from '@evoconn/constants/clanColors';
@@ -38,6 +54,9 @@ import { blockUser, insertReport, isRealUserId } from '@evoconn/services/supabas
 import { useAuth } from '../../mobile/lib/AuthContext';
 import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
 
+const READING_SCROLLBAR_TRACK_W = 4;
+const READING_SCROLLBAR_GAP = 10;
+
 type ReflectionDetailItemProps = {
   post: CommunityPost;
   /** Visible height for this item (full screen minus top/bottom bars). */
@@ -45,6 +64,11 @@ type ReflectionDetailItemProps = {
   onAuthorPress: (userId: string) => void;
   onClanPress: (clanId: string) => void;
   onReadingModeChange?: (active: boolean) => void;
+  /**
+   * Community vertical pager (Para ti / Siguiendo): don’t capture the root responder so the
+   * outer FlatList can scroll; enable long-reflection “Ver más” reliably with nested scroll.
+   */
+  communityVerticalFeed?: boolean;
 };
 
 export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
@@ -53,6 +77,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   onAuthorPress,
   onClanPress,
   onReadingModeChange,
+  communityVerticalFeed = false,
 }: ReflectionDetailItemProps) {
   const clanColor = getClanColor(post.author.clanId);
   const reflectionPanelBorderColor =
@@ -370,19 +395,30 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
 
   const [isLongText, setIsLongText] = useState(false);
   const isLongTextRef = useRef(false);
+  const reflectionScrollLayoutH = useRef(0);
+  const reflectionContentH = useRef(0);
+  const [reflectScrollMetrics, setReflectScrollMetrics] = useState({
+    scrollY: 0,
+    viewportH: 0,
+    contentH: 0,
+  });
+
+  /** Bumps when scroll viewport height is first measured so body Text re-runs onTextLayout with a reliable budget. */
+  const [bodyLayoutKey, setBodyLayoutKey] = useState(0);
+  const scrollViewportReadyRef = useRef(false);
 
   useEffect(() => {
     setIsLongText(false);
     isLongTextRef.current = false;
     reflectionScrollLayoutH.current = 0;
     reflectionContentH.current = 0;
+    scrollViewportReadyRef.current = false;
     readingModeRef.current = false;
     setReadingMode(false);
+    setBodyLayoutKey(0);
+    setReflectScrollMetrics({ scrollY: 0, viewportH: 0, contentH: 0 });
     onReadingModeChange?.(false);
   }, [post.id, onReadingModeChange]);
-
-  const reflectionScrollLayoutH = useRef(0);
-  const reflectionContentH = useRef(0);
 
   const checkOverflow = useCallback(() => {
     if (isLongTextRef.current) return;
@@ -395,14 +431,78 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   }, []);
 
   const handleReflectionScrollLayout = useCallback((e: any) => {
-    reflectionScrollLayoutH.current = e.nativeEvent.layout.height;
+    const h = e.nativeEvent.layout.height;
+    if (h <= 0) return;
+    reflectionScrollLayoutH.current = h;
+    setReflectScrollMetrics(prev => ({ ...prev, viewportH: h }));
     checkOverflow();
   }, [checkOverflow]);
 
+  /** Row wraps track + ScrollView; height is reliable when inner ScrollView reports 0 (pager / clipping). */
+  const handleReflectionScrollRowLayout = useCallback(
+    (e: LayoutChangeEvent) => {
+      const h = e.nativeEvent.layout.height;
+      if (h <= 0) return;
+      reflectionScrollLayoutH.current = h;
+      setReflectScrollMetrics(prev => ({ ...prev, viewportH: h }));
+      if (!scrollViewportReadyRef.current) {
+        scrollViewportReadyRef.current = true;
+        setBodyLayoutKey(k => k + 1);
+      }
+      checkOverflow();
+    },
+    [checkOverflow],
+  );
+
   const handleReflectionContentSize = useCallback((_w: number, h: number) => {
     reflectionContentH.current = h;
+    setReflectScrollMetrics(prev => ({ ...prev, contentH: h }));
     checkOverflow();
   }, [checkOverflow]);
+
+  const readingModeScrollRef = useRef(readingMode);
+  readingModeScrollRef.current = readingMode;
+  const isLongTextScrollRef = useRef(isLongText);
+  isLongTextScrollRef.current = isLongText;
+
+  const handleReflectionScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (!readingModeScrollRef.current || !isLongTextScrollRef.current) return;
+    const y = e.nativeEvent?.contentOffset?.y;
+    if (typeof y !== 'number' || !Number.isFinite(y)) return;
+    setReflectScrollMetrics(prev => ({
+      ...prev,
+      scrollY: y,
+    }));
+  }, []);
+
+  type BodyTextLayoutEvent = NativeSyntheticEvent<{ lines: Array<{ y: number; height: number }> }>;
+
+  const handleBodyTextLayout = useCallback(
+    (e: BodyTextLayoutEvent) => {
+      if (isLongTextRef.current || readingModeRef.current) return;
+      const lines = e.nativeEvent?.lines;
+      if (!lines?.length) return;
+
+      if (lines.length > maxBodyLines) {
+        isLongTextRef.current = true;
+        setIsLongText(true);
+        return;
+      }
+
+      const last = lines[lines.length - 1]!;
+      const lastBottom = last.y + (last.height > 0 ? last.height : BODY_LINE_HEIGHT);
+      const titleBlockH = post.title ? titleOccupied + 10 : 0;
+      const viewportBudget =
+        reflectionScrollLayoutH.current > 0
+          ? Math.max(1, reflectionScrollLayoutH.current - titleBlockH)
+          : bodyAvailableH;
+      if (lastBottom > viewportBudget - 1) {
+        isLongTextRef.current = true;
+        setIsLongText(true);
+      }
+    },
+    [maxBodyLines, bodyAvailableH, post.title, titleOccupied],
+  );
 
   const visibleComments = useMemo(
     () => contextComments.filter((c) => !blockedUsers.has(c.author.id)),
@@ -496,7 +596,11 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   }, [kbOffset]);
 
   return (
-    <View style={[styles.container, { height: itemHeight }]} onStartShouldSetResponder={() => !readingMode} onResponderRelease={dismissKeyboard}>
+    <View
+      style={[styles.container, { height: itemHeight }]}
+      onStartShouldSetResponder={() => (communityVerticalFeed ? false : !readingMode)}
+      onResponderRelease={dismissKeyboard}
+    >
       <ReflectionBackground clan={post.author.clanId}>
         <View style={styles.content}>
           {/* ── Header ── */}
@@ -580,46 +684,74 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                 ) : null}
               </ScrollView>
             ) : (
-              <ScrollView
-                scrollEnabled={readingMode && isLongText}
-                showsVerticalScrollIndicator={readingMode && isLongText}
-                nestedScrollEnabled
-                bounces={readingMode && isLongText}
-                keyboardShouldPersistTaps="handled"
-                style={styles.reflectionScroll}
-                contentContainerStyle={{ paddingRight: REFLECTION_TEXT_RIGHT_INSET }}
-                onLayout={handleReflectionScrollLayout}
-                onContentSizeChange={handleReflectionContentSize}
-              >
-                {post.title ? (
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      styles.title,
-                      {
-                        transform: [
-                          { translateX: TL.offsetX },
-                          { translateY: TL.offsetY },
-                          { scale: TL.scale },
-                        ],
-                      },
-                    ]}
-                  >
-                    {post.title.length > TL.maxCharacters
-                      ? post.title.slice(0, TL.maxCharacters) + '…'
-                      : post.title}
-                  </Text>
+              <View style={styles.reflectionScrollRow} onLayout={handleReflectionScrollRowLayout}>
+                {readingMode &&
+                isLongText &&
+                reflectScrollMetrics.contentH > reflectScrollMetrics.viewportH + 2 ? (
+                  <View style={styles.readingScrollTrack}>
+                    {(() => {
+                      const { scrollY, viewportH, contentH } = reflectScrollMetrics;
+                      const range = Math.max(1, contentH - viewportH);
+                      const thumbH = Math.max(
+                        20,
+                        Math.min(viewportH * 0.85, (viewportH / contentH) * viewportH),
+                      );
+                      const maxTop = Math.max(0, viewportH - thumbH);
+                      const thumbTop = Math.min(maxTop, Math.max(0, (scrollY / range) * maxTop));
+                      return (
+                        <View
+                          pointerEvents="none"
+                          style={[styles.readingScrollThumb, { height: thumbH, top: thumbTop }]}
+                        />
+                      );
+                    })()}
+                  </View>
                 ) : null}
-                <Text
-                  style={styles.bodyText}
-                  numberOfLines={!readingMode && isLongText ? maxBodyLines : undefined}
+                <ScrollView
+                  style={[styles.reflectionScroll, styles.reflectionScrollFlex]}
+                  scrollEnabled={readingMode && isLongText}
+                  showsVerticalScrollIndicator={false}
+                  nestedScrollEnabled
+                  bounces={readingMode && isLongText}
+                  keyboardShouldPersistTaps="handled"
+                  scrollEventThrottle={16}
+                  onScroll={handleReflectionScroll}
+                  contentContainerStyle={{ paddingRight: REFLECTION_TEXT_RIGHT_INSET }}
+                  onLayout={handleReflectionScrollLayout}
+                  onContentSizeChange={handleReflectionContentSize}
                 >
-                  {post.body}
-                </Text>
-                {!readingMode && isLongText ? (
-                  <Text style={styles.readMoreLabel}>Ver más...</Text>
-                ) : null}
-              </ScrollView>
+                  {post.title ? (
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.title,
+                        {
+                          transform: [
+                            { translateX: TL.offsetX },
+                            { translateY: TL.offsetY },
+                            { scale: TL.scale },
+                          ],
+                        },
+                      ]}
+                    >
+                      {post.title.length > TL.maxCharacters
+                        ? post.title.slice(0, TL.maxCharacters) + '…'
+                        : post.title}
+                    </Text>
+                  ) : null}
+                  <Text
+                    key={bodyLayoutKey}
+                    style={styles.bodyText}
+                    numberOfLines={!readingMode && isLongText ? maxBodyLines : undefined}
+                    onTextLayout={handleBodyTextLayout}
+                  >
+                    {post.body}
+                  </Text>
+                  {!readingMode && isLongText ? (
+                    <Text style={styles.readMoreLabel}>Ver más...</Text>
+                  ) : null}
+                </ScrollView>
+              </View>
             )}
           </View>
 
@@ -751,8 +883,30 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     overflow: 'hidden',
   },
+  reflectionScrollRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  readingScrollTrack: {
+    width: READING_SCROLLBAR_TRACK_W,
+    marginRight: READING_SCROLLBAR_GAP,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    overflow: 'hidden',
+  },
+  readingScrollThumb: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.38)',
+  },
   reflectionScroll: {
     flex: 1,
+  },
+  reflectionScrollFlex: {
+    minWidth: 0,
   },
   title: {
     color: evoconnColors.text,

@@ -14,12 +14,6 @@ export const BOTTOM_BAR_LAYOUT = {
    */
   BOTTOM_BAR_VIEWPORT_CLEARANCE_BELOW: 20,
 
-  /**
-   * Extra px for `contentContainerStyle.paddingBottom` on scroll views that sit under the absolute bottom bar.
-   * Reference: CommunityScreen FlatList (Para Ti). Not additive with VIEWPORT_CLEARANCE_BELOW.
-   */
-  BOTTOM_BAR_SCROLL_CLEARANCE_BELOW: 16,
-
   /** Bottom inset for left-edge drawer gesture strips (Community / detail feed). */
   BOTTOM_BAR_EDGE_GESTURE_CLEARANCE_BELOW: 8,
 
@@ -28,6 +22,12 @@ export const BOTTOM_BAR_LAYOUT = {
    * Debe coincidir con `headerRow` (padding + una línea de texto + borde).
    */
   FLOATING_BAR_STACK_SUBHEADER_HEIGHT: 48,
+
+  /**
+   * Franja oscura extra bajo el scroll en clan y frases (lápiz), alineada con la sensación del feed Para Ti.
+   * Se resta de la altura del cuerpo y se suma al padding inferior del scroll.
+   */
+  BOTTOM_BAR_CLAN_PHRASES_STRIP_EXTRA: 18,
 
   BOTTOM_BAR_BORDER_RADIUS: 0,
   BOTTOM_BAR_ITEM_GAP: 0,
@@ -109,26 +109,8 @@ export function getBottomBarViewportReserveBottom(insetBottom: number): number {
 }
 
 /**
- * `paddingBottom` for scrollable content under the absolute bottom bar (same end spacing as Para Ti feed).
+ * Misma reserva que `getBottomBarViewportReserveBottom`: un solo valor para viewport y padding de scroll.
  */
 export function getBottomBarScrollContentPaddingBottom(insetBottom: number): number {
-  return (
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
-    insetBottom +
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SCROLL_CLEARANCE_BELOW
-  );
-}
-
-/**
- * Altura de la columna principal bajo `AppTopBar` cuando la barra inferior es flotante (misma geometría que Para Ti).
- * El scroll/lista no debe usar `flex:1` hasta el borde de pantalla sin esta reserva.
- */
-export function getMainColumnHeightForFloatingBottomBar(
-  windowHeight: number,
-  insetTop: number,
-  insetBottom: number,
-): number {
-  const topBarHeight = 60 + insetTop;
-  return windowHeight - topBarHeight - getBottomBarViewportReserveBottom(insetBottom);
+  return getBottomBarViewportReserveBottom(insetBottom);
 }

@@ -125,6 +125,7 @@ export function ProfileDetailPanel({
             renderItem={renderItem}
             keyExtractor={(item) => item.id}
             pagingEnabled
+            nestedScrollEnabled
             scrollEnabled={feedScrollEnabled}
             decelerationRate="fast"
             showsVerticalScrollIndicator={false}

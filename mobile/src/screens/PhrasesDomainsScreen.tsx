@@ -21,7 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { evoconnColors } from '@evoconn/theme/colors';
-import { AppTopBar, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
+import { AppTopBar, AppShellBottomTabsWrap, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useQuotes } from '@evoconn/hooks/QuotesContext';
@@ -30,10 +30,9 @@ import { getTopBarLapizByHouse } from '@evoconn/utils/getTopBarLapizByHouse';
 import { getQuotesByDomain } from '@evoconn/data/quotes';
 import { TOTAL_QUOTES_IN_DB } from '@evoconn/logic/quotes/getDomainStats';
 import {
-  BOTTOM_BAR_LAYOUT,
-  getBottomBarScrollContentPaddingBottom,
-  getMainColumnHeightForFloatingBottomBar,
-} from '@evoconn/constants/bottomBarLayout';
+  getClanPhrasesScrollPaddingBottom,
+  getClanPhrasesShellBodyHeight,
+} from '@evoconn/constants/appShellLayout';
 import { QUOTES_PENCIL_ICON_SCALE } from '@evoconn/constants/streakLayout';
 import {
   HERO_SUMMARY_ROW_GAP,
@@ -301,7 +300,7 @@ export default function PhrasesDomainsScreen() {
     [iconSlot],
   );
 
-  const bodyHeight = getMainColumnHeightForFloatingBottomBar(screenH, insets.top, insets.bottom);
+  const bodyHeight = getClanPhrasesShellBodyHeight(screenH, insets.top, insets.bottom);
 
   return (
     <View style={styles.root}>
@@ -312,12 +311,12 @@ export default function PhrasesDomainsScreen() {
       />
 
       {/* Misma franja bajo el top bar que Para Ti (no flex hasta el borde con la barra encima). */}
-      <View style={{ height: bodyHeight, overflow: 'hidden' }}>
+      <View style={{ height: bodyHeight, overflow: 'hidden', flexGrow: 0 }}>
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={[
             styles.scroll,
-            { paddingBottom: getBottomBarScrollContentPaddingBottom(insets.bottom) },
+            { paddingBottom: getClanPhrasesScrollPaddingBottom(insets.bottom) },
           ]}
           showsVerticalScrollIndicator={false}
         >
@@ -385,19 +384,9 @@ export default function PhrasesDomainsScreen() {
       </View>
 
       {/* Bottom bar */}
-      <View
-        style={[
-          styles.bottomTabsWrap,
-          {
-            paddingBottom: insets.bottom + BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION,
-            paddingHorizontal: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HORIZONTAL_PADDING,
-            bottom: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_BOTTOM_OFFSET,
-            borderRadius: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_BORDER_RADIUS,
-          },
-        ]}
-      >
+      <AppShellBottomTabsWrap>
         <BottomCommunityTabs activeTab={null} onTabChange={handleTabChange} />
-      </View>
+      </AppShellBottomTabsWrap>
 
       {/* Sidebar */}
       <SidebarDrawer
@@ -430,15 +419,6 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: evoconnColors.background,
-  },
-  bottomTabsWrap: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: evoconnColors.background,
-    borderTopWidth: 1,
-    borderTopColor: evoconnColors.background,
   },
 
   // ── Scroll ──

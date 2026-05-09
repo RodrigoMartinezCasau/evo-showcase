@@ -14,13 +14,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
 import type { CommunityPost } from '@evoconn/types';
 import { ReflectionDetailItem } from '@evoconn/components/ReflectionDetailItem';
-import { AppTopBar, SidebarDrawer, BottomCommunityTabs } from '@evoconn/components';
+import { AppTopBar, AppShellBottomTabsWrap, SidebarDrawer, BottomCommunityTabs } from '@evoconn/components';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useFeedStore } from '@evoconn/hooks/useFeedStore';
-import {
-  BOTTOM_BAR_LAYOUT,
-  getBottomBarViewportReserveBottom,
-} from '@evoconn/constants/bottomBarLayout';
+import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
+import { getAppShellScrollableBodyHeight } from '@evoconn/constants/appShellLayout';
+import { getAppTopBarLayoutHeight } from '@evoconn/constants/topBarLayout';
 import {
   COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE,
   COMMUNITY_DETAIL_PREFETCH_POSTS,
@@ -142,9 +141,8 @@ export default function DetailFeedScreen() {
     [router],
   );
 
-  const topBarHeight = 60 + insets.top;
-  const bottomBarHeight = getBottomBarViewportReserveBottom(insets.bottom);
-  const itemHeight = screenH - topBarHeight - bottomBarHeight;
+  const topBarHeight = getAppTopBarLayoutHeight(insets.top);
+  const itemHeight = getAppShellScrollableBodyHeight(screenH, insets.top, insets.bottom);
 
   const getItemLayout = useCallback(
     (_: unknown, index: number) => ({
@@ -163,6 +161,7 @@ export default function DetailFeedScreen() {
         onAuthorPress={handleAuthorPress}
         onClanPress={handleClanPress}
         onReadingModeChange={handleReadingModeChange}
+        communityVerticalFeed
       />
     ),
     [itemHeight, handleAuthorPress, handleClanPress, handleReadingModeChange],
@@ -268,6 +267,7 @@ export default function DetailFeedScreen() {
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         pagingEnabled
+        nestedScrollEnabled
         scrollEnabled={feedScrollEnabled}
         snapToInterval={itemHeight}
         decelerationRate="fast"
@@ -282,22 +282,12 @@ export default function DetailFeedScreen() {
         style={styles.list}
       />
 
-      <View
-        style={[
-          styles.bottomBar,
-          {
-            paddingBottom: insets.bottom + BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION,
-            paddingHorizontal: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HORIZONTAL_PADDING,
-            bottom: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_BOTTOM_OFFSET,
-            borderRadius: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_BORDER_RADIUS,
-          },
-        ]}
-      >
+      <AppShellBottomTabsWrap>
         <BottomCommunityTabs
           activeTab={activeTab}
           onTabChange={handleTabChange}
         />
-      </View>
+      </AppShellBottomTabsWrap>
 
       {!sidebarOpen ? (
         <GestureDetector gesture={edgeOpenGesture}>
@@ -342,12 +332,4 @@ const styles = StyleSheet.create({
     zIndex: 250,
   },
   list: { flex: 1 },
-  bottomBar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    backgroundColor: evoconnColors.background,
-    borderTopWidth: 1,
-    borderTopColor: evoconnColors.background,
-  },
 });

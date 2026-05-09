@@ -25,17 +25,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { getPersonalProfile } from '@evoconn/data/mockPersonalProfile';
-import { AppTopBar, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
+import { AppTopBar, AppShellBottomTabsWrap, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { usePreviewMode } from '@evoconn/debug/PreviewModeContext';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
-import {
-  BOTTOM_BAR_LAYOUT,
-  getBottomBarViewportReserveBottom,
-} from '@evoconn/constants/bottomBarLayout';
+import { getAppShellScrollableBodyHeight } from '@evoconn/constants/appShellLayout';
 
 import { AiSummaryCard } from '@evoconn/components/philosophyProfile/AiSummaryCard';
 import { ClanBadgesRecordCard } from '@evoconn/components/philosophyProfile/ClanBadgesRecordCard';
@@ -230,9 +227,7 @@ export default function PersonalPhilosophyDetailScreen() {
   );
 
   // ─── Layout ─────────────────────────────────────────────────────────────
-  const topBarHeight = 60 + insets.top;
-  const bottomBarHeight = getBottomBarViewportReserveBottom(insets.bottom);
-  const contentHeight = screenH - topBarHeight - bottomBarHeight;
+  const contentHeight = getAppShellScrollableBodyHeight(screenH, insets.top, insets.bottom);
 
   return (
     <View style={styles.container}>
@@ -315,19 +310,9 @@ export default function PersonalPhilosophyDetailScreen() {
         </ReflectionBackground>
       </View>
 
-      <View
-        style={[
-          styles.bottomTabsWrap,
-          {
-            paddingBottom: insets.bottom + BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION,
-            paddingHorizontal: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HORIZONTAL_PADDING,
-            bottom: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_BOTTOM_OFFSET,
-            borderRadius: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_BORDER_RADIUS,
-          },
-        ]}
-      >
+      <AppShellBottomTabsWrap>
         <BottomCommunityTabs activeTab={null} onTabChange={handleBottomTabChange} />
-      </View>
+      </AppShellBottomTabsWrap>
 
       <SidebarDrawer
         visible={sidebarOpen}
@@ -366,14 +351,5 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: 24,
-  },
-  bottomTabsWrap: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: evoconnColors.background,
-    borderTopWidth: 1,
-    borderTopColor: evoconnColors.background,
   },
 });

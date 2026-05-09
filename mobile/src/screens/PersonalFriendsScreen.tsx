@@ -18,14 +18,11 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { AppTopBar, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
+import { AppTopBar, AppShellBottomTabsWrap, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
-import {
-  BOTTOM_BAR_LAYOUT,
-  getBottomBarScrollContentPaddingBottom,
-  getMainColumnHeightForFloatingBottomBar,
-} from '@evoconn/constants/bottomBarLayout';
+import { BOTTOM_BAR_LAYOUT, getBottomBarScrollContentPaddingBottom } from '@evoconn/constants/bottomBarLayout';
+import { getMainColumnHeightForFloatingBottomBar } from '@evoconn/constants/appShellLayout';
 import { getClanProfileByHouse } from '@evoconn/utils/getClanProfileByHouse';
 import { usePersonalProfile } from '@evoconn/hooks/PersonalProfileContext';
 import type { FollowingEntry } from '@evoconn/data/mockPersonalProfile';
@@ -145,19 +142,12 @@ export default function PersonalFriendsScreen() {
         />
       </View>
 
-      <View
-        style={[
-          styles.bottomTabsWrap,
-          {
-            paddingBottom: insets.bottom + BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION,
-            paddingHorizontal: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HORIZONTAL_PADDING,
-            bottom: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_BOTTOM_OFFSET,
-            borderRadius: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_BORDER_RADIUS,
-          },
-        ]}
+      <AppShellBottomTabsWrap
+        backgroundColor="#0b0b0f"
+        borderTopColor="rgba(255,255,255,0.06)"
       >
         <BottomCommunityTabs activeTab={null} onTabChange={handleTabChange} />
-      </View>
+      </AppShellBottomTabsWrap>
 
       <SidebarDrawer
         visible={sidebarOpen}
@@ -247,14 +237,5 @@ const styles = StyleSheet.create({
   emptyText: {
     color: 'rgba(255,255,255,0.4)',
     fontSize: 14,
-  },
-  bottomTabsWrap: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#0b0b0f',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.06)',
   },
 });

@@ -20,6 +20,7 @@ import { useConversationFolders } from '@evoconn/hooks/ConversationFoldersContex
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
+import { getAppTopBarLayoutHeight } from '@evoconn/constants/topBarLayout';
 import { COMMUNITY_DRAWER_EDGE_ZONE_WIDTH } from '@evoconn/constants/communityDrawerGesture';
 import { useSidebarGesture } from '@evoconn/hooks/useSidebarGesture';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
@@ -146,7 +147,7 @@ export default function PhraseCreationScreen() {
   const PublishStar = useMemo(() => getPublishStarByClan(activeClan), [activeClan]);
 
   const insets = useSafeAreaInsets();
-  const topBarHeight = 60 + insets.top;
+  const topBarHeight = getAppTopBarLayoutHeight(insets.top);
   const { width: screenW, height: screenH } = useWindowDimensions();
 
   // ── Post-publish preview overlay ────────────────────────────────────────────

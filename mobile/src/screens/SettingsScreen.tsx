@@ -19,13 +19,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { DAILY_USES_LIMIT } from '@evoconn/services/userStatsStorage';
-import { AppTopBar, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
+import { AppTopBar, AppShellBottomTabsWrap, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
-import {
-  BOTTOM_BAR_LAYOUT,
-  getBottomBarViewportReserveBottom,
-} from '@evoconn/constants/bottomBarLayout';
+import { getAppShellScrollableBodyHeight } from '@evoconn/constants/appShellLayout';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { getClanProfileByHouse } from '@evoconn/utils/getClanProfileByHouse';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
@@ -313,9 +310,7 @@ export default function SettingsScreen({
     [router],
   );
 
-  const topBarHeight    = 60 + insets.top;
-  const bottomBarHeight = getBottomBarViewportReserveBottom(insets.bottom);
-  const contentHeight   = screenH - topBarHeight - bottomBarHeight;
+  const contentHeight = getAppShellScrollableBodyHeight(screenH, insets.top, insets.bottom);
 
   const fallbackDeleteAccount = useCallback(() => Alert.alert('Eliminar cuenta', 'Función no disponible.'), []);
   const confirmDeleteAccount  = onDeleteAccount ?? fallbackDeleteAccount;
@@ -467,9 +462,9 @@ export default function SettingsScreen({
         </ScrollView>
       </View>
 
-      <View style={[styles.bottomTabsWrap, { paddingBottom: insets.bottom + BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION, paddingHorizontal: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HORIZONTAL_PADDING, bottom: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_BOTTOM_OFFSET, borderRadius: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_BORDER_RADIUS }]}>
+      <AppShellBottomTabsWrap>
         <BottomCommunityTabs activeTab={null} onTabChange={handleBottomTabChange} />
-      </View>
+      </AppShellBottomTabsWrap>
 
       <SidebarDrawer
         visible={sidebarOpen}
@@ -524,5 +519,4 @@ const styles = StyleSheet.create({
   logoutBtn:      { backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: 18, borderWidth: 1, borderColor: 'rgba(239,68,68,0.25)', paddingVertical: 16, alignItems: 'center' },
   logoutText:     { color: evoconnColors.danger, fontSize: 16, fontWeight: '600', letterSpacing: 0.2 },
   bottomSpacer:   { height: 24 },
-  bottomTabsWrap: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: evoconnColors.background, borderTopWidth: 1, borderTopColor: evoconnColors.background },
 });

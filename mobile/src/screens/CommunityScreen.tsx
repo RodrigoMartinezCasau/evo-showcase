@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Animated,
   Easing,
+  Platform,
   useWindowDimensions,
 } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -13,6 +14,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   AppTopBar,
+  AppShellBottomTabsWrap,
   CommunityPostCard,
   BottomCommunityTabs,
   SidebarDrawer,
@@ -23,16 +25,16 @@ import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContex
 import { useParatiSeenPosts } from '@evoconn/hooks/ParatiSeenPostsContext';
 import type { CommunityPost } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
-import {
-  BOTTOM_BAR_LAYOUT,
-  getBottomBarScrollContentPaddingBottom,
-  getMainColumnHeightForFloatingBottomBar,
-} from '@evoconn/constants/bottomBarLayout';
+import { BOTTOM_BAR_LAYOUT, getBottomBarScrollContentPaddingBottom } from '@evoconn/constants/bottomBarLayout';
+import { getMainColumnHeightForFloatingBottomBar } from '@evoconn/constants/appShellLayout';
+import { getAppTopBarLayoutHeight } from '@evoconn/constants/topBarLayout';
+import { useEvoPreferences } from '@evoconn/hooks/EvoPreferencesContext';
 import {
   COMMUNITY_DRAWER_EDGE_ZONE_WIDTH,
   COMMUNITY_DRAWER_GESTURE_RANGE_X,
 } from '@evoconn/constants/communityDrawerGesture';
 import {
+  COMMUNITY_DETAIL_DECELERATION_RATE_IOS,
   COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE,
   COMMUNITY_DETAIL_PREFETCH_POSTS,
 } from '@evoconn/constants/communityDetailFeed';
@@ -121,15 +123,6 @@ function getDataForMode(
   }
 }
 
-function sameCommunityPostOrder(a: CommunityPost[], b: CommunityPost[]): boolean {
-  if (a === b) return true;
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    if (a[i]!.id !== b[i]!.id) return false;
-  }
-  return true;
-}
-
 function clampDetailInitialIndex(dataLength: number, initialIndex: number): number {
   if (dataLength <= 0) return 0;
   return Math.min(Math.max(0, initialIndex), dataLength - 1);
@@ -156,6 +149,7 @@ export default function CommunityScreen() {
   const { posts: allPosts, getPostById } = useFeedStore();
   const { getBoost, revision: tasteRevision, recordDwell } = useRecommendationTaste();
   const { seenIds: paratiSeenIds, markParatiPostSeen } = useParatiSeenPosts();
+  const { triggerHaptic } = useEvoPreferences();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const drawerOpenProgress = useRef(new Animated.Value(0)).current;
   const gestureCommittingRef = useRef(false);
@@ -192,6 +186,8 @@ export default function CommunityScreen() {
   detailFeedModeRef.current = detailFeed?.mode ?? null;
   const markParatiSeenRef = useRef(markParatiPostSeen);
   markParatiSeenRef.current = markParatiPostSeen;
+  const triggerHapticRef = useRef(triggerHaptic);
+  triggerHapticRef.current = triggerHaptic;
 
   const seenForParatiOrder = foryouSeenFrozen ?? paratiSeenIds;
 
@@ -290,23 +286,10 @@ export default function CommunityScreen() {
     ],
   );
 
-  // Mantener el feed ampliado alineado con el ranking actual (votos, nuevos posts…).
-  useEffect(() => {
-    setDetailFeed((prev) => {
-      if (!prev) return prev;
-      const nextData = prev.mode === 'foryou' ? foryouFeedOrdered : followingFeedOrdered;
-      const safeIdx = Math.min(prev.initialIndex, Math.max(0, prev.data.length - 1));
-      const anchorId = prev.data[safeIdx]?.id;
-      let nextInitial = prev.initialIndex;
-      if (anchorId) {
-        const ni = nextData.findIndex((p) => p.id === anchorId);
-        if (ni >= 0) nextInitial = ni;
-      }
-      nextInitial = clampDetailInitialIndex(nextData.length, nextInitial);
-      if (sameCommunityPostOrder(prev.data, nextData)) return prev;
-      return { ...prev, data: nextData, initialIndex: nextInitial };
-    });
-  }, [foryouFeedOrdered, followingFeedOrdered]);
+  // No sincronizar `detailFeed.data` con el ranking en vivo mientras el visor está abierto:
+  // votos, taste y “vistos” reordenan `foryouFeedOrdered` y sustituir `data` hace que FlatList
+  // salte o parezca que la publicación “desaparece”. La lista es snapshot al abrir; al cerrar,
+  // la próxima apertura trae el orden actual.
 
   useEffect(() => {
     if (!tabParam) return;
@@ -432,7 +415,7 @@ export default function CommunityScreen() {
     };
   }, [transitionTab, tabSlideAnim]);
 
-  const topBarHeight = 60 + insets.top;
+  const topBarHeight = getAppTopBarLayoutHeight(insets.top);
   const feedItemHeight = getMainColumnHeightForFloatingBottomBar(screenH, insets.top, insets.bottom);
 
   const listData = useMemo(() => {
@@ -494,6 +477,7 @@ export default function CommunityScreen() {
         onAuthorPress={handleAuthorPress}
         onClanPress={handleClanPress}
         onReadingModeChange={handleReadingModeChange}
+        communityVerticalFeed
       />
     ),
     [feedItemHeight, handleAuthorPress, handleClanPress, handleReadingModeChange],
@@ -641,6 +625,7 @@ export default function CommunityScreen() {
           const ms = now - prev.since;
           const prevPost = tasteDwellRefs.current.getPostById(prev.postId);
           if (prevPost && ms >= 450) tasteDwellRefs.current.recordDwell(prevPost, ms);
+          triggerHapticRef.current('light');
         }
         dwellRef.current = { postId: post.id, since: now };
 
@@ -839,8 +824,11 @@ export default function CommunityScreen() {
               renderItem={renderFeedItem}
               keyExtractor={(item) => item.id}
               pagingEnabled
+              nestedScrollEnabled
               scrollEnabled={feedScrollEnabled && !profileOverlayActive}
-              decelerationRate="fast"
+              decelerationRate={
+                Platform.OS === 'ios' ? COMMUNITY_DETAIL_DECELERATION_RATE_IOS : 'fast'
+              }
               showsVerticalScrollIndicator={false}
               getItemLayout={getFeedItemLayout}
               initialScrollIndex={
@@ -888,24 +876,14 @@ export default function CommunityScreen() {
         ) : null}
       </View>
 
-      <View
-        style={[
-          styles.bottomTabsWrap,
-          {
-            paddingBottom: insets.bottom + BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION,
-            paddingHorizontal: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HORIZONTAL_PADDING,
-            bottom: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_BOTTOM_OFFSET,
-            borderRadius: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_BORDER_RADIUS,
-          },
-        ]}
-      >
+      <AppShellBottomTabsWrap>
         <BottomCommunityTabs
           activeTab={displayTab}
           onTabChange={handleTabChange}
           followingSort={followingSort}
           onFollowingSortChange={setFollowingSort}
         />
-      </View>
+      </AppShellBottomTabsWrap>
 
       {/* Left-edge: sidebar gesture — only when profile overlay is NOT active */}
       {!sidebarOpen && !profileOverlayActive ? (
@@ -986,13 +964,4 @@ const styles = StyleSheet.create({
   },
   panelInner: { flex: 1 },
   list: { paddingTop: 8 },
-  bottomTabsWrap: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: evoconnColors.background,
-    borderTopWidth: 1,
-    borderTopColor: evoconnColors.background,
-  },
 });

@@ -185,3 +185,22 @@ export function topBarIconEditorStyle(
   };
 }
 
+/**
+ * Altura vertical que ocupa `AppTopBar` en el layout (padding safe + fila de iconos + padding inferior).
+ * Usar en **todas** las pantallas que calculan `contentHeight` / listas bajo la barra inferior flotante.
+ * Debe mantenerse alineado con `AppTopBar.tsx` (paddingTop / paddingBottom / fila más alta).
+ */
+export function getAppTopBarLayoutHeight(insetTop: number): number {
+  const paddingTop = insetTop + TOP_BAR_LAYOUT.SAFE_TOP_OFFSET;
+  const iconVerticalPad = 12; // `iconBtn` / `counterBtn` paddingVertical: 6 × 2
+  const rowBody = Math.max(
+    TOP_BAR_LAYOUT.SHIELD_SIZE + iconVerticalPad,
+    TOP_BAR_LAYOUT.MENU_SIZE + iconVerticalPad,
+    TOP_BAR_LAYOUT.STAR_SIZE + iconVerticalPad,
+    TOP_BAR_LAYOUT.COUNTER_ICON_SIZE + iconVerticalPad,
+  );
+  const contentH = paddingTop + rowBody + TOP_BAR_LAYOUT.TOPBAR_PADDING_BOTTOM;
+  const minH = TOP_BAR_LAYOUT.TOPBAR_MIN_HEIGHT + insetTop;
+  return Math.max(contentH, minH);
+}
+
