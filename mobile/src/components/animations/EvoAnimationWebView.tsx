@@ -80,7 +80,7 @@ export async function ensureAnimationAssets(): Promise<void> {
 
   _copyPromise = (async () => {
     const STAMP_FILE = ANIM_DIR + '.stamp';
-    const APP_VERSION = '51';
+    const APP_VERSION = '53';
 
     try {
       const stampInfo = await FileSystem.getInfoAsync(STAMP_FILE);
@@ -153,6 +153,8 @@ export type EvoAnimationProps = {
   rank?: { previous: string; current: string; percentage: number };
   rankMessage?: string;
   locale?: 'es' | 'en';
+  /** Inyectado en Android para `streak`: menos partículas / sin filtro costoso en la estrella. */
+  animationLowGpu?: boolean;
 };
 
 type Props = {
@@ -202,7 +204,7 @@ async function buildInlinedHtml(name: EvoAnimationName): Promise<string> {
       '<style id="evo-android-fix">' +
       'html,body{height:100%!important;width:100%!important;overflow:hidden!important}' +
       '.stage{position:absolute!important;top:0!important;left:0!important;right:0!important;bottom:0!important}' +
-      '.flash{position:absolute!important;top:0!important;left:0!important;right:0!important;bottom:0!important}' +
+      '.flash{position:absolute!important;top:0!important;left:0!important;right:0!important;bottom:0!important;pointer-events:none!important}' +
       '</style>';
     if (html.includes('<head>')) {
       html = html.replace('<head>', '<head>' + ANDROID_POS_FIX);
@@ -375,10 +377,13 @@ export function EvoAnimationWebView({
 
   // Inject props + real screen dimensions before the page loads.
   // Merge soundsEnabled so HTML animations can gate their Web Audio synthesis.
-  const injectedBeforeLoad = useMemo(
-    () => `window.EVO_PROPS = ${JSON.stringify({ ...params, soundsEnabled: prefSounds })}; window.EVO_SCREEN_WIDTH = ${winW}; window.EVO_SCREEN_HEIGHT = ${winH}; true;`,
-    [params, winW, winH, prefSounds],
-  );
+  const injectedBeforeLoad = useMemo(() => {
+    const base: Record<string, unknown> = { ...params, soundsEnabled: prefSounds };
+    if (Platform.OS === 'android' && name === 'streak') {
+      base.animationLowGpu = true;
+    }
+    return `window.EVO_PROPS = ${JSON.stringify(base)}; window.EVO_SCREEN_WIDTH = ${winW}; window.EVO_SCREEN_HEIGHT = ${winH}; true;`;
+  }, [params, winW, winH, prefSounds, name]);
 
   const onMessage = useCallback(
     (e: WebViewMessageEvent) => {
@@ -512,6 +517,7 @@ export function EvoAnimationWebView({
               scrollEnabled={false}
               bounces={false}
               overScrollMode="never"
+              // Android: "software" suavizaba toques pero laggeaba canvas/CSS; toques de racha van en HTML.
               androidLayerType="hardware"
               setSupportMultipleWindows={false}
               scalesPageToFit={false}

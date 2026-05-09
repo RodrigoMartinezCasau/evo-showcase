@@ -191,6 +191,13 @@ export default function AppAnimationLayer() {
     }
   }, []);
 
+  // Si el WebView no entrega toque / JS se queda colgado, no dejar el modal eternamente.
+  useEffect(() => {
+    if (!showStreak) return;
+    const t = setTimeout(() => closeStreakAndMaybeShowNoUses(), 90_000);
+    return () => clearTimeout(t);
+  }, [showStreak, closeStreakAndMaybeShowNoUses]);
+
   // ── Clan reveal / change animation ──────────────────────────────────────
   const [showClanReveal, setShowClanReveal] = useState(false);
   const [clanRevealPreviousId, setClanRevealPreviousId] = useState<string | null>(null);

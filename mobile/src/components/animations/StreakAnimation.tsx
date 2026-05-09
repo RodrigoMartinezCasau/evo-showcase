@@ -149,7 +149,8 @@ export default function StreakAnimation({
 
       const fireTick = (ts: number) => {
         if (!lastTs) lastTs = ts;
-        const dt = ts - lastTs; lastTs = ts;
+        const dt = Math.min(ts - lastTs, 48);
+        lastTs = ts;
         kfProg += dt;
         const dur = durations[kf % durations.length];
         if (kfProg >= dur) { kfProg -= dur; kf = (kf + 1) % scales.length; }
