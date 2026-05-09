@@ -29,7 +29,11 @@ import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { getTopBarLapizByHouse } from '@evoconn/utils/getTopBarLapizByHouse';
 import { getQuotesByDomain } from '@evoconn/data/quotes';
 import { TOTAL_QUOTES_IN_DB } from '@evoconn/logic/quotes/getDomainStats';
-import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
+import {
+  BOTTOM_BAR_LAYOUT,
+  getBottomBarScrollContentPaddingBottom,
+  getMainColumnHeightForFloatingBottomBar,
+} from '@evoconn/constants/bottomBarLayout';
 import { QUOTES_PENCIL_ICON_SCALE } from '@evoconn/constants/streakLayout';
 import {
   HERO_SUMMARY_ROW_GAP,
@@ -253,7 +257,7 @@ function DomainCard({ stat, onPress }: DomainCardProps) {
 export default function PhrasesDomainsScreen() {
   const router      = useRouter();
   const insets      = useSafeAreaInsets();
-  const { width: screenW } = useWindowDimensions();
+  const { width: screenW, height: screenH } = useWindowDimensions();
   const { thoughts } = useThoughts();
 
   const activeClan  = useActiveClan(mockCurrentUser.clanId);
@@ -274,13 +278,6 @@ export default function PhrasesDomainsScreen() {
 
   const [sidebarOpen,  setSidebarOpen]  = useState(false);
   const [detailDomain, setDetailDomain] = useState<DomainStats | null>(null);
-
-  // ─── Bottom bar height ───────────────────────────────────────────────────────
-  const bottomBarH =
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
-    insets.bottom +
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
-    20;
 
   // ─── Navigation ─────────────────────────────────────────────────────────────
   const handleTabChange = useCallback(
@@ -304,6 +301,8 @@ export default function PhrasesDomainsScreen() {
     [iconSlot],
   );
 
+  const bodyHeight = getMainColumnHeightForFloatingBottomBar(screenH, insets.top, insets.bottom);
+
   return (
     <View style={styles.root}>
       {/* Top bar */}
@@ -312,15 +311,16 @@ export default function PhrasesDomainsScreen() {
         showClanIcon
       />
 
-      {/* Scrollable body */}
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={[
-          styles.scroll,
-          { paddingBottom: bottomBarH + 16 },
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
+      {/* Misma franja bajo el top bar que Para Ti (no flex hasta el borde con la barra encima). */}
+      <View style={{ height: bodyHeight, overflow: 'hidden' }}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={[
+            styles.scroll,
+            { paddingBottom: getBottomBarScrollContentPaddingBottom(insets.bottom) },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
         {/* ── Summary card ──────────────────────────────────────────────────── */}
         <View style={styles.summaryCard}>
           <View style={styles.heroCenterSlot}>
@@ -381,7 +381,8 @@ export default function PhrasesDomainsScreen() {
             Las frases asociadas a tus reflexiones provienen exclusivamente de esta base de datos enteramente diseñada por @Evoconn.
           </Text>
         </View>
-      </ScrollView>
+        </ScrollView>
+      </View>
 
       {/* Bottom bar */}
       <View

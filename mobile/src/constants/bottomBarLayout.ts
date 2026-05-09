@@ -8,6 +8,27 @@ export const BOTTOM_BAR_LAYOUT = {
   /** Used for list padding so content never hides under the bar. */
   BOTTOM_BAR_HEIGHT: 52,
 
+  /**
+   * Clearance below the bar when computing full-screen viewport height (feed item height, profile grids, etc.).
+   * Reference: CommunityScreen (Para Ti).
+   */
+  BOTTOM_BAR_VIEWPORT_CLEARANCE_BELOW: 20,
+
+  /**
+   * Extra px for `contentContainerStyle.paddingBottom` on scroll views that sit under the absolute bottom bar.
+   * Reference: CommunityScreen FlatList (Para Ti). Not additive with VIEWPORT_CLEARANCE_BELOW.
+   */
+  BOTTOM_BAR_SCROLL_CLEARANCE_BELOW: 16,
+
+  /** Bottom inset for left-edge drawer gesture strips (Community / detail feed). */
+  BOTTOM_BAR_EDGE_GESTURE_CLEARANCE_BELOW: 8,
+
+  /**
+   * Altura fija del bloque “flecha atrás + título” bajo AppTopBar (notificaciones, seguidos, etc.).
+   * Debe coincidir con `headerRow` (padding + una línea de texto + borde).
+   */
+  FLOATING_BAR_STACK_SUBHEADER_HEIGHT: 48,
+
   BOTTOM_BAR_BORDER_RADIUS: 0,
   BOTTOM_BAR_ITEM_GAP: 0,
 
@@ -76,3 +97,38 @@ export const BOTTOM_BAR_LAYOUT = {
    */
   FOLLOWING_SORT_DROPDOWN_TEXT_UNIVERSAL_OFFSET_Y: 0,
 } as const;
+
+/** Height to subtract from screen when the main content area must clear the floating bottom bar (Para Ti). */
+export function getBottomBarViewportReserveBottom(insetBottom: number): number {
+  return (
+    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
+    insetBottom +
+    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
+    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_VIEWPORT_CLEARANCE_BELOW
+  );
+}
+
+/**
+ * `paddingBottom` for scrollable content under the absolute bottom bar (same end spacing as Para Ti feed).
+ */
+export function getBottomBarScrollContentPaddingBottom(insetBottom: number): number {
+  return (
+    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
+    insetBottom +
+    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
+    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SCROLL_CLEARANCE_BELOW
+  );
+}
+
+/**
+ * Altura de la columna principal bajo `AppTopBar` cuando la barra inferior es flotante (misma geometría que Para Ti).
+ * El scroll/lista no debe usar `flex:1` hasta el borde de pantalla sin esta reserva.
+ */
+export function getMainColumnHeightForFloatingBottomBar(
+  windowHeight: number,
+  insetTop: number,
+  insetBottom: number,
+): number {
+  const topBarHeight = 60 + insetTop;
+  return windowHeight - topBarHeight - getBottomBarViewportReserveBottom(insetBottom);
+}

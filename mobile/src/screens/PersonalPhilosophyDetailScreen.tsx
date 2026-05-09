@@ -32,7 +32,10 @@ import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { usePreviewMode } from '@evoconn/debug/PreviewModeContext';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
-import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
+import {
+  BOTTOM_BAR_LAYOUT,
+  getBottomBarViewportReserveBottom,
+} from '@evoconn/constants/bottomBarLayout';
 
 import { AiSummaryCard } from '@evoconn/components/philosophyProfile/AiSummaryCard';
 import { ClanBadgesRecordCard } from '@evoconn/components/philosophyProfile/ClanBadgesRecordCard';
@@ -228,11 +231,7 @@ export default function PersonalPhilosophyDetailScreen() {
 
   // ─── Layout ─────────────────────────────────────────────────────────────
   const topBarHeight = 60 + insets.top;
-  const bottomBarHeight =
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
-    insets.bottom +
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
-    20;
+  const bottomBarHeight = getBottomBarViewportReserveBottom(insets.bottom);
   const contentHeight = screenH - topBarHeight - bottomBarHeight;
 
   return (

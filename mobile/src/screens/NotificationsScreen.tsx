@@ -18,13 +18,18 @@ import {
   TouchableOpacity,
   StyleSheet,
   type ListRenderItemInfo,
+  useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AppTopBar, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
-import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
+import {
+  BOTTOM_BAR_LAYOUT,
+  getBottomBarScrollContentPaddingBottom,
+  getMainColumnHeightForFloatingBottomBar,
+} from '@evoconn/constants/bottomBarLayout';
 import { useNotifications } from '@evoconn/hooks/NotificationsContext';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
@@ -152,6 +157,7 @@ function EmptyState() {
 export default function NotificationsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { height: screenH } = useWindowDimensions();
   const { notifications, markAllRead, refreshNotifications } = useNotifications();
   const { users } = useSimulation();
   const { thoughts } = useThoughts();
@@ -163,12 +169,6 @@ export default function NotificationsScreen() {
     },
     [router],
   );
-
-  const bottomBarH =
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
-    insets.bottom +
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
-    20;
 
   // Fresh data when opening the screen (fixes stale empty state if activeUserId was late).
   useFocusEffect(
@@ -229,8 +229,12 @@ export default function NotificationsScreen() {
     [],
   );
 
+  const listPanelHeight =
+    getMainColumnHeightForFloatingBottomBar(screenH, insets.top, insets.bottom) -
+    BOTTOM_BAR_LAYOUT.FLOATING_BAR_STACK_SUBHEADER_HEIGHT;
+
   return (
-    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
+    <View style={styles.container}>
       <AppTopBar onMenuPress={() => setSidebarOpen(true)} />
 
       {/* Back arrow + title — same pattern as PersonalFollowersScreen */}
@@ -241,17 +245,22 @@ export default function NotificationsScreen() {
         <Text style={styles.screenTitle}>NOTIFICACIONES</Text>
       </View>
 
-      <FlatList
-        data={notifications}
-        renderItem={renderItem}
-        keyExtractor={keyExtractor}
-        ItemSeparatorComponent={Separator}
-        ListEmptyComponent={EmptyState}
-        contentContainerStyle={
-          notifications.length === 0 ? styles.emptyContainer : { paddingBottom: bottomBarH + 8 }
-        }
-        showsVerticalScrollIndicator={false}
-      />
+      <View style={{ height: listPanelHeight, overflow: 'hidden' }}>
+        <FlatList
+          style={{ flex: 1 }}
+          data={notifications}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          ItemSeparatorComponent={Separator}
+          ListEmptyComponent={EmptyState}
+          contentContainerStyle={
+            notifications.length === 0
+              ? styles.emptyContainer
+              : { paddingBottom: getBottomBarScrollContentPaddingBottom(insets.bottom) }
+          }
+          showsVerticalScrollIndicator={false}
+        />
+      </View>
 
       <View
         style={[

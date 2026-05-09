@@ -22,7 +22,10 @@ import { DAILY_USES_LIMIT } from '@evoconn/services/userStatsStorage';
 import { AppTopBar, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
-import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
+import {
+  BOTTOM_BAR_LAYOUT,
+  getBottomBarViewportReserveBottom,
+} from '@evoconn/constants/bottomBarLayout';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { getClanProfileByHouse } from '@evoconn/utils/getClanProfileByHouse';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
@@ -311,7 +314,7 @@ export default function SettingsScreen({
   );
 
   const topBarHeight    = 60 + insets.top;
-  const bottomBarHeight = BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT + insets.bottom + BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION + 20;
+  const bottomBarHeight = getBottomBarViewportReserveBottom(insets.bottom);
   const contentHeight   = screenH - topBarHeight - bottomBarHeight;
 
   const fallbackDeleteAccount = useCallback(() => Alert.alert('Eliminar cuenta', 'Función no disponible.'), []);

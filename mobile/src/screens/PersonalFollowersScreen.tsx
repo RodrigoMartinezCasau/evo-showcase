@@ -12,6 +12,7 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
+  useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,7 +21,11 @@ import { evoconnColors } from '@evoconn/theme/colors';
 import { AppTopBar, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
-import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
+import {
+  BOTTOM_BAR_LAYOUT,
+  getBottomBarScrollContentPaddingBottom,
+  getMainColumnHeightForFloatingBottomBar,
+} from '@evoconn/constants/bottomBarLayout';
 import { getClanProfileByHouse } from '@evoconn/utils/getClanProfileByHouse';
 import { usePersonalProfile } from '@evoconn/hooks/PersonalProfileContext';
 import type { FollowerEntry } from '@evoconn/data/mockPersonalProfile';
@@ -103,6 +108,7 @@ function FollowerRow({
 export default function PersonalFollowersScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { height: screenH } = useWindowDimensions();
   const { thoughts } = useThoughts();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
 
@@ -120,12 +126,6 @@ export default function PersonalFollowersScreen() {
     },
     [router],
   );
-
-  const bottomBarH =
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
-    insets.bottom +
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
-    20;
 
   const handleUserPress = useCallback(
     (id: string) => {
@@ -148,6 +148,10 @@ export default function PersonalFollowersScreen() {
     [followingBackIds, followBack, unfollowBack, isFollowingBack, handleUserPress],
   );
 
+  const listPanelHeight =
+    getMainColumnHeightForFloatingBottomBar(screenH, insets.top, insets.bottom) -
+    BOTTOM_BAR_LAYOUT.FLOATING_BAR_STACK_SUBHEADER_HEIGHT;
+
   return (
     <View style={styles.container}>
       <AppTopBar onMenuPress={() => setSidebarOpen(true)} />
@@ -159,14 +163,17 @@ export default function PersonalFollowersScreen() {
         <Text style={styles.screenTitle}>SEGUIDORES</Text>
       </View>
 
-      <FlatList
-        data={followers}
-        keyExtractor={item => item.id}
-        renderItem={renderItem}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: bottomBarH + 8 }}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-      />
+      <View style={{ height: listPanelHeight, overflow: 'hidden' }}>
+        <FlatList
+          style={{ flex: 1 }}
+          data={followers}
+          keyExtractor={item => item.id}
+          renderItem={renderItem}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: getBottomBarScrollContentPaddingBottom(insets.bottom) }}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+        />
+      </View>
 
       <View
         style={[

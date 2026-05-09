@@ -17,7 +17,10 @@ import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import { getClanCardColor } from '@evoconn/theme/theme';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
-import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
+import {
+  BOTTOM_BAR_LAYOUT,
+  getBottomBarViewportReserveBottom,
+} from '@evoconn/constants/bottomBarLayout';
 import {
   OtherProfileFollowRow,
   UserIdentityHeader,
@@ -280,11 +283,7 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
   const { thoughts } = useThoughts();
 
   const topBarHeight = 60 + insets.top;
-  const bottomBarHeight =
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
-    insets.bottom +
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
-    20;
+  const bottomBarHeight = getBottomBarViewportReserveBottom(insets.bottom);
   const contentHeight = screenH - topBarHeight - bottomBarHeight;
 
   // ─── Expanded post detail panel ────────────────────────────────────

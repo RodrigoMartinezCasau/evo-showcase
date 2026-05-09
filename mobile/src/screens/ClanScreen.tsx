@@ -1,11 +1,15 @@
 import React, { useCallback, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, useWindowDimensions } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppTopBar, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
-import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
+import {
+  BOTTOM_BAR_LAYOUT,
+  getBottomBarScrollContentPaddingBottom,
+  getMainColumnHeightForFloatingBottomBar,
+} from '@evoconn/constants/bottomBarLayout';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { ClanDisplay } from '@evoconn/components/clan/ClanDisplay';
 
@@ -13,20 +17,17 @@ export default function ClanScreen() {
   const { id }    = useLocalSearchParams<{ id: string }>();
   const router    = useRouter();
   const insets    = useSafeAreaInsets();
+  const { height: screenH } = useWindowDimensions();
   const { thoughts } = useThoughts();
 
   const clanId = id ?? 'estoico';
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const bottomBarHeight =
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
-    insets.bottom +
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
-    20;
-
   const handleBottomTabChange = useCallback((tab: TabId) => {
     router.replace({ pathname: '/(tabs)', params: { tab } });
   }, [router]);
+
+  const bodyHeight = getMainColumnHeightForFloatingBottomBar(screenH, insets.top, insets.bottom);
 
   return (
     <View style={styles.container}>
@@ -34,10 +35,10 @@ export default function ClanScreen() {
         onMenuPress={() => setSidebarOpen(true)}
       />
 
-      <View style={styles.content}>
+      <View style={[styles.content, { height: bodyHeight }]}>
         <ClanDisplay
           clanId={clanId}
-          bottomPadding={bottomBarHeight + 28}
+          bottomPadding={getBottomBarScrollContentPaddingBottom(insets.bottom)}
         />
       </View>
 
@@ -81,6 +82,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    backgroundColor: evoconnColors.card,
+    bottom: 0,
+    backgroundColor: evoconnColors.background,
+    borderTopWidth: 1,
+    borderTopColor: evoconnColors.background,
   },
 });

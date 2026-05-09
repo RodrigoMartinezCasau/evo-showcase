@@ -25,7 +25,10 @@ import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
 import { ProfileDetailPanel } from '@evoconn/components/ProfileDetailPanel';
-import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
+import {
+  BOTTOM_BAR_LAYOUT,
+  getBottomBarViewportReserveBottom,
+} from '@evoconn/constants/bottomBarLayout';
 import {
   PERSONAL_POSTS_CARD_SCALE,
   PERSONAL_POSTS_COLUMN_GAP,
@@ -103,12 +106,8 @@ export default function PersonalPostsScreen() {
 
   // ─── Layout ───────────────────────────────────────────────────────
   const topBarHeight   = 60 + insets.top;
-  const bottomBarH     =
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
-    insets.bottom +
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
-    20;
-  const contentHeight  = screenH - topBarHeight - bottomBarH;
+  const bottomBarH    = getBottomBarViewportReserveBottom(insets.bottom);
+  const contentHeight = screenH - topBarHeight - bottomBarH;
 
   // ─── Column widths ─────────────────────────────────────────────────
   const H_PADDING  = 16;

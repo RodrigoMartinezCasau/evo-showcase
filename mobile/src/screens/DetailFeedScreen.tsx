@@ -17,7 +17,10 @@ import { ReflectionDetailItem } from '@evoconn/components/ReflectionDetailItem';
 import { AppTopBar, SidebarDrawer, BottomCommunityTabs } from '@evoconn/components';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useFeedStore } from '@evoconn/hooks/useFeedStore';
-import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
+import {
+  BOTTOM_BAR_LAYOUT,
+  getBottomBarViewportReserveBottom,
+} from '@evoconn/constants/bottomBarLayout';
 import {
   COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE,
   COMMUNITY_DETAIL_PREFETCH_POSTS,
@@ -140,11 +143,7 @@ export default function DetailFeedScreen() {
   );
 
   const topBarHeight = 60 + insets.top;
-  const bottomBarHeight =
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
-    insets.bottom +
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
-    20;
+  const bottomBarHeight = getBottomBarViewportReserveBottom(insets.bottom);
   const itemHeight = screenH - topBarHeight - bottomBarHeight;
 
   const getItemLayout = useCallback(
@@ -312,7 +311,7 @@ export default function DetailFeedScreen() {
                   BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
                   insets.bottom +
                   BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
-                  8,
+                  BOTTOM_BAR_LAYOUT.BOTTOM_BAR_EDGE_GESTURE_CLEARANCE_BELOW,
               },
             ]}
           />

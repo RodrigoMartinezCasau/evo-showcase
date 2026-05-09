@@ -25,7 +25,10 @@ import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { usePreviewMode } from '@evoconn/debug/PreviewModeContext';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
-import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
+import {
+  BOTTOM_BAR_LAYOUT,
+  getBottomBarViewportReserveBottom,
+} from '@evoconn/constants/bottomBarLayout';
 import {
   PersonalFollowRow,
   PersonalIdentityHeader,
@@ -98,11 +101,7 @@ export default function PersonalProfileScreen() {
   // Top bar height (matches OtherUserProfileView calculation).
   const topBarHeight = 60 + insets.top;
   // Bottom bar height — used for scroll padding and detail panel item height.
-  const bottomBarHeight =
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
-    insets.bottom +
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
-    20;
+  const bottomBarHeight = getBottomBarViewportReserveBottom(insets.bottom);
   // Content area height: profile wrap stops exactly above the bottom bar,
   // matching the OtherUserProfileView layout so the rounded bottom corners
   // of ReflectionBackground's bgClip are visually above the bottom tab bar.

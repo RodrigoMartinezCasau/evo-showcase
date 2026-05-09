@@ -20,9 +20,14 @@ import {
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useFeedStore } from '@evoconn/hooks/useFeedStore';
 import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
+import { useParatiSeenPosts } from '@evoconn/hooks/ParatiSeenPostsContext';
 import type { CommunityPost } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
-import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
+import {
+  BOTTOM_BAR_LAYOUT,
+  getBottomBarScrollContentPaddingBottom,
+  getMainColumnHeightForFloatingBottomBar,
+} from '@evoconn/constants/bottomBarLayout';
 import {
   COMMUNITY_DRAWER_EDGE_ZONE_WIDTH,
   COMMUNITY_DRAWER_GESTURE_RANGE_X,
@@ -61,6 +66,9 @@ function tabToFeedMode(tab: TabId): FeedMode {
  * - Clan boost: ×1.4 if author's clan matches viewer's clan
  * Discovery-mode: discovery posts (not from followed users) are ranked first,
  * but followed users still appear as fallback so the feed is never empty.
+ *
+ * Seen posts (vertical "Para ti" viewer): reordered to the bottom so the user
+ * mostly sees fresh items first; seen content still fills the tail if needed.
  */
 function scorePostForYou(
   post: CommunityPost,
@@ -83,6 +91,7 @@ function getDataForMode(
   viewerUserId?: string,
   followingSort: FollowingSortOption = 'recientes',
   tasteBoost: (p: CommunityPost) => number = () => 1,
+  paratiSeenIds?: Set<string>,
 ): CommunityPost[] {
   switch (mode) {
     case 'following': {
@@ -99,13 +108,31 @@ function getDataForMode(
         : allPosts;
       // Sort all by score (discovery + followed mixed, discovery floats higher
       // because followed content already lives in SIGUIENDO).
-      return [...others].sort(
+      const sorted = [...others].sort(
         (a, b) =>
           scorePostForYou(b, viewerClanId ?? null, tasteBoost) -
           scorePostForYou(a, viewerClanId ?? null, tasteBoost),
       );
+      if (!paratiSeenIds || paratiSeenIds.size === 0) return sorted;
+      const unseen = sorted.filter((p) => !paratiSeenIds.has(p.id));
+      const seen = sorted.filter((p) => paratiSeenIds.has(p.id));
+      return [...unseen, ...seen];
     }
   }
+}
+
+function sameCommunityPostOrder(a: CommunityPost[], b: CommunityPost[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i]!.id !== b[i]!.id) return false;
+  }
+  return true;
+}
+
+function clampDetailInitialIndex(dataLength: number, initialIndex: number): number {
+  if (dataLength <= 0) return 0;
+  return Math.min(Math.max(0, initialIndex), dataLength - 1);
 }
 
 const ANIM_DURATION = 200;
@@ -128,11 +155,14 @@ export default function CommunityScreen() {
   const { thoughts } = useThoughts();
   const { posts: allPosts, getPostById } = useFeedStore();
   const { getBoost, revision: tasteRevision, recordDwell } = useRecommendationTaste();
+  const { seenIds: paratiSeenIds, markParatiPostSeen } = useParatiSeenPosts();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const drawerOpenProgress = useRef(new Animated.Value(0)).current;
   const gestureCommittingRef = useRef(false);
   const [activeTab, setActiveTab] = useState<TabId>('siguiendo');
   const [followingSort, setFollowingSort] = useState<FollowingSortOption>('recientes');
+  /** While "Para ti" fullscreen is open, freeze seen-ids used for ordering so the list does not jump as posts are marked seen. */
+  const [foryouSeenFrozen, setForyouSeenFrozen] = useState<Set<string> | null>(null);
 
   // Track which tabParam value we have already reacted to so we never
   // re-trigger the same navigation when openDetailFeed's reference changes
@@ -158,6 +188,12 @@ export default function CommunityScreen() {
 
   const slideAnim = useRef(new Animated.Value(0)).current;
   const detailMounted = detailFeed !== null;
+  const detailFeedModeRef = useRef<FeedMode | null>(null);
+  detailFeedModeRef.current = detailFeed?.mode ?? null;
+  const markParatiSeenRef = useRef(markParatiPostSeen);
+  markParatiSeenRef.current = markParatiPostSeen;
+
+  const seenForParatiOrder = foryouSeenFrozen ?? paratiSeenIds;
 
   /** Orden global Para ti — memoizado para no re-ordenar en cada frame y al abrir el detalle. */
   const foryouFeedOrdered = useMemo(
@@ -170,7 +206,10 @@ export default function CommunityScreen() {
         mockCurrentUser.id,
         followingSort,
         getBoost,
+        seenForParatiOrder,
       ),
+    // Only `seenForParatiOrder` for seen-state — do not also depend on `paratiSeenIds` while
+    // frozen: that Set changes every mark and would thrash this memo + FlatList (initialScrollIndex bugs).
     [
       allPosts,
       followingSet,
@@ -179,6 +218,7 @@ export default function CommunityScreen() {
       followingSort,
       getBoost,
       tasteRevision,
+      seenForParatiOrder,
     ],
   );
 
@@ -197,13 +237,38 @@ export default function CommunityScreen() {
 
   const openDetailFeed = useCallback(
     (mode: FeedMode, postId?: string) => {
-      const data = mode === 'foryou' ? foryouFeedOrdered : followingFeedOrdered;
-      let initialIndex = 0;
-      if (postId) {
-        const idx = data.findIndex((p) => p.id === postId);
-        initialIndex = idx >= 0 ? idx : 0;
+      if (mode === 'foryou') {
+        const snap = new Set(paratiSeenIds);
+        setForyouSeenFrozen(snap);
+        const data = getDataForMode(
+          'foryou',
+          allPosts,
+          followingSet,
+          mockCurrentUser.clanId,
+          mockCurrentUser.id,
+          followingSort,
+          getBoost,
+          snap,
+        );
+        let initialIndex = 0;
+        if (postId) {
+          const idx = data.findIndex((p) => p.id === postId);
+          initialIndex = idx >= 0 ? idx : 0;
+        }
+        initialIndex = clampDetailInitialIndex(data.length, initialIndex);
+        setDetailFeed({ mode, data, initialIndex });
+      } else {
+        setForyouSeenFrozen(null);
+        const data = followingFeedOrdered;
+        let initialIndex = 0;
+        if (postId) {
+          const idx = data.findIndex((p) => p.id === postId);
+          initialIndex = idx >= 0 ? idx : 0;
+        }
+        initialIndex = clampDetailInitialIndex(data.length, initialIndex);
+        setDetailFeed({ mode, data, initialIndex });
       }
-      setDetailFeed({ mode, data, initialIndex });
+      slideAnim.stopAnimation();
       slideAnim.setValue(0);
       requestAnimationFrame(() => {
         Animated.timing(slideAnim, {
@@ -214,7 +279,15 @@ export default function CommunityScreen() {
         }).start();
       });
     },
-    [slideAnim, foryouFeedOrdered, followingFeedOrdered],
+    [
+      slideAnim,
+      followingFeedOrdered,
+      allPosts,
+      followingSet,
+      followingSort,
+      getBoost,
+      paratiSeenIds,
+    ],
   );
 
   // Mantener el feed ampliado alineado con el ranking actual (votos, nuevos posts…).
@@ -229,7 +302,8 @@ export default function CommunityScreen() {
         const ni = nextData.findIndex((p) => p.id === anchorId);
         if (ni >= 0) nextInitial = ni;
       }
-      if (prev.data === nextData) return prev;
+      nextInitial = clampDetailInitialIndex(nextData.length, nextInitial);
+      if (sameCommunityPostOrder(prev.data, nextData)) return prev;
       return { ...prev, data: nextData, initialIndex: nextInitial };
     });
   }, [foryouFeedOrdered, followingFeedOrdered]);
@@ -259,6 +333,7 @@ export default function CommunityScreen() {
       useNativeDriver: true,
     }).start(({ finished }) => {
       if (finished) {
+        setForyouSeenFrozen(null);
         setDetailFeed(null);
       }
     });
@@ -358,12 +433,7 @@ export default function CommunityScreen() {
   }, [transitionTab, tabSlideAnim]);
 
   const topBarHeight = 60 + insets.top;
-  const bottomBarHeight =
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
-    insets.bottom +
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
-    20;
-  const feedItemHeight = screenH - topBarHeight - bottomBarHeight;
+  const feedItemHeight = getMainColumnHeightForFloatingBottomBar(screenH, insets.top, insets.bottom);
 
   const listData = useMemo(() => {
     switch (activeTab) {
@@ -530,6 +600,16 @@ export default function CommunityScreen() {
     }
   }, [detailFeed]);
 
+  /** Marcar vistos en "Para ti" al abrir el visor vertical (prioridad: no vistos arriba). */
+  useEffect(() => {
+    if (!detailFeed || detailFeed.mode !== 'foryou') return;
+    const len = detailFeed.data.length;
+    if (len === 0) return;
+    const idx = clampDetailInitialIndex(len, detailFeed.initialIndex);
+    const pid = detailFeed.data[idx]?.id;
+    if (pid) markParatiPostSeen(pid);
+  }, [detailFeed, markParatiPostSeen]);
+
   /** Dwell time on full-screen posts → taste model (Para ti). */
   const dwellRef = useRef<{ postId: string | null; since: number }>({ postId: null, since: Date.now() });
   const tasteDwellRefs = useRef({ getPostById, recordDwell });
@@ -537,7 +617,9 @@ export default function CommunityScreen() {
 
   useEffect(() => {
     if (!detailFeed) return;
-    const startId = detailFeed.data[detailFeed.initialIndex]?.id ?? null;
+    const len = detailFeed.data.length;
+    const idx = clampDetailInitialIndex(len, detailFeed.initialIndex);
+    const startId = len > 0 ? detailFeed.data[idx]?.id ?? null : null;
     dwellRef.current = { postId: startId, since: Date.now() };
     return () => {
       const { postId, since } = dwellRef.current;
@@ -561,6 +643,10 @@ export default function CommunityScreen() {
           if (prevPost && ms >= 450) tasteDwellRefs.current.recordDwell(prevPost, ms);
         }
         dwellRef.current = { postId: post.id, since: now };
+
+        if (detailFeedModeRef.current === 'foryou') {
+          markParatiSeenRef.current(post.id);
+        }
 
         const id = post.author.id;
         visibleAuthorIdRef.current = id;
@@ -677,7 +763,7 @@ export default function CommunityScreen() {
     BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
     insets.bottom +
     BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
-    8;
+    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_EDGE_GESTURE_CLEARANCE_BELOW;
 
   return (
     <GestureHandlerRootView style={styles.gestureRoot}>
@@ -704,13 +790,7 @@ export default function CommunityScreen() {
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={[
                   styles.list,
-                  {
-                    paddingBottom:
-                      BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
-                      insets.bottom +
-                      BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
-                      16,
-                  },
+                  { paddingBottom: getBottomBarScrollContentPaddingBottom(insets.bottom) },
                 ]}
                 style={styles.panelInner}
               />
@@ -739,13 +819,7 @@ export default function CommunityScreen() {
               keyExtractor={(item) => item.id}
               contentContainerStyle={[
                 styles.list,
-                {
-                  paddingBottom:
-                    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
-                    insets.bottom +
-                    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
-                    16,
-                },
+                { paddingBottom: getBottomBarScrollContentPaddingBottom(insets.bottom) },
               ]}
               style={styles.panelInner}
             />
@@ -769,7 +843,11 @@ export default function CommunityScreen() {
               decelerationRate="fast"
               showsVerticalScrollIndicator={false}
               getItemLayout={getFeedItemLayout}
-              initialScrollIndex={detailFeed?.initialIndex ?? 0}
+              initialScrollIndex={
+                detailFeed && detailFeed.data.length > 0
+                  ? clampDetailInitialIndex(detailFeed.data.length, detailFeed.initialIndex)
+                  : 0
+              }
               initialNumToRender={COMMUNITY_DETAIL_PREFETCH_POSTS}
               maxToRenderPerBatch={COMMUNITY_DETAIL_PREFETCH_POSTS}
               windowSize={COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE}

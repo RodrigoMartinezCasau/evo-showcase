@@ -27,7 +27,10 @@ import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { IS_DEBUG_STATS_MODE, useDebugStats } from '../debug/DebugStatsContext';
-import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
+import {
+  BOTTOM_BAR_LAYOUT,
+  getBottomBarViewportReserveBottom,
+} from '@evoconn/constants/bottomBarLayout';
 import { fetchUsesLog, type UsesLogData } from '@evoconn/services/streakApi';
 import { DAILY_USES_LIMIT } from '@evoconn/services/userStatsStorage';
 import { getTopBarUsosByHouse } from '@evoconn/utils/getTopBarUsosByHouse';
@@ -347,11 +350,7 @@ export default function DailyUsesScreen() {
 
   // ─── Layout heights ───────────────────────────────────────────────────────
   const topBarHeight = 60 + insets.top;
-  const bottomBarHeight =
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
-    insets.bottom +
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
-    20;
+  const bottomBarHeight = getBottomBarViewportReserveBottom(insets.bottom);
   const contentHeight = screenH - topBarHeight - bottomBarHeight;
 
   const usedToday = log[today] ?? 0;

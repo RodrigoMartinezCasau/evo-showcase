@@ -25,7 +25,10 @@ import { AppTopBar, BottomCommunityTabs, SidebarDrawer } from '@evoconn/componen
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
-import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
+import {
+  BOTTOM_BAR_LAYOUT,
+  getBottomBarViewportReserveBottom,
+} from '@evoconn/constants/bottomBarLayout';
 import { fetchStreak, type StreakData } from '@evoconn/services/streakApi';
 import { CalendarGrid } from '@evoconn/components/shared/CalendarGrid';
 import { getTopBarRachaTopByHouse } from '@evoconn/utils/getTopBarRachaTopByHouse';
@@ -233,11 +236,7 @@ export default function StreakScreen() {
 
   // ─── Layout heights (same pattern as PersonalPhilosophyDetailScreen) ────────
   const topBarHeight = 60 + insets.top;
-  const bottomBarHeight =
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
-    insets.bottom +
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
-    20;
+  const bottomBarHeight = getBottomBarViewportReserveBottom(insets.bottom);
   const contentHeight = screenH - topBarHeight - bottomBarHeight;
 
   const totalDays = data?.activity_log.length ?? 0;
