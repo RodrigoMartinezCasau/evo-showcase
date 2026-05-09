@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useRef, useMemo, useEffect } from 'react';
+import React, { useCallback, useState, useRef, useMemo, useEffect, useLayoutEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet, Animated, Easing, useWindowDimensions } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -97,6 +97,25 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
   const mockProfile = getOtherUserProfile(userId);
   const [supabaseProfile, setSupabaseProfile] = useState<OtherUserProfile | null>(null);
   const [supabasePosts, setSupabasePosts] = useState<CommunityPost[]>([]);
+  const {
+    followGraph,
+    activeUserId: viewerId,
+    posts: allSimPosts,
+    users: simUsers,
+  } = useSimulation();
+  const followGraphRef = useRef(followGraph);
+  followGraphRef.current = followGraph;
+
+  /** Snapshot from API + whether the viewer already followed the target at fetch time — for instant follower delta. */
+  const [followCountSnap, setFollowCountSnap] = useState<{
+    followers: number;
+    following: number;
+    iFollowed: boolean;
+  } | null>(null);
+
+  useLayoutEffect(() => {
+    setFollowCountSnap(null);
+  }, [userId]);
 
   useEffect(() => {
     if (mockProfile || !isRealUserId(userId)) return;
@@ -111,7 +130,17 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
       fetchFollowCounts(userId),
       fetchPostsByUser(userId),
     ]).then(([{ data }, counts, posts]) => {
+      const vid = followGraphRef.current;
+      const iFollowed =
+        isRealUserId(viewerId) && isRealUserId(userId)
+          ? (vid[viewerId]?.has(userId) ?? false)
+          : false;
       if (data) {
+        setFollowCountSnap({
+          followers: counts.followersCount,
+          following: counts.followingCount,
+          iFollowed,
+        });
         setSupabaseProfile({
           id: data.id,
           username: '@' + (data.username ?? '').toUpperCase(),
@@ -147,7 +176,7 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
         createdAt: p.createdAt,
       })));
     });
-  }, [userId, mockProfile]);
+  }, [userId, mockProfile, viewerId]);
 
   // Static profile data (username, rank, insignia, etc.)
   // Falls back to supabaseProfile for real users, or first mock user as last resort.
@@ -165,9 +194,10 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
     recentPosts: [],
   };
 
-  // Live posts from the simulation so "Últimas publicaciones" reflects any newly
-  // published reflections/phrases and never goes stale after a reload or user switch.
-  const { posts: allSimPosts, users: simUsers } = useSimulation();
+  const iFollowTargetNow =
+    isRealUserId(viewerId) && isRealUserId(userId)
+      ? (followGraph[viewerId]?.has(userId) ?? false)
+      : false;
 
   // Per-user real philosophical classification — replaces seed clanId and
   // seed philosophyPercentages so even other simulated users start as
@@ -181,6 +211,18 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
     rank: classification.getDisplayRank(userId),
     philosophyPercentages: realPercentages,
   };
+
+  const profileWithLiveFollowers = useMemo(() => {
+    if (mockProfile || !isRealUserId(userId) || !followCountSnap) return profile;
+    const adj =
+      followCountSnap.followers +
+      (iFollowTargetNow ? 1 : 0) -
+      (followCountSnap.iFollowed ? 1 : 0);
+    return {
+      ...profile,
+      followersCount: Math.max(0, adj),
+    };
+  }, [profile, mockProfile, userId, followCountSnap, iFollowTargetNow]);
 
   // For real Supabase users: use dedicated fetchPostsByUser result.
   // For simulated users: filter the global sim posts array.
@@ -323,11 +365,11 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
             showsVerticalScrollIndicator={false}
           >
             <OtherProfileFollowRow
-              userId={profile.id}
-              username={profile.username}
-              clanId={profile.clanId}
-              followersCount={profile.followersCount}
-              followingCount={profile.followingCount}
+              userId={profileWithLiveFollowers.id}
+              username={profileWithLiveFollowers.username}
+              clanId={profileWithLiveFollowers.clanId}
+              followersCount={profileWithLiveFollowers.followersCount}
+              followingCount={profileWithLiveFollowers.followingCount}
             />
             <UserIdentityHeader
               username={profile.username}

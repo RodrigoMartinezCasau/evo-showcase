@@ -30,6 +30,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setActiveSimUser, mockCurrentUser } from '@evoconn/data/mockUser';
 import { useAuth } from '../../mobile/lib/AuthContext';
 import { supabase } from '../../mobile/lib/supabase';
+import { primeFollowProfileIds } from '@evoconn/hooks/followProfilePrime';
 import {
   isRealUserId,
   fetchAllPosts,
@@ -157,6 +158,8 @@ const SimCtx = createContext<SimulationContextValue | null>(null);
 export function SimulationProvider({ children }: { children: ReactNode }) {
   const { profile: authProfile, session, loading: authLoading } = useAuth();
   const [activeUserId, setActiveUserIdRaw] = useState('u1');
+  const activeUserIdRef = useRef(activeUserId);
+  activeUserIdRef.current = activeUserId;
 
   // When a real Supabase user is authenticated (UUID not in the 9-user sim),
   // make activeUserId equal to their UUID. This ensures ALL sim-backed features
@@ -189,13 +192,15 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   // ── Supabase hydration for real users ────────────────────────────────────
   // When the authenticated user's UUID is known, load ALL social data from
   // Supabase so the app is consistent across devices.
-  const supabaseHydrated = useRef(false);
+  // Re-runs on every real `activeUserId` change (account switch) with cancellation.
   useEffect(() => {
-    if (!isRealUserId(activeUserId) || supabaseHydrated.current) return;
-    supabaseHydrated.current = true;
+    if (!isRealUserId(activeUserId)) return;
+
+    let cancelled = false;
+    const hydrateFor = activeUserId;
 
     (async () => {
-      console.log('[Social] Hydrating from Supabase for user', activeUserId);
+      console.log('[Social] Hydrating from Supabase for user', hydrateFor);
 
       // 1. Posts — the full global feed.
       const sbPosts = await fetchAllPosts();
@@ -211,19 +216,19 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       }
 
       // 3. My votes → voteMap.
-      const myVotesMap = await fetchMyVotes(activeUserId);
+      const myVotesMap = await fetchMyVotes(hydrateFor);
 
       // 4. My saves → savedMap.
-      const mySavedPostIds = await fetchMySaves(activeUserId);
+      const mySavedPostIds = await fetchMySaves(hydrateFor);
       for (const pid of mySavedPostIds) {
         const post = sbPosts.find(p => p.id === pid);
-        if (post) post.saverIds = [...post.saverIds, activeUserId];
+        if (post) post.saverIds = [...post.saverIds, hydrateFor];
       }
 
       // 5. Follow graph — who I follow + who follows me.
       const [following, followers] = await Promise.all([
-        fetchFollowing(activeUserId),
-        fetchFollowers(activeUserId),
+        fetchFollowing(hydrateFor),
+        fetchFollowers(hydrateFor),
       ]);
 
       // 6. Comments — fetch for all loaded posts in one query.
@@ -233,24 +238,29 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
         if (allComments[i].length > 0) commentsByPost[id] = allComments[i];
       });
 
+      if (cancelled || activeUserIdRef.current !== hydrateFor) return;
+
       // ── Apply to state ──────────────────────────────────────────────────
       setPosts(() => sbPosts);
       setVoteMapRaw(prev => ({
         ...prev,
-        [activeUserId]: myVotesMap,
+        [hydrateFor]: myVotesMap,
       }));
       setSavedMapArr(prev => {
         const updated = { ...prev };
-        updated[activeUserId] = mySavedPostIds;
+        updated[hydrateFor] = mySavedPostIds;
         return updated;
       });
       setFollowGraph(prev => {
         const updated = { ...prev };
-        updated[activeUserId] = following;
+        const prevMine = prev[hydrateFor] ?? [];
+        // Union with server list so optimistic follows (insert still in flight) are not wiped.
+        updated[hydrateFor] = [...new Set([...following, ...prevMine])];
         // Populate reverse edges so followers appear in activeFollowersCount.
         for (const followerId of followers) {
-          updated[followerId] = [...(updated[followerId] ?? []), activeUserId]
-            .filter((v, i, a) => a.indexOf(v) === i); // deduplicate
+          updated[followerId] = [
+            ...new Set([...(updated[followerId] ?? []), hydrateFor]),
+          ];
         }
         return updated;
       });
@@ -263,6 +273,10 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       savedHydrated.current  = true;
       console.log('[Social] Supabase hydration complete. Posts:', sbPosts.length);
     })();
+
+    return () => {
+      cancelled = true;
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeUserId]);
 
@@ -295,6 +309,97 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       if (realtimeSubRef.current) {
         supabase.removeChannel(realtimeSubRef.current);
         realtimeSubRef.current = null;
+      }
+    };
+  }, [activeUserId]);
+
+  // ── Realtime: follows involving the active user (keeps graph + counts fresh) ──
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const followsRealtimeRef = useRef<any>(null);
+  useEffect(() => {
+    if (!isRealUserId(activeUserId)) return;
+    const timer = setTimeout(() => {
+      const ch = supabase
+        .channel(`public:follows:${activeUserId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'follows',
+            filter: `follower_id=eq.${activeUserId}`,
+          },
+          (payload: { new: Record<string, unknown> }) => {
+            const row = payload.new as { follower_id: string; following_id: string };
+            setFollowGraph(prev => {
+              const arr = prev[row.follower_id] ?? [];
+              if (arr.includes(row.following_id)) return prev;
+              return { ...prev, [row.follower_id]: [...arr, row.following_id] };
+            });
+          },
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'follows',
+            filter: `follower_id=eq.${activeUserId}`,
+          },
+          (payload: { old: Record<string, unknown> }) => {
+            const row = payload.old as { follower_id: string; following_id: string };
+            setFollowGraph(prev => {
+              const arr = prev[row.follower_id] ?? [];
+              return { ...prev, [row.follower_id]: arr.filter(id => id !== row.following_id) };
+            });
+          },
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'follows',
+            filter: `following_id=eq.${activeUserId}`,
+          },
+          (payload: { new: Record<string, unknown> }) => {
+            const row = payload.new as { follower_id: string; following_id: string };
+            setFollowGraph(prev => {
+              const fid = row.follower_id;
+              const target = row.following_id;
+              const arr = prev[fid] ?? [];
+              if (arr.includes(target)) return prev;
+              return { ...prev, [fid]: [...arr, target] };
+            });
+          },
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'follows',
+            filter: `following_id=eq.${activeUserId}`,
+          },
+          (payload: { old: Record<string, unknown> }) => {
+            const row = payload.old as { follower_id: string; following_id: string };
+            setFollowGraph(prev => {
+              const fid = row.follower_id;
+              const target = row.following_id;
+              const arr = prev[fid] ?? [];
+              return { ...prev, [fid]: arr.filter(id => id !== target) };
+            });
+          },
+        )
+        .subscribe();
+      followsRealtimeRef.current = ch;
+    }, 1800);
+
+    return () => {
+      clearTimeout(timer);
+      if (followsRealtimeRef.current) {
+        supabase.removeChannel(followsRealtimeRef.current);
+        followsRealtimeRef.current = null;
       }
     };
   }, [activeUserId]);
@@ -533,34 +638,46 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
 
   // ── Follow actions ────────────────────────────────────────────────────────
   const follow = useCallback((fromId: string, toId: string) => {
+    let added = false;
     setFollowGraph(prev => {
       const arr = prev[fromId] ?? [];
       if (arr.includes(toId)) return prev;
+      added = true;
       return { ...prev, [fromId]: [...arr, toId] };
     });
-    insertFollow(fromId, toId); // persist to Supabase (no-op for sim users)
+    if (added) {
+      insertFollow(fromId, toId);
+      primeFollowProfileIds([toId]);
+    }
   }, []);
 
   const unfollow = useCallback((fromId: string, toId: string) => {
+    let removed = false;
     setFollowGraph(prev => {
       const arr = prev[fromId] ?? [];
       if (!arr.includes(toId)) return prev;
+      removed = true;
       return { ...prev, [fromId]: arr.filter(id => id !== toId) };
     });
-    dbDeleteFollow(fromId, toId);
+    if (removed) dbDeleteFollow(fromId, toId);
   }, []);
 
   const toggleFollow = useCallback((fromId: string, toId: string) => {
+    let willFollow = false;
     setFollowGraph(prev => {
       const arr = prev[fromId] ?? [];
-      const nowFollowing = !arr.includes(toId);
-      // Side-effect inside setter is intentional: fire-and-forget Supabase write.
-      if (nowFollowing) insertFollow(fromId, toId);
-      else dbDeleteFollow(fromId, toId);
-      return nowFollowing
+      const wasFollowing = arr.includes(toId);
+      willFollow = !wasFollowing;
+      return willFollow
         ? { ...prev, [fromId]: [...arr, toId] }
         : { ...prev, [fromId]: arr.filter(id => id !== toId) };
     });
+    if (willFollow) {
+      insertFollow(fromId, toId);
+      primeFollowProfileIds([toId]);
+    } else {
+      dbDeleteFollow(fromId, toId);
+    }
   }, []);
 
   // ── Vote ──────────────────────────────────────────────────────────────────

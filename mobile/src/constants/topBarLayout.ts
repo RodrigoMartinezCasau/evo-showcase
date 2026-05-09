@@ -44,7 +44,7 @@ export const TOP_BAR_LAYOUT = {
   RIGHT_CLUSTER_GAP: 0,
 
   /**
-   * Escala unificada del bloque de stats: escudo + etiqueta clan + lápiz + racha + usos.
+   * Escala unificada del bloque central: estrella + menú + escudo + etiqueta + lápiz + racha + usos.
    * Un solo factor para que no descompense tablet vs teléfono.
    */
   RIGHT_CLUSTER_UNIVERSAL_SCALE: 0.85,

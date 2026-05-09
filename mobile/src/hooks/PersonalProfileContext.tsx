@@ -17,6 +17,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -30,6 +31,7 @@ import {
   type SimUser,
 } from '@evoconn/data/simulation/simulatedNetwork';
 import { fetchProfilesBatch, setPostHidden, isRealUserId, type BasicProfile } from '@evoconn/services/supabaseSocial';
+import { registerFollowProfilePrimer } from '@evoconn/hooks/followProfilePrime';
 import { useAuth } from '../../mobile/lib/AuthContext';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -102,30 +104,55 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
   const [profileCache, setProfileCache] = useState<Record<string, BasicProfile>>({});
   const fetchingRef = useRef<Set<string>>(new Set());
 
+  const fetchMissingProfiles = useCallback(
+    (candidates: string[]) => {
+      const toFetch = [...new Set(candidates)].filter(
+        uid =>
+          isRealUserId(uid) &&
+          !users[uid] &&
+          !SIM_USERS_BY_ID[uid] &&
+          !profileCache[uid] &&
+          !fetchingRef.current.has(uid),
+      );
+      if (toFetch.length === 0) return;
+      toFetch.forEach(uid => fetchingRef.current.add(uid));
+      fetchProfilesBatch(toFetch)
+        .then(profiles => {
+          setProfileCache(prev => {
+            const next = { ...prev };
+            profiles.forEach(p => {
+              next[p.id] = p;
+            });
+            return next;
+          });
+        })
+        .catch(() => { /* network / RLS — allow retry on next effect run */ })
+        .finally(() => {
+          toFetch.forEach(uid => fetchingRef.current.delete(uid));
+        });
+    },
+    [users, profileCache],
+  );
+
   // Collect all unknown UUIDs from followers + following, batch-fetch their profiles.
-  useEffect(() => {
+  useLayoutEffect(() => {
     const allUids = new Set<string>();
-    // Followers: UIDs that follow activeUserId.
     Object.entries(followGraph)
       .filter(([, set]) => set.has(activeUserId))
-      .forEach(([uid]) => { if (!users[uid] && !SIM_USERS_BY_ID[uid]) allUids.add(uid); });
-    // Following: UIDs that activeUserId follows.
-    const myFollowing = followGraph[activeUserId] ?? new Set<string>();
-    myFollowing.forEach(uid => { if (!users[uid] && !SIM_USERS_BY_ID[uid]) allUids.add(uid); });
-
-    const toFetch = [...allUids].filter(uid => !profileCache[uid] && !fetchingRef.current.has(uid));
-    if (toFetch.length === 0) return;
-    toFetch.forEach(uid => fetchingRef.current.add(uid));
-    fetchProfilesBatch(toFetch).then(profiles => {
-      setProfileCache(prev => {
-        const next = { ...prev };
-        profiles.forEach(p => { next[p.id] = p; });
-        return next;
+      .forEach(([uid]) => {
+        if (!users[uid] && !SIM_USERS_BY_ID[uid]) allUids.add(uid);
       });
-      toFetch.forEach(uid => fetchingRef.current.delete(uid));
+    const myFollowing = followGraph[activeUserId] ?? new Set<string>();
+    myFollowing.forEach(uid => {
+      if (!users[uid] && !SIM_USERS_BY_ID[uid]) allUids.add(uid);
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [followGraph, activeUserId, users]);
+    fetchMissingProfiles([...allUids]);
+  }, [followGraph, activeUserId, users, fetchMissingProfiles]);
+
+  useEffect(() => {
+    registerFollowProfilePrimer(fetchMissingProfiles);
+    return () => registerFollowProfilePrimer(null);
+  }, [fetchMissingProfiles]);
 
   // ── Posts ──────────────────────────────────────────────────────────────────
   const posts = useMemo<CommunityPost[]>(

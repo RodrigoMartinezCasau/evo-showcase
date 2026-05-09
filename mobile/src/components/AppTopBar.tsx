@@ -157,8 +157,8 @@ export function AppTopBar({
     }
   }, [hasSentToday, statsLoaded, fireAnim]);
 
-  const starFrame = iconFrame(TOP_BAR_LAYOUT.STAR_SIZE, topBarIconFrameScale.evoStar);
   const statsScale = TOP_BAR_LAYOUT.RIGHT_CLUSTER_UNIVERSAL_SCALE;
+  const starFrame = iconFrame(TOP_BAR_LAYOUT.STAR_SIZE * statsScale, topBarIconFrameScale.evoStar);
   const shieldFrame = iconFrame(TOP_BAR_LAYOUT.SHIELD_SIZE * statsScale, topBarIconFrameScale.shield);
   const counterIconFrame = iconFrame(TOP_BAR_LAYOUT.COUNTER_ICON_SIZE * statsScale, 1);
   const counterTextSize = TOP_BAR_LAYOUT.COUNTER_TEXT_SIZE * statsScale;
@@ -166,7 +166,7 @@ export function AppTopBar({
   const counterPairGap = TOP_BAR_LAYOUT.COUNTER_PAIR_GAP * statsScale;
   const counterNumMinW = 22 * statsScale;
   const unifiedStatsRowGap = TOP_BAR_LAYOUT.UNIFIED_STATS_ROW_GAP * statsScale;
-  const menuSize = TOP_BAR_LAYOUT.MENU_SIZE;
+  const menuDisplaySize = Math.round(TOP_BAR_LAYOUT.MENU_SIZE * statsScale);
 
   const previewClanLabel = isPreviewActive
     ? (previewClanId ? previewClanId.toUpperCase() : 'SIN CLAN')
@@ -191,34 +191,32 @@ export function AppTopBar({
           { transform: [{ translateY: TOP_BAR_LAYOUT.TOPBAR_WHOLE_SHIFT_Y }] },
         ]}
       >
-        {/* Izquierda — estrella + menú (ancho intrínseco) */}
-        <View style={[styles.leftCluster, { gap: TOP_BAR_LAYOUT.LEFT_CLUSTER_GAP }]}>
-          <TouchableOpacity onPress={onMenuPress} style={styles.iconBtn} hitSlop={14}>
-            <View style={[styles.iconFrame, starFrame, topBarIconEditorStyle('star', 'star')]}>
-              <EstrellaIcon
-                width={starFrame.width}
-                height={starFrame.height}
-                color={starTintColor}
-                style={{ color: starTintColor }}
-              />
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={onMenuPress} style={styles.iconBtn} hitSlop={14}>
-            <View
-              style={[
-                styles.iconFrame,
-                { width: menuSize, height: menuSize },
-                topBarIconEditorStyle('menu', 'menu'),
-              ]}
-            >
-              <HamburgerIcon size={menuSize} />
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Centro — una sola fila: clan + contadores (mismo gap en phone y tablet; sin space-around) */}
+        {/* Toda la barra de acciones en un solo grupo centrado: estrella, menú, clan, stats */}
         <View style={styles.statsRail}>
           <View style={[styles.unifiedStatsRow, { gap: unifiedStatsRowGap }]}>
+            <TouchableOpacity onPress={onMenuPress} style={styles.iconBtn} hitSlop={14}>
+              <View style={[styles.iconFrame, starFrame, topBarIconEditorStyle('star', 'star')]}>
+                <EstrellaIcon
+                  width={starFrame.width}
+                  height={starFrame.height}
+                  color={starTintColor}
+                  style={{ color: starTintColor }}
+                />
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={onMenuPress} style={styles.iconBtn} hitSlop={14}>
+              <View
+                style={[
+                  styles.iconFrame,
+                  { width: menuDisplaySize, height: menuDisplaySize },
+                  topBarIconEditorStyle('menu', 'menu'),
+                ]}
+              >
+                <HamburgerIcon size={menuDisplaySize} />
+              </View>
+            </TouchableOpacity>
+
             {showClanIcon && (
               <TouchableOpacity onPress={handleClanPress} style={styles.centerPress} hitSlop={12}>
                 <View style={[styles.iconFrame, shieldFrame, topBarIconEditorStyle('shield', 'shield')]}>
@@ -321,8 +319,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     width: '100%',
   },
-  leftCluster: { flexDirection: 'row', alignItems: 'flex-end' },
-  /** Ocupa el espacio restante y centra la fila clan + stats (evita huecos tipo tablet). */
+  /** Fila única centrada (estrella + menú + clan + contadores). */
   statsRail: {
     flex: 1,
     flexDirection: 'row',
