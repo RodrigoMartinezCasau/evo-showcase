@@ -52,6 +52,7 @@ import type { SimComment } from '@evoconn/data/simulation/simulatedNetwork';
 import { blockUser, insertReport, isRealUserId } from '@evoconn/services/supabaseSocial';
 import { useAuth } from '../../mobile/lib/AuthContext';
 import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
+import { computePhraseDetailTypography } from '@evoconn/utils/phraseDetailTypography';
 
 /** Matches `styles.content` horizontal padding — used until the reflection panel is measured. */
 const REFLECTION_DETAIL_CONTENT_PAD_H = 16;
@@ -98,12 +99,23 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   const readingModeRef = useRef(false);
 
   // Measure the reflection panel to anchor the action column exactly.
-  const [reflPanelLayout, setReflPanelLayout] = useState<{ y: number; height: number } | null>(null);
+  const [reflPanelLayout, setReflPanelLayout] = useState<{
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
   const handleReflPanelLayout = useCallback((e: LayoutChangeEvent) => {
-    const { y, height } = e.nativeEvent.layout;
+    const { y, width, height } = e.nativeEvent.layout;
     setReflPanelLayout(prev => {
-      if (prev && Math.abs(prev.y - y) < 1 && Math.abs(prev.height - height) < 1) return prev;
-      return { y, height };
+      if (
+        prev &&
+        Math.abs(prev.y - y) < 1 &&
+        Math.abs(prev.width - width) < 1 &&
+        Math.abs(prev.height - height) < 1
+      ) {
+        return prev;
+      }
+      return { y, width, height };
     });
   }, []);
 
@@ -402,6 +414,110 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
 
   const isPhrase = post.type === 'phrase';
 
+  /** Effective width for phrase wrap (panel scale + quote paddings). */
+  const phraseTextMaxWidth = useMemo(() => {
+    const inner =
+      reflPanelLayout && reflPanelLayout.width > 0
+        ? Math.max(1, reflPanelLayout.width - 2 * RP.paddingHorizontal)
+        : Math.max(
+            1,
+            screenW - 2 * REFLECTION_DETAIL_CONTENT_PAD_H - 2 * RP.paddingHorizontal,
+          );
+    const afterPad = inner - QL.maxWidthReductionLeft - QL.maxWidthReductionRight;
+    return Math.max(1, afterPad * RP.widthScale);
+  }, [screenW, reflPanelLayout]);
+
+  const phraseAvailHeight = useMemo(
+    () => Math.max(48, reflectionH - RP.paddingVertical * 2 - 14),
+    [reflectionH],
+  );
+
+  const phraseTypography = useMemo(() => {
+    if (!isPhrase) return null;
+    const quoted = `\u201C${post.body}\u201D`;
+    return computePhraseDetailTypography(
+      quoted,
+      post.quoteAuthor,
+      phraseTextMaxWidth,
+      phraseAvailHeight,
+      QL.fontSize,
+      QL.lineHeight,
+      QAL.fontSize,
+      8,
+    );
+  }, [
+    isPhrase,
+    post.body,
+    post.quoteAuthor,
+    phraseTextMaxWidth,
+    phraseAvailHeight,
+    QL.fontSize,
+    QL.lineHeight,
+    QAL.fontSize,
+  ]);
+
+  /** Correct rare underestimation: shrink fonts in small steps until native layout fits the viewport. */
+  const [phraseFitMultiplier, setPhraseFitMultiplier] = useState(1);
+  const [phraseOverflowScroll, setPhraseOverflowScroll] = useState(false);
+  const phraseViewportHRef = useRef(0);
+  const phraseContentHRef = useRef(0);
+  const phraseFitMultiplierRef = useRef(1);
+
+  const phraseSizes = useMemo(() => {
+    if (!phraseTypography) return null;
+    const m = phraseFitMultiplier;
+    return {
+      quoteFontSize: Math.max(9, Math.round(phraseTypography.quoteFontSize * m)),
+      quoteLineHeight: Math.max(
+        Math.round(phraseTypography.quoteLineHeight * m),
+        Math.round(phraseTypography.quoteFontSize * m) + 4,
+      ),
+      authorFontSize: Math.max(9, Math.round(phraseTypography.authorFontSize * m)),
+      authorLineHeight: Math.max(
+        Math.round(phraseTypography.authorLineHeight * m),
+        Math.round(phraseTypography.authorFontSize * m) + 3,
+      ),
+    };
+  }, [phraseTypography, phraseFitMultiplier]);
+
+  const applyPhraseViewportFit = useCallback(() => {
+    const ch = phraseContentHRef.current;
+    const vh = phraseViewportHRef.current;
+    if (vh <= 0) return;
+    if (ch <= vh + 2) {
+      setPhraseOverflowScroll(false);
+      return;
+    }
+    const prev = phraseFitMultiplierRef.current;
+    if (prev > 0.72) {
+      const next = Math.max(0.72, Math.round((prev - 0.05) * 100) / 100);
+      phraseFitMultiplierRef.current = next;
+      setPhraseFitMultiplier(next);
+    } else {
+      setPhraseOverflowScroll(true);
+    }
+  }, []);
+
+  const onPhraseScrollViewportLayout = useCallback(
+    (e: LayoutChangeEvent) => {
+      phraseViewportHRef.current = e.nativeEvent.layout.height;
+      applyPhraseViewportFit();
+    },
+    [applyPhraseViewportFit],
+  );
+
+  const onPhraseContentLayout = useCallback(
+    (e: LayoutChangeEvent) => {
+      phraseContentHRef.current = e.nativeEvent.layout.height;
+      applyPhraseViewportFit();
+    },
+    [applyPhraseViewportFit],
+  );
+
+  useEffect(() => {
+    phraseFitMultiplierRef.current = phraseFitMultiplier;
+  }, [phraseFitMultiplier]);
+
   const BODY_LINE_HEIGHT = 24;
   const titleOccupied = post.title ? 32 : 0;
   const readMoreSpace = 22;
@@ -426,6 +542,11 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     readingModeRef.current = false;
     setReadingMode(false);
     setBodyLayoutKey(0);
+    setPhraseFitMultiplier(1);
+    phraseFitMultiplierRef.current = 1;
+    setPhraseOverflowScroll(false);
+    phraseViewportHRef.current = 0;
+    phraseContentHRef.current = 0;
     onReadingModeChange?.(false);
   }, [post.id, onReadingModeChange]);
 
@@ -667,6 +788,8 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
           >
             {isPhrase ? (
               <ScrollView
+                scrollEnabled={phraseOverflowScroll}
+                onLayout={onPhraseScrollViewportLayout}
                 contentContainerStyle={[
                   styles.quoteCenter,
                   {
@@ -679,33 +802,41 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                     ],
                   },
                 ]}
-                showsVerticalScrollIndicator={false}
+                showsVerticalScrollIndicator={phraseOverflowScroll}
                 nestedScrollEnabled
               >
-                <Text
-                  style={[
-                    styles.quoteText,
-                    { fontSize: QL.fontSize, lineHeight: QL.lineHeight },
-                  ]}
-                >
-                  {`\u201C${post.body}\u201D`}
-                </Text>
-                {post.quoteAuthor ? (
+                <View style={styles.phraseQuoteStack} onLayout={onPhraseContentLayout}>
                   <Text
                     style={[
-                      styles.quoteAuthor,
-                      {
-                        fontSize: QAL.fontSize,
-                        transform: [
-                          { translateX: QAL.offsetX },
-                          { translateY: QAL.offsetY },
-                        ],
+                      styles.quoteText,
+                      phraseSizes && {
+                        fontSize: phraseSizes.quoteFontSize,
+                        lineHeight: phraseSizes.quoteLineHeight,
+                        maxWidth: phraseTextMaxWidth,
                       },
                     ]}
                   >
-                    {post.quoteAuthor}
+                    {`\u201C${post.body}\u201D`}
                   </Text>
-                ) : null}
+                  {post.quoteAuthor ? (
+                    <Text
+                      style={[
+                        styles.quoteAuthor,
+                        phraseSizes && {
+                          fontSize: phraseSizes.authorFontSize,
+                          lineHeight: phraseSizes.authorLineHeight,
+                          maxWidth: phraseTextMaxWidth,
+                          transform: [
+                            { translateX: QAL.offsetX },
+                            { translateY: QAL.offsetY },
+                          ],
+                        },
+                      ]}
+                    >
+                      {post.quoteAuthor}
+                    </Text>
+                  ) : null}
+                </View>
               </ScrollView>
             ) : (
               <View style={styles.reflectionScrollRow} onLayout={handleReflectionScrollRowLayout}>
@@ -940,6 +1071,10 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     textAlign: 'center',
     marginTop: 8,
+  },
+  phraseQuoteStack: {
+    alignItems: 'center',
+    width: '100%',
   },
 
   commentsPanel: {
