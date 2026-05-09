@@ -387,7 +387,8 @@ const styles = StyleSheet.create({
   },
   barRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    /** Centros verticales en una línea (flex-end desalineaba estrella/clan vs contadores en tablet). */
+    alignItems: 'center',
     width: '100%',
   },
   /** Fila única centrada (estrella + menú + clan + contadores). */
@@ -395,19 +396,19 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     justifyContent: 'center',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     minWidth: 0,
   },
   unifiedStatsRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     alignSelf: 'center',
     flexShrink: 0,
   },
   iconBtn: { paddingVertical: 6, paddingHorizontal: 6 },
   counterBtn: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     paddingVertical: 6,
     paddingHorizontal: 6,
   },

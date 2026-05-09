@@ -75,18 +75,18 @@ export const TOP_BAR_LAYOUT = {
   // Counter pair spacing (icon ↔ number)
   COUNTER_PAIR_GAP: 8,
 
-  // Per-item nudges (fine-tuning)
+  // Per-item nudges (fine-tuning). Y se mantiene en 0: la fila usa alignItems:center en AppTopBar.
   PER_ITEM_OFFSETS: {
     star:       { x: -8,  y: 0 },
-    menu:       { x: -25, y: -10 },
+    menu:       { x: -25, y: 0 },
     shield:     { x: 1,   y: 0 },
-    clanLabel:  { x: -4, y: 3 },
-    pencilIcon: { x: 30,  y: -5 },
-    pencilText: { x: 22,  y: -13 },
-    fireIcon:   { x:  15,  y: -5 },
-    fireText:   { x:  5,  y: -13 },
-    heartIcon:  { x: -2, y: -1 },
-    heartText:  { x: -12, y: -14 },
+    clanLabel:  { x: -4,  y: 0 },
+    pencilIcon: { x: 30,  y: 0 },
+    pencilText: { x: 22,  y: 0 },
+    fireIcon:   { x: 15,  y: 0 },
+    fireText:   { x: 5,   y: 0 },
+    heartIcon:  { x: -2,  y: 0 },
+    heartText:  { x: -12, y: 0 },
   } satisfies Record<TopBarItemKey, XY>,
 } as const;
 
@@ -117,13 +117,13 @@ export const TOP_BAR_ICON_EDITOR: Record<
 > = {
   star: { offsetX: 2, offsetY: 0, scale: 1 },
   menu: { offsetX: 7, offsetY: 0, scale: 1 },
-  shield: { offsetX: -35, offsetY: -1, scale: 1 },
+  shield: { offsetX: -35, offsetY: 0, scale: 1 },
   clanLabel: { offsetX: -30, offsetY: 0, scale: 1.2 },
-  pencilIcon: { offsetX: -62, offsetY: -9, scale: 2 },
+  pencilIcon: { offsetX: -62, offsetY: 0, scale: 2 },
   pencilText: { offsetX: -45, offsetY: 0, scale: 1.2 },
-  fireIcon: { offsetX: -35, offsetY: -11, scale: 2.2 },
+  fireIcon: { offsetX: -35, offsetY: 0, scale: 2.2 },
   fireText: { offsetX: -20, offsetY: 0, scale: 1.2 },
-  heartIcon: { offsetX: -5, offsetY: -14, scale: 2 },
+  heartIcon: { offsetX: -5, offsetY: 0, scale: 2 },
   heartText: { offsetX: 15, offsetY: 0, scale: 1.2 },
 };
 
