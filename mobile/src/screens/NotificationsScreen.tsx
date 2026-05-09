@@ -6,10 +6,11 @@
  *   - row-based FlatList with clan icon, username, action text, timestamp
  *   - same typography hierarchy (white username bold, muted meta)
  *
- * On screen mount all notifications are marked as read (simple bulk-read model).
+ * On focus: refresh, then mark all read (evita carrera con el fetch). Al perder el
+ * foco se vuelve a marcar leídas para que el numerito de la campana se reinicie.
  * Tapping a notification navigates to the relevant content.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -167,17 +168,21 @@ export default function NotificationsScreen() {
     [router],
   );
 
-  // Fresh data when opening the screen (fixes stale empty state if activeUserId was late).
+  // Evita carrera refresh vs mark: si el fetch termina después de markAllRead, antes
+  // volvía a poner read:false y el badge no bajaba. Orden: fetch → marcar leídas.
+  // Al salir, markAllRead otra vez por si el usuario sale antes de que acabe el fetch.
   useFocusEffect(
     useCallback(() => {
-      refreshNotifications();
-    }, [refreshNotifications]),
+      let cancelled = false;
+      void refreshNotifications().then(() => {
+        if (!cancelled) markAllRead();
+      });
+      return () => {
+        cancelled = true;
+        markAllRead();
+      };
+    }, [refreshNotifications, markAllRead]),
   );
-
-  // Mark all as read when the screen is opened.
-  useEffect(() => {
-    markAllRead();
-  }, [markAllRead]);
 
   const handlePressProfile = useCallback(
     (n: AppNotification) => {

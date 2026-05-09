@@ -62,7 +62,7 @@ export type NotificationsContextValue = {
   /** Mark all active user's notifications as read (call on screen open). */
   markAllRead: () => void;
   /** Reload from Supabase / AsyncStorage (e.g. when opening the notifications screen). */
-  refreshNotifications: () => void;
+  refreshNotifications: () => Promise<void>;
 };
 
 function mapDbRowsToAppNotifications(rows: Awaited<ReturnType<typeof fetchMyNotifications>>): AppNotification[] {
@@ -95,16 +95,15 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     dbRef.current = db;
   }, [db]);
 
-  const refreshNotifications = useCallback(() => {
+  const refreshNotifications = useCallback((): Promise<void> => {
     if (isRealUserId(activeUserId)) {
-      fetchMyNotifications(activeUserId).then((rows) => {
+      return fetchMyNotifications(activeUserId).then((rows) => {
         setDb((prev) => ({ ...prev, [activeUserId]: mapDbRowsToAppNotifications(rows) }));
       });
-    } else {
-      loadNotificationsDB()
-        .then((loaded) => setDb(loaded))
-        .catch(() => {});
     }
+    return loadNotificationsDB()
+      .then((loaded) => setDb(loaded))
+      .catch(() => {});
   }, [activeUserId]);
 
   // Load notifications — Supabase for real users, AsyncStorage for sim users.
