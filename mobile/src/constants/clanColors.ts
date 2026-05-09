@@ -1,4 +1,5 @@
 import { evoconnColors } from '../theme/colors';
+import type { FollowingSortOption } from './followingFeedSort';
 
 export type ClanId =
   | 'nihilista'
@@ -93,6 +94,28 @@ export function getSidebarFooterClanLineColor(clanId: string | null | undefined)
     return evoconnColors.neonGreen;
   }
   return getClanColor(clanId);
+}
+
+/**
+ * Color del marco de cada fila del desplegable Siguiendo (mismo criterio que
+ * `getFollowingSortDropdownBackgroundSvg`: recientes → principal, votadas_24h → secundario, votadas_mes → terciario).
+ * Sin clan: #c7ff02 / #7000ff / #4f59fe como en los SVG `297` / `307` / `317`.
+ */
+export function getFollowingSortRowBorderColor(
+  clanId: string | null | undefined,
+  sort: FollowingSortOption,
+): string {
+  const trimmed = clanId == null ? '' : String(clanId).trim();
+  const key = trimmed === '' ? null : trimmed.toLowerCase();
+  switch (sort) {
+    case 'recientes':
+      return getSidebarFooterClanLineColor(clanId);
+    case 'votadas_24h':
+      if (!key) return NO_CLAN_SECONDARY_COLOR;
+      return (CLAN_SECONDARY_COLOR as Record<string, string>)[key] ?? NO_CLAN_SECONDARY_COLOR;
+    case 'votadas_mes':
+      return getClanTertiaryColor(clanId);
+  }
 }
 
 export function getClanBgAsset(clanId: string | null | undefined): number | undefined {

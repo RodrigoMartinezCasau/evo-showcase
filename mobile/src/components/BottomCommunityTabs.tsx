@@ -13,7 +13,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { evoconnColors } from '@evoconn/theme/colors';
-import { getSidebarFooterClanLineColor } from '@evoconn/constants/clanColors';
+import {
+  getFollowingSortRowBorderColor,
+  getSidebarFooterClanLineColor,
+} from '@evoconn/constants/clanColors';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
@@ -358,6 +361,7 @@ export function BottomCommunityTabs({
           >
             {FOLLOWING_SORT_MENU_ORDER.map((opt) => {
               const selected = followingSort === opt;
+              const selectedLabelColor = getFollowingSortRowBorderColor(activeClan, opt);
               const BgSvg = getFollowingSortDropdownBackgroundSvg(activeClan, opt);
               return (
                 <Pressable
@@ -395,7 +399,7 @@ export function BottomCommunityTabs({
                       <Text
                         style={[
                           styles.sortMenuLabelSvgText,
-                          selected && { color: selectedColor, fontWeight: '700' as const },
+                          selected && { color: selectedLabelColor, fontWeight: '700' as const },
                         ]}
                       >
                         {FOLLOWING_SORT_LABELS[opt]}
