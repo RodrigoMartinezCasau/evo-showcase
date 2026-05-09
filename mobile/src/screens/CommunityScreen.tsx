@@ -66,8 +66,8 @@ function tabToFeedMode(tab: TabId): FeedMode {
  * - Net votes: upvotes × 2 - downvotes + saves (engagement signal)
  * - Recency boost: ×2 if post is < 6 h old, ×1.5 if < 24 h, ×1 otherwise
  * - Clan boost: ×1.4 if author's clan matches viewer's clan
- * Discovery-mode: discovery posts (not from followed users) are ranked first,
- * but followed users still appear as fallback so the feed is never empty.
+ * Discovery-mode: discovery posts (not from followed users) are ranked first.
+ * Siguiendo is only posts from users you follow (empty if you follow no one).
  *
  * Seen posts (vertical "Para ti" viewer): reordered to the bottom so the user
  * mostly sees fresh items first; seen content still fills the tail if needed.
@@ -97,10 +97,8 @@ function getDataForMode(
 ): CommunityPost[] {
   switch (mode) {
     case 'following': {
-      const pool =
-        followingSet && followingSet.size > 0
-          ? allPosts.filter((p) => followingSet.has(p.author.id))
-          : [...allPosts];
+      const ids = followingSet ?? new Set<string>();
+      const pool = allPosts.filter((p) => ids.has(p.author.id));
       return sortFollowingPosts(pool, followingSort);
     }
     case 'foryou': {
@@ -108,8 +106,7 @@ function getDataForMode(
       const others = viewerUserId
         ? allPosts.filter((p) => p.author.id !== viewerUserId)
         : allPosts;
-      // Sort all by score (discovery + followed mixed, discovery floats higher
-      // because followed content already lives in SIGUIENDO).
+      // Sort all by score (discovery + followed mixed, discovery floats higher).
       const sorted = [...others].sort(
         (a, b) =>
           scorePostForYou(b, viewerClanId ?? null, tasteBoost) -

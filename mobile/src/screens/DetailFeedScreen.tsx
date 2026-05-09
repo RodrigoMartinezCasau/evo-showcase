@@ -55,10 +55,8 @@ function getDataForMode(
   const followingSort = parseFollowingSortParam(followingSortKey);
   switch (mode) {
     case 'following': {
-      const pool =
-        followingSet && followingSet.size > 0
-          ? allPosts.filter((p) => followingSet.has(p.author.id))
-          : [...allPosts];
+      const ids = followingSet ?? new Set<string>();
+      const pool = allPosts.filter((p) => ids.has(p.author.id));
       return sortFollowingPosts(pool, followingSort);
     }
     case 'foryou':
