@@ -38,6 +38,9 @@ function formatCount(n: number): string {
   return String(n);
 }
 
+/** Same vertical gap: up (count→icon) and down (icon→count). */
+const VOTE_STAT_ICON_GAP = 2;
+
 type DetailActionColumnProps = {
   clanId: string | null | undefined;
   upCount: number;
@@ -97,9 +100,9 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
   // ── Dynamic icon sizing ────────────────────────────────────────────────────
   // Solve: ICON_RATIO_SUM * effectiveSz + FIXED_H = containerHeight
   // Clan = 2.2 × other (120% bigger).  Icons fill the panel; gaps from space-between.
-  // Fixed items: 3 text nodes (upvote count, approval %, downvote count) @ ~18px + 2px inner margin.
+  // Fixed: 3 text lines (~18px) + 2× VOTE_STAT_ICON_GAP (up count↔icon, down icon↔count).
   const ICON_RATIO_SUM = 2.2 + 1 + 1 + 0.92 + 0.6; // clan + up + down + save + dots
-  const FIXED_H = 3 * 18 + 2; // 56 px
+  const FIXED_H = 3 * 18 + 2 * VOTE_STAT_ICON_GAP;
 
   let clanSz: number;
   let otherSz: number;
@@ -128,7 +131,7 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
 
   return (
     <View style={styles.root}>
-      {/* ── 7-item column: clan / upvote-count / upvote-icon / approval% / downvote+count / save / dots ── */}
+      {/* ── 6-item column: clan / up block / approval% / down block / save / dots (same count↔icon gap up & down) ── */}
       <View style={columnStyle}>
 
         {/* 1. Clan badge */}
@@ -138,28 +141,35 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
           </View>
         </TouchableOpacity>
 
-        {/* 2. Upvote count (standalone — between clan and upvote icon) */}
-        <Text style={styles.statText}>{formatCount(upCount)}</Text>
-
-        {/* 3. Upvote icon */}
+        {/* 2. Upvote: count then icon — gap matches down block */}
         <TouchableOpacity onPress={handleUp} activeOpacity={0.7}>
-          <Animated.View style={{ width: otherSz, height: otherSz, transform: [{ scale: upBounce.scale }] }}>
-            {voted === 'up' ? (
-              <UpvoteActive key="up-a" width={otherSz} height={otherSz} />
-            ) : (
-              <UpvoteInactive key="up-i" width={otherSz} height={otherSz} />
-            )}
-          </Animated.View>
+          <View style={styles.voteStack}>
+            <Text style={styles.statText}>{formatCount(upCount)}</Text>
+            <Animated.View
+              style={{
+                marginTop: VOTE_STAT_ICON_GAP,
+                width: otherSz,
+                height: otherSz,
+                transform: [{ scale: upBounce.scale }],
+              }}
+            >
+              {voted === 'up' ? (
+                <UpvoteActive key="up-a" width={otherSz} height={otherSz} />
+              ) : (
+                <UpvoteInactive key="up-i" width={otherSz} height={otherSz} />
+              )}
+            </Animated.View>
+          </View>
         </TouchableOpacity>
 
-        {/* 4. Approval % */}
+        {/* 3. Approval % */}
         <Text style={styles.approvalText}>
           {approvalPct}%
         </Text>
 
-        {/* 5. Downvote + count below */}
+        {/* 4. Downvote: icon then count — same gap as up block */}
         <TouchableOpacity onPress={handleDown} activeOpacity={0.7}>
-          <View style={styles.iconWithStat}>
+          <View style={styles.voteStack}>
             <Animated.View style={{ width: otherSz, height: otherSz, transform: [{ scale: downBounce.scale }] }}>
               {voted === 'down' ? (
                 <DownvoteActive key="down-a" width={otherSz} height={otherSz} />
@@ -167,11 +177,11 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
                 <DownvoteInactive key="down-i" width={otherSz} height={otherSz} />
               )}
             </Animated.View>
-            <Text style={styles.statText}>{formatCount(downCount)}</Text>
+            <Text style={[styles.statText, styles.statBelowIcon]}>{formatCount(downCount)}</Text>
           </View>
         </TouchableOpacity>
 
-        {/* 6. Save */}
+        {/* 5. Save */}
         <TouchableOpacity onPress={handleSave} activeOpacity={0.7}>
           <Animated.View style={{ width: saveSz, height: saveSz, transform: [{ scale: saveBounce.scale }] }}>
             {saved ? (
@@ -182,7 +192,7 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
           </Animated.View>
         </TouchableOpacity>
 
-        {/* 7. More (three dots) */}
+        {/* 6. More (three dots) */}
         <TouchableOpacity onPress={onMorePress} activeOpacity={0.7} hitSlop={8}>
           <Text style={[styles.moreDots, { fontSize: dotsFontSz }]}>···</Text>
         </TouchableOpacity>
@@ -204,15 +214,17 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     width: COL_FIXED_WIDTH,
   },
-  iconWithStat: {
+  voteStack: {
     alignItems: 'center',
   },
   statText: {
     fontSize: 13,
     fontWeight: '700',
-    marginTop: 2,
     textAlign: 'center',
     color: '#FFFFFF',
+  },
+  statBelowIcon: {
+    marginTop: VOTE_STAT_ICON_GAP,
   },
   approvalText: {
     fontSize: 13,
