@@ -17,6 +17,7 @@ import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { SIM_USERS_BY_ID, type SimPost } from '@evoconn/data/simulation/simulatedNetwork';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { useNotifications } from '@evoconn/hooks/NotificationsContext';
+import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -71,6 +72,7 @@ const FeedContext = createContext<FeedContextValue | null>(null);
 export function FeedProvider({ children }: { children: React.ReactNode }) {
   const sim = useSimulation();
   const { addNotification } = useNotifications();
+  const taste = useRecommendationTaste();
   const [publishedIds, setPublishedIds] = useState<Set<string>>(new Set());
 
   // All posts: derive CommunityPost[] from the live SimPost[] so vote/save
@@ -101,9 +103,10 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
         saverIds: [],
       };
       sim.publishPost(simPost);
+      taste.recordPublish(post.type);
       setPublishedIds(prev => new Set(prev).add(post.id));
     },
-    [sim],
+    [sim, taste],
   );
 
   // Also check the live posts list so the result stays correct after remounts
@@ -123,7 +126,12 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
   const updatePostVote = useCallback(
     (postId: string, _from: 'up' | 'down' | null, to: 'up' | 'down' | null) => {
       const previousVote = sim.voteMap[sim.activeUserId]?.[postId] ?? null;
+      const preVotePost = sim.posts.find((p) => p.id === postId);
+      const tastePost: CommunityPost | undefined = preVotePost
+        ? simPostToCommunityPost(preVotePost)
+        : undefined;
       sim.castVote(sim.activeUserId, postId, to);
+      if (tastePost) taste.recordVote(tastePost, previousVote, to);
       // Emit notification only when casting a NEW upvote (not removing or changing).
       if (to === 'up' && previousVote !== 'up') {
         const post = sim.posts.find((p) => p.id === postId);
@@ -140,7 +148,7 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
         }
       }
     },
-    [sim, addNotification],
+    [sim, addNotification, taste],
   );
 
   // Save count on posts is always up-to-date via SimulationContext.toggleSave

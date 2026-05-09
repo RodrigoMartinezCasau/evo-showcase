@@ -44,13 +44,33 @@ export const TOP_BAR_LAYOUT = {
   RIGHT_CLUSTER_GAP: 0,
 
   /**
-   * Escala unificada del bloque central: estrella + menú + escudo + etiqueta + lápiz + racha + usos.
-   * Un solo factor para que no descompense tablet vs teléfono.
+   * Escala base del bloque central (móvil). Tablet multiplica además por `TOP_BAR_TABLET_STATS_SCALE_MULTIPLIER`.
+   * El encaje por overflow solo **reduce** cuando la fila supera el carril; si cabe, se mantiene en 1.
    */
-  RIGHT_CLUSTER_UNIVERSAL_SCALE: 0.85,
+  RIGHT_CLUSTER_UNIVERSAL_SCALE: 1,
+
+  /**
+   * Solo cuando `isTopBarTabletLayout`: multiplica la escala del grupo central.
+   * Los móviles usan factor 1 (sin cambio). Ajusta aquí si la tablet se ve pequeña o grande.
+   */
+  TOP_BAR_TABLET_STATS_SCALE_MULTIPLIER: 1.42,
+
+  /**
+   * Lado corto mínimo de la ventana (dp) para considerar tablet en la top bar.
+   * 600 deja fuera móviles y phablets típicos; coincide con breakpoints habituales.
+   */
+  TOP_BAR_TABLET_MIN_SHORTEST_SIDE: 600,
 
   /** Hueco horizontal entre escudo+etiqueta y cada par lápiz/fuego/corazón (fila única). */
   UNIFIED_STATS_ROW_GAP: 6,
+
+  /**
+   * Encaje cuando hay muchas cifras: margen respecto al ancho útil del carril (por lado).
+   */
+  TOP_BAR_OVERFLOW_SAFE_MARGIN: 10,
+
+  /** Mínimo del factor de encaje (muchas cifras en pantallas estrechas). */
+  TOP_BAR_OVERFLOW_MIN_SHRINK: 0.5,
 
   // Counter pair spacing (icon ↔ number)
   COUNTER_PAIR_GAP: 8,
@@ -69,6 +89,11 @@ export const TOP_BAR_LAYOUT = {
     heartText:  { x: -12, y: -14 },
   } satisfies Record<TopBarItemKey, XY>,
 } as const;
+
+/** Tablet (solo top bar): usa el menor de ancho/alto; móviles quedan fuera por el umbral. */
+export function isTopBarTabletLayout(windowWidth: number, windowHeight: number): boolean {
+  return Math.min(windowWidth, windowHeight) >= TOP_BAR_LAYOUT.TOP_BAR_TABLET_MIN_SHORTEST_SIDE;
+}
 
 /**
  * Editor independiente por icono/texto de la barra superior: suma a `PER_ITEM_OFFSETS` y aplica `scale`.

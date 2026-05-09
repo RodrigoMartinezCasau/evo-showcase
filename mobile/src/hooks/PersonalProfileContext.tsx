@@ -32,6 +32,7 @@ import {
 } from '@evoconn/data/simulation/simulatedNetwork';
 import { fetchProfilesBatch, setPostHidden, isRealUserId, type BasicProfile } from '@evoconn/services/supabaseSocial';
 import { registerFollowProfilePrimer } from '@evoconn/hooks/followProfilePrime';
+import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
 import { useAuth } from '../../mobile/lib/AuthContext';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -98,6 +99,7 @@ const PersonalProfileCtx = createContext<PersonalProfileContextValue | null>(nul
 
 export function PersonalProfileProvider({ children }: { children: React.ReactNode }) {
   const sim = useSimulation();
+  const taste = useRecommendationTaste();
   const { activeUserId, users, posts: simPosts, followGraph, savedMap, hiddenMap } = sim;
 
   // Cache of Supabase profiles for real UUID users not in SIM_USERS_BY_ID.
@@ -263,16 +265,23 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
   );
 
   const savePost = useCallback(
-    (post: CommunityPost) => sim.toggleSave(activeUserId, post.id),
-    [sim, activeUserId],
+    (post: CommunityPost) => {
+      if (savedPostIds.has(post.id)) return;
+      sim.toggleSave(activeUserId, post.id);
+      taste.recordSave(post);
+    },
+    [sim, activeUserId, taste, savedPostIds],
   );
 
   const unsavePost = useCallback(
     (id: string) => {
       // Only toggle if currently saved (to avoid toggling to saved)
-      if (savedPostIds.has(id)) sim.toggleSave(activeUserId, id);
+      if (savedPostIds.has(id)) {
+        sim.toggleSave(activeUserId, id);
+        taste.recordUnsave(id);
+      }
     },
-    [sim, activeUserId, savedPostIds],
+    [sim, activeUserId, savedPostIds, taste],
   );
 
   const isSaved = useCallback(

@@ -36,6 +36,7 @@ import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import type { SimComment } from '@evoconn/data/simulation/simulatedNetwork';
 import { blockUser, insertReport, isRealUserId } from '@evoconn/services/supabaseSocial';
 import { useAuth } from '../../mobile/lib/AuthContext';
+import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
 
 type ReflectionDetailItemProps = {
   post: CommunityPost;
@@ -158,6 +159,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   }, [session]);
 
   const { addNotification } = useNotifications();
+  const { recordComment } = useRecommendationTaste();
 
   const handleAddComment = useCallback(
     async (text: string) => {
@@ -175,6 +177,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
         createdAt: new Date().toISOString(),
       };
       await addSimComment(simComment);
+      recordComment(post);
       addNotification({
         recipientUserId: post.author.id,
         type: 'comment',
@@ -185,7 +188,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
         textPreview: text.trim().slice(0, 80),
       });
     },
-    [addSimComment, addNotification, post.author.id, post.id],
+    [addSimComment, addNotification, recordComment, post, post.author.id, post.id],
   );
 
   const { isFollowing: checkFollowing, toggleFollow } = useFollowState();

@@ -7,6 +7,7 @@
 import React, { createContext, useCallback, useContext, useMemo } from 'react';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { useNotifications } from '@evoconn/hooks/NotificationsContext';
+import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 
 type FollowContextValue = {
@@ -20,6 +21,7 @@ const FollowContext = createContext<FollowContextValue | null>(null);
 export function FollowProvider({ children }: { children: React.ReactNode }) {
   const sim = useSimulation();
   const { addNotification } = useNotifications();
+  const taste = useRecommendationTaste();
   const { activeUserId, followGraph, toggleFollow: simToggle } = sim;
 
   const followingSet = useMemo(
@@ -31,8 +33,8 @@ export function FollowProvider({ children }: { children: React.ReactNode }) {
     (uid: string) => {
       const wasFollowing = followingSet.has(uid);
       simToggle(activeUserId, uid);
-      // Emit notification only when a new follow occurs (not unfollow).
       if (!wasFollowing) {
+        taste.recordFollow(uid);
         const follower = sim.users[activeUserId];
         addNotification({
           recipientUserId: uid,
@@ -41,9 +43,11 @@ export function FollowProvider({ children }: { children: React.ReactNode }) {
           // For real users, sim.users[activeUserId] is undefined — use mockCurrentUser.
           fromUsername: follower?.username ?? mockCurrentUser.username,
         });
+      } else {
+        taste.recordUnfollow(uid);
       }
     },
-    [followingSet, simToggle, activeUserId, sim.users, addNotification],
+    [followingSet, simToggle, activeUserId, sim.users, addNotification, taste],
   );
 
   const value = useMemo<FollowContextValue>(

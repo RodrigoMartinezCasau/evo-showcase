@@ -1,10 +1,18 @@
-import React, { useMemo, useRef, useEffect } from 'react';
-import { View, TouchableOpacity, StyleSheet, Text, Animated } from 'react-native';
+import React, { useMemo, useRef, useEffect, useState, useCallback, useLayoutEffect } from 'react';
+import {
+  View,
+  TouchableOpacity,
+  StyleSheet,
+  Text,
+  Animated,
+  useWindowDimensions,
+  type LayoutChangeEvent,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { TOP_BAR_LAYOUT, topBarIconEditorStyle } from '@evoconn/constants/topBarLayout';
-import { mockCurrentUser, mockUserStats } from '@evoconn/data/mockUser';
+import { TOP_BAR_LAYOUT, topBarIconEditorStyle, isTopBarTabletLayout } from '@evoconn/constants/topBarLayout';
+import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { topBarIconFrameScale } from '@evoconn/assets/icons/topbar';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { usePreviewMode } from '@evoconn/debug/PreviewModeContext';
@@ -17,7 +25,7 @@ import { getTopBarInsigniaByHouse } from '@evoconn/utils/getTopBarInsigniaByHous
 import { getProgressionIcon } from '@evoconn/utils/getTopBarProgressionIcon';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import FuegoApagadoIcon from '../assets/topbar/fueguitoSvg/fuego-apagado.svg';
-import { useDebugStreak, IS_DEBUG_STREAK_MODE } from '../debug/DebugStreakContext';
+import { useDebugStreak } from '../debug/DebugStreakContext';
 import { useDebugStats } from '../debug/DebugStatsContext';
 import { useQuotes } from '../hooks/QuotesContext';
 
@@ -69,6 +77,7 @@ export function AppTopBar({
 }: AppTopBarProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width: winW, height: winH } = useWindowDimensions();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const { isPreviewActive, previewClanId } = usePreviewMode();
   const { getVisibleClanId, getReflectionCount, getPhraseCount } = useClassification();
@@ -157,7 +166,66 @@ export function AppTopBar({
     }
   }, [hasSentToday, statsLoaded, fireAnim]);
 
-  const statsScale = TOP_BAR_LAYOUT.RIGHT_CLUSTER_UNIVERSAL_SCALE;
+  const tabletStatsBoost = isTopBarTabletLayout(winW, winH)
+    ? TOP_BAR_LAYOUT.TOP_BAR_TABLET_STATS_SCALE_MULTIPLIER
+    : 1;
+  const baseStatsScale =
+    TOP_BAR_LAYOUT.RIGHT_CLUSTER_UNIVERSAL_SCALE * tabletStatsBoost;
+
+  /** Encoge el bloque entero si la fila supera el carril (más cifras en contadores). */
+  const overflowShrinkRef = useRef(1);
+  const [overflowShrink, setOverflowShrink] = useState(1);
+  const [statsRailWidth, setStatsRailWidth] = useState(0);
+  const [unifiedRowWidth, setUnifiedRowWidth] = useState(0);
+
+  const statsScale = baseStatsScale * overflowShrink;
+
+  const onStatsRailLayout = useCallback((e: LayoutChangeEvent) => {
+    const w = e.nativeEvent.layout.width;
+    setStatsRailWidth((prev) => (Math.abs(prev - w) > 0.5 ? w : prev));
+  }, []);
+
+  const onUnifiedStatsRowLayout = useCallback((e: LayoutChangeEvent) => {
+    const w = e.nativeEvent.layout.width;
+    setUnifiedRowWidth((prev) => (Math.abs(prev - w) > 0.5 ? w : prev));
+  }, []);
+
+  useLayoutEffect(() => {
+    const R = statsRailWidth;
+    const rowW = unifiedRowWidth;
+    const m = TOP_BAR_LAYOUT.TOP_BAR_OVERFLOW_SAFE_MARGIN;
+    const cap = Math.max(0, R - m * 2);
+    const minL = TOP_BAR_LAYOUT.TOP_BAR_OVERFLOW_MIN_SHRINK;
+
+    if (R < 56 || rowW < 1 || cap < 72) return;
+
+    let L = overflowShrinkRef.current;
+
+    // Solo encoger si la fila **realmente** supera el hueco útil (sin fudge: evita quedarse pequeño por defecto).
+    if (rowW > cap) {
+      L *= cap / rowW;
+    } else {
+      // Cabe: recuperar hacia 1 aprovechando el margen (corrige estados previos con L < 1).
+      L = Math.min(1, L * (cap / Math.max(rowW, 1)));
+    }
+
+    L = Math.max(minL, Math.min(1, L));
+
+    if (Math.abs(L - overflowShrinkRef.current) > 0.005) {
+      overflowShrinkRef.current = L;
+      setOverflowShrink(L);
+    }
+  }, [
+    statsRailWidth,
+    unifiedRowWidth,
+    pencilCount,
+    fireCount,
+    heartCount,
+    showClanIcon,
+    showCounters,
+    clanLabel,
+    baseStatsScale,
+  ]);
   const starFrame = iconFrame(TOP_BAR_LAYOUT.STAR_SIZE * statsScale, topBarIconFrameScale.evoStar);
   const shieldFrame = iconFrame(TOP_BAR_LAYOUT.SHIELD_SIZE * statsScale, topBarIconFrameScale.shield);
   const counterIconFrame = iconFrame(TOP_BAR_LAYOUT.COUNTER_ICON_SIZE * statsScale, 1);
@@ -192,8 +260,11 @@ export function AppTopBar({
         ]}
       >
         {/* Toda la barra de acciones en un solo grupo centrado: estrella, menú, clan, stats */}
-        <View style={styles.statsRail}>
-          <View style={[styles.unifiedStatsRow, { gap: unifiedStatsRowGap }]}>
+        <View style={styles.statsRail} onLayout={onStatsRailLayout}>
+          <View
+            style={[styles.unifiedStatsRow, { gap: unifiedStatsRowGap }]}
+            onLayout={onUnifiedStatsRowLayout}
+          >
             <TouchableOpacity onPress={onMenuPress} style={styles.iconBtn} hitSlop={14}>
               <View style={[styles.iconFrame, starFrame, topBarIconEditorStyle('star', 'star')]}>
                 <EstrellaIcon
@@ -330,7 +401,8 @@ const styles = StyleSheet.create({
   unifiedStatsRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    flexShrink: 1,
+    alignSelf: 'center',
+    flexShrink: 0,
   },
   iconBtn: { paddingVertical: 6, paddingHorizontal: 6 },
   counterBtn: {

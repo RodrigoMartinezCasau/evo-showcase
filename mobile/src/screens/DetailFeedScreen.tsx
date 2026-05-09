@@ -18,6 +18,10 @@ import { AppTopBar, SidebarDrawer, BottomCommunityTabs } from '@evoconn/componen
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useFeedStore } from '@evoconn/hooks/useFeedStore';
 import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
+import {
+  COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE,
+  COMMUNITY_DETAIL_PREFETCH_POSTS,
+} from '@evoconn/constants/communityDetailFeed';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import {
   COMMUNITY_DRAWER_EDGE_ZONE_WIDTH,
@@ -272,9 +276,9 @@ export default function DetailFeedScreen() {
         showsVerticalScrollIndicator={false}
         getItemLayout={getItemLayout}
         initialScrollIndex={initialIndex}
-        initialNumToRender={1}
-        maxToRenderPerBatch={1}
-        windowSize={3}
+        initialNumToRender={COMMUNITY_DETAIL_PREFETCH_POSTS}
+        maxToRenderPerBatch={COMMUNITY_DETAIL_PREFETCH_POSTS}
+        windowSize={COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE}
         removeClippedSubviews
         style={styles.list}
       />

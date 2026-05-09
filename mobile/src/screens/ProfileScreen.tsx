@@ -12,6 +12,7 @@ import { AppTopBar, RankBadge, ClanBanner, BottomCommunityTabs, SidebarDrawer } 
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
+import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import { getClanCardColor } from '@evoconn/theme/theme';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
@@ -105,6 +106,12 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
   } = useSimulation();
   const followGraphRef = useRef(followGraph);
   followGraphRef.current = followGraph;
+
+  const { recordProfileVisit } = useRecommendationTaste();
+  useEffect(() => {
+    if (!userId || userId === viewerId) return;
+    recordProfileVisit(userId);
+  }, [userId, viewerId, recordProfileVisit]);
 
   /** Snapshot from API + whether the viewer already followed the target at fetch time — for instant follower delta. */
   const [followCountSnap, setFollowCountSnap] = useState<{

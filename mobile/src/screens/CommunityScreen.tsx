@@ -19,6 +19,7 @@ import {
 } from '@evoconn/components';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useFeedStore } from '@evoconn/hooks/useFeedStore';
+import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
 import type { CommunityPost } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
@@ -26,6 +27,10 @@ import {
   COMMUNITY_DRAWER_EDGE_ZONE_WIDTH,
   COMMUNITY_DRAWER_GESTURE_RANGE_X,
 } from '@evoconn/constants/communityDrawerGesture';
+import {
+  COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE,
+  COMMUNITY_DETAIL_PREFETCH_POSTS,
+} from '@evoconn/constants/communityDetailFeed';
 import { ReflectionDetailItem } from '@evoconn/components/ReflectionDetailItem';
 import { SearchScreen } from '@evoconn/components/SearchScreen';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
@@ -60,13 +65,14 @@ function tabToFeedMode(tab: TabId): FeedMode {
 function scorePostForYou(
   post: CommunityPost,
   viewerClanId: string | null,
+  tasteBoost: (p: CommunityPost) => number,
 ): number {
   const net = post.voteStats.up * 2 - post.voteStats.down + post.voteStats.save;
   const ageMs = Date.now() - new Date(post.createdAt).getTime();
   const ageH = ageMs / 3_600_000;
   const recency = ageH < 6 ? 2 : ageH < 24 ? 1.5 : 1;
   const clanBoost = viewerClanId && post.author.clanId === viewerClanId ? 1.4 : 1;
-  return net * recency * clanBoost;
+  return net * recency * clanBoost * tasteBoost(post);
 }
 
 function getDataForMode(
@@ -76,6 +82,7 @@ function getDataForMode(
   viewerClanId?: string | null,
   viewerUserId?: string,
   followingSort: FollowingSortOption = 'recientes',
+  tasteBoost: (p: CommunityPost) => number = () => 1,
 ): CommunityPost[] {
   switch (mode) {
     case 'following': {
@@ -93,7 +100,9 @@ function getDataForMode(
       // Sort all by score (discovery + followed mixed, discovery floats higher
       // because followed content already lives in SIGUIENDO).
       return [...others].sort(
-        (a, b) => scorePostForYou(b, viewerClanId ?? null) - scorePostForYou(a, viewerClanId ?? null),
+        (a, b) =>
+          scorePostForYou(b, viewerClanId ?? null, tasteBoost) -
+          scorePostForYou(a, viewerClanId ?? null, tasteBoost),
       );
     }
   }
@@ -117,7 +126,8 @@ export default function CommunityScreen() {
   const { width: screenW, height: screenH } = useWindowDimensions();
   const { followingSet } = useFollowState();
   const { thoughts } = useThoughts();
-  const { posts: allPosts } = useFeedStore();
+  const { posts: allPosts, getPostById } = useFeedStore();
+  const { getBoost, revision: tasteRevision, recordDwell } = useRecommendationTaste();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const drawerOpenProgress = useRef(new Animated.Value(0)).current;
   const gestureCommittingRef = useRef(false);
@@ -149,16 +159,45 @@ export default function CommunityScreen() {
   const slideAnim = useRef(new Animated.Value(0)).current;
   const detailMounted = detailFeed !== null;
 
-  const openDetailFeed = useCallback(
-    (mode: FeedMode, postId?: string) => {
-      const data = getDataForMode(
-        mode,
+  /** Orden global Para ti — memoizado para no re-ordenar en cada frame y al abrir el detalle. */
+  const foryouFeedOrdered = useMemo(
+    () =>
+      getDataForMode(
+        'foryou',
         allPosts,
         followingSet,
         mockCurrentUser.clanId,
         mockCurrentUser.id,
         followingSort,
-      );
+        getBoost,
+      ),
+    [
+      allPosts,
+      followingSet,
+      mockCurrentUser.clanId,
+      mockCurrentUser.id,
+      followingSort,
+      getBoost,
+      tasteRevision,
+    ],
+  );
+
+  const followingFeedOrdered = useMemo(
+    () =>
+      getDataForMode(
+        'following',
+        allPosts,
+        followingSet,
+        mockCurrentUser.clanId,
+        mockCurrentUser.id,
+        followingSort,
+      ),
+    [allPosts, followingSet, mockCurrentUser.clanId, mockCurrentUser.id, followingSort],
+  );
+
+  const openDetailFeed = useCallback(
+    (mode: FeedMode, postId?: string) => {
+      const data = mode === 'foryou' ? foryouFeedOrdered : followingFeedOrdered;
       let initialIndex = 0;
       if (postId) {
         const idx = data.findIndex((p) => p.id === postId);
@@ -175,8 +214,25 @@ export default function CommunityScreen() {
         }).start();
       });
     },
-    [slideAnim, allPosts, followingSet, followingSort],
+    [slideAnim, foryouFeedOrdered, followingFeedOrdered],
   );
+
+  // Mantener el feed ampliado alineado con el ranking actual (votos, nuevos posts…).
+  useEffect(() => {
+    setDetailFeed((prev) => {
+      if (!prev) return prev;
+      const nextData = prev.mode === 'foryou' ? foryouFeedOrdered : followingFeedOrdered;
+      const safeIdx = Math.min(prev.initialIndex, Math.max(0, prev.data.length - 1));
+      const anchorId = prev.data[safeIdx]?.id;
+      let nextInitial = prev.initialIndex;
+      if (anchorId) {
+        const ni = nextData.findIndex((p) => p.id === anchorId);
+        if (ni >= 0) nextInitial = ni;
+      }
+      if (prev.data === nextData) return prev;
+      return { ...prev, data: nextData, initialIndex: nextInitial };
+    });
+  }, [foryouFeedOrdered, followingFeedOrdered]);
 
   useEffect(() => {
     if (!tabParam) return;
@@ -309,32 +365,23 @@ export default function CommunityScreen() {
     20;
   const feedItemHeight = screenH - topBarHeight - bottomBarHeight;
 
-  const listData = useMemo(
-    () =>
-      getDataForMode(
-        tabToFeedMode(activeTab),
-        allPosts,
-        followingSet,
-        mockCurrentUser.clanId,
-        mockCurrentUser.id,
-        followingSort,
-      ),
-    [activeTab, allPosts, followingSet, followingSort],
-  );
+  const listData = useMemo(() => {
+    switch (activeTab) {
+      case 'siguiendo':
+        return followingFeedOrdered;
+      case 'para-ti':
+        return foryouFeedOrdered;
+      default:
+        return [];
+    }
+  }, [activeTab, followingFeedOrdered, foryouFeedOrdered]);
 
   const transitionData = useMemo(
     () =>
       transitionTab && transitionTab !== 'search' && transitionTab !== 'para-ti'
-        ? getDataForMode(
-            tabToFeedMode(transitionTab),
-            allPosts,
-            followingSet,
-            mockCurrentUser.clanId,
-            mockCurrentUser.id,
-            followingSort,
-          )
+        ? followingFeedOrdered
         : [],
-    [transitionTab, allPosts, followingSet, followingSort],
+    [transitionTab, followingFeedOrdered],
   );
 
   const renderMainListItem = useCallback(
@@ -483,11 +530,39 @@ export default function CommunityScreen() {
     }
   }, [detailFeed]);
 
+  /** Dwell time on full-screen posts → taste model (Para ti). */
+  const dwellRef = useRef<{ postId: string | null; since: number }>({ postId: null, since: Date.now() });
+  const tasteDwellRefs = useRef({ getPostById, recordDwell });
+  tasteDwellRefs.current = { getPostById, recordDwell };
+
+  useEffect(() => {
+    if (!detailFeed) return;
+    const startId = detailFeed.data[detailFeed.initialIndex]?.id ?? null;
+    dwellRef.current = { postId: startId, since: Date.now() };
+    return () => {
+      const { postId, since } = dwellRef.current;
+      if (!postId) return;
+      const ms = Date.now() - since;
+      const p = tasteDwellRefs.current.getPostById(postId);
+      if (p && ms >= 450) tasteDwellRefs.current.recordDwell(p, ms);
+    };
+  }, [detailFeed]);
+
   const detailViewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
   const onDetailViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: Array<{ item: CommunityPost }> }) => {
       if (viewableItems.length > 0 && viewableItems[0].item?.author?.id) {
-        const id = viewableItems[0].item.author.id;
+        const post = viewableItems[0].item;
+        const now = Date.now();
+        const prev = dwellRef.current;
+        if (prev.postId && prev.postId !== post.id) {
+          const ms = now - prev.since;
+          const prevPost = tasteDwellRefs.current.getPostById(prev.postId);
+          if (prevPost && ms >= 450) tasteDwellRefs.current.recordDwell(prevPost, ms);
+        }
+        dwellRef.current = { postId: post.id, since: now };
+
+        const id = post.author.id;
         visibleAuthorIdRef.current = id;
         setVisibleAuthorId(id);
       }
@@ -695,9 +770,9 @@ export default function CommunityScreen() {
               showsVerticalScrollIndicator={false}
               getItemLayout={getFeedItemLayout}
               initialScrollIndex={detailFeed?.initialIndex ?? 0}
-              initialNumToRender={1}
-              maxToRenderPerBatch={1}
-              windowSize={3}
+              initialNumToRender={COMMUNITY_DETAIL_PREFETCH_POSTS}
+              maxToRenderPerBatch={COMMUNITY_DETAIL_PREFETCH_POSTS}
+              windowSize={COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE}
               removeClippedSubviews
               style={styles.panelInner}
               viewabilityConfig={detailViewabilityConfig}

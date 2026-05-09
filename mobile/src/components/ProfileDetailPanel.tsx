@@ -10,6 +10,10 @@ import { runOnJS } from 'react-native-reanimated';
 import type { CommunityPost } from '@evoconn/types';
 import { ReflectionDetailItem } from '@evoconn/components/ReflectionDetailItem';
 import { evoconnColors } from '@evoconn/theme/colors';
+import {
+  COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE,
+  COMMUNITY_DETAIL_PREFETCH_POSTS,
+} from '@evoconn/constants/communityDetailFeed';
 
 type Props = {
   data: CommunityPost[];
@@ -126,9 +130,9 @@ export function ProfileDetailPanel({
             showsVerticalScrollIndicator={false}
             getItemLayout={getItemLayout}
             initialScrollIndex={initialIndex}
-            initialNumToRender={1}
-            maxToRenderPerBatch={1}
-            windowSize={3}
+            initialNumToRender={COMMUNITY_DETAIL_PREFETCH_POSTS}
+            maxToRenderPerBatch={COMMUNITY_DETAIL_PREFETCH_POSTS}
+            windowSize={COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE}
             removeClippedSubviews
             style={styles.list}
           />
