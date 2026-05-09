@@ -158,12 +158,14 @@ export function AppTopBar({
   }, [hasSentToday, statsLoaded, fireAnim]);
 
   const starFrame = iconFrame(TOP_BAR_LAYOUT.STAR_SIZE, topBarIconFrameScale.evoStar);
-  const shieldFrame = iconFrame(TOP_BAR_LAYOUT.SHIELD_SIZE, topBarIconFrameScale.shield);
-  const rightClusterScale = TOP_BAR_LAYOUT.RIGHT_CLUSTER_UNIVERSAL_SCALE;
-  const counterIconFrame = iconFrame(TOP_BAR_LAYOUT.COUNTER_ICON_SIZE * rightClusterScale, 1);
-  const counterTextSize = TOP_BAR_LAYOUT.COUNTER_TEXT_SIZE * rightClusterScale;
-  const counterPairGap = TOP_BAR_LAYOUT.COUNTER_PAIR_GAP * rightClusterScale;
-  const counterNumMinW = 22 * rightClusterScale;
+  const statsScale = TOP_BAR_LAYOUT.RIGHT_CLUSTER_UNIVERSAL_SCALE;
+  const shieldFrame = iconFrame(TOP_BAR_LAYOUT.SHIELD_SIZE * statsScale, topBarIconFrameScale.shield);
+  const counterIconFrame = iconFrame(TOP_BAR_LAYOUT.COUNTER_ICON_SIZE * statsScale, 1);
+  const counterTextSize = TOP_BAR_LAYOUT.COUNTER_TEXT_SIZE * statsScale;
+  const clanLabelFontSize = (TOP_BAR_LAYOUT.COUNTER_TEXT_SIZE + 1) * statsScale;
+  const counterPairGap = TOP_BAR_LAYOUT.COUNTER_PAIR_GAP * statsScale;
+  const counterNumMinW = 22 * statsScale;
+  const unifiedStatsRowGap = TOP_BAR_LAYOUT.UNIFIED_STATS_ROW_GAP * statsScale;
   const menuSize = TOP_BAR_LAYOUT.MENU_SIZE;
 
   const previewClanLabel = isPreviewActive
@@ -186,11 +188,10 @@ export function AppTopBar({
       <View
         style={[
           styles.barRow,
-          styles.barRowUniform,
           { transform: [{ translateY: TOP_BAR_LAYOUT.TOPBAR_WHOLE_SHIFT_Y }] },
         ]}
       >
-        {/* Group 1 — star + hamburger */}
+        {/* Izquierda — estrella + menú (ancho intrínseco) */}
         <View style={[styles.leftCluster, { gap: TOP_BAR_LAYOUT.LEFT_CLUSTER_GAP }]}>
           <TouchableOpacity onPress={onMenuPress} style={styles.iconBtn} hitSlop={14}>
             <View style={[styles.iconFrame, starFrame, topBarIconEditorStyle('star', 'star')]}>
@@ -215,83 +216,84 @@ export function AppTopBar({
           </TouchableOpacity>
         </View>
 
-        {/* Group 2 — clan icon + label */}
-        {showClanIcon && (
-          <TouchableOpacity onPress={handleClanPress} style={styles.centerPress} hitSlop={12}>
-            <View style={[styles.iconFrame, shieldFrame, topBarIconEditorStyle('shield', 'shield')]}>
-              <InsigniaIcon width={shieldFrame.width} height={shieldFrame.height} />
-            </View>
-            <View
-              style={[
-                styles.textBox,
-                { height: shieldFrame.height },
-                topBarIconEditorStyle('clanLabel', 'clanLabel'),
-              ]}
+        {/* Centro — una sola fila: clan + contadores (mismo gap en phone y tablet; sin space-around) */}
+        <View style={styles.statsRail}>
+          <View style={[styles.unifiedStatsRow, { gap: unifiedStatsRowGap }]}>
+            {showClanIcon && (
+              <TouchableOpacity onPress={handleClanPress} style={styles.centerPress} hitSlop={12}>
+                <View style={[styles.iconFrame, shieldFrame, topBarIconEditorStyle('shield', 'shield')]}>
+                  <InsigniaIcon width={shieldFrame.width} height={shieldFrame.height} />
+                </View>
+                <View
+                  style={[
+                    styles.textBox,
+                    { height: shieldFrame.height },
+                    topBarIconEditorStyle('clanLabel', 'clanLabel'),
+                  ]}
+                >
+                  <Text
+                    style={[styles.clanLabel, { fontSize: clanLabelFontSize }]}
+                    numberOfLines={1}
+                    ellipsizeMode="clip"
+                  >
+                    {clanLabel}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              onPress={() => router.push('/phrases-domains')}
+              style={[styles.counterBtn, { gap: counterPairGap }]}
+              hitSlop={14}
             >
-              <Text
-                style={[styles.clanLabel, { fontSize: TOP_BAR_LAYOUT.COUNTER_TEXT_SIZE + 1 }]}
-                numberOfLines={1}
-                ellipsizeMode="clip"
-              >
-                {clanLabel}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        )}
-
-        {/* Groups 3–5 — contadores ~5% más compactos (layout real, no solo scale) */}
-        <View style={styles.rightCluster}>
-          <TouchableOpacity
-            onPress={() => router.push('/phrases-domains')}
-            style={[styles.counterBtn, { gap: counterPairGap }]}
-            hitSlop={14}
-          >
-            <View style={[styles.iconFrame, counterIconFrame, topBarIconEditorStyle('pencilIcon', 'pencilIcon')]}>
-              <LapizIcon width={counterIconFrame.width} height={counterIconFrame.height} />
-            </View>
-            {showCounters && (
-              <View style={[styles.textBox, { height: counterIconFrame.height }, topBarIconEditorStyle('pencilText', 'pencilText')]}>
-                <Text style={[styles.counterText, { fontSize: counterTextSize, minWidth: counterNumMinW }]}>{pencilCount}</Text>
+              <View style={[styles.iconFrame, counterIconFrame, topBarIconEditorStyle('pencilIcon', 'pencilIcon')]}>
+                <LapizIcon width={counterIconFrame.width} height={counterIconFrame.height} />
               </View>
-            )}
-          </TouchableOpacity>
+              {showCounters && (
+                <View style={[styles.textBox, { height: counterIconFrame.height }, topBarIconEditorStyle('pencilText', 'pencilText')]}>
+                  <Text style={[styles.counterText, { fontSize: counterTextSize, minWidth: counterNumMinW }]}>{pencilCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={() => router.push('/streak')}
-            style={[styles.counterBtn, { gap: counterPairGap }]}
-            hitSlop={14}
-          >
-            <View style={[styles.iconFrame, counterIconFrame, topBarIconEditorStyle('fireIcon', 'fireIcon')]}>
-              <>
-                <Animated.View style={[StyleSheet.absoluteFill, { opacity: Animated.subtract(1, fireAnim) }]}>
-                  <FuegoApagadoIcon width={counterIconFrame.width} height={counterIconFrame.height} />
-                </Animated.View>
-                <Animated.View style={[StyleSheet.absoluteFill, { opacity: fireAnim }]}>
-                  <RachaIcon width={counterIconFrame.width} height={counterIconFrame.height} />
-                </Animated.View>
-              </>
-            </View>
-            {showCounters && (
-              <View style={[styles.textBox, { height: counterIconFrame.height }, topBarIconEditorStyle('fireText', 'fireText')]}>
-                <Text style={[styles.counterText, { fontSize: counterTextSize, minWidth: counterNumMinW }]}>{fireCount}</Text>
+            <TouchableOpacity
+              onPress={() => router.push('/streak')}
+              style={[styles.counterBtn, { gap: counterPairGap }]}
+              hitSlop={14}
+            >
+              <View style={[styles.iconFrame, counterIconFrame, topBarIconEditorStyle('fireIcon', 'fireIcon')]}>
+                <>
+                  <Animated.View style={[StyleSheet.absoluteFill, { opacity: Animated.subtract(1, fireAnim) }]}>
+                    <FuegoApagadoIcon width={counterIconFrame.width} height={counterIconFrame.height} />
+                  </Animated.View>
+                  <Animated.View style={[StyleSheet.absoluteFill, { opacity: fireAnim }]}>
+                    <RachaIcon width={counterIconFrame.width} height={counterIconFrame.height} />
+                  </Animated.View>
+                </>
               </View>
-            )}
-          </TouchableOpacity>
+              {showCounters && (
+                <View style={[styles.textBox, { height: counterIconFrame.height }, topBarIconEditorStyle('fireText', 'fireText')]}>
+                  <Text style={[styles.counterText, { fontSize: counterTextSize, minWidth: counterNumMinW }]}>{fireCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={() => router.push('/daily-uses')}
-            style={[styles.counterBtn, { gap: counterPairGap }]}
-            hitSlop={14}
-          >
-            <View style={[styles.iconFrame, counterIconFrame, topBarIconEditorStyle('heartIcon', 'heartIcon')]}>
-              <UsosIcon width={counterIconFrame.width} height={counterIconFrame.height} />
-            </View>
-            {showCounters && (
-              <View style={[styles.textBox, { height: counterIconFrame.height }, topBarIconEditorStyle('heartText', 'heartText')]}>
-                <Text style={[styles.counterText, { fontSize: counterTextSize, minWidth: counterNumMinW }]}>{heartCount}</Text>
+            <TouchableOpacity
+              onPress={() => router.push('/daily-uses')}
+              style={[styles.counterBtn, { gap: counterPairGap }]}
+              hitSlop={14}
+            >
+              <View style={[styles.iconFrame, counterIconFrame, topBarIconEditorStyle('heartIcon', 'heartIcon')]}>
+                <UsosIcon width={counterIconFrame.width} height={counterIconFrame.height} />
               </View>
-            )}
-          </TouchableOpacity>
+              {showCounters && (
+                <View style={[styles.textBox, { height: counterIconFrame.height }, topBarIconEditorStyle('heartText', 'heartText')]}>
+                  <Text style={[styles.counterText, { fontSize: counterTextSize, minWidth: counterNumMinW }]}>{heartCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </View>
@@ -319,11 +321,20 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     width: '100%',
   },
-  barRowUniform: {
-    justifyContent: 'space-around',
-  },
   leftCluster: { flexDirection: 'row', alignItems: 'flex-end' },
-  rightCluster: { flexDirection: 'row', alignItems: 'flex-end' },
+  /** Ocupa el espacio restante y centra la fila clan + stats (evita huecos tipo tablet). */
+  statsRail: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    minWidth: 0,
+  },
+  unifiedStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    flexShrink: 1,
+  },
   iconBtn: { paddingVertical: 6, paddingHorizontal: 6 },
   counterBtn: {
     flexDirection: 'row',

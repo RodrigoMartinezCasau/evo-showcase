@@ -44,10 +44,13 @@ export const TOP_BAR_LAYOUT = {
   RIGHT_CLUSTER_GAP: 0,
 
   /**
-   * Escala del bloque derecho (lápiz, racha, usos + números). Valores por debajo
-   * de 1 acercan el conjunto al centro y evitan recortes en pantallas estrechas.
+   * Escala unificada del bloque de stats: escudo + etiqueta clan + lápiz + racha + usos.
+   * Un solo factor para que no descompense tablet vs teléfono.
    */
   RIGHT_CLUSTER_UNIVERSAL_SCALE: 0.85,
+
+  /** Hueco horizontal entre escudo+etiqueta y cada par lápiz/fuego/corazón (fila única). */
+  UNIFIED_STATS_ROW_GAP: 6,
 
   // Counter pair spacing (icon ↔ number)
   COUNTER_PAIR_GAP: 8,
@@ -113,8 +116,7 @@ export const topBarIconsOffsetY        = 0;      // px, positive = down
 //
 // topBarAllOffsetX — shifts EVERY element in the top bar (icons + counters +
 //   text labels) together on the X axis.  Positive = right, negative = left.
-//   Use this to nudge the whole right cluster (lápiz, fuego, corazón + números)
-//   without touching any individual editor above.
+//   Útil para afinar el bloque centrado (clan + lápiz + racha + usos) de forma global.
 //
 export const topBarAllOffsetX = -4;   // px, positive = right
 
