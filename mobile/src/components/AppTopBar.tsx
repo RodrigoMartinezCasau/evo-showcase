@@ -8,7 +8,8 @@ import {
   useWindowDimensions,
   type LayoutChangeEvent,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, usePathname } from 'expo-router';
+import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TOP_BAR_LAYOUT, topBarIconEditorStyle, isTopBarTabletLayout } from '@evoconn/constants/topBarLayout';
@@ -76,6 +77,7 @@ export function AppTopBar({
   counts,
 }: AppTopBarProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { width: winW, height: winH } = useWindowDimensions();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
@@ -99,7 +101,7 @@ export function AppTopBar({
       effectiveClan != null && String(effectiveClan).trim() !== ''
         ? String(effectiveClan).trim().toLowerCase()
         : 'indefinido';
-    router.push(`/clan/${clanRouteSlug}`);
+    pushUnlessCurrent(pathname, `/clan/${clanRouteSlug}`);
   };
 
   const clanLabel =
@@ -312,7 +314,7 @@ export function AppTopBar({
             )}
 
             <TouchableOpacity
-              onPress={() => router.push('/phrases-domains')}
+              onPress={() => pushUnlessCurrent(pathname, '/phrases-domains')}
               style={[styles.counterBtn, { gap: counterPairGap }]}
               hitSlop={14}
             >
@@ -327,7 +329,7 @@ export function AppTopBar({
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => router.push('/streak')}
+              onPress={() => pushUnlessCurrent(pathname, '/streak')}
               style={[styles.counterBtn, { gap: counterPairGap }]}
               hitSlop={14}
             >
@@ -349,7 +351,7 @@ export function AppTopBar({
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => router.push('/daily-uses')}
+              onPress={() => pushUnlessCurrent(pathname, '/daily-uses')}
               style={[styles.counterBtn, { gap: counterPairGap }]}
               hitSlop={14}
             >

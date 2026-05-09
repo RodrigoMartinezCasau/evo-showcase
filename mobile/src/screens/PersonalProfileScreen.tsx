@@ -15,7 +15,8 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, usePathname } from 'expo-router';
+import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
@@ -48,6 +49,7 @@ const ANIM_DURATION = 200;
 
 export default function PersonalProfileScreen() {
   const router = useRouter();
+  const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { width: screenW, height: screenH } = useWindowDimensions();
   const { profile: authProfile, session, refreshProfile } = useAuth();
@@ -223,9 +225,9 @@ export default function PersonalProfileScreen() {
 
   const handleDetailClanPress = useCallback(
     (clanId: string) => {
-      router.push({ pathname: '/clan/[id]', params: { id: clanId } });
+      pushUnlessCurrent(pathname, `/clan/${String(clanId).trim().toLowerCase()}`);
     },
-    [router],
+    [pathname],
   );
 
   const handleBottomTabChange = useCallback((tab: TabId) => {
@@ -263,7 +265,15 @@ export default function PersonalProfileScreen() {
               username={profileWithClan.username}
               clanId={profileWithClan.clanId}
               rank={profileWithClan.rank}
-              onShieldPress={profileWithClan.clanId ? () => router.push({ pathname: '/clan/[id]', params: { id: profileWithClan.clanId! } }) : undefined}
+              onShieldPress={
+                profileWithClan.clanId
+                  ? () =>
+                      pushUnlessCurrent(
+                        pathname,
+                        `/clan/${String(profileWithClan.clanId).trim().toLowerCase()}`,
+                      )
+                  : undefined
+              }
             />
             <View style={styles.contentGap} />
             <PersonalInsigniaPhrase phrase={insigniaPhrase} onEdit={handlePhraseEditOpen} />

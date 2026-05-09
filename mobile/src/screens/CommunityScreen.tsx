@@ -10,7 +10,8 @@ import {
 } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, usePathname } from 'expo-router';
+import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   AppTopBar,
@@ -138,6 +139,7 @@ const VALID_TAB_IDS: TabId[] = ['siguiendo', 'para-ti', 'search'];
 
 export default function CommunityScreen() {
   const router = useRouter();
+  const pathname = usePathname();
   const { tab: tabParam, postId: postIdParam } = useLocalSearchParams<{ tab?: string; postId?: string }>();
   const insets = useSafeAreaInsets();
   const { width: screenW, height: screenH } = useWindowDimensions();
@@ -348,16 +350,19 @@ export default function CommunityScreen() {
   const handleAuthorPress = useCallback(
     (userId: string) => {
       if (userId === mockCurrentUser.id) {
-        router.push('/my-profile');
+        pushUnlessCurrent(pathname, '/my-profile');
       } else {
         router.push({ pathname: '/profile/[id]', params: { id: userId } });
       }
     },
-    [router],
+    [router, pathname],
   );
   const handleClanPress = useCallback(
-    (clanId: string) => router.push({ pathname: '/clan/[id]', params: { id: clanId } }),
-    [router],
+    (clanId: string) => {
+      const href = `/clan/${String(clanId).trim().toLowerCase()}`;
+      pushUnlessCurrent(pathname, href);
+    },
+    [pathname],
   );
 
   const handleTabChange = useCallback(

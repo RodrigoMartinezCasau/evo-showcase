@@ -1,6 +1,7 @@
 import React, { useCallback, useState, useRef, useMemo, useEffect, useLayoutEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet, Animated, Easing, useWindowDimensions } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, usePathname } from 'expo-router';
+import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { mockCurrentUser, mockUserStats } from '@evoconn/data/mockUser';
@@ -94,6 +95,7 @@ function OwnProfileView() {
 }
 
 function OtherUserProfileView({ userId, router }: { userId: string; router: ReturnType<typeof useRouter> }) {
+  const pathname = usePathname();
   // Try the 9-user simulation first; if not found, fetch from Supabase.
   const mockProfile = getOtherUserProfile(userId);
   const [supabaseProfile, setSupabaseProfile] = useState<OtherUserProfile | null>(null);
@@ -326,7 +328,7 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
   const handleDetailAuthorPress = useCallback(
     (authorId: string) => {
       if (authorId === mockCurrentUser.id) {
-        router.push('/my-profile');
+        pushUnlessCurrent(pathname, '/my-profile');
       } else if (authorId === profile.id) {
         // Already viewing this user's profile — close the panel
         closeDetailFeed();
@@ -334,14 +336,15 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
         router.push({ pathname: '/profile/[id]', params: { id: authorId } });
       }
     },
-    [closeDetailFeed, profile.id, router],
+    [closeDetailFeed, pathname, profile.id, router],
   );
 
   const handleDetailClanPress = useCallback(
     (clanId: string) => {
-      router.push({ pathname: '/clan/[id]', params: { id: clanId } });
+      const href = `/clan/${String(clanId).trim().toLowerCase()}`;
+      pushUnlessCurrent(pathname, href);
     },
-    [router],
+    [pathname],
   );
 
   const handleBottomTabChange = useCallback((tab: TabId) => {
@@ -376,7 +379,15 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
               username={profile.username}
               clanId={profile.clanId}
               rank={profile.rank}
-              onShieldPress={profile.clanId ? () => router.push({ pathname: '/clan/[id]', params: { id: profile.clanId! } }) : undefined}
+              onShieldPress={
+                profile.clanId
+                  ? () =>
+                      pushUnlessCurrent(
+                        pathname,
+                        `/clan/${String(profile.clanId).trim().toLowerCase()}`,
+                      )
+                  : undefined
+              }
             />
             <UserInsigniaPhrase phrase={profile.insigniaPhrase} />
             <PhilosophyPercentagesPanel percentages={profile.philosophyPercentages} clanId={profile.clanId} />

@@ -24,7 +24,8 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, usePathname } from 'expo-router';
+import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppTopBar, ChatInputBar, SidebarDrawer } from '@evoconn/components';
 import { getAppTopBarLayoutHeight } from '@evoconn/constants/topBarLayout';
@@ -128,6 +129,7 @@ type ChatBubble = DebateMessage & { revealed?: string; introPhase?: IntroPhase }
 
 export default function ReflectionCreationScreen() {
   const router = useRouter();
+  const pathname = usePathname();
   const params = useLocalSearchParams<{ thoughtId?: string }>();
   const thoughtId = Array.isArray(params.thoughtId) ? params.thoughtId[0] : params.thoughtId;
 
@@ -778,8 +780,14 @@ export default function ReflectionCreationScreen() {
           slideAnim={previewSlideAnim}
           screenW={screenW}
           onClose={closePreview}
-          onAuthorPress={() => { closePreview(); router.push('/my-profile'); }}
-          onClanPress={(clanId) => { closePreview(); router.push({ pathname: '/clan/[id]', params: { id: clanId } }); }}
+          onAuthorPress={() => {
+            closePreview();
+            pushUnlessCurrent(pathname, '/my-profile');
+          }}
+          onClanPress={(clanId) => {
+            closePreview();
+            pushUnlessCurrent(pathname, `/clan/${String(clanId).trim().toLowerCase()}`);
+          }}
         />
       )}
     </View>

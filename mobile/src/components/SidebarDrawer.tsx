@@ -12,7 +12,8 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
+import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { SIDEBAR_HEADER_LAYOUT as SH } from '@evoconn/constants/sidebarHeaderLayout';
 import { getSidebarStarSvgByHouse, SIDEBAR_DEFAULT_STAR_SVG } from '@evoconn/utils/getSidebarStarSvgByHouse';
 import { getCommunityButtonByHouse } from '@evoconn/utils/getSidebarCommunityButton';
@@ -91,6 +92,7 @@ export function SidebarDrawer({
   openProgress: openProgressProp,
 }: SidebarDrawerProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const user = { ...mockCurrentUser, clanId: activeClan };
   const closeSidebar = onClose;
@@ -255,7 +257,10 @@ export function SidebarDrawer({
             height: SCL.SIDEBAR_COMMUNITY_STAR_HEIGHT,
             scale: SCL.SIDEBAR_COMMUNITY_STAR_SCALE,
           }}
-          onPress={() => { onClose(); router.push('/(tabs)'); }}
+          onPress={() => {
+            onClose();
+            pushUnlessCurrent(pathname, '/(tabs)');
+          }}
         />
         <SidebarPngMenuButton
           config={getNewReflectionPngMenuConfig()}
@@ -271,7 +276,10 @@ export function SidebarDrawer({
             width: newReflectionPlusLayout.width,
             height: newReflectionPlusLayout.height,
           }}
-          onPress={() => { onClose(); router.push('/reflection'); }}
+          onPress={() => {
+            onClose();
+            router.push('/reflection');
+          }}
         />
         <SidebarPngMenuButton
           config={getNewPhrasePngMenuConfig()}
@@ -320,7 +328,10 @@ export function SidebarDrawer({
         <View style={styles.footerRow}>
           {/* Profile insignia — left edge aligns with conversations panel */}
           <TouchableOpacity
-            onPress={() => { onClose(); router.push('/my-profile'); }}
+            onPress={() => {
+              onClose();
+              pushUnlessCurrent(pathname, '/my-profile');
+            }}
             activeOpacity={0.88}
             accessibilityRole="button"
             accessibilityLabel="Perfil"
@@ -344,7 +355,14 @@ export function SidebarDrawer({
                 { top: FOOTER_USERNAME_TOP_PX },
               ]}
             >
-              <TouchableOpacity onPress={() => { onClose(); router.push('/my-profile'); }} hitSlop={6} activeOpacity={0.85}>
+              <TouchableOpacity
+                onPress={() => {
+                  onClose();
+                  pushUnlessCurrent(pathname, '/my-profile');
+                }}
+                hitSlop={6}
+                activeOpacity={0.85}
+              >
                 <Text style={styles.footerUsername} numberOfLines={1}>
                   {user.username.toUpperCase()}
                 </Text>
@@ -359,7 +377,14 @@ export function SidebarDrawer({
                 },
               ]}
             >
-              <TouchableOpacity onPress={() => { onClose(); router.push(`/clan/${clanRouteSlug}`); }} hitSlop={6} activeOpacity={0.85}>
+              <TouchableOpacity
+                onPress={() => {
+                  onClose();
+                  pushUnlessCurrent(pathname, `/clan/${clanRouteSlug}`);
+                }}
+                hitSlop={6}
+                activeOpacity={0.85}
+              >
                 <Text style={[styles.footerClanLine, { color: footerClanColor }]} numberOfLines={1}>
                   {footerClanLine}
                 </Text>
@@ -372,7 +397,10 @@ export function SidebarDrawer({
               ]}
             >
               <TouchableOpacity
-                onPress={() => { onClose(); router.push('/my-profile'); }}
+                onPress={() => {
+                  onClose();
+                  pushUnlessCurrent(pathname, '/my-profile');
+                }}
                 hitSlop={6}
                 activeOpacity={0.85}
                 style={styles.footerRankHit}
@@ -387,7 +415,10 @@ export function SidebarDrawer({
           {/* Settings — centrado en vertical respecto al bloque 68px del icono */}
           <TouchableOpacity
             style={styles.footerSettingsHit}
-            onPress={() => { onClose(); router.push('/settings'); }}
+            onPress={() => {
+              onClose();
+              pushUnlessCurrent(pathname, '/settings');
+            }}
             activeOpacity={0.88}
             accessibilityRole="button"
             accessibilityLabel="Ajustes"

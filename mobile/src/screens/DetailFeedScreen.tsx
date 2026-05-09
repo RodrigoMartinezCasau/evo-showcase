@@ -9,7 +9,8 @@ import {
 } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, usePathname } from 'expo-router';
+import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
 import type { CommunityPost } from '@evoconn/types';
@@ -80,6 +81,7 @@ function normalizeFeedMode(raw: string): FeedMode {
 
 export default function DetailFeedScreen() {
   const router = useRouter();
+  const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { height: screenH } = useWindowDimensions();
   const params = useLocalSearchParams<{
@@ -127,16 +129,19 @@ export default function DetailFeedScreen() {
   const handleAuthorPress = useCallback(
     (userId: string) => {
       if (userId === mockCurrentUser.id) {
-        router.push('/my-profile');
+        pushUnlessCurrent(pathname, '/my-profile');
       } else {
         router.push({ pathname: '/profile/[id]', params: { id: userId } });
       }
     },
-    [router],
+    [router, pathname],
   );
   const handleClanPress = useCallback(
-    (clanId: string) => router.push({ pathname: '/clan/[id]', params: { id: clanId } }),
-    [router],
+    (clanId: string) => {
+      const href = `/clan/${String(clanId).trim().toLowerCase()}`;
+      pushUnlessCurrent(pathname, href);
+    },
+    [pathname],
   );
 
   const topBarHeight = getAppTopBarLayoutHeight(insets.top);

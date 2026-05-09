@@ -17,7 +17,8 @@ import { PublishBlock, PhraseNotesCard, PhraseFolderManagerCard } from '@evoconn
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import { useConversationFolders } from '@evoconn/hooks/ConversationFoldersContext';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, usePathname } from 'expo-router';
+import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getAppTopBarLayoutHeight } from '@evoconn/constants/topBarLayout';
@@ -120,6 +121,7 @@ function getPhrasePublishUI(
 
 export default function PhraseCreationScreen() {
   const router = useRouter();
+  const pathname = usePathname();
   const params = useLocalSearchParams<{ phraseId?: string }>();
   const phraseId = Array.isArray(params.phraseId) ? params.phraseId[0] : params.phraseId;
 
@@ -867,8 +869,14 @@ export default function PhraseCreationScreen() {
           slideAnim={previewSlideAnim}
           screenW={screenW}
           onClose={closePreview}
-          onAuthorPress={() => { closePreview(); router.push('/my-profile'); }}
-          onClanPress={(clanId) => { closePreview(); router.push({ pathname: '/clan/[id]', params: { id: clanId } }); }}
+          onAuthorPress={() => {
+            closePreview();
+            pushUnlessCurrent(pathname, '/my-profile');
+          }}
+          onClanPress={(clanId) => {
+            closePreview();
+            pushUnlessCurrent(pathname, `/clan/${String(clanId).trim().toLowerCase()}`);
+          }}
         />
       )}
     </View>
