@@ -1,8 +1,7 @@
 /**
- * Contenedor de conversaciones del sidebar: marco con borde de clan + lista.
- * Los SVG de «Nuevas barras conversaciones» llevan clipPaths anidados que
- * react-native-svg a menudo no compone bien; el marco visible es un View nativo
- * con los mismos colores que el arte (`getClanColor`).
+ * Lista de conversaciones del sidebar: estilo minimal (fondo negro, sin marco de clan).
+ * El ancho útil coincide con `SIDEBAR_PNG_MENU_BUTTON_LAYOUT_WIDTH_PX` (misma columna
+ * que «Nueva reflexión»): título al borde izquierdo del botón, lápiz al borde derecho.
  */
 export const SIDEBAR_CONVERSATIONS_LAYOUT = {
   /** El panel usa ancho completo del drawer; sin márgenes negativos legacy. */
@@ -13,19 +12,16 @@ export const SIDEBAR_CONVERSATIONS_LAYOUT = {
   SIDEBAR_CONVERSATIONS_OFFSET_X: 0,
   SIDEBAR_CONVERSATIONS_OFFSET_Y: 0,
 
-  /** Marco redondeado (View) — aproxima el grosor del borde de los SVG. */
-  SIDEBAR_CONVERSATIONS_FRAME_BORDER_WIDTH: 3,
-  SIDEBAR_CONVERSATIONS_FRAME_CORNER_RADIUS: 14,
-  SIDEBAR_CONVERSATIONS_FRAME_FILL_COLOR: '#0b0b0f',
+  /** Marco desactivado (diseño minimal); el área de scroll sigue usando el mismo flex. */
+  SIDEBAR_CONVERSATIONS_FRAME_BORDER_WIDTH: 0,
+  SIDEBAR_CONVERSATIONS_FRAME_CORNER_RADIUS: 0,
+  SIDEBAR_CONVERSATIONS_FRAME_FILL_COLOR: '#000000',
 
-  /**
-   * Inset del contenido (pestañas + lista) respecto al borde del marco.
-   * Porcentajes respecto al contenedor del marco.
-   */
-  SIDEBAR_CONVERSATIONS_INSET_LEFT_PCT: '5.5%',
-  SIDEBAR_CONVERSATIONS_INSET_RIGHT_PCT: '5.5%',
-  SIDEBAR_CONVERSATIONS_INSET_TOP_PCT: '2.5%',
-  SIDEBAR_CONVERSATIONS_INSET_BOTTOM_PCT: '3%',
+  /** Inset del ScrollView respecto al contenedor (0 = alineación con bordes del botón PNG). */
+  SIDEBAR_CONVERSATIONS_INSET_LEFT: 0,
+  SIDEBAR_CONVERSATIONS_INSET_RIGHT: 0,
+  SIDEBAR_CONVERSATIONS_INSET_TOP: 0,
+  SIDEBAR_CONVERSATIONS_INSET_BOTTOM: 0,
 
   /** Espacio vertical entre las tres pestañas de sección (FAVORITOS / CARPETAS / PENSAMIENTOS). */
   SIDEBAR_CONVERSATIONS_SECTION_GAP_Y: 14,
@@ -39,8 +35,8 @@ export const SIDEBAR_CONVERSATIONS_LAYOUT = {
    */
   SIDEBAR_CONVERSATIONS_SECTIONS_TO_LIST_GAP_Y: 16,
 
-  /** FAVORITOS — independientes (no derivan de otros layouts). */
-  SIDEBAR_FAVORITES_OFFSET_X: 2,
+  /** FAVORITOS — alineados al borde izquierdo de la columna (mismo eje que el botón PNG). */
+  SIDEBAR_FAVORITES_OFFSET_X: 0,
   SIDEBAR_FAVORITES_OFFSET_Y: 2,
   SIDEBAR_FAVORITES_FONT_SIZE: 11,
   SIDEBAR_FAVORITES_SCALE: 1,
@@ -53,7 +49,7 @@ export const SIDEBAR_CONVERSATIONS_LAYOUT = {
   FAVORITES_ICON_BASE_SIZE: 18,
 
   /** CARPETAS */
-  SIDEBAR_FOLDERS_OFFSET_X: 2,
+  SIDEBAR_FOLDERS_OFFSET_X: 0,
   SIDEBAR_FOLDERS_OFFSET_Y: 0,
   SIDEBAR_FOLDERS_FONT_SIZE: 11,
   SIDEBAR_FOLDERS_SCALE: 1,
@@ -76,19 +72,23 @@ export const SIDEBAR_CONVERSATIONS_LAYOUT = {
   THOUGHTS_ICON_SCALE: 1.5,
   THOUGHTS_ICON_BASE_SIZE: 18,
 
-  SIDEBAR_CONVERSATIONS_ITEM_OFFSET_X: 4,
+  /**
+   * Padding izquierdo del contenido del ScrollView (porcentaje del ancho de la columna).
+   * ~3% separa el inicio del texto del borde; antes estaba en 0.
+   */
+  SIDEBAR_CONVERSATIONS_ITEM_OFFSET_X: '1%',
   SIDEBAR_CONVERSATIONS_ITEM_OFFSET_Y: 4,
   /** Separación vertical entre filas de conversación. */
   SIDEBAR_CONVERSATIONS_ITEM_GAP_Y: 6,
   SIDEBAR_CONVERSATIONS_ITEM_TEXT_FONT_SIZE: 13,
-  SIDEBAR_CONVERSATIONS_ITEM_TITLE_COLOR: '#E8EAEF',
+  SIDEBAR_CONVERSATIONS_ITEM_TITLE_COLOR: '#E5E5E5',
   SIDEBAR_CONVERSATIONS_ITEM_TEXT_LINE_HEIGHT: 18,
   /** Una sola línea en lista; título corto p. ej. ~3 palabras (resto con «…»). */
   SIDEBAR_CONVERSATIONS_ITEM_TEXT_MIN_HEIGHT: 18,
 
   SIDEBAR_CONVERSATIONS_TITLE_ICONS_GAP_X: 8,
-  /** Franja de iconos: menos margen al borde derecho del marco (lista más ancha). */
-  SIDEBAR_CONVERSATIONS_ICONS_STRIP_MARGIN_END: 8,
+  /** 0 = lápiz al borde derecho de la columna (coincide con borde derecho del botón PNG). */
+  SIDEBAR_CONVERSATIONS_ICONS_STRIP_MARGIN_END: 0,
   SIDEBAR_CONVERSATIONS_ICONS_INNER_GAP_X: -2,
 
   SIDEBAR_CONVERSATIONS_STAR_OFFSET_Y: -4,

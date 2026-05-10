@@ -12,7 +12,6 @@ import {
   Pressable,
 } from 'react-native';
 import { SIDEBAR_CONVERSATIONS_LAYOUT as L } from '@evoconn/constants/sidebarConversationsLayout';
-import { getClanColor } from '@evoconn/constants/clanColors';
 import { getSidebarFolderColors } from '@evoconn/constants/sidebarFolderColors';
 import {
   getSidebarClanTabColorRow,
@@ -58,7 +57,6 @@ export function SidebarConversationsPanel({
   const [renameFolderId, setRenameFolderId] = useState<string | null>(null);
   const [renameFolderText, setRenameFolderText] = useState('');
 
-  const frameBorderColor = useMemo(() => getClanColor(clanId), [clanId]);
   const folderColors = useMemo(() => getSidebarFolderColors(clanId), [clanId]);
   const clanTabColors = useMemo(() => getSidebarClanTabColorRow(clanId), [clanId]);
   const browsedFolderName = useMemo(
@@ -386,7 +384,7 @@ export function SidebarConversationsPanel({
           style={{
             flexShrink: 0,
             alignSelf: 'stretch',
-            paddingLeft: 4,
+            paddingLeft: 0,
             paddingTop: 2,
             marginBottom: L.SIDEBAR_CONVERSATIONS_SECTIONS_TO_LIST_GAP_Y,
             backgroundColor: 'transparent',
@@ -397,38 +395,25 @@ export function SidebarConversationsPanel({
       )}
 
       {/*
-       * `barFill` flex:1 + minHeight:0; el marco es absoluteFill. Los filtros van
-       * fuera, entre la búsqueda del drawer y este bloque.
+       * Misma geometría que con el marco visible: flex:1 + minHeight:0 para que la lista
+       * haga scroll y no invada el footer; sin borde ni fill distinto del drawer (#000).
        */}
       <View style={styles.barFill}>
-          <View
-            pointerEvents="none"
-            style={[
-              styles.barFrameLayer,
-              {
-                borderColor: frameBorderColor,
-                borderWidth: L.SIDEBAR_CONVERSATIONS_FRAME_BORDER_WIDTH,
-                borderRadius: L.SIDEBAR_CONVERSATIONS_FRAME_CORNER_RADIUS,
-                backgroundColor: L.SIDEBAR_CONVERSATIONS_FRAME_FILL_COLOR,
-              },
-            ]}
-          />
-
           <View
             style={[
               styles.barContentInset,
               {
-                paddingLeft: L.SIDEBAR_CONVERSATIONS_INSET_LEFT_PCT,
-                paddingRight: L.SIDEBAR_CONVERSATIONS_INSET_RIGHT_PCT,
-                paddingTop: L.SIDEBAR_CONVERSATIONS_INSET_TOP_PCT,
-                paddingBottom: L.SIDEBAR_CONVERSATIONS_INSET_BOTTOM_PCT,
+                paddingLeft: L.SIDEBAR_CONVERSATIONS_INSET_LEFT,
+                paddingRight: L.SIDEBAR_CONVERSATIONS_INSET_RIGHT,
+                paddingTop: L.SIDEBAR_CONVERSATIONS_INSET_TOP,
+                paddingBottom: L.SIDEBAR_CONVERSATIONS_INSET_BOTTOM,
               },
             ]}
           >
             <ScrollView
               style={styles.scroll}
               contentContainerStyle={styles.scrollContent}
-              showsVerticalScrollIndicator
+              showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="always"
               keyboardDismissMode="on-drag"
             >
@@ -630,18 +615,12 @@ const styles = StyleSheet.create({
     minHeight: 0,
     width: '100%',
     position: 'relative',
-    backgroundColor: 'transparent',
-  },
-  barFrameLayer: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 0,
-    overflow: 'hidden',
+    backgroundColor: L.SIDEBAR_CONVERSATIONS_FRAME_FILL_COLOR,
   },
   barContentInset: {
     flex: 1,
     minHeight: 0,
     flexDirection: 'column',
-    zIndex: 1,
     backgroundColor: 'transparent',
   },
   sectionLabel: { textTransform: 'uppercase' },
@@ -658,7 +637,7 @@ const styles = StyleSheet.create({
     paddingTop: 0,
     paddingBottom: 8,
     paddingLeft: L.SIDEBAR_CONVERSATIONS_ITEM_OFFSET_X,
-    paddingRight: 4,
+    paddingRight: 0,
     alignItems: 'stretch',
     backgroundColor: 'transparent',
   },

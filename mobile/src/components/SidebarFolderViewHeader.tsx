@@ -9,7 +9,7 @@ export const SIDEBAR_FOLDER_VIEW_HEADER_LAYOUT = {
   titleOffsetX: 0,
   titleOffsetY: 0,
   gap: 8,
-  paddingH: 4,
+  paddingH: 0,
   paddingV: 4,
   marginBottom: 8,
 } as const;

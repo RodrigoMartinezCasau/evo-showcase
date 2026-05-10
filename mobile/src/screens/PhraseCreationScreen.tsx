@@ -8,7 +8,6 @@ import {
   Keyboard,
   Alert,
   Animated,
-  useWindowDimensions,
   Platform,
 } from 'react-native';
 import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -17,8 +16,7 @@ import { PublishBlock, PhraseNotesCard, PhraseFolderManagerCard } from '@evoconn
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import { useConversationFolders } from '@evoconn/hooks/ConversationFoldersContext';
-import { useLocalSearchParams, useRouter, usePathname } from 'expo-router';
-import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getAppTopBarLayoutHeight } from '@evoconn/constants/topBarLayout';
@@ -53,9 +51,7 @@ import {
 } from '@evoconn/constants/debateResponseLayout';
 import { getPublishStarByClan } from '@evoconn/utils/getDebateStarByClan';
 import type { DebateMessage } from '@evoconn/types/debate';
-import type { CommunityPost } from '@evoconn/types';
 import { useFeedStore, createPhrasePost } from '@evoconn/hooks/useFeedStore';
-import { ProfileDetailPanel } from '@evoconn/components/ProfileDetailPanel';
 import { useDebugStreak } from '../debug/DebugStreakContext';
 import { useDebugStats } from '../debug/DebugStatsContext';
 import { requestNoUsesAnimation } from '@evoconn/components/animations/AppAnimationLayer';
@@ -121,7 +117,6 @@ function getPhrasePublishUI(
 
 export default function PhraseCreationScreen() {
   const router = useRouter();
-  const pathname = usePathname();
   const params = useLocalSearchParams<{ phraseId?: string }>();
   const phraseId = Array.isArray(params.phraseId) ? params.phraseId[0] : params.phraseId;
 
@@ -150,31 +145,6 @@ export default function PhraseCreationScreen() {
 
   const insets = useSafeAreaInsets();
   const topBarHeight = getAppTopBarLayoutHeight(insets.top);
-  const { width: screenW, height: screenH } = useWindowDimensions();
-
-  // ── Post-publish preview overlay ────────────────────────────────────────────
-  const [previewPost, setPreviewPost] = useState<CommunityPost | null>(null);
-  const previewSlideAnim = useRef(new Animated.Value(0)).current;
-
-  const openPreview = useCallback((post: CommunityPost) => {
-    setPreviewPost(post);
-    previewSlideAnim.setValue(0);
-    requestAnimationFrame(() => {
-      Animated.timing(previewSlideAnim, {
-        toValue: 1,
-        duration: 220,
-        useNativeDriver: true,
-      }).start();
-    });
-  }, [previewSlideAnim]);
-
-  const closePreview = useCallback(() => {
-    Animated.timing(previewSlideAnim, {
-      toValue: 0,
-      duration: 200,
-      useNativeDriver: true,
-    }).start(({ finished }) => { if (finished) setPreviewPost(null); });
-  }, [previewSlideAnim]);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { drawerOpenProgress, edgeOpenGesture } = useSidebarGesture(sidebarOpen, setSidebarOpen);
@@ -370,7 +340,7 @@ export default function PhraseCreationScreen() {
       const post = createPhrasePost(mockCurrentUser, phraseInner, authorName);
       (post as { id: string }).id = sourceId;
       publishPost(post);
-      openPreview(post as CommunityPost);
+      router.replace({ pathname: '/latest-posts', params: { postId: sourceId } });
 
       // Preserve the AI intro (if it was generated for this thread) so the
       // published view doesn't lose context on reopen. Read from the live ref
@@ -395,7 +365,7 @@ export default function PhraseCreationScreen() {
       publishAuthorRef.current = '';
       Keyboard.dismiss();
     },
-    [publishPost, updateThought, openPreview],
+    [publishPost, updateThought, router],
   );
 
   const handleAssignPhraseToFolder = useCallback(
@@ -859,26 +829,6 @@ export default function PhraseCreationScreen() {
         }}
         openProgress={drawerOpenProgress}
       />
-
-      {/* Post-publish preview — slides in from the right, swipe right to close */}
-      {previewPost !== null && (
-        <ProfileDetailPanel
-          data={[previewPost]}
-          initialIndex={0}
-          itemHeight={screenH - topBarHeight}
-          slideAnim={previewSlideAnim}
-          screenW={screenW}
-          onClose={closePreview}
-          onAuthorPress={() => {
-            closePreview();
-            pushUnlessCurrent(pathname, '/my-profile');
-          }}
-          onClanPress={(clanId) => {
-            closePreview();
-            pushUnlessCurrent(pathname, `/clan/${String(clanId).trim().toLowerCase()}`);
-          }}
-        />
-      )}
     </View>
     </GestureHandlerRootView>
   );

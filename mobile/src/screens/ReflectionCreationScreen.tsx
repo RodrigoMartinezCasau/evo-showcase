@@ -21,7 +21,6 @@ import {
   Keyboard,
   Animated,
   TouchableOpacity,
-  useWindowDimensions,
 } from 'react-native';
 import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useLocalSearchParams, useRouter, usePathname } from 'expo-router';
@@ -107,8 +106,6 @@ import { EMPTY_WELCOME_TRIPLE_STARS_LAYOUT as EMPTY_WELCOME_TRIPLE_STARS } from 
 import { getReflectionTripleStarsByHouse } from '@evoconn/utils/getReflectionTripleStarsByHouse';
 import { DebateResponseDisplay, PublishBlock } from '@evoconn/components/debate';
 import { useFeedStore, createReflectionPost } from '@evoconn/hooks/useFeedStore';
-import type { CommunityPost } from '@evoconn/types';
-import { ProfileDetailPanel } from '@evoconn/components/ProfileDetailPanel';
 import {
   AI_RESPONSE_BORDER_WIDTH as DEBATE_BW,
   getBlockBorderColor,
@@ -165,38 +162,13 @@ export default function ReflectionCreationScreen() {
         const post = createReflectionPost(mockCurrentUser, title, body);
         (post as any).id = sourceId;
         publishPost(post);
-        openPreview(post);
+        router.replace({ pathname: '/latest-posts', params: { postId: sourceId } });
       },
-    [publishPost, openPreview],
+    [publishPost, router],
   );
 
   const insets = useSafeAreaInsets();
   const topBarHeight = getAppTopBarLayoutHeight(insets.top);
-  const { width: screenW, height: screenH } = useWindowDimensions();
-
-  // ── Post-publish preview overlay ──────────────────────────────────────────
-  const [previewPost, setPreviewPost] = useState<CommunityPost | null>(null);
-  const previewSlideAnim = useRef(new Animated.Value(0)).current;
-
-  const openPreview = useCallback((post: CommunityPost) => {
-    setPreviewPost(post);
-    previewSlideAnim.setValue(0);
-    requestAnimationFrame(() => {
-      Animated.timing(previewSlideAnim, {
-        toValue: 1,
-        duration: 220,
-        useNativeDriver: true,
-      }).start();
-    });
-  }, [previewSlideAnim]);
-
-  const closePreview = useCallback(() => {
-    Animated.timing(previewSlideAnim, {
-      toValue: 0,
-      duration: 200,
-      useNativeDriver: true,
-    }).start(({ finished }) => { if (finished) setPreviewPost(null); });
-  }, [previewSlideAnim]);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { drawerOpenProgress, edgeOpenGesture } = useSidebarGesture(sidebarOpen, setSidebarOpen);
@@ -772,24 +744,6 @@ export default function ReflectionCreationScreen() {
       />
 
       {/* Post-publish preview — slides in from the right, swipe right to close */}
-      {previewPost !== null && (
-        <ProfileDetailPanel
-          data={[previewPost]}
-          initialIndex={0}
-          itemHeight={screenH - topBarHeight}
-          slideAnim={previewSlideAnim}
-          screenW={screenW}
-          onClose={closePreview}
-          onAuthorPress={() => {
-            closePreview();
-            pushUnlessCurrent(pathname, '/my-profile');
-          }}
-          onClanPress={(clanId) => {
-            closePreview();
-            pushUnlessCurrent(pathname, `/clan/${String(clanId).trim().toLowerCase()}`);
-          }}
-        />
-      )}
     </View>
     </GestureHandlerRootView>
   );
