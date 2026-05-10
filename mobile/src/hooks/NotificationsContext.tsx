@@ -38,7 +38,11 @@ import {
   markNotificationsRead,
 } from '@evoconn/services/supabaseSocial';
 import { supabase } from '../../mobile/lib/supabase';
-import { showLocalNotification, registerPushToken } from '@evoconn/services/pushNotifications';
+import {
+  showLocalNotification,
+  registerPushToken,
+  shouldDeliverSocialPush,
+} from '@evoconn/services/pushNotifications';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -85,8 +89,16 @@ const NotificationsCtx = createContext<NotificationsContextValue | null>(null);
 
 // ─── Provider ────────────────────────────────────────────────────────────────
 
+function formatAtUsername(username: string): string {
+  const u = username.trim();
+  if (!u) return '';
+  return u.startsWith('@') ? u : `@${u}`;
+}
+
 export function NotificationsProvider({ children }: { children: ReactNode }) {
-  const { activeUserId } = useSimulation();
+  const { activeUserId, activeFollowersCount } = useSimulation();
+  const followersCountRef = useRef(activeFollowersCount);
+  followersCountRef.current = activeFollowersCount;
 
   const [db, setDb] = useState<NotificationsDatabase>({});
   const dbRef = useRef<NotificationsDatabase>({});
@@ -151,16 +163,25 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
           }));
           // Only show native push (sound + vibration) for follow and comment.
           // Likes, dislikes and saves are shown in the in-app bell only.
+          // Cuentas muy seguidas no reciben estas pushes (anti-spam).
           if (notif.type === 'follow' || notif.type === 'comment') {
-            const titleMap: Record<string, string> = {
-              comment: '💬 Nuevo comentario',
-              follow: '✨ Nuevo seguidor',
-            };
-            const title = titleMap[notif.type] ?? 'EVO';
-            const body = notif.fromUsername
-              ? `${notif.fromUsername}${notif.textPreview ? `: "${notif.textPreview}"` : ''}`
-              : 'Tienes una nueva notificación';
-            showLocalNotification(title, body).catch(console.error);
+            if (!shouldDeliverSocialPush(followersCountRef.current)) return;
+            const who = formatAtUsername(notif.fromUsername);
+            if (notif.type === 'comment') {
+              const preview = notif.textPreview?.trim() ?? '';
+              const body =
+                who && preview
+                  ? `${who}: «${preview}»`
+                  : who
+                    ? `${who} comentó tu publicación.`
+                    : 'Nuevo comentario en tu publicación.';
+              showLocalNotification('💬 Nuevo comentario', body).catch(console.error);
+            } else {
+              const body = who
+                ? `${who} te ha empezado a seguir.`
+                : 'Tienes un nuevo seguidor.';
+              showLocalNotification('✨ Nuevo seguidor', body).catch(console.error);
+            }
           }
         },
       )

@@ -125,12 +125,24 @@ export async function showLocalNotification(
 }
 
 // ─── Recordatorio de racha ────────────────────────────────────────────────────
+// Ventana hasta medianoche: aviso a las 22:00 (~2 h) y a las 23:30 (~30 min).
 
-const STREAK_REMINDER_ID = 'evo_streak_reminder';
+const STREAK_REMINDER_2H_ID = 'evo_streak_reminder_2h';
+const STREAK_REMINDER_30M_ID = 'evo_streak_reminder_30m';
 
 /**
- * Programa un recordatorio diario a las 22:00 si el usuario no ha reflexionado.
- * Llama esto al abrir la app cuando hasSentToday = false.
+ * Cuentas con este número de seguidores o más no reciben notificación nativa
+ * por comentarios ni nuevos seguidores (sí siguen viendo la campana en la app).
+ */
+export const MAX_FOLLOWERS_FOR_SOCIAL_PUSH = 10_000;
+
+export function shouldDeliverSocialPush(followersCount: number): boolean {
+  return followersCount < MAX_FOLLOWERS_FOR_SOCIAL_PUSH;
+}
+
+/**
+ * Programa recordatorios locales (22:00 y 23:30) si aún no ha reflexionado hoy.
+ * Llama al abrir la app cuando hasSentToday = false.
  */
 export async function scheduleStreakReminder(): Promise<void> {
   const N = getNotifications();
@@ -139,37 +151,58 @@ export async function scheduleStreakReminder(): Promise<void> {
     await cancelStreakReminder();
 
     const now = new Date();
-    const target = new Date();
-    target.setHours(22, 0, 0, 0);
+    const at22 = new Date();
+    at22.setHours(22, 0, 0, 0);
+    const at2330 = new Date();
+    at2330.setHours(23, 30, 0, 0);
 
-    if (target <= now) return;
+    if (at22 > now) {
+      const secondsUntil = Math.floor((at22.getTime() - now.getTime()) / 1000);
+      await N.scheduleNotificationAsync({
+        identifier: STREAK_REMINDER_2H_ID,
+        content: {
+          title: '🔥 Tu racha está en peligro',
+          body: 'Te quedan 2 horas para reflexionar y mantener tu racha viva.',
+          sound: true,
+          vibrate: [0, 300, 200, 300],
+        },
+        trigger: { type: N.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: secondsUntil },
+      });
+      console.log('[Push] Recordatorio racha (2 h) en', secondsUntil, 's.');
+    }
 
-    const secondsUntil = Math.floor((target.getTime() - now.getTime()) / 1000);
-
-    await N.scheduleNotificationAsync({
-      identifier: STREAK_REMINDER_ID,
-      content: {
-        title: '🔥 Tu racha está en peligro',
-        body: 'Te quedan 2 horas para reflexionar y mantener tu racha viva.',
-        sound: true,
-        vibrate: [0, 300, 200, 300],
-      },
-      trigger: { type: N.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: secondsUntil },
-    });
-    console.log('[Push] Recordatorio de racha programado en', secondsUntil, 'segundos.');
+    if (at2330 > now) {
+      const secondsUntil = Math.floor((at2330.getTime() - now.getTime()) / 1000);
+      await N.scheduleNotificationAsync({
+        identifier: STREAK_REMINDER_30M_ID,
+        content: {
+          title: '🔥 Último aviso de racha',
+          body: 'Te quedan 30 minutos para reflexionar y extender tu racha.',
+          sound: true,
+          vibrate: [0, 300, 200, 300],
+        },
+        trigger: { type: N.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: secondsUntil },
+      });
+      console.log('[Push] Recordatorio racha (30 min) en', secondsUntil, 's.');
+    }
   } catch (err) {
     console.error('[Push] Error programando recordatorio de racha:', err);
   }
 }
 
 /**
- * Cancela el recordatorio de racha (llama esto cuando el usuario reflexiona).
+ * Cancela los recordatorios de racha (llama esto cuando el usuario reflexiona).
  */
 export async function cancelStreakReminder(): Promise<void> {
   const N = getNotifications();
   if (!N) return;
   try {
-    await N.cancelScheduledNotificationAsync(STREAK_REMINDER_ID);
+    await N.cancelScheduledNotificationAsync(STREAK_REMINDER_2H_ID);
+  } catch {
+    // Ignorar si no existe
+  }
+  try {
+    await N.cancelScheduledNotificationAsync(STREAK_REMINDER_30M_ID);
   } catch {
     // Ignorar si no existe
   }

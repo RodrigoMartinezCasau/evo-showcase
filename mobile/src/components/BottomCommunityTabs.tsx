@@ -20,7 +20,11 @@ import {
 } from '@evoconn/constants/clanColors';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
-import { BOTTOM_BAR_LAYOUT, getBottomBarViewportReserveBottom } from '@evoconn/constants/bottomBarLayout';
+import {
+  BOTTOM_BAR_LAYOUT,
+  bottomBarTabRowOuterHeightPx,
+  getBottomBarViewportReserveBottom,
+} from '@evoconn/constants/bottomBarLayout';
 import {
   FOLLOWING_SORT_LABELS,
   FOLLOWING_SORT_MENU_ORDER,
@@ -488,7 +492,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     /** Stretch columns to one height, then each slot centers its content on Y. */
     alignItems: 'stretch',
-    minHeight: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT,
+    minHeight: bottomBarTabRowOuterHeightPx(),
     borderTopWidth: 1,
     borderTopColor: evoconnColors.background,
     backgroundColor: evoconnColors.background,
@@ -504,6 +508,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    ...(Platform.OS === 'android'
+      ? { justifyContent: 'flex-end' as const, paddingBottom: 2 }
+      : {}),
   },
   /** `bottom` negativo baja la raya sin `transform` (así no choca con translateX de la lupa). */
   tabUnderline: {

@@ -149,25 +149,30 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // ── Streak reminder at 22:00 if user hasn't sent today ───────────────────
-  useEffect(() => {
-    if (!statsLoaded) return;
-    const todaySent = activeSlice.hasSentTodayDate === getLocalDayKey();
-    if (!todaySent) {
-      scheduleStreakReminder().catch(console.error);
-    } else {
-      cancelStreakReminder().catch(console.error);
-    }
-  // Run once when stats load, and whenever the day changes.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statsLoaded, activeUserId]);
-
-  // ── Day-rollover detection ────────────────────────────────────────────────
+  // ── Day-rollover detection (needed before streak reminder scheduling) ───
   const [currentDay, setCurrentDay] = useState(() => getLocalDayKey());
   useEffect(() => {
     const id = setInterval(() => setCurrentDay(getLocalDayKey()), 60_000);
     return () => clearInterval(id);
   }, []);
+
+  // Solo cambia al alternar usuario, día, o si ya reflexionó hoy — evita reprogramar en cada mutación de db.
+  const streakReminderGateKey = useMemo(() => {
+    const slice = db[activeUserId] ?? defaultUserStats();
+    return `${activeUserId}|${currentDay}|${slice.hasSentTodayDate}`;
+  }, [db, activeUserId, currentDay]);
+
+  // ── Streak reminders (22:00 ≈ 2 h y 23:30 ≈ 30 min antes de medianoche) ───
+  useEffect(() => {
+    if (!statsLoaded) return;
+    const slice = db[activeUserId] ?? defaultUserStats();
+    const todaySent = slice.hasSentTodayDate === currentDay;
+    if (!todaySent) {
+      scheduleStreakReminder().catch(console.error);
+    } else {
+      cancelStreakReminder().catch(console.error);
+    }
+  }, [statsLoaded, activeUserId, currentDay, streakReminderGateKey]);
 
   // ── Helper: mutate the active user's slice and persist atomically ────────
   const mutateActiveSlice = useCallback(
