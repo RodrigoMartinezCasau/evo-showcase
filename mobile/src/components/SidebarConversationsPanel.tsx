@@ -21,6 +21,7 @@ import {
   EvoActionSheetModal,
   EvoConfirmModal,
   EvoInfoModal,
+  EvoPickerModal,
 } from '@evoconn/components/shared/EvoActionSheetModal';
 import { SidebarFolderItem } from './SidebarFolderItem';
 import { SidebarFolderViewHeader } from './SidebarFolderViewHeader';
