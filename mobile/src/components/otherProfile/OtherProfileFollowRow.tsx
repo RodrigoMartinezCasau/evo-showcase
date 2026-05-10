@@ -56,7 +56,7 @@ export const OtherProfileFollowRow = React.memo(function OtherProfileFollowRow({
       </View>
 
       {/* Three-dots menu */}
-      <ProfileMoreMenu userId={userId} username={username} />
+      <ProfileMoreMenu userId={userId} username={username} clanId={clanId} />
     </View>
   );
 });

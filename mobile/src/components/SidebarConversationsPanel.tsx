@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   Modal,
   TextInput,
   Pressable,
@@ -18,6 +17,11 @@ import {
   sidebarTabIconTint,
 } from '@evoconn/constants/sidebarClanTabColors';
 import type { ConversationItem, SidebarFolder } from '@evoconn/types';
+import {
+  EvoActionSheetModal,
+  EvoConfirmModal,
+  EvoInfoModal,
+} from '@evoconn/components/shared/EvoActionSheetModal';
 import { SidebarFolderItem } from './SidebarFolderItem';
 import { SidebarFolderViewHeader } from './SidebarFolderViewHeader';
 import { SIDEBAR_FOLDER_ITEM_LAYOUT as FIL } from '@evoconn/constants/sidebarFolderItemLayout';
@@ -56,6 +60,12 @@ export function SidebarConversationsPanel({
   const [newFolderConvId, setNewFolderConvId] = useState<string | null>(null);
   const [renameFolderId, setRenameFolderId] = useState<string | null>(null);
   const [renameFolderText, setRenameFolderText] = useState('');
+  const [convMenuItem, setConvMenuItem] = useState<ConversationItem | null>(null);
+  const [folderMenuItem, setFolderMenuItem] = useState<SidebarFolder | null>(null);
+  const [folderPickFor, setFolderPickFor] = useState<ConversationItem | null>(null);
+  const [pendingDeleteConv, setPendingDeleteConv] = useState<ConversationItem | null>(null);
+  const [pendingDeleteFolder, setPendingDeleteFolder] = useState<SidebarFolder | null>(null);
+  const [folderHintOpen, setFolderHintOpen] = useState(false);
 
   const folderColors = useMemo(() => getSidebarFolderColors(clanId), [clanId]);
   const clanTabColors = useMemo(() => getSidebarClanTabColorRow(clanId), [clanId]);
@@ -121,68 +131,9 @@ export function SidebarConversationsPanel({
     setRenameText('');
   }, [renameTarget, renameText, conversations, onConversationsChange]);
 
-  const openEditMenu = useCallback(
-    (item: ConversationItem) => {
-      Alert.alert(item.title, undefined, [
-        {
-          text: 'Editar nombre',
-          onPress: () => {
-            setRenameTarget(item);
-            setRenameText(item.title);
-          },
-        },
-        {
-          text: item.isFavorite ? 'Quitar de favoritos' : 'Marcar como favorito',
-          onPress: () => toggleFavorite(item.id),
-        },
-        {
-          text: 'Añadir a carpeta',
-          onPress: () => {
-            if (folders.length === 0) {
-              Alert.alert('No hay carpetas', 'Crea una carpeta primero.');
-              return;
-            }
-            Alert.alert(
-              'Elegir carpeta',
-              undefined,
-              [
-                ...folders.map((f) => ({
-                  text: f.name,
-                  onPress: () => {
-                    onConversationsChange(
-                      conversations.map((c) => (c.id === item.id ? { ...c, folderId: f.id } : c))
-                    );
-                  },
-                })),
-                { text: 'Cancelar', style: 'cancel' as const },
-              ],
-              { cancelable: true }
-            );
-          },
-        },
-        {
-          text: 'Nueva carpeta',
-          onPress: () => {
-            setNewFolderConvId(item.id);
-            setNewFolderName('');
-            setNewFolderOpen(true);
-          },
-        },
-        {
-          text: 'Borrar conversación',
-          style: 'destructive',
-          onPress: () => {
-            Alert.alert('Borrar', `¿Eliminar «${item.title}»?`, [
-              { text: 'Cancelar', style: 'cancel' },
-              { text: 'Borrar', style: 'destructive', onPress: () => deleteConv(item.id) },
-            ]);
-          },
-        },
-        { text: 'Cancelar', style: 'cancel' },
-      ]);
-    },
-    [conversations, folders, onConversationsChange, deleteConv, toggleFavorite]
-  );
+  const openEditMenu = useCallback((item: ConversationItem) => {
+    setConvMenuItem(item);
+  }, []);
 
   const createFolderAndAssign = useCallback(() => {
     const name = newFolderName.trim();
@@ -197,42 +148,19 @@ export function SidebarConversationsPanel({
     setNewFolderConvId(null);
   }, [newFolderName, newFolderConvId, folders, conversations, onFoldersChange, onConversationsChange]);
 
-  const openFolderEditMenu = useCallback(
-    (folder: { id: string; name: string }) => {
-      Alert.alert(folder.name, undefined, [
-        {
-          text: 'Renombrar carpeta',
-          onPress: () => {
-            setRenameFolderId(folder.id);
-            setRenameFolderText(folder.name);
-          },
-        },
-        {
-          text: 'Eliminar carpeta',
-          style: 'destructive',
-          onPress: () => {
-            Alert.alert('Eliminar', `¿Eliminar «${folder.name}»?`, [
-              { text: 'Cancelar', style: 'cancel' },
-              {
-                text: 'Eliminar',
-                style: 'destructive',
-                onPress: () => {
-                  onFoldersChange(folders.filter((f) => f.id !== folder.id));
-                  onConversationsChange(
-                    conversations.map((c) =>
-                      c.folderId === folder.id ? { ...c, folderId: null } : c
-                    )
-                  );
-                  if (foldersBrowseId === folder.id) setFoldersBrowseId(null);
-                },
-              },
-            ]);
-          },
-        },
-        { text: 'Cancelar', style: 'cancel' },
-      ]);
+  const openFolderEditMenu = useCallback((folder: SidebarFolder) => {
+    setFolderMenuItem(folder);
+  }, []);
+
+  const applyDeleteFolder = useCallback(
+    (folder: SidebarFolder) => {
+      onFoldersChange(folders.filter((f) => f.id !== folder.id));
+      onConversationsChange(
+        conversations.map((c) => (c.folderId === folder.id ? { ...c, folderId: null } : c)),
+      );
+      if (foldersBrowseId === folder.id) setFoldersBrowseId(null);
     },
-    [folders, conversations, foldersBrowseId, onFoldersChange, onConversationsChange]
+    [folders, conversations, foldersBrowseId, onFoldersChange, onConversationsChange],
   );
 
   const applyFolderRename = useCallback(() => {
@@ -605,6 +533,133 @@ export function SidebarConversationsPanel({
           </Pressable>
         </Pressable>
       </Modal>
+
+      <EvoActionSheetModal
+        visible={convMenuItem != null}
+        onClose={() => setConvMenuItem(null)}
+        title={convMenuItem?.title}
+        options={
+          convMenuItem
+            ? [
+                {
+                  key: 'rename',
+                  label: 'Editar nombre',
+                  onPress: () => {
+                    setRenameTarget(convMenuItem);
+                    setRenameText(convMenuItem.title);
+                  },
+                },
+                {
+                  key: 'fav',
+                  label: convMenuItem.isFavorite ? 'Quitar de favoritos' : 'Marcar como favorito',
+                  onPress: () => toggleFavorite(convMenuItem.id),
+                },
+                {
+                  key: 'tofolder',
+                  label: 'Añadir a carpeta',
+                  onPress: () => {
+                    if (folders.length === 0) {
+                      setFolderHintOpen(true);
+                      return;
+                    }
+                    setFolderPickFor(convMenuItem);
+                  },
+                },
+                {
+                  key: 'newfolder',
+                  label: 'Nueva carpeta',
+                  onPress: () => {
+                    setNewFolderConvId(convMenuItem.id);
+                    setNewFolderName('');
+                    setNewFolderOpen(true);
+                  },
+                },
+                {
+                  key: 'delete',
+                  label: 'Borrar conversación',
+                  destructive: true,
+                  onPress: () => setPendingDeleteConv(convMenuItem),
+                },
+              ]
+            : []
+        }
+      />
+
+      <EvoActionSheetModal
+        visible={folderMenuItem != null}
+        onClose={() => setFolderMenuItem(null)}
+        title={folderMenuItem?.name}
+        options={
+          folderMenuItem
+            ? [
+                {
+                  key: 'ren',
+                  label: 'Renombrar carpeta',
+                  onPress: () => {
+                    setRenameFolderId(folderMenuItem.id);
+                    setRenameFolderText(folderMenuItem.name);
+                  },
+                },
+                {
+                  key: 'del',
+                  label: 'Eliminar carpeta',
+                  destructive: true,
+                  onPress: () => setPendingDeleteFolder(folderMenuItem),
+                },
+              ]
+            : []
+        }
+      />
+
+      <EvoPickerModal
+        visible={folderPickFor != null}
+        onClose={() => setFolderPickFor(null)}
+        title="Elegir carpeta"
+        items={folders.map((f) => ({
+          key: f.id,
+          label: f.name,
+          onPress: () => {
+            const target = folderPickFor;
+            if (!target) return;
+            onConversationsChange(
+              conversations.map((c) => (c.id === target.id ? { ...c, folderId: f.id } : c)),
+            );
+          },
+        }))}
+      />
+
+      <EvoConfirmModal
+        visible={pendingDeleteConv != null}
+        onClose={() => setPendingDeleteConv(null)}
+        title="Borrar conversación"
+        message={pendingDeleteConv ? `¿Eliminar «${pendingDeleteConv.title}»?` : undefined}
+        confirmLabel="Borrar"
+        destructive
+        onConfirm={() => {
+          if (pendingDeleteConv) deleteConv(pendingDeleteConv.id);
+        }}
+      />
+
+      <EvoConfirmModal
+        visible={pendingDeleteFolder != null}
+        onClose={() => setPendingDeleteFolder(null)}
+        title="Eliminar carpeta"
+        message={
+          pendingDeleteFolder ? `¿Eliminar «${pendingDeleteFolder.name}»? Las conversaciones pasan a sin carpeta.` : undefined
+        }
+        confirmLabel="Eliminar"
+        destructive
+        onConfirm={() => {
+          if (pendingDeleteFolder) applyDeleteFolder(pendingDeleteFolder);
+        }}
+      />
+
+      <EvoInfoModal
+        visible={folderHintOpen}
+        onClose={() => setFolderHintOpen(false)}
+        title="No hay carpetas"
+        message="Crea una carpeta primero (por ejemplo con «Nueva carpeta» en el menú de una conversación)."
+      />
     </View>
   );
 }

@@ -469,8 +469,8 @@ export default function SettingsScreen({
             onToggleKey: 'privateAccount' as const,
           }]
           : []),
-        { id: 'data-use', label: 'Uso de datos',      icon: 'pie-chart-outline', iconBg: IC.slate, type: 'navigate' },
-        { id: 'download', label: 'Descargar mis datos', icon: 'download-outline', iconBg: IC.slate, type: 'action' },
+        { id: 'data-use', label: 'Uso de datos',      icon: 'pie-chart-outline', iconBg: IC.slate, type: 'navigate', onPress: () => router.push('/settings-data-use') },
+        { id: 'download', label: 'Descargar mis datos', icon: 'download-outline', iconBg: IC.slate, type: 'navigate', onPress: () => router.push('/settings-export-data') },
         { id: 'delete',   label: deletingAccount ? 'Eliminando…' : 'Eliminar cuenta', icon: 'trash-outline', iconBg: IC.red, type: 'danger', onPress: confirmDeleteAccount },
       ],
     },
@@ -487,16 +487,16 @@ export default function SettingsScreen({
       title: 'SOPORTE',
       rows: [
         { id: 'bug',     label: 'Reportar un error', icon: 'bug-outline',                 iconBg: IC.pink, type: 'navigate', onPress: () => router.push('/report-bug') },
-        { id: 'help',    label: 'Centro de ayuda',   icon: 'help-circle-outline',         iconBg: IC.cyan, type: 'action' },
-        { id: 'contact', label: 'Contactar soporte', icon: 'chatbubble-ellipses-outline', iconBg: IC.blue, type: 'action' },
+        { id: 'help',    label: 'Centro de ayuda',   icon: 'help-circle-outline',         iconBg: IC.cyan, type: 'navigate', onPress: () => router.push('/settings-help') },
+        { id: 'contact', label: 'Contactar soporte', icon: 'chatbubble-ellipses-outline', iconBg: IC.blue, type: 'navigate', onPress: () => router.push('/settings-support') },
       ],
     },
     {
       id: 'legal',
       title: 'LEGAL',
       rows: [
-        { id: 'terms',   label: 'Términos de servicio',   icon: 'document-text-outline', iconBg: IC.gray, type: 'navigate' },
-        { id: 'privacy', label: 'Política de privacidad', icon: 'shield-outline',        iconBg: IC.gray, type: 'navigate' },
+        { id: 'terms',   label: 'Términos de servicio',   icon: 'document-text-outline', iconBg: IC.gray, type: 'navigate', onPress: () => router.push('/settings-terms') },
+        { id: 'privacy-policy', label: 'Política de privacidad', icon: 'shield-outline', iconBg: IC.gray, type: 'navigate', onPress: () => router.push('/settings-privacy-policy') },
       ],
     },
     {

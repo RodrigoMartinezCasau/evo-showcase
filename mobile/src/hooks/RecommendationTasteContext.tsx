@@ -157,6 +157,8 @@ type RecommendationTasteContextValue = {
   recordComment: (post: CommunityPost) => void;
   recordFollow: (userId: string) => void;
   recordUnfollow: (userId: string) => void;
+  /** Fuerte señal negativa en el modelo local (Para ti) al bloquear a un autor. */
+  recordBlockUser: (userId: string, clanId?: string | null) => void;
   recordProfileVisit: (userId: string) => void;
   recordDwell: (post: CommunityPost, visibleMs: number) => void;
   recordPublish: (type: 'phrase' | 'reflection') => void;
@@ -341,6 +343,22 @@ export function RecommendationTasteProvider({ children }: { children: React.Reac
     [simUsers, update],
   );
 
+  const recordBlockUser = useCallback(
+    (userId: string, clanId?: string | null) => {
+      const u = simUsers[userId];
+      update((s) => {
+        let authors = addToMap(s.authors, userId, -28);
+        let clans = s.clans;
+        const ck = clanStorageKey(clanId ?? u?.clanId ?? null);
+        if (ck) clans = addToMap(clans, ck, -9);
+        authors = Object.keys(authors).length > TRIM_THRESHOLD ? trimMap(authors, MAX_MAP_KEYS) : authors;
+        clans = Object.keys(clans).length > TRIM_THRESHOLD ? trimMap(clans, MAX_MAP_KEYS) : clans;
+        return { ...s, authors, clans };
+      });
+    },
+    [simUsers, update],
+  );
+
   const recordProfileVisit = useCallback(
     (userId: string) => {
       const u = simUsers[userId];
@@ -392,6 +410,7 @@ export function RecommendationTasteProvider({ children }: { children: React.Reac
       recordComment,
       recordFollow,
       recordUnfollow,
+      recordBlockUser,
       recordProfileVisit,
       recordDwell,
       recordPublish,
@@ -405,6 +424,7 @@ export function RecommendationTasteProvider({ children }: { children: React.Reac
       recordComment,
       recordFollow,
       recordUnfollow,
+      recordBlockUser,
       recordProfileVisit,
       recordDwell,
       recordPublish,

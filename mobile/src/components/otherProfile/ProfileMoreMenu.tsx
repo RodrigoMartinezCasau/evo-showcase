@@ -1,6 +1,17 @@
-import React, { useCallback } from 'react';
-import { TouchableOpacity, Text, StyleSheet, Alert } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { TouchableOpacity, Text, StyleSheet, Share } from 'react-native';
+import * as Linking from 'expo-linking';
+import { useRouter } from 'expo-router';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
+import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
+import { useAuth } from '../../../mobile/lib/AuthContext';
+import { blockUser, insertReport, isRealUserId } from '@evoconn/services/supabaseSocial';
+import { mockCurrentUser } from '@evoconn/data/mockUser';
+import {
+  EvoActionSheetModal,
+  EvoConfirmModal,
+  EvoInfoModal,
+} from '@evoconn/components/shared/EvoActionSheetModal';
 import {
   THREE_DOTS_OFFSET_X,
   THREE_DOTS_OFFSET_Y,
@@ -10,60 +21,196 @@ import {
 type Props = {
   userId: string;
   username: string;
+  clanId: string | null | undefined;
 };
 
-export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({ userId, username }: Props) {
+export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({
+  userId,
+  username,
+  clanId,
+}: Props) {
+  const router = useRouter();
+  const { session } = useAuth();
   const { isFollowing, toggleFollow } = useFollowState();
+  const { recordBlockUser } = useRecommendationTaste();
   const following = isFollowing(userId);
 
-  const handlePress = useCallback(() => {
-    const followLabel = following ? 'Dejar de seguir' : 'Seguir';
+  const [mainOpen, setMainOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [blockOpen, setBlockOpen] = useState(false);
+  const [info, setInfo] = useState<{ title: string; message?: string } | null>(null);
 
-    Alert.alert(
-      username,
-      undefined,
-      [
-        { text: followLabel, onPress: () => toggleFollow(userId) },
-        { text: 'Bloquear usuario', style: 'destructive', onPress: () => {} },
-        { text: 'Compartir perfil', onPress: () => {} },
-        { text: 'Denunciar perfil', style: 'destructive', onPress: () => {} },
-        { text: 'Cancelar', style: 'cancel' },
-      ],
-    );
-  }, [userId, username, following, toggleFollow]);
+  const isOwnProfile =
+    (session?.user?.id != null && session.user.id === userId) || mockCurrentUser.id === userId;
+
+  const openInfo = useCallback((title: string, message?: string) => {
+    setInfo({ title, message });
+  }, []);
+
+  const handleShare = useCallback(async () => {
+    try {
+      const path = `profile/${userId}`;
+      const url = Linking.createURL(path);
+      await Share.share({
+        message: `Perfil de ${username} en EVO\n${url}`,
+        url,
+      });
+    } catch {
+      /* cancel */
+    }
+  }, [userId, username]);
+
+  const confirmBlock = useCallback(async () => {
+    if (!session?.user) {
+      openInfo('Sesión requerida', 'Inicia sesión para bloquear usuarios.');
+      return;
+    }
+    if (following) toggleFollow(userId);
+    if (isRealUserId(session.user.id) && isRealUserId(userId)) {
+      await blockUser(session.user.id, userId).catch(console.error);
+    }
+    recordBlockUser(userId, clanId ?? null);
+    openInfo('Usuario bloqueado', 'Ya no verás su contenido. Puedes desbloquear desde Ajustes.');
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)');
+  }, [
+    session,
+    following,
+    userId,
+    clanId,
+    toggleFollow,
+    recordBlockUser,
+    router,
+    openInfo,
+  ]);
+
+  const submitReport = useCallback(
+    async (reason: string) => {
+      if (!session?.user) {
+        openInfo('Sesión requerida', 'Inicia sesión para denunciar.');
+        return;
+      }
+      if (isRealUserId(session.user.id) && isRealUserId(userId)) {
+        await insertReport({
+          reporterId: session.user.id,
+          targetType: 'user',
+          targetId: userId,
+          reason,
+        }).catch(console.error);
+      }
+      openInfo('Denuncia enviada', 'Gracias. Revisaremos el perfil.');
+    },
+    [session, userId, openInfo],
+  );
 
   const pad = 8;
   const hit = Math.max(44, THREE_DOTS_SIZE + pad * 2);
 
+  if (isOwnProfile) {
+    return null;
+  }
+
   return (
-    <TouchableOpacity
-      onPress={handlePress}
-      hitSlop={12}
-      activeOpacity={0.6}
-      style={[
-        styles.button,
-        {
-          minWidth: hit,
-          minHeight: hit,
-          transform: [
-            { translateX: THREE_DOTS_OFFSET_X },
-            { translateY: THREE_DOTS_OFFSET_Y },
-          ],
-        },
-      ]}
-    >
-      <Text
+    <>
+      <TouchableOpacity
+        onPress={() => setMainOpen(true)}
+        hitSlop={12}
+        activeOpacity={0.6}
         style={[
-          styles.dots,
+          styles.button,
           {
-            fontSize: THREE_DOTS_SIZE,
-            lineHeight: THREE_DOTS_SIZE * 1.15,
+            minWidth: hit,
+            minHeight: hit,
+            transform: [
+              { translateX: THREE_DOTS_OFFSET_X },
+              { translateY: THREE_DOTS_OFFSET_Y },
+            ],
           },
         ]}
       >
-        ⋮
-      </Text>
-    </TouchableOpacity>
+        <Text
+          style={[
+            styles.dots,
+            {
+              fontSize: THREE_DOTS_SIZE,
+              lineHeight: THREE_DOTS_SIZE * 1.15,
+            },
+          ]}
+        >
+          ⋮
+        </Text>
+      </TouchableOpacity>
+
+      <EvoActionSheetModal
+        visible={mainOpen}
+        onClose={() => setMainOpen(false)}
+        title={username}
+        options={[
+          {
+            key: 'follow',
+            label: following ? 'Dejar de seguir' : 'Seguir',
+            onPress: () => toggleFollow(userId),
+          },
+          {
+            key: 'share',
+            label: 'Compartir perfil',
+            onPress: () => void handleShare(),
+          },
+          {
+            key: 'report',
+            label: 'Denunciar perfil',
+            destructive: true,
+            onPress: () => setReportOpen(true),
+          },
+          {
+            key: 'block',
+            label: 'Bloquear usuario',
+            destructive: true,
+            onPress: () => setBlockOpen(true),
+          },
+        ]}
+      />
+
+      <EvoActionSheetModal
+        visible={reportOpen}
+        onClose={() => setReportOpen(false)}
+        title="Denunciar perfil"
+        options={[
+          {
+            key: 'r1',
+            label: 'Contenido inapropiado',
+            onPress: () => void submitReport('Contenido inapropiado (perfil)'),
+          },
+          {
+            key: 'r2',
+            label: 'Spam o suplantación',
+            onPress: () => void submitReport('Spam o suplantación (perfil)'),
+          },
+          {
+            key: 'r3',
+            label: 'Acoso o abuso',
+            onPress: () => void submitReport('Acoso o abuso (perfil)'),
+          },
+        ]}
+      />
+
+      <EvoConfirmModal
+        visible={blockOpen}
+        onClose={() => setBlockOpen(false)}
+        title="Bloquear usuario"
+        message={`¿Bloquear a ${username}? Dejarás de ver su contenido.`}
+        confirmLabel="Bloquear"
+        destructive
+        onConfirm={() => void confirmBlock()}
+      />
+
+      <EvoInfoModal
+        visible={info != null}
+        onClose={() => setInfo(null)}
+        title={info?.title ?? ''}
+        message={info?.message}
+      />
+    </>
   );
 });
 
