@@ -15,7 +15,8 @@ import { ClanDisplay } from '@evoconn/components/clan/ClanDisplay';
 export default function ClanScreen() {
   const { id }    = useLocalSearchParams<{ id: string }>();
   const router    = useRouter();
-  const insets    = useSafeAreaInsets();
+  const insets = useSafeAreaInsets();
+  const safeFrame = useSafeAreaFrame();
   const { height: screenH } = useWindowDimensions();
   const { thoughts } = useThoughts();
 

@@ -24,8 +24,12 @@ export const BOTTOM_BAR_LAYOUT = {
    * Reference: CommunityScreen (Para Ti).
    */
   BOTTOM_BAR_VIEWPORT_CLEARANCE_BELOW: 20,
-  /** Android: la reserva ya incluye el inset; clearance extra suele inflar el hueco sobre la barra. */
-  BOTTOM_BAR_VIEWPORT_CLEARANCE_BELOW_ANDROID: 0,
+  /**
+   * Android: mismo rol que en iOS (franja entre el borde inferior del viewport y la barra flotante).
+   * La fila de tabs en Android es ~6px más baja que en iOS (46 vs 52); +6px aquí iguala la sensación
+   * de margen que en iOS (referencia). Teléfono y tablet comparten esta constante.
+   */
+  BOTTOM_BAR_VIEWPORT_CLEARANCE_BELOW_ANDROID: 26,
 
   /** Bottom inset for left-edge drawer gesture strips (Community / detail feed). */
   BOTTOM_BAR_EDGE_GESTURE_CLEARANCE_BELOW: 8,

@@ -28,7 +28,9 @@ import {
   computeCommunityFeedCardContentLayout,
   computeFeedCardTextContentBottomY,
   computeSvgCardLayout,
+  COMMUNITY_FEED_CARD_MAX_INNER_WIDTH,
   getBodyMaxLines,
+  maxCardWidthForInnerCardHeightPx,
   SVG_CARD_VISUAL,
 } from '@evoconn/constants/svgCardLayout';
 
@@ -44,6 +46,11 @@ type CommunityPostCardProps = {
    * Vistas ampliadas usan `ReflectionDetailItem`, no esta tarjeta.
    */
   showPhraseAuthor?: boolean;
+  /**
+   * Alto exterior máximo del bloque tarjeta+márgenes en el feed (hueco lista − paddingTop).
+   * Si la tarjeta “natural” lo supera, se reduce el ancho para acortar la altura y mantener bordes redondeados visibles.
+   */
+  slotOuterHeight?: number;
 };
 
 export function CommunityPostCard({
@@ -52,6 +59,7 @@ export function CommunityPostCard({
   onAuthorPress,
   onClanPress: _onClanPress,
   showPhraseAuthor = false,
+  slotOuterHeight,
 }: CommunityPostCardProps) {
   const { updatePostVote, updatePostSaveToggle, getMyVote } = useFeedStore();
   const { savePost, unsavePost, isSaved } = usePersonalProfile();
@@ -93,7 +101,16 @@ export function CommunityPostCard({
   }, [cardTier, post.author.clanId]);
 
   const { width: screenWidth } = useWindowDimensions();
-  const cardWidth = screenWidth - V.CARD_HORIZONTAL_MARGIN * 2;
+  const maxUsableWidth = screenWidth - V.CARD_HORIZONTAL_MARGIN * 2;
+  const baseCardWidth = Math.min(maxUsableWidth, COMMUNITY_FEED_CARD_MAX_INNER_WIDTH);
+  const cardWidth = useMemo(() => {
+    if (slotOuterHeight == null || !(slotOuterHeight > 0)) return baseCardWidth;
+    const innerMax = Math.max(0, slotOuterHeight - V.CARD_VERTICAL_MARGIN * 2);
+    if (!(innerMax > 0)) return baseCardWidth;
+    const maxW = maxCardWidthForInnerCardHeightPx(cardTier, innerMax);
+    return Math.max(120, Math.floor(Math.min(baseCardWidth, maxW)));
+  }, [baseCardWidth, cardTier, slotOuterHeight]);
+  const cardMarginH = (screenWidth - cardWidth) / 2;
   const layout = useMemo(
     () => computeSvgCardLayout(cardTier, cardWidth),
     [cardTier, cardWidth]
@@ -174,7 +191,7 @@ export function CommunityPostCard({
         style={{
           width: cardWidth,
           height: layout.cardHeight,
-          marginHorizontal: V.CARD_HORIZONTAL_MARGIN,
+          marginHorizontal: cardMarginH,
           marginVertical: V.CARD_VERTICAL_MARGIN,
         }}
       >

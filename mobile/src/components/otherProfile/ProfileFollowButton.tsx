@@ -1,31 +1,63 @@
 import React, { useRef, useCallback, useEffect } from 'react';
 import { TouchableOpacity, Animated, Text, StyleSheet, View } from 'react-native';
-import { getFollowPlusButtonByHouse } from '@evoconn/utils/getFollowPlusButtonByHouse';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
-import {
-  FOLLOW_BUTTON_PLUS_OFFSET_X,
-  FOLLOW_BUTTON_PLUS_OFFSET_Y,
-  FOLLOW_BUTTON_PLUS_SCALE,
-  FOLLOW_BUTTON_SEGUIR_TEXT_OFFSET_X,
-  FOLLOW_BUTTON_SEGUIR_TEXT_OFFSET_Y,
-  FOLLOW_BUTTON_SEGUIR_TEXT_SCALE,
-} from '@evoconn/constants/otherProfileLayout';
 
 type Props = {
   userId: string;
+  /** Conservado por compatibilidad con el layout; el icono es neutro (blanco). */
   clanId: string | null | undefined;
 };
 
-const PLUS_SIZE = 38;
-const INNER_PLUS_BASE_LEFT = 24;
-const INNER_SEGUIR_BASE_LEFT = 62;
-const SEGUIR_TEXT_HALF_LINE = 10;
+/** + dibujado con vistas: grosor real, no depende del trazo de la fuente del sistema. */
+function FollowPlusMark({ color = '#FFFFFF' }: { color?: string }) {
+  const arm = 13;
+  const thick = 2.5;
+  const cap = thick / 2;
+  return (
+    <View style={followPlusStyles.box}>
+      <View
+        style={[
+          followPlusStyles.bar,
+          {
+            width: arm,
+            height: thick,
+            borderRadius: cap,
+            backgroundColor: color,
+          },
+        ]}
+      />
+      <View
+        style={[
+          followPlusStyles.bar,
+          {
+            width: thick,
+            height: arm,
+            borderRadius: cap,
+            backgroundColor: color,
+          },
+        ]}
+      />
+    </View>
+  );
+}
 
-export const ProfileFollowButton = React.memo(function ProfileFollowButton({ userId, clanId }: Props) {
+const followPlusStyles = StyleSheet.create({
+  box: {
+    width: 13,
+    height: 13,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bar: {
+    position: 'absolute',
+  },
+});
+/** Espacio entre el + y «Seguir» (fila centrada en el botón). */
+const SEGUIR_ROW_GAP = 8;
+
+export const ProfileFollowButton = React.memo(function ProfileFollowButton({ userId }: Props) {
   const { isFollowing, toggleFollow } = useFollowState();
   const following = isFollowing(userId);
-
-  const PlusSvg = getFollowPlusButtonByHouse(clanId);
 
   const fadeAnim = useRef(new Animated.Value(following ? 1 : 0)).current;
   const prevFollowing = useRef(following);
@@ -51,35 +83,14 @@ export const ProfileFollowButton = React.memo(function ProfileFollowButton({ use
       style={styles.button}
     >
       <View style={styles.inner} pointerEvents="box-none">
-        <Animated.View
-          style={[
-            styles.plusWrap,
-            {
-              opacity: Animated.subtract(1, fadeAnim),
-              left: INNER_PLUS_BASE_LEFT + FOLLOW_BUTTON_PLUS_OFFSET_X,
-              marginTop: -PLUS_SIZE / 2 + FOLLOW_BUTTON_PLUS_OFFSET_Y,
-              transform: [{ scale: FOLLOW_BUTTON_PLUS_SCALE }],
-            },
-          ]}
-        >
-          <PlusSvg width={PLUS_SIZE} height={PLUS_SIZE} />
-        </Animated.View>
-
         <Animated.View style={[styles.textWrap, { opacity: fadeAnim }]}>
           <Text style={styles.followingText}>Siguiendo</Text>
         </Animated.View>
 
         <Animated.View
-          style={[
-            styles.seguirWrap,
-            {
-              opacity: Animated.subtract(1, fadeAnim),
-              left: INNER_SEGUIR_BASE_LEFT + FOLLOW_BUTTON_SEGUIR_TEXT_OFFSET_X,
-              marginTop: -SEGUIR_TEXT_HALF_LINE + FOLLOW_BUTTON_SEGUIR_TEXT_OFFSET_Y,
-              transform: [{ scale: FOLLOW_BUTTON_SEGUIR_TEXT_SCALE }],
-            },
-          ]}
+          style={[styles.seguirRow, { opacity: Animated.subtract(1, fadeAnim) }]}
         >
+          <FollowPlusMark />
           <Text style={styles.label}>Seguir</Text>
         </Animated.View>
       </View>
@@ -103,11 +114,6 @@ const styles = StyleSheet.create({
   inner: {
     ...StyleSheet.absoluteFillObject,
   },
-  plusWrap: {
-    position: 'absolute',
-    top: '50%',
-    zIndex: 1,
-  },
   textWrap: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
@@ -120,9 +126,13 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     color: '#FFFFFF',
   },
-  seguirWrap: {
-    position: 'absolute',
-    top: '50%',
+  /** Icono + texto como un bloque centrado: mismo eje Y y poco espacio entre ambos. */
+  seguirRow: {
+    ...StyleSheet.absoluteFillObject,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SEGUIR_ROW_GAP,
     zIndex: 1,
   },
   label: {
@@ -130,5 +140,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     letterSpacing: 1.2,
     color: '#FFFFFF',
+    includeFontPadding: false,
   },
 });

@@ -55,6 +55,19 @@ export type SvgCardLayout = {
  * Compute the layout for a given tier at a specific card width.
  * The card height is derived so the colored frame fills the card with no distortion.
  */
+/**
+ * Ancho máximo de tarjeta (px) para que `computeSvgCardLayout(tier, w).cardHeight` no supere `maxInnerHeight`.
+ * Usado en el feed para que el display quepa en el hueco sobre la barra flotante (teléfono / tablet).
+ */
+export function maxCardWidthForInnerCardHeightPx(tier: CardSizeTier, maxInnerHeight: number): number {
+  if (!(maxInnerHeight > 0)) return SVG_VIEWBOX_SIZE;
+  const g = SVG_GEOMETRY[tier] ?? SVG_GEOMETRY.medium;
+  const frameHeight = g.frameBottom - g.frameTop;
+  const heightPerWidth = frameHeight / SVG_VIEWBOX_SIZE;
+  if (heightPerWidth <= 0) return SVG_VIEWBOX_SIZE;
+  return maxInnerHeight / heightPerWidth;
+}
+
 export function computeSvgCardLayout(tier: CardSizeTier, cardWidth: number): SvgCardLayout {
   const g = SVG_GEOMETRY[tier] ?? SVG_GEOMETRY.medium;
   const frameHeight = g.frameBottom - g.frameTop;
@@ -143,6 +156,13 @@ export function computeFeedCardTextContentBottomY(args: {
  * Used to scale feed typography and insets so text clears frame, estandarte, and header controls.
  */
 export const COMMUNITY_FEED_CARD_REF_WIDTH = 366;
+
+/**
+ * Ancho máximo del marco coloreado en Siguiendo / Para ti.
+ * En tablet el ancho útil supera este valor: sin tope la tarjeta escala a pantalla completa,
+ * crece en altura y se recortan bordes / márgenes respecto a la barra inferior.
+ */
+export const COMMUNITY_FEED_CARD_MAX_INNER_WIDTH = 420;
 
 /**
  * Approximate visual width of the clan-color stats chip (up + save), tuned so reflection

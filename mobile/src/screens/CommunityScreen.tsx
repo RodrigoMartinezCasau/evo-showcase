@@ -31,6 +31,10 @@ import {
   getBottomBarEdgeGestureBottomOffset,
   getBottomBarScrollContentPaddingBottom,
 } from '@evoconn/constants/bottomBarLayout';
+import {
+  COMMUNITY_FEED_CARD_MAX_INNER_WIDTH,
+  SVG_CARD_VISUAL,
+} from '@evoconn/constants/svgCardLayout';
 import { getMainColumnHeightForFloatingBottomBar } from '@evoconn/constants/appShellLayout';
 import { getAppTopBarLayoutHeight } from '@evoconn/constants/topBarLayout';
 import { useEvoPreferences } from '@evoconn/hooks/EvoPreferencesContext';
@@ -140,6 +144,15 @@ const TAB_INDEX: Record<TabId, number> = {
 };
 
 const VALID_TAB_IDS: TabId[] = ['siguiendo', 'para-ti', 'search'];
+
+/** Debe coincidir con `styles.list.paddingTop` — define el hueco vertical útil de cada fila del feed. */
+const COMMUNITY_FEED_LIST_PADDING_TOP = 8;
+/**
+ * Android: respiro extra bajo la tarjeta (dentro del área del feed) para acercar el margen al de iOS.
+ */
+const COMMUNITY_FEED_SLOT_BOTTOM_INSET_ANDROID = 14;
+/** Pantallas anchas (tablet / iPad): mismo criterio que el tope de ancho de tarjeta; evita que el slot sea tan alto que el display quede pegado a la barra. */
+const COMMUNITY_FEED_SLOT_BOTTOM_WIDE = 18;
 
 export default function CommunityScreen() {
   const router = useRouter();
@@ -449,11 +462,23 @@ export default function CommunityScreen() {
     [transitionTab, followingFeedOrdered],
   );
 
+  const communityFeedUsableWidth =
+    screenW - SVG_CARD_VISUAL.CARD_HORIZONTAL_MARGIN * 2;
+  const communityWideFeedLayout =
+    communityFeedUsableWidth > COMMUNITY_FEED_CARD_MAX_INNER_WIDTH;
+
+  const feedCardSlotOuterHeight =
+    feedItemHeight -
+    COMMUNITY_FEED_LIST_PADDING_TOP -
+    (Platform.OS === 'android' ? COMMUNITY_FEED_SLOT_BOTTOM_INSET_ANDROID : 0) -
+    (communityWideFeedLayout ? COMMUNITY_FEED_SLOT_BOTTOM_WIDE : 0);
+
   const renderMainListItem = useCallback(
     ({ item }: { item: CommunityPost }): React.ReactElement => (
       <CommunityPostCard
         post={item}
         showPhraseAuthor={activeTab === 'para-ti'}
+        slotOuterHeight={feedCardSlotOuterHeight}
         onPress={() => handlePostPress(item)}
         onAuthorPress={() => handleAuthorPress(item.author.id)}
         onClanPress={() => {
@@ -462,7 +487,7 @@ export default function CommunityScreen() {
         }}
       />
     ),
-    [activeTab, handlePostPress, handleAuthorPress, handleClanPress],
+    [activeTab, feedCardSlotOuterHeight, handlePostPress, handleAuthorPress, handleClanPress],
   );
 
   const renderTransitionListItem = useCallback(
@@ -470,6 +495,7 @@ export default function CommunityScreen() {
       <CommunityPostCard
         post={item}
         showPhraseAuthor={false}
+        slotOuterHeight={feedCardSlotOuterHeight}
         onPress={() => handlePostPress(item)}
         onAuthorPress={() => handleAuthorPress(item.author.id)}
         onClanPress={() => {
@@ -478,7 +504,7 @@ export default function CommunityScreen() {
         }}
       />
     ),
-    [handlePostPress, handleAuthorPress, handleClanPress],
+    [feedCardSlotOuterHeight, handlePostPress, handleAuthorPress, handleClanPress],
   );
 
   const renderFeedItem = useCallback(

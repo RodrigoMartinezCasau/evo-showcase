@@ -255,8 +255,8 @@ function DomainCard({ stat, onPress }: DomainCardProps) {
 
 export default function PhrasesDomainsScreen() {
   const router      = useRouter();
-  const insets      = useSafeAreaInsets();
-  const safeFrame   = useSafeAreaFrame();
+  const insets = useSafeAreaInsets();
+  const safeFrame = useSafeAreaFrame();
   const { width: screenW, height: screenH } = useWindowDimensions();
   const { thoughts } = useThoughts();
 
