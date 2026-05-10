@@ -12,7 +12,13 @@ import { useRouter, usePathname } from 'expo-router';
 import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { TOP_BAR_LAYOUT, topBarIconEditorStyle, isTopBarTabletLayout } from '@evoconn/constants/topBarLayout';
+import {
+  TOP_BAR_LAYOUT,
+  topBarIconEditorStyle,
+  isTopBarTabletLayout,
+  topBarAndroidTopBumpPx,
+  topBarSafePaddingTopPx,
+} from '@evoconn/constants/topBarLayout';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { topBarIconFrameScale } from '@evoconn/assets/icons/topbar';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
@@ -248,10 +254,10 @@ export function AppTopBar({
       style={[
         styles.bar,
         {
-          paddingTop: insets.top + TOP_BAR_LAYOUT.SAFE_TOP_OFFSET,
+          paddingTop: topBarSafePaddingTopPx(insets.top),
           paddingHorizontal: TOP_BAR_LAYOUT.TOPBAR_PADDING_HORIZONTAL,
           paddingBottom: TOP_BAR_LAYOUT.TOPBAR_PADDING_BOTTOM,
-          minHeight: TOP_BAR_LAYOUT.TOPBAR_MIN_HEIGHT + insets.top,
+          minHeight: TOP_BAR_LAYOUT.TOPBAR_MIN_HEIGHT + insets.top + topBarAndroidTopBumpPx(),
         },
       ]}
     >

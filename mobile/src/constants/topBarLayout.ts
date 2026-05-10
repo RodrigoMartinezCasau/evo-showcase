@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 export type TopBarItemKey =
   | 'star'
   | 'menu'
@@ -15,6 +17,12 @@ export type XY = { x?: number; y?: number };
 export const TOP_BAR_LAYOUT = {
   // Added on top of safe-area inset (Dynamic Island / notch)
   SAFE_TOP_OFFSET: -18,
+
+  /**
+   * Android edge-to-edge: separa un poco la barra del borde físico (sin tocar iOS).
+   * Debe sumarse en `AppTopBar` y en `getAppTopBarLayoutHeight`.
+   */
+  TOP_BAR_ANDROID_EXTRA_PADDING_TOP: 8,
 
   /**
    * Desplaza **todo** el contenido de la barra (izquierda + centro + derecha) junto.
@@ -186,13 +194,22 @@ export function topBarIconEditorStyle(
   };
 }
 
+export function topBarAndroidTopBumpPx(): number {
+  return Platform.OS === 'android' ? TOP_BAR_LAYOUT.TOP_BAR_ANDROID_EXTRA_PADDING_TOP : 0;
+}
+
+/** `paddingTop` de `AppTopBar`: safe area + offset iOS + respiro Android. */
+export function topBarSafePaddingTopPx(insetTop: number): number {
+  return insetTop + TOP_BAR_LAYOUT.SAFE_TOP_OFFSET + topBarAndroidTopBumpPx();
+}
+
 /**
  * Altura vertical que ocupa `AppTopBar` en el layout (padding safe + fila de iconos + padding inferior).
  * Usar en **todas** las pantallas que calculan `contentHeight` / listas bajo la barra inferior flotante.
  * Debe mantenerse alineado con `AppTopBar.tsx` (paddingTop / paddingBottom / fila más alta).
  */
 export function getAppTopBarLayoutHeight(insetTop: number): number {
-  const paddingTop = insetTop + TOP_BAR_LAYOUT.SAFE_TOP_OFFSET;
+  const paddingTop = topBarSafePaddingTopPx(insetTop);
   const iconVerticalPad = 12; // `iconBtn` / `counterBtn` paddingVertical: 6 × 2
   const rowBody = Math.max(
     TOP_BAR_LAYOUT.SHIELD_SIZE + iconVerticalPad,
@@ -201,7 +218,7 @@ export function getAppTopBarLayoutHeight(insetTop: number): number {
     TOP_BAR_LAYOUT.COUNTER_ICON_SIZE + iconVerticalPad,
   );
   const contentH = paddingTop + rowBody + TOP_BAR_LAYOUT.TOPBAR_PADDING_BOTTOM;
-  const minH = TOP_BAR_LAYOUT.TOPBAR_MIN_HEIGHT + insetTop;
+  const minH = TOP_BAR_LAYOUT.TOPBAR_MIN_HEIGHT + insetTop + topBarAndroidTopBumpPx();
   return Math.max(contentH, minH);
 }
 
