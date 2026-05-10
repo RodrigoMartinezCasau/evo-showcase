@@ -15,6 +15,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export type NotificationType =
   | 'upvote_post'
   | 'follow'
+  | 'follow_request'
   | 'comment'
   | 'upvote_comment';
 

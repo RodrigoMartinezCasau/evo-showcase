@@ -164,7 +164,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
           // Only show native push (sound + vibration) for follow and comment.
           // Likes, dislikes and saves are shown in the in-app bell only.
           // Cuentas muy seguidas no reciben estas pushes (anti-spam).
-          if (notif.type === 'follow' || notif.type === 'comment') {
+          if (notif.type === 'follow' || notif.type === 'follow_request' || notif.type === 'comment') {
             if (!shouldDeliverSocialPush(followersCountRef.current)) return;
             const who = formatAtUsername(notif.fromUsername);
             if (notif.type === 'comment') {
@@ -176,6 +176,11 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
                     ? `${who} comentó tu publicación.`
                     : 'Nuevo comentario en tu publicación.';
               showLocalNotification('💬 Nuevo comentario', body).catch(console.error);
+            } else if (notif.type === 'follow_request') {
+              const body = who
+                ? `${who} quiere seguirte. Abre la app para aceptar.`
+                : 'Nueva solicitud de seguimiento.';
+              showLocalNotification('🔒 Solicitud de seguimiento', body).catch(console.error);
             } else {
               const body = who
                 ? `${who} te ha empezado a seguir.`

@@ -191,6 +191,119 @@ export async function deleteFollow(followerId: string, followingId: string): Pro
   if (error) console.error('[Social] deleteFollow:', error.message);
 }
 
+// ─── Follow requests (private accounts) ───────────────────────────────────────
+
+/** Supabase PostgREST antes de migrar: tabla aún no expuesta → evita LogBox con console.error. */
+function isFollowRequestsTableMissing(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes('follow_requests') &&
+    (m.includes('schema cache') || m.includes('does not exist') || m.includes('not find'))
+  );
+}
+
+export async function fetchProfileIsPrivate(userId: string): Promise<boolean> {
+  if (!isRealUserId(userId)) return false;
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('is_private')
+    .eq('id', userId)
+    .maybeSingle();
+  if (error) {
+    console.error('[Social] fetchProfileIsPrivate:', error.message);
+    return false;
+  }
+  return !!(data as { is_private?: boolean } | null)?.is_private;
+}
+
+export async function fetchOutgoingFollowRequestTargets(requesterId: string): Promise<string[]> {
+  if (!isRealUserId(requesterId)) return [];
+  const { data, error } = await supabase
+    .from('follow_requests')
+    .select('target_id')
+    .eq('requester_id', requesterId);
+  if (error) {
+    if (isFollowRequestsTableMissing(error.message)) {
+      if (__DEV__) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          '[Social] Tabla follow_requests no creada en Supabase. Ejecuta supabase_private_accounts.sql',
+        );
+      }
+    } else {
+      console.error('[Social] fetchOutgoingFollowRequestTargets:', error.message);
+    }
+    return [];
+  }
+  return (data ?? []).map((r: { target_id: string }) => r.target_id);
+}
+
+/** Creates a pending request; DB trigger inserts follow_request notification for target. */
+export async function insertFollowRequest(requesterId: string, targetId: string): Promise<boolean> {
+  if (!isRealUserId(requesterId) || !isRealUserId(targetId)) return false;
+  const { error } = await supabase.from('follow_requests').insert({
+    requester_id: requesterId,
+    target_id: targetId,
+  });
+  if (error) {
+    if (isFollowRequestsTableMissing(error.message)) {
+      if (__DEV__) {
+        // eslint-disable-next-line no-console
+        console.warn('[Social] insertFollowRequest: falta migración follow_requests');
+      }
+    } else {
+      console.error('[Social] insertFollowRequest:', error.message);
+    }
+    return false;
+  }
+  return true;
+}
+
+export async function deleteFollowRequest(requesterId: string, targetId: string): Promise<void> {
+  if (!isRealUserId(requesterId) || !isRealUserId(targetId)) return;
+  const { error } = await supabase
+    .from('follow_requests')
+    .delete()
+    .eq('requester_id', requesterId)
+    .eq('target_id', targetId);
+  if (error && !isFollowRequestsTableMissing(error.message)) {
+    console.error('[Social] deleteFollowRequest:', error.message);
+  }
+}
+
+export async function acceptFollowRequestRpc(requesterId: string): Promise<boolean> {
+  if (!isRealUserId(requesterId)) return false;
+  const { error } = await supabase.rpc('accept_follow_request', { p_requester: requesterId });
+  if (error) {
+    console.error('[Social] acceptFollowRequestRpc:', error.message);
+    return false;
+  }
+  return true;
+}
+
+export async function rejectFollowRequestRpc(requesterId: string): Promise<boolean> {
+  if (!isRealUserId(requesterId)) return false;
+  const { error } = await supabase.rpc('reject_follow_request', { p_requester: requesterId });
+  if (error) {
+    console.error('[Social] rejectFollowRequestRpc:', error.message);
+    return false;
+  }
+  return true;
+}
+
+export async function setProfilePrivate(userId: string, isPrivate: boolean): Promise<boolean> {
+  if (!isRealUserId(userId)) return false;
+  const { error } = await supabase
+    .from('profiles')
+    .update({ is_private: isPrivate })
+    .eq('id', userId);
+  if (error) {
+    console.error('[Social] setProfilePrivate:', error.message);
+    return false;
+  }
+  return true;
+}
+
 // ─── Posts by user ────────────────────────────────────────────────────────────
 
 /** Fetch all posts from a specific author (for their profile page). */

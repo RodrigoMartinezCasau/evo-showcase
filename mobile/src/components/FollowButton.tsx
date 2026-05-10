@@ -1,5 +1,5 @@
 import React, { useRef, useCallback, useEffect } from 'react';
-import { TouchableOpacity, Animated, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, Animated, StyleSheet } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { getClanSecondaryColor } from '@evoconn/constants/clanColors';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
@@ -62,8 +62,9 @@ export const FollowButton = React.memo(function FollowButton({
   authorClanId,
   context,
 }: FollowButtonProps) {
-  const { isFollowing, toggleFollow } = useFollowState();
+  const { isFollowing, isFollowPending, toggleFollow } = useFollowState();
   const following = isFollowing(authorId);
+  const pending = isFollowPending(authorId);
 
   // Never show the follow button on the authenticated user's own posts.
   if (authorId === mockCurrentUser.id) return null;
@@ -123,6 +124,31 @@ export const FollowButton = React.memo(function FollowButton({
     if (following || busy.current) return;
     toggleFollow(authorId);
   }, [following, authorId, toggleFollow]);
+
+  // Solicitud pendiente: mismo botón, toque cancela (no animación de “siguiendo”).
+  if (pending) {
+    const layout = LAYOUT_BY_CONTEXT[context];
+    const sz = BASE_SIZE * layout.scale;
+    const borderColor = getClanSecondaryColor(authorClanId);
+    return (
+      <View
+        style={[
+          styles.root,
+          {
+            transform: [
+              { translateX: layout.offsetX },
+              { translateY: layout.offsetY },
+            ],
+            opacity: 0.45,
+          },
+        ]}
+      >
+        <TouchableOpacity onPress={handlePress} activeOpacity={0.7} hitSlop={6}>
+          <FollowPlusSvg borderColor={borderColor} size={sz} />
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   const layout = LAYOUT_BY_CONTEXT[context];
   const sz = BASE_SIZE * layout.scale;

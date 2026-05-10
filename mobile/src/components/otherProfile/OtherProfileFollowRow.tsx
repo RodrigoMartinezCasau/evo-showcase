@@ -9,6 +9,8 @@ type Props = {
   clanId: string | null | undefined;
   followersCount: number;
   followingCount: number;
+  /** Total publicaciones (reflexiones + frases) mostrado en la fila de stats. */
+  postsCount: number;
 };
 
 function formatCount(n: number): string {
@@ -23,6 +25,7 @@ export const OtherProfileFollowRow = React.memo(function OtherProfileFollowRow({
   clanId,
   followersCount,
   followingCount,
+  postsCount,
 }: Props) {
   return (
     <View style={styles.row}>
@@ -45,6 +48,13 @@ export const OtherProfileFollowRow = React.memo(function OtherProfileFollowRow({
         <Text style={styles.label}>Seguidos</Text>
       </View>
 
+      <View style={styles.divider} />
+
+      <View style={styles.stat}>
+        <Text style={styles.value}>{formatCount(postsCount)}</Text>
+        <Text style={styles.label}>Posts</Text>
+      </View>
+
       {/* Three-dots menu */}
       <ProfileMoreMenu userId={userId} username={username} />
     </View>
@@ -55,11 +65,14 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     paddingVertical: 10,
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
+    flexWrap: 'wrap',
+    rowGap: 8,
   },
   stat: {
+    minWidth: 56,
     flex: 1,
     alignItems: 'center',
   },

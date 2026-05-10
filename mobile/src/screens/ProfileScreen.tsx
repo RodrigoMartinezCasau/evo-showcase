@@ -1,5 +1,6 @@
 import React, { useCallback, useState, useRef, useMemo, useEffect, useLayoutEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet, Animated, Easing, useWindowDimensions } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, usePathname } from 'expo-router';
 import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
@@ -100,6 +101,7 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
   const mockProfile = getOtherUserProfile(userId);
   const [supabaseProfile, setSupabaseProfile] = useState<OtherUserProfile | null>(null);
   const [supabasePosts, setSupabasePosts] = useState<CommunityPost[]>([]);
+  const [targetIsPrivate, setTargetIsPrivate] = useState(false);
   const {
     followGraph,
     activeUserId: viewerId,
@@ -124,6 +126,7 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
 
   useLayoutEffect(() => {
     setFollowCountSnap(null);
+    setTargetIsPrivate(false);
   }, [userId]);
 
   useEffect(() => {
@@ -133,7 +136,7 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
     Promise.all([
       supabase
         .from('profiles')
-        .select('id, username, clan_id, rank, insignia_phrase, total_reflections, total_quotes')
+        .select('id, username, clan_id, rank, insignia_phrase, total_reflections, total_quotes, is_private')
         .eq('id', userId)
         .maybeSingle(),
       fetchFollowCounts(userId),
@@ -145,6 +148,8 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
           ? (vid[viewerId]?.has(userId) ?? false)
           : false;
       if (data) {
+        const isPrivate = Boolean((data as { is_private?: boolean }).is_private);
+        setTargetIsPrivate(isPrivate);
         setFollowCountSnap({
           followers: counts.followersCount,
           following: counts.followingCount,
@@ -207,6 +212,14 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
     isRealUserId(viewerId) && isRealUserId(userId)
       ? (followGraph[viewerId]?.has(userId) ?? false)
       : false;
+
+  const isProfileLocked =
+    isRealUserId(userId) &&
+    !mockProfile &&
+    targetIsPrivate &&
+    !iFollowTargetNow &&
+    isRealUserId(viewerId) &&
+    viewerId !== userId;
 
   // Per-user real philosophical classification — replaces seed clanId and
   // seed philosophyPercentages so even other simulated users start as
@@ -275,6 +288,22 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
     () => livePosts.filter((p) => p.type === 'phrase').length,
     [livePosts],
   );
+
+  const postsCountForRow = useMemo(() => {
+    if (isProfileLocked) {
+      return (
+        (profileWithLiveFollowers.totalReflections ?? 0) +
+        (profileWithLiveFollowers.totalQuotes ?? 0)
+      );
+    }
+    return liveReflectionCount + liveQuoteCount;
+  }, [
+    isProfileLocked,
+    profileWithLiveFollowers.totalReflections,
+    profileWithLiveFollowers.totalQuotes,
+    liveReflectionCount,
+    liveQuoteCount,
+  ]);
 
   const insets = useSafeAreaInsets();
   const safeFrame = useSafeAreaFrame();
@@ -384,6 +413,7 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
               clanId={profileWithLiveFollowers.clanId}
               followersCount={profileWithLiveFollowers.followersCount}
               followingCount={profileWithLiveFollowers.followingCount}
+              postsCount={postsCountForRow}
             />
             <UserIdentityHeader
               username={profile.username}
@@ -400,16 +430,28 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
               }
             />
             <UserInsigniaPhrase phrase={profile.insigniaPhrase} />
-            <PhilosophyPercentagesPanel percentages={profile.philosophyPercentages} clanId={profile.clanId} />
-            <UserTotalsStats
-              totalReflections={liveReflectionCount}
-              totalQuotes={liveQuoteCount}
-            />
-            <RecentPostsSlider
-              posts={livePosts}
-              onPostPress={handlePostPress}
-              onSeeMorePress={handleSeeMoreRecentPosts}
-            />
+            {isProfileLocked ? (
+              <View style={styles.privateLock}>
+                <Ionicons name="lock-closed" size={40} color="rgba(255,255,255,0.35)" />
+                <Text style={styles.privateLockTitle}>Esta cuenta es privada</Text>
+                <Text style={styles.privateLockSub}>
+                  Sigue a esta persona para ver su filosofía y publicaciones.
+                </Text>
+              </View>
+            ) : (
+              <>
+                <PhilosophyPercentagesPanel percentages={profile.philosophyPercentages} clanId={profile.clanId} />
+                <UserTotalsStats
+                  totalReflections={liveReflectionCount}
+                  totalQuotes={liveQuoteCount}
+                />
+                <RecentPostsSlider
+                  posts={livePosts}
+                  onPostPress={handlePostPress}
+                  onSeeMorePress={handleSeeMoreRecentPosts}
+                />
+              </>
+            )}
             <View style={styles.bottomSpacer} />
           </ScrollView>
         </ReflectionBackground>
@@ -474,5 +516,27 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: 20,
+  },
+  privateLock: {
+    alignItems: 'center',
+    paddingVertical: 36,
+    paddingHorizontal: 28,
+    gap: 12,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(0,0,0,0.25)',
+  },
+  privateLockTitle: {
+    color: evoconnColors.text,
+    fontSize: 17,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  privateLockSub: {
+    color: evoconnColors.muted,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
   },
 });

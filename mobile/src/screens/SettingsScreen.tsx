@@ -29,6 +29,8 @@ import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import { CLAN_TO_COLOR } from '@evoconn/constants/clanColors';
 import { useDebugStats } from '@evoconn/debug/DebugStatsContext';
 import { useEvoPreferences } from '@evoconn/hooks/EvoPreferencesContext';
+import { useAuth } from '../../mobile/lib/AuthContext';
+import { isRealUserId, setProfilePrivate } from '@evoconn/services/supabaseSocial';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -74,7 +76,7 @@ interface SettingRow {
   type:         RowType;
   value?:       string;
   checked?:     boolean;
-  onToggleKey?: 'notifications' | 'haptics' | 'sounds';
+  onToggleKey?: 'notifications' | 'haptics' | 'sounds' | 'privateAccount';
   onPress?:     () => void;
 }
 
@@ -103,9 +105,22 @@ interface RowProps {
   onHapticsToggle:   (val: boolean) => void;
   soundsEnabled:     boolean;
   onSoundsToggle:    (val: boolean) => void;
+  privateAccountEnabled: boolean;
+  onPrivateAccountToggle: (val: boolean) => void;
 }
 
-function SettingsRow({ row, isFirst, notifEnabled, onNotifToggle, hapticsEnabled, onHapticsToggle, soundsEnabled, onSoundsToggle }: RowProps) {
+function SettingsRow({
+  row,
+  isFirst,
+  notifEnabled,
+  onNotifToggle,
+  hapticsEnabled,
+  onHapticsToggle,
+  soundsEnabled,
+  onSoundsToggle,
+  privateAccountEnabled,
+  onPrivateAccountToggle,
+}: RowProps) {
   const isToggle  = row.type === 'toggle';
   const isInfo    = row.type === 'info';
   const isDanger  = row.type === 'danger';
@@ -151,11 +166,13 @@ function SettingsRow({ row, isFirst, notifEnabled, onNotifToggle, hapticsEnabled
   const toggleValue = row.onToggleKey === 'notifications' ? notifEnabled
     : row.onToggleKey === 'haptics' ? hapticsEnabled
     : row.onToggleKey === 'sounds'  ? soundsEnabled
+    : row.onToggleKey === 'privateAccount' ? privateAccountEnabled
     : false;
 
   const handleToggleChange = row.onToggleKey === 'notifications' ? onNotifToggle
     : row.onToggleKey === 'haptics' ? onHapticsToggle
     : row.onToggleKey === 'sounds'  ? onSoundsToggle
+    : row.onToggleKey === 'privateAccount' ? onPrivateAccountToggle
     : undefined;
 
   return (
@@ -196,7 +213,15 @@ function SettingsRow({ row, isFirst, notifEnabled, onNotifToggle, hapticsEnabled
 }
 
 function SettingsSection({
-  section, notifEnabled, onNotifToggle, hapticsEnabled, onHapticsToggle, soundsEnabled, onSoundsToggle,
+  section,
+  notifEnabled,
+  onNotifToggle,
+  hapticsEnabled,
+  onHapticsToggle,
+  soundsEnabled,
+  onSoundsToggle,
+  privateAccountEnabled,
+  onPrivateAccountToggle,
 }: {
   section: SettingSection;
   notifEnabled: boolean;
@@ -205,6 +230,8 @@ function SettingsSection({
   onHapticsToggle: (val: boolean) => void;
   soundsEnabled: boolean;
   onSoundsToggle: (val: boolean) => void;
+  privateAccountEnabled: boolean;
+  onPrivateAccountToggle: (val: boolean) => void;
 }) {
   return (
     <View style={styles.sectionWrap}>
@@ -221,6 +248,8 @@ function SettingsSection({
             onHapticsToggle={onHapticsToggle}
             soundsEnabled={soundsEnabled}
             onSoundsToggle={onSoundsToggle}
+            privateAccountEnabled={privateAccountEnabled}
+            onPrivateAccountToggle={onPrivateAccountToggle}
           />
         ))}
       </View>
@@ -293,6 +322,24 @@ export default function SettingsScreen({
   const { thoughts }              = useThoughts();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { remainingUses }         = useDebugStats();
+  const { profile, refreshProfile } = useAuth();
+  const [privateAccountLocal, setPrivateAccountLocal] = useState(false);
+
+  useEffect(() => {
+    setPrivateAccountLocal(Boolean(profile?.is_private));
+  }, [profile?.is_private]);
+
+  const handlePrivateAccountToggle = useCallback(async (next: boolean) => {
+    if (!profile?.id || !isRealUserId(profile.id)) return;
+    setPrivateAccountLocal(next);
+    const ok = await setProfilePrivate(profile.id, next);
+    if (!ok) {
+      setPrivateAccountLocal(!next);
+      Alert.alert('No se pudo guardar', 'Revisa tu conexión e inténtalo de nuevo.');
+      return;
+    }
+    await refreshProfile();
+  }, [profile?.id, refreshProfile]);
 
   // ── Notifications toggle (persisted) ─────────────────────────────────────
   const [notifsEnabled, setNotifsEnabled] = useState(true);
@@ -411,6 +458,17 @@ export default function SettingsScreen({
       id: 'privacy',
       title: 'PRIVACIDAD Y DATOS',
       rows: [
+        ...(isRealUserId(profile?.id)
+          ? [{
+            id: 'private-account',
+            label: 'Cuenta privada',
+            subtitle: 'Quien no te siga envía solicitud; tus publicaciones no salen en Para ti.',
+            icon: 'lock-closed-outline',
+            iconBg: IC.slate,
+            type: 'toggle' as const,
+            onToggleKey: 'privateAccount' as const,
+          }]
+          : []),
         { id: 'data-use', label: 'Uso de datos',      icon: 'pie-chart-outline', iconBg: IC.slate, type: 'navigate' },
         { id: 'download', label: 'Descargar mis datos', icon: 'download-outline', iconBg: IC.slate, type: 'action' },
         { id: 'delete',   label: deletingAccount ? 'Eliminando…' : 'Eliminar cuenta', icon: 'trash-outline', iconBg: IC.red, type: 'danger', onPress: confirmDeleteAccount },
@@ -449,7 +507,7 @@ export default function SettingsScreen({
         { id: 'build',   label: 'Build',   value: '(16)',   icon: 'cube-outline',               iconBg: IC.gray, type: 'info' },
       ],
     },
-  ], [remainingUses, userEmail, userPhone, deletingAccount, confirmDeleteAccount, showSubscriptionAlert, router]);
+  ], [remainingUses, userEmail, userPhone, deletingAccount, confirmDeleteAccount, showSubscriptionAlert, router, profile?.id]);
 
   const handleHapticsToggle = useCallback((val: boolean) => setHapticsEnabled(val), [setHapticsEnabled]);
   const handleSoundsToggle  = useCallback((val: boolean) => setSoundsEnabled(val),  [setSoundsEnabled]);
@@ -475,6 +533,8 @@ export default function SettingsScreen({
               onHapticsToggle={handleHapticsToggle}
               soundsEnabled={soundsEnabled}
               onSoundsToggle={handleSoundsToggle}
+              privateAccountEnabled={privateAccountLocal}
+              onPrivateAccountToggle={handlePrivateAccountToggle}
             />
           ))}
           <View style={styles.logoutWrap}>

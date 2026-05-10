@@ -33,6 +33,10 @@ import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { getClanProfileByHouse } from '@evoconn/utils/getClanProfileByHouse';
 import type { AppNotification } from '@evoconn/services/notificationsStorage';
+import {
+  acceptFollowRequestRpc,
+  rejectFollowRequestRpc,
+} from '@evoconn/services/supabaseSocial';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -59,6 +63,8 @@ function actionLabel(n: AppNotification): string {
       return 'ha dado upvote a tu publicación';
     case 'follow':
       return 'ha empezado a seguirte';
+    case 'follow_request':
+      return 'quiere seguirte';
     case 'comment':
       return n.textPreview
         ? `ha comentado: "${n.textPreview.length > 60 ? n.textPreview.slice(0, 60) + '…' : n.textPreview}"`
@@ -88,8 +94,8 @@ const NotificationRow = React.memo(function NotificationRow({
   const ProfileSvg = getClanProfileByHouse(clanId ?? null);
   const username = n.fromUsername.replace(/^@+/, '');
 
-  // Follow notifications have no "content" destination — both zones go to profile.
-  const handleContent = n.type === 'follow'
+  // Follow / solicitud: destino perfil.
+  const handleContent = n.type === 'follow' || n.type === 'follow_request'
     ? () => onPressProfile(n)
     : () => onPressContent(n);
 
@@ -139,6 +145,78 @@ const NotificationRow = React.memo(function NotificationRow({
   );
 });
 
+type FollowRequestRowProps = {
+  notification: AppNotification;
+  clanId: string | null | undefined;
+  onPressProfile: (n: AppNotification) => void;
+  busy: boolean;
+  onAccept: (n: AppNotification) => void;
+  onReject: (n: AppNotification) => void;
+};
+
+const FollowRequestRow = React.memo(function FollowRequestRow({
+  notification: n,
+  clanId,
+  onPressProfile,
+  busy,
+  onAccept,
+  onReject,
+}: FollowRequestRowProps) {
+  const ProfileSvg = getClanProfileByHouse(clanId ?? null);
+  const username = n.fromUsername.replace(/^@+/, '');
+
+  return (
+    <View style={[styles.row, !n.read && styles.rowUnread]}>
+      {!n.read && <View style={styles.unreadDot} />}
+      <TouchableOpacity
+        onPress={() => onPressProfile(n)}
+        activeOpacity={0.6}
+        hitSlop={4}
+      >
+        <View style={styles.avatarWrap}>
+          <View style={{ transform: [{ scale: PROFILE_ICON_SCALE }] }}>
+            <ProfileSvg width={AVATAR_SIZE} height={AVATAR_SIZE} />
+          </View>
+        </View>
+      </TouchableOpacity>
+      <View style={styles.followRequestMid}>
+        <TouchableOpacity
+          style={styles.textBlock}
+          onPress={() => onPressProfile(n)}
+          activeOpacity={0.6}
+        >
+          <Text style={styles.actionText} numberOfLines={2}>
+            <Text style={styles.username} onPress={() => onPressProfile(n)}>
+              @{username}
+            </Text>
+            {' '}
+            <Text>quiere seguirte</Text>
+          </Text>
+          <Text style={styles.timestamp}>{relativeTime(n.createdAt)}</Text>
+        </TouchableOpacity>
+        <View style={styles.followRequestActions}>
+          <TouchableOpacity
+            style={[styles.acceptBtn, busy && styles.btnDisabled]}
+            disabled={busy}
+            onPress={() => onAccept(n)}
+            activeOpacity={0.75}
+          >
+            <Text style={styles.acceptBtnText}>{busy ? '…' : 'Aceptar'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.rejectBtn, busy && styles.btnDisabled]}
+            disabled={busy}
+            onPress={() => onReject(n)}
+            activeOpacity={0.75}
+          >
+            <Text style={styles.rejectBtnText}>Rechazar</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+});
+
 // ─── Empty state ──────────────────────────────────────────────────────────────
 
 function EmptyState() {
@@ -161,6 +239,7 @@ export default function NotificationsScreen() {
   const { users } = useSimulation();
   const { thoughts } = useThoughts();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [requestActionBusy, setRequestActionBusy] = useState(false);
 
   const handleTabChange = useCallback(
     (tab: TabId) => {
@@ -192,6 +271,34 @@ export default function NotificationsScreen() {
     [router],
   );
 
+  const handleAcceptFollowRequest = useCallback(
+    async (n: AppNotification) => {
+      if (requestActionBusy || !n.fromUserId) return;
+      setRequestActionBusy(true);
+      try {
+        const ok = await acceptFollowRequestRpc(n.fromUserId);
+        if (ok) await refreshNotifications();
+      } finally {
+        setRequestActionBusy(false);
+      }
+    },
+    [requestActionBusy, refreshNotifications],
+  );
+
+  const handleRejectFollowRequest = useCallback(
+    async (n: AppNotification) => {
+      if (requestActionBusy || !n.fromUserId) return;
+      setRequestActionBusy(true);
+      try {
+        const ok = await rejectFollowRequestRpc(n.fromUserId);
+        if (ok) await refreshNotifications();
+      } finally {
+        setRequestActionBusy(false);
+      }
+    },
+    [requestActionBusy, refreshNotifications],
+  );
+
   const handlePressContent = useCallback(
     (n: AppNotification) => {
       if (n.targetPostId) {
@@ -213,6 +320,18 @@ export default function NotificationsScreen() {
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<AppNotification>) => {
       const user = users[item.fromUserId];
+      if (item.type === 'follow_request') {
+        return (
+          <FollowRequestRow
+            notification={item}
+            clanId={user?.clanId ?? null}
+            onPressProfile={handlePressProfile}
+            busy={requestActionBusy}
+            onAccept={handleAcceptFollowRequest}
+            onReject={handleRejectFollowRequest}
+          />
+        );
+      }
       return (
         <NotificationRow
           notification={item}
@@ -222,7 +341,14 @@ export default function NotificationsScreen() {
         />
       );
     },
-    [users, handlePressProfile, handlePressContent],
+    [
+      users,
+      handlePressProfile,
+      handlePressContent,
+      requestActionBusy,
+      handleAcceptFollowRequest,
+      handleRejectFollowRequest,
+    ],
   );
 
   const keyExtractor = useCallback((item: AppNotification) => item.id, []);
@@ -394,5 +520,41 @@ const styles = StyleSheet.create({
     fontSize: 15,
     textAlign: 'center',
     maxWidth: 220,
+  },
+  followRequestMid: {
+    flex: 1,
+    gap: 10,
+  },
+  followRequestActions: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'center',
+  },
+  acceptBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: 'rgba(199,255,2,0.18)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(199,255,2,0.45)',
+  },
+  acceptBtnText: {
+    color: '#c7ff02',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  rejectBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  rejectBtnText: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  btnDisabled: {
+    opacity: 0.45,
   },
 });

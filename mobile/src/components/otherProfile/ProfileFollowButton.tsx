@@ -1,5 +1,5 @@
-import React, { useRef, useCallback, useEffect } from 'react';
-import { TouchableOpacity, Animated, Text, StyleSheet, View } from 'react-native';
+import React, { useCallback } from 'react';
+import { TouchableOpacity, Text, StyleSheet, View } from 'react-native';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
 
 type Props = {
@@ -56,21 +56,9 @@ const followPlusStyles = StyleSheet.create({
 const SEGUIR_ROW_GAP = 8;
 
 export const ProfileFollowButton = React.memo(function ProfileFollowButton({ userId }: Props) {
-  const { isFollowing, toggleFollow } = useFollowState();
+  const { isFollowing, isFollowPending, toggleFollow } = useFollowState();
   const following = isFollowing(userId);
-
-  const fadeAnim = useRef(new Animated.Value(following ? 1 : 0)).current;
-  const prevFollowing = useRef(following);
-
-  useEffect(() => {
-    if (prevFollowing.current === following) return;
-    prevFollowing.current = following;
-    Animated.timing(fadeAnim, {
-      toValue: following ? 1 : 0,
-      duration: 280,
-      useNativeDriver: true,
-    }).start();
-  }, [following, fadeAnim]);
+  const pending = isFollowPending(userId);
 
   const handlePress = useCallback(() => {
     toggleFollow(userId);
@@ -80,29 +68,29 @@ export const ProfileFollowButton = React.memo(function ProfileFollowButton({ use
     <TouchableOpacity
       onPress={handlePress}
       activeOpacity={0.75}
-      style={styles.button}
+      style={[
+        styles.button,
+        pending && styles.buttonPending,
+        following && styles.buttonFollowing,
+      ]}
     >
-      <View style={styles.inner} pointerEvents="box-none">
-        <Animated.View style={[styles.textWrap, { opacity: fadeAnim }]}>
-          <Text style={styles.followingText}>Siguiendo</Text>
-        </Animated.View>
-
-        <Animated.View
-          style={[styles.seguirRow, { opacity: Animated.subtract(1, fadeAnim) }]}
-        >
+      {following ? (
+        <Text style={styles.followingText}>Siguiendo</Text>
+      ) : pending ? (
+        <Text style={styles.pendingText}>Solicitud enviada</Text>
+      ) : (
+        <View style={styles.seguirRow}>
           <FollowPlusMark />
           <Text style={styles.label}>Seguir</Text>
-        </Animated.View>
-      </View>
+        </View>
+      )}
     </TouchableOpacity>
   );
 });
 
 const styles = StyleSheet.create({
   button: {
-    position: 'relative',
-    overflow: 'visible',
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 14,
     borderWidth: 1.5,
@@ -110,15 +98,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)',
     minWidth: 120,
     minHeight: 44,
-  },
-  inner: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  textWrap: {
-    ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 2,
+  },
+  buttonPending: {
+    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  buttonFollowing: {
+    borderColor: 'rgba(255,255,255,0.12)',
   },
   followingText: {
     fontSize: 16,
@@ -126,14 +114,18 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     color: '#FFFFFF',
   },
-  /** Icono + texto como un bloque centrado: mismo eje Y y poco espacio entre ambos. */
+  pendingText: {
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    color: 'rgba(255,255,255,0.75)',
+    textAlign: 'center',
+  },
   seguirRow: {
-    ...StyleSheet.absoluteFillObject,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: SEGUIR_ROW_GAP,
-    zIndex: 1,
   },
   label: {
     fontSize: 16,
