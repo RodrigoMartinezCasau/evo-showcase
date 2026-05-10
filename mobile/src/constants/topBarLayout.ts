@@ -117,8 +117,9 @@ export const TOP_BAR_ICON_EDITOR: Record<
 > = {
   star: { offsetX: 2, offsetY: 0, scale: 1 },
   menu: { offsetX: 7, offsetY: 0, scale: 1 },
-  shield: { offsetX: -35, offsetY: 0, scale: 1 },
-  clanLabel: { offsetX: -30, offsetY: 0, scale: 1.2 },
+  /** offsetY −1: sube 1 px el badge; no afecta a `clanLabel` (texto aparte). */
+  shield: { offsetX: -35, offsetY: -2.5, scale: 1 },
+  clanLabel: { offsetX: -30, offsetY: 1, scale: 1.2 },
   pencilIcon: { offsetX: -62, offsetY: 0, scale: 2 },
   pencilText: { offsetX: -45, offsetY: 0, scale: 1.2 },
   fireIcon: { offsetX: -35, offsetY: 0, scale: 2.2 },
