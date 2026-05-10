@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { getPersonalProfile } from '@evoconn/data/mockPersonalProfile';
@@ -51,6 +51,7 @@ export default function PersonalProfileScreen() {
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
+  const safeFrame = useSafeAreaFrame();
   const { width: screenW, height: screenH } = useWindowDimensions();
   const { profile: authProfile, session, refreshProfile } = useAuth();
   const { activeFollowersCount, activeFollowingCount } = useSimulation();
@@ -143,7 +144,12 @@ export default function PersonalProfileScreen() {
   }, []);
 
   // Misma altura de cuerpo que Para Ti (`AppTopBar` real + reserva de barra inferior).
-  const contentHeight = getAppShellScrollableBodyHeight(screenH, insets.top, insets.bottom);
+  const contentHeight = getAppShellScrollableBodyHeight(
+    screenH,
+    insets.top,
+    insets.bottom,
+    safeFrame.height,
+  );
 
   // ProfileDetailPanel still needs an explicit pixel height.
   const contentHeightRef = useRef(0);

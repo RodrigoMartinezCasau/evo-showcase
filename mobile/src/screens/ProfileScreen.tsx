@@ -2,7 +2,7 @@ import React, { useCallback, useState, useRef, useMemo, useEffect, useLayoutEffe
 import { View, Text, ScrollView, StyleSheet, Animated, Easing, useWindowDimensions } from 'react-native';
 import { useLocalSearchParams, useRouter, usePathname } from 'expo-router';
 import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { mockCurrentUser, mockUserStats } from '@evoconn/data/mockUser';
 import { getOtherUserProfile } from '@evoconn/data/mockOtherUsers';
@@ -277,11 +277,17 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
   );
 
   const insets = useSafeAreaInsets();
+  const safeFrame = useSafeAreaFrame();
   const { width: screenW, height: screenH } = useWindowDimensions();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { thoughts } = useThoughts();
 
-  const contentHeight = getAppShellScrollableBodyHeight(screenH, insets.top, insets.bottom);
+  const contentHeight = getAppShellScrollableBodyHeight(
+    screenH,
+    insets.top,
+    insets.bottom,
+    safeFrame.height,
+  );
 
   // ─── Expanded post detail panel ────────────────────────────────────
   const slideAnim = useRef(new Animated.Value(0)).current;

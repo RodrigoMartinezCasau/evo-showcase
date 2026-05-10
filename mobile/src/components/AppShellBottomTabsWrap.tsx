@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
+import { BOTTOM_BAR_LAYOUT, shellBottomOffsetPx } from '@evoconn/constants/bottomBarLayout';
 import { evoconnColors } from '@evoconn/theme/colors';
 
 type AppShellBottomTabsWrapProps = {
@@ -21,6 +21,7 @@ export function AppShellBottomTabsWrap({
   borderTopColor = evoconnColors.background,
 }: AppShellBottomTabsWrapProps) {
   const insets = useSafeAreaInsets();
+  /** Inset completo del sistema (gesto / 3 botones). Nunca capar: si no, la barra queda encima de la nav de Android. */
   return (
     <View
       style={[
@@ -28,7 +29,7 @@ export function AppShellBottomTabsWrap({
         {
           paddingBottom: insets.bottom + BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION,
           paddingHorizontal: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HORIZONTAL_PADDING,
-          bottom: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_BOTTOM_OFFSET,
+          bottom: shellBottomOffsetPx(),
           borderRadius: BOTTOM_BAR_LAYOUT.BOTTOM_BAR_BORDER_RADIUS,
           backgroundColor,
           borderTopWidth,

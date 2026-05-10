@@ -19,7 +19,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { AppTopBar, AppShellBottomTabsWrap, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
@@ -44,6 +44,7 @@ const ANIM_DURATION = 200;
 export default function PersonalSavedPostsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const safeFrame = useSafeAreaFrame();
   const { width: screenW, height: screenH } = useWindowDimensions();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const { thoughts } = useThoughts();
@@ -103,7 +104,12 @@ export default function PersonalSavedPostsScreen() {
   );
 
   // ─── Layout ───────────────────────────────────────────────────────
-  const contentHeight = getAppShellScrollableBodyHeight(screenH, insets.top, insets.bottom);
+  const contentHeight = getAppShellScrollableBodyHeight(
+    screenH,
+    insets.top,
+    insets.bottom,
+    safeFrame.height,
+  );
 
   // ─── Column widths ─────────────────────────────────────────────────
   const H_PADDING = 16;

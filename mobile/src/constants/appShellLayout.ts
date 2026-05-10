@@ -7,16 +7,18 @@ import { getAppTopBarLayoutHeight } from '@evoconn/constants/topBarLayout';
 
 /**
  * Altura del área de contenido bajo `AppTopBar` con barra inferior flotante (referencia Para Ti).
+ * @param safeFrameHeight `useSafeAreaFrame().height` — en Android edge-to-edge evita doble resta del inset inferior.
  */
 export function getMainColumnHeightForFloatingBottomBar(
   windowHeight: number,
   insetTop: number,
   insetBottom: number,
+  safeFrameHeight?: number,
 ): number {
   return (
     windowHeight -
     getAppTopBarLayoutHeight(insetTop) -
-    getBottomBarViewportReserveBottom(insetBottom)
+    getBottomBarViewportReserveBottom(insetBottom, windowHeight, safeFrameHeight)
   );
 }
 
@@ -25,8 +27,9 @@ export function getAppShellScrollableBodyHeight(
   windowHeight: number,
   insetTop: number,
   insetBottom: number,
+  safeFrameHeight?: number,
 ): number {
-  return getMainColumnHeightForFloatingBottomBar(windowHeight, insetTop, insetBottom);
+  return getMainColumnHeightForFloatingBottomBar(windowHeight, insetTop, insetBottom, safeFrameHeight);
 }
 
 /** Clan + frases (lápiz): más franja bajo el contenido, mismo padding de scroll. */
@@ -34,16 +37,21 @@ export function getClanPhrasesShellBodyHeight(
   windowHeight: number,
   insetTop: number,
   insetBottom: number,
+  safeFrameHeight?: number,
 ): number {
   return (
-    getMainColumnHeightForFloatingBottomBar(windowHeight, insetTop, insetBottom) -
+    getMainColumnHeightForFloatingBottomBar(windowHeight, insetTop, insetBottom, safeFrameHeight) -
     BOTTOM_BAR_LAYOUT.BOTTOM_BAR_CLAN_PHRASES_STRIP_EXTRA
   );
 }
 
-export function getClanPhrasesScrollPaddingBottom(insetBottom: number): number {
+export function getClanPhrasesScrollPaddingBottom(
+  insetBottom: number,
+  windowHeight?: number,
+  safeFrameHeight?: number,
+): number {
   return (
-    getBottomBarScrollContentPaddingBottom(insetBottom) +
+    getBottomBarScrollContentPaddingBottom(insetBottom, windowHeight, safeFrameHeight) +
     BOTTOM_BAR_LAYOUT.BOTTOM_BAR_CLAN_PHRASES_STRIP_EXTRA
   );
 }

@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { View, StyleSheet, useWindowDimensions } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { AppTopBar, AppShellBottomTabsWrap, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
@@ -26,7 +26,12 @@ export default function ClanScreen() {
     router.replace({ pathname: '/(tabs)', params: { tab } });
   }, [router]);
 
-  const bodyHeight = getClanPhrasesShellBodyHeight(screenH, insets.top, insets.bottom);
+  const bodyHeight = getClanPhrasesShellBodyHeight(
+    screenH,
+    insets.top,
+    insets.bottom,
+    safeFrame.height,
+  );
 
   return (
     <View style={styles.container}>
@@ -37,7 +42,11 @@ export default function ClanScreen() {
       <View style={[styles.content, { height: bodyHeight }]}>
         <ClanDisplay
           clanId={clanId}
-          bottomPadding={getClanPhrasesScrollPaddingBottom(insets.bottom)}
+          bottomPadding={getClanPhrasesScrollPaddingBottom(
+            insets.bottom,
+            screenH,
+            safeFrame.height,
+          )}
         />
       </View>
 

@@ -17,7 +17,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getPersonalProfile } from '@evoconn/data/mockPersonalProfile';
@@ -302,6 +302,7 @@ function UsesCalendarGrid({ log, limit }: { log: UsesLogData; limit: number }) {
 export default function DailyUsesScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const safeFrame = useSafeAreaFrame();
   const { height: screenH, width: screenW } = useWindowDimensions();
   const profile = getPersonalProfile();
   const { thoughts } = useThoughts();
@@ -346,7 +347,12 @@ export default function DailyUsesScreen() {
   );
 
   // ─── Layout heights ───────────────────────────────────────────────────────
-  const contentHeight = getAppShellScrollableBodyHeight(screenH, insets.top, insets.bottom);
+  const contentHeight = getAppShellScrollableBodyHeight(
+    screenH,
+    insets.top,
+    insets.bottom,
+    safeFrame.height,
+  );
 
   const usedToday = log[today] ?? 0;
   const realRemaining = Math.max(DAILY_LIMIT - usedToday, 0);

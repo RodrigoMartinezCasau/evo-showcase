@@ -11,14 +11,14 @@ import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-g
 import { runOnJS } from 'react-native-reanimated';
 import { useLocalSearchParams, useRouter, usePathname } from 'expo-router';
 import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
 import type { CommunityPost } from '@evoconn/types';
 import { ReflectionDetailItem } from '@evoconn/components/ReflectionDetailItem';
 import { AppTopBar, AppShellBottomTabsWrap, SidebarDrawer, BottomCommunityTabs } from '@evoconn/components';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useFeedStore } from '@evoconn/hooks/useFeedStore';
-import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
+import { getBottomBarEdgeGestureBottomOffset } from '@evoconn/constants/bottomBarLayout';
 import { getAppShellScrollableBodyHeight } from '@evoconn/constants/appShellLayout';
 import { getAppTopBarLayoutHeight } from '@evoconn/constants/topBarLayout';
 import {
@@ -83,6 +83,7 @@ export default function DetailFeedScreen() {
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
+  const safeFrame = useSafeAreaFrame();
   const { height: screenH } = useWindowDimensions();
   const params = useLocalSearchParams<{
     mode?: string;
@@ -145,7 +146,12 @@ export default function DetailFeedScreen() {
   );
 
   const topBarHeight = getAppTopBarLayoutHeight(insets.top);
-  const itemHeight = getAppShellScrollableBodyHeight(screenH, insets.top, insets.bottom);
+  const itemHeight = getAppShellScrollableBodyHeight(
+    screenH,
+    insets.top,
+    insets.bottom,
+    safeFrame.height,
+  );
 
   const getItemLayout = useCallback(
     (_: unknown, index: number) => ({
@@ -300,11 +306,7 @@ export default function DetailFeedScreen() {
               {
                 top: topBarHeight,
                 width: COMMUNITY_DRAWER_EDGE_ZONE_WIDTH,
-                bottom:
-                  BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
-                  insets.bottom +
-                  BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
-                  BOTTOM_BAR_LAYOUT.BOTTOM_BAR_EDGE_GESTURE_CLEARANCE_BELOW,
+                bottom: getBottomBarEdgeGestureBottomOffset(insets.bottom),
               },
             ]}
           />

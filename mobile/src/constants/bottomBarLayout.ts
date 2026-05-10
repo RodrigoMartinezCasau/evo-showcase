@@ -1,6 +1,10 @@
+import { Platform } from 'react-native';
+
 export const BOTTOM_BAR_LAYOUT = {
-  /** Move the whole bar up/down (positive = up, negative = closer to bottom edge). */
+  /** Move the whole bar up/down (positive = up, negative = closer to bottom edge). iOS. */
   BOTTOM_BAR_BOTTOM_OFFSET: -10,
+  /** Android: anclada al borde inferior del layout; el hueco sobre la nav del sistema viene de `paddingBottom: insets.bottom`. */
+  BOTTOM_BAR_BOTTOM_OFFSET_ANDROID: 0,
 
   BOTTOM_BAR_HORIZONTAL_PADDING: 0,
   BOTTOM_BAR_INTERNAL_PADDING_VERTICAL: 0,
@@ -8,11 +12,18 @@ export const BOTTOM_BAR_LAYOUT = {
   /** Used for list padding so content never hides under the bar. */
   BOTTOM_BAR_HEIGHT: 52,
 
+  /** Debe coincidir con `paddingBottom` de la fila en `BottomCommunityTabs` (`styles.bar`). */
+  BOTTOM_BAR_ROW_PADDING_BOTTOM_IOS: 16,
+  /** Android: mínimo para no inflar la franja oscura encima de los iconos. */
+  BOTTOM_BAR_ROW_PADDING_BOTTOM_ANDROID: 4,
+
   /**
    * Clearance below the bar when computing full-screen viewport height (feed item height, profile grids, etc.).
    * Reference: CommunityScreen (Para Ti).
    */
   BOTTOM_BAR_VIEWPORT_CLEARANCE_BELOW: 20,
+  /** Android: separación mínima contenido ↔ barra (el inset del sistema va aparte en la reserva). */
+  BOTTOM_BAR_VIEWPORT_CLEARANCE_BELOW_ANDROID: 2,
 
   /** Bottom inset for left-edge drawer gesture strips (Community / detail feed). */
   BOTTOM_BAR_EDGE_GESTURE_CLEARANCE_BELOW: 8,
@@ -98,19 +109,89 @@ export const BOTTOM_BAR_LAYOUT = {
   FOLLOWING_SORT_DROPDOWN_TEXT_UNIVERSAL_OFFSET_Y: 0,
 } as const;
 
-/** Height to subtract from screen when the main content area must clear the floating bottom bar (Para Ti). */
-export function getBottomBarViewportReserveBottom(insetBottom: number): number {
+function viewportClearanceBelowPx(): number {
+  return Platform.OS === 'android'
+    ? BOTTOM_BAR_LAYOUT.BOTTOM_BAR_VIEWPORT_CLEARANCE_BELOW_ANDROID
+    : BOTTOM_BAR_LAYOUT.BOTTOM_BAR_VIEWPORT_CLEARANCE_BELOW;
+}
+
+/** Solo Android: en iOS la reserva histórica (52 + inset + clearance) ya encajaba sin desglosar el padding de fila. */
+function barRowPaddingForReservePx(): number {
+  return Platform.OS === 'android' ? BOTTOM_BAR_LAYOUT.BOTTOM_BAR_ROW_PADDING_BOTTOM_ANDROID : 0;
+}
+
+/**
+ * Android edge-to-edge: si `windowHeight` ≈ `safeAreaFrame.height`, el alto útil ya excluye la barra
+ * del sistema y **no** debemos volver a restar `insets.bottom` en la reserva del viewport (hueco doble).
+ * No afecta al `paddingBottom` del wrap de la barra: ahí siempre usamos `insets.bottom` completo para
+ * quedar por encima de la navegación de 3 botones / gesto.
+ */
+export function shouldOmitAndroidNavInsetInViewportReserve(
+  windowHeight: number,
+  safeFrameHeight: number,
+): boolean {
+  if (Platform.OS !== 'android') return false;
+  return safeFrameHeight > 0 && Math.abs(windowHeight - safeFrameHeight) <= 12;
+}
+
+function bottomInsetForViewportReserve(
+  insetBottom: number,
+  windowHeight?: number,
+  safeFrameHeight?: number,
+): number {
+  if (
+    windowHeight != null &&
+    safeFrameHeight != null &&
+    shouldOmitAndroidNavInsetInViewportReserve(windowHeight, safeFrameHeight)
+  ) {
+    return 0;
+  }
+  return insetBottom;
+}
+
+/**
+ * Offset desde el borde inferior de la pantalla hasta el límite superior de la franja de gesto.
+ * Usa **siempre** el inset real del sistema para alinearse con la barra flotante (nav 3 botones, etc.).
+ */
+export function getBottomBarEdgeGestureBottomOffset(insetBottom: number): number {
   return (
     BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
+    barRowPaddingForReservePx() +
     insetBottom +
     BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_VIEWPORT_CLEARANCE_BELOW
+    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_EDGE_GESTURE_CLEARANCE_BELOW
+  );
+}
+
+export function shellBottomOffsetPx(): number {
+  return Platform.OS === 'android'
+    ? BOTTOM_BAR_LAYOUT.BOTTOM_BAR_BOTTOM_OFFSET_ANDROID
+    : BOTTOM_BAR_LAYOUT.BOTTOM_BAR_BOTTOM_OFFSET;
+}
+
+/** Height to subtract from screen when the main content area must clear the floating bottom bar (Para Ti). */
+export function getBottomBarViewportReserveBottom(
+  insetBottom: number,
+  windowHeight?: number,
+  safeFrameHeight?: number,
+): number {
+  const navInset = bottomInsetForViewportReserve(insetBottom, windowHeight, safeFrameHeight);
+  return (
+    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
+    barRowPaddingForReservePx() +
+    navInset +
+    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
+    viewportClearanceBelowPx()
   );
 }
 
 /**
  * Misma reserva que `getBottomBarViewportReserveBottom`: un solo valor para viewport y padding de scroll.
  */
-export function getBottomBarScrollContentPaddingBottom(insetBottom: number): number {
-  return getBottomBarViewportReserveBottom(insetBottom);
+export function getBottomBarScrollContentPaddingBottom(
+  insetBottom: number,
+  windowHeight?: number,
+  safeFrameHeight?: number,
+): number {
+  return getBottomBarViewportReserveBottom(insetBottom, windowHeight, safeFrameHeight);
 }

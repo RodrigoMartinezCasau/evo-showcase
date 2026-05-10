@@ -13,7 +13,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { evoconnColors } from '@evoconn/theme/colors';
@@ -261,11 +261,19 @@ function ProfileHeader({ username, rank: rawRank, onPress }: { username: string;
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
+function formatPhoneForDisplay(e164: string): string {
+  const t = e164.trim();
+  if (!t) return '';
+  if (t.startsWith('+')) return t;
+  return `+${t}`;
+}
+
 export default function SettingsScreen({
   onLogout,
   onDeleteAccount,
   deletingAccount,
   userEmail,
+  userPhone,
   userUsername,
   userRank,
 }: {
@@ -273,11 +281,14 @@ export default function SettingsScreen({
   onDeleteAccount?: () => void;
   deletingAccount?: boolean;
   userEmail?: string;
+  /** E.164 desde `session.user.phone` tras vincular en Supabase Auth */
+  userPhone?: string;
   userUsername?: string;
   userRank?: string;
 }) {
   const router                    = useRouter();
   const insets                    = useSafeAreaInsets();
+  const safeFrame                 = useSafeAreaFrame();
   const { height: screenH }       = useWindowDimensions();
   const { thoughts }              = useThoughts();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -310,7 +321,12 @@ export default function SettingsScreen({
     [router],
   );
 
-  const contentHeight = getAppShellScrollableBodyHeight(screenH, insets.top, insets.bottom);
+  const contentHeight = getAppShellScrollableBodyHeight(
+    screenH,
+    insets.top,
+    insets.bottom,
+    safeFrame.height,
+  );
 
   const fallbackDeleteAccount = useCallback(() => Alert.alert('Eliminar cuenta', 'Función no disponible.'), []);
   const confirmDeleteAccount  = onDeleteAccount ?? fallbackDeleteAccount;
@@ -330,7 +346,15 @@ export default function SettingsScreen({
       title: 'CUENTA',
       rows: [
         { id: 'email',  label: 'Correo electrónico', value: userEmail || '—', icon: 'mail-outline',        iconBg: IC.blue,  type: 'navigate', onPress: () => router.push('/account-email') },
-        { id: 'phone',  label: 'Teléfono',           value: 'No vinculado',   icon: 'call-outline',        iconBg: IC.blue,  type: 'navigate', onPress: () => router.push('/account-phone') },
+        {
+          id: 'phone',
+          label: 'Teléfono',
+          value: userPhone?.trim() ? formatPhoneForDisplay(userPhone) : 'No vinculado',
+          icon: 'call-outline',
+          iconBg: IC.blue,
+          type: 'navigate',
+          onPress: () => router.push('/account-phone'),
+        },
         { id: 'pass',   label: 'Contraseña y seguridad',                      icon: 'lock-closed-outline', iconBg: IC.slate, type: 'navigate', onPress: () => router.push('/account-password') },
         { id: 'linked', label: 'Cuentas vinculadas',  subtitle: 'Google, Apple…', icon: 'link-outline',   iconBg: IC.gray,  type: 'navigate', onPress: () => router.push('/account-linked') },
       ],
@@ -425,7 +449,7 @@ export default function SettingsScreen({
         { id: 'build',   label: 'Build',   value: '(16)',   icon: 'cube-outline',               iconBg: IC.gray, type: 'info' },
       ],
     },
-  ], [remainingUses, userEmail, deletingAccount, confirmDeleteAccount, showSubscriptionAlert, router]);
+  ], [remainingUses, userEmail, userPhone, deletingAccount, confirmDeleteAccount, showSubscriptionAlert, router]);
 
   const handleHapticsToggle = useCallback((val: boolean) => setHapticsEnabled(val), [setHapticsEnabled]);
   const handleSoundsToggle  = useCallback((val: boolean) => setSoundsEnabled(val),  [setSoundsEnabled]);

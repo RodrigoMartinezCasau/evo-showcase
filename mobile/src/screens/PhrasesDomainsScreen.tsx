@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { evoconnColors } from '@evoconn/theme/colors';
@@ -256,6 +256,7 @@ function DomainCard({ stat, onPress }: DomainCardProps) {
 export default function PhrasesDomainsScreen() {
   const router      = useRouter();
   const insets      = useSafeAreaInsets();
+  const safeFrame   = useSafeAreaFrame();
   const { width: screenW, height: screenH } = useWindowDimensions();
   const { thoughts } = useThoughts();
 
@@ -300,7 +301,12 @@ export default function PhrasesDomainsScreen() {
     [iconSlot],
   );
 
-  const bodyHeight = getClanPhrasesShellBodyHeight(screenH, insets.top, insets.bottom);
+  const bodyHeight = getClanPhrasesShellBodyHeight(
+    screenH,
+    insets.top,
+    insets.bottom,
+    safeFrame.height,
+  );
 
   return (
     <View style={styles.root}>
@@ -316,7 +322,13 @@ export default function PhrasesDomainsScreen() {
           style={{ flex: 1 }}
           contentContainerStyle={[
             styles.scroll,
-            { paddingBottom: getClanPhrasesScrollPaddingBottom(insets.bottom) },
+            {
+              paddingBottom: getClanPhrasesScrollPaddingBottom(
+                insets.bottom,
+                screenH,
+                safeFrame.height,
+              ),
+            },
           ]}
           showsVerticalScrollIndicator={false}
         >

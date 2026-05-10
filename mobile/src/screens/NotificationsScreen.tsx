@@ -22,7 +22,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AppTopBar, AppShellBottomTabsWrap, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
@@ -155,6 +155,7 @@ function EmptyState() {
 export default function NotificationsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const safeFrame = useSafeAreaFrame();
   const { height: screenH } = useWindowDimensions();
   const { notifications, markAllRead, refreshNotifications } = useNotifications();
   const { users } = useSimulation();
@@ -232,8 +233,12 @@ export default function NotificationsScreen() {
   );
 
   const listPanelHeight =
-    getMainColumnHeightForFloatingBottomBar(screenH, insets.top, insets.bottom) -
-    BOTTOM_BAR_LAYOUT.FLOATING_BAR_STACK_SUBHEADER_HEIGHT;
+    getMainColumnHeightForFloatingBottomBar(
+      screenH,
+      insets.top,
+      insets.bottom,
+      safeFrame.height,
+    ) - BOTTOM_BAR_LAYOUT.FLOATING_BAR_STACK_SUBHEADER_HEIGHT;
 
   return (
     <View style={styles.container}>
@@ -258,7 +263,13 @@ export default function NotificationsScreen() {
           contentContainerStyle={
             notifications.length === 0
               ? styles.emptyContainer
-              : { paddingBottom: getBottomBarScrollContentPaddingBottom(insets.bottom) }
+              : {
+                  paddingBottom: getBottomBarScrollContentPaddingBottom(
+                    insets.bottom,
+                    screenH,
+                    safeFrame.height,
+                  ),
+                }
           }
           showsVerticalScrollIndicator={false}
         />

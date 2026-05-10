@@ -14,7 +14,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, usePathname } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AppTopBar, AppShellBottomTabsWrap, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
@@ -63,6 +63,7 @@ export default function LatestPostsScreen() {
   const needsRemoteFetch = isRealUserId(targetUserId) && viewingOtherUser;
 
   const insets = useSafeAreaInsets();
+  const safeFrame = useSafeAreaFrame();
   const { height: screenH } = useWindowDimensions();
   const { posts: allPosts } = useFeedStore();
   const { thoughts } = useThoughts();
@@ -159,8 +160,12 @@ export default function LatestPostsScreen() {
   );
 
   const listPanelHeight =
-    getMainColumnHeightForFloatingBottomBar(screenH, insets.top, insets.bottom) -
-    BOTTOM_BAR_LAYOUT.FLOATING_BAR_STACK_SUBHEADER_HEIGHT;
+    getMainColumnHeightForFloatingBottomBar(
+      screenH,
+      insets.top,
+      insets.bottom,
+      safeFrame.height,
+    ) - BOTTOM_BAR_LAYOUT.FLOATING_BAR_STACK_SUBHEADER_HEIGHT;
 
   const itemHeight = listPanelHeight;
 

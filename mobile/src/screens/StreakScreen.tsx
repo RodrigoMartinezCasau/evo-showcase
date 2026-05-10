@@ -17,7 +17,7 @@ import {
   Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getPersonalProfile } from '@evoconn/data/mockPersonalProfile';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
@@ -86,6 +86,7 @@ function weeklyAverage(log: string[], totalDays: number): string {
 export default function StreakScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const safeFrame = useSafeAreaFrame();
   const { height: screenH, width: screenW } = useWindowDimensions();
   const profile = getPersonalProfile();
   const { thoughts } = useThoughts();
@@ -232,7 +233,12 @@ export default function StreakScreen() {
   );
 
   // ─── Layout heights (shell unificado con Para Ti) ────────
-  const contentHeight = getAppShellScrollableBodyHeight(screenH, insets.top, insets.bottom);
+  const contentHeight = getAppShellScrollableBodyHeight(
+    screenH,
+    insets.top,
+    insets.bottom,
+    safeFrame.height,
+  );
 
   const totalDays = data?.activity_log.length ?? 0;
 

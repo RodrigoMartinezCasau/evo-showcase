@@ -16,7 +16,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AppTopBar, AppShellBottomTabsWrap, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
@@ -83,6 +83,7 @@ function FriendRow({
 export default function PersonalFriendsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const safeFrame = useSafeAreaFrame();
   const { height: screenH } = useWindowDimensions();
   const { thoughts } = useThoughts();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
@@ -111,8 +112,12 @@ export default function PersonalFriendsScreen() {
   );
 
   const listPanelHeight =
-    getMainColumnHeightForFloatingBottomBar(screenH, insets.top, insets.bottom) -
-    BOTTOM_BAR_LAYOUT.FLOATING_BAR_STACK_SUBHEADER_HEIGHT;
+    getMainColumnHeightForFloatingBottomBar(
+      screenH,
+      insets.top,
+      insets.bottom,
+      safeFrame.height,
+    ) - BOTTOM_BAR_LAYOUT.FLOATING_BAR_STACK_SUBHEADER_HEIGHT;
 
   return (
     <View style={styles.container}>
@@ -132,7 +137,13 @@ export default function PersonalFriendsScreen() {
           keyExtractor={item => item.id}
           renderItem={renderItem}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: getBottomBarScrollContentPaddingBottom(insets.bottom) }}
+          contentContainerStyle={{
+            paddingBottom: getBottomBarScrollContentPaddingBottom(
+              insets.bottom,
+              screenH,
+              safeFrame.height,
+            ),
+          }}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           ListEmptyComponent={
             <View style={styles.emptyWrap}>

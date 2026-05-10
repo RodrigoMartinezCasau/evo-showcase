@@ -12,7 +12,7 @@ import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-g
 import { runOnJS } from 'react-native-reanimated';
 import { useRouter, useLocalSearchParams, usePathname } from 'expo-router';
 import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import {
   AppTopBar,
   AppShellBottomTabsWrap,
@@ -26,7 +26,11 @@ import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContex
 import { useParatiSeenPosts } from '@evoconn/hooks/ParatiSeenPostsContext';
 import type { CommunityPost } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
-import { BOTTOM_BAR_LAYOUT, getBottomBarScrollContentPaddingBottom } from '@evoconn/constants/bottomBarLayout';
+import {
+  BOTTOM_BAR_LAYOUT,
+  getBottomBarEdgeGestureBottomOffset,
+  getBottomBarScrollContentPaddingBottom,
+} from '@evoconn/constants/bottomBarLayout';
 import { getMainColumnHeightForFloatingBottomBar } from '@evoconn/constants/appShellLayout';
 import { getAppTopBarLayoutHeight } from '@evoconn/constants/topBarLayout';
 import { useEvoPreferences } from '@evoconn/hooks/EvoPreferencesContext';
@@ -142,6 +146,7 @@ export default function CommunityScreen() {
   const pathname = usePathname();
   const { tab: tabParam, postId: postIdParam } = useLocalSearchParams<{ tab?: string; postId?: string }>();
   const insets = useSafeAreaInsets();
+  const safeFrame = useSafeAreaFrame();
   const { width: screenW, height: screenH } = useWindowDimensions();
   const { followingSet } = useFollowState();
   const { thoughts } = useThoughts();
@@ -418,7 +423,12 @@ export default function CommunityScreen() {
   }, [transitionTab, tabSlideAnim]);
 
   const topBarHeight = getAppTopBarLayoutHeight(insets.top);
-  const feedItemHeight = getMainColumnHeightForFloatingBottomBar(screenH, insets.top, insets.bottom);
+  const feedItemHeight = getMainColumnHeightForFloatingBottomBar(
+    screenH,
+    insets.top,
+    insets.bottom,
+    safeFrame.height,
+  );
 
   const listData = useMemo(() => {
     switch (activeTab) {
@@ -746,11 +756,7 @@ export default function CommunityScreen() {
     [profileOverlayActive, setProfileProgressJS, commitProfileCloseJS, cancelProfileCloseJS],
   );
 
-  const edgeBottomOffset =
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_HEIGHT +
-    insets.bottom +
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_SAFE_AREA_COMPENSATION +
-    BOTTOM_BAR_LAYOUT.BOTTOM_BAR_EDGE_GESTURE_CLEARANCE_BELOW;
+  const edgeBottomOffset = getBottomBarEdgeGestureBottomOffset(insets.bottom);
 
   return (
     <GestureHandlerRootView style={styles.gestureRoot}>
@@ -777,7 +783,13 @@ export default function CommunityScreen() {
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={[
                   styles.list,
-                  { paddingBottom: getBottomBarScrollContentPaddingBottom(insets.bottom) },
+                  {
+                    paddingBottom: getBottomBarScrollContentPaddingBottom(
+                      insets.bottom,
+                      screenH,
+                      safeFrame.height,
+                    ),
+                  },
                 ]}
                 style={styles.panelInner}
               />
@@ -806,7 +818,13 @@ export default function CommunityScreen() {
               keyExtractor={(item) => item.id}
               contentContainerStyle={[
                 styles.list,
-                { paddingBottom: getBottomBarScrollContentPaddingBottom(insets.bottom) },
+                {
+                  paddingBottom: getBottomBarScrollContentPaddingBottom(
+                    insets.bottom,
+                    screenH,
+                    safeFrame.height,
+                  ),
+                },
               ]}
               style={styles.panelInner}
             />

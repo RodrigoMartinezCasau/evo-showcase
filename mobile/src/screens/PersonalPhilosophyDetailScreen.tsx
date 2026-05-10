@@ -21,7 +21,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { getPersonalProfile } from '@evoconn/data/mockPersonalProfile';
@@ -89,6 +89,7 @@ function buildContext(
 export default function PersonalPhilosophyDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const safeFrame = useSafeAreaFrame();
   const { height: screenH } = useWindowDimensions();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const { isPreviewActive, previewBadgeHistory, cyclePreviewBadgeRank } = usePreviewMode();
@@ -227,7 +228,12 @@ export default function PersonalPhilosophyDetailScreen() {
   );
 
   // ─── Layout ─────────────────────────────────────────────────────────────
-  const contentHeight = getAppShellScrollableBodyHeight(screenH, insets.top, insets.bottom);
+  const contentHeight = getAppShellScrollableBodyHeight(
+    screenH,
+    insets.top,
+    insets.bottom,
+    safeFrame.height,
+  );
 
   return (
     <View style={styles.container}>

@@ -9,7 +9,7 @@ import {
   Modal,
   Pressable,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { useRouter, usePathname } from 'expo-router';
 import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { Ionicons } from '@expo/vector-icons';
@@ -102,7 +102,8 @@ export function BottomCommunityTabs({
   const pathname = usePathname();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const insets = useSafeAreaInsets();
-  const { width: screenW } = useWindowDimensions();
+  const safeFrame = useSafeAreaFrame();
+  const { width: screenW, height: windowH } = useWindowDimensions();
   const [createOpen, setCreateOpen] = useState(false);
   const [followingMenuOpen, setFollowingMenuOpen] = useState(false);
 
@@ -151,7 +152,11 @@ export function BottomCommunityTabs({
   const createSz = BOTTOM_BAR_LAYOUT.BOTTOM_BAR_CREATE_BUTTON_SIZE;
   const createButtonColor = createOpen ? selectedColor : evoconnColors.muted;
 
-  const sortMenuBottomOffset = getBottomBarViewportReserveBottom(insets.bottom);
+  const sortMenuBottomOffset = getBottomBarViewportReserveBottom(
+    insets.bottom,
+    windowH,
+    safeFrame.height,
+  );
 
   const onSiguiendoPress = useCallback(() => {
     if (activeTab === 'siguiendo') {
@@ -489,7 +494,10 @@ const styles = StyleSheet.create({
     backgroundColor: evoconnColors.background,
     /** Asimétrico: menos arriba para acercar el bloque al borde superior de la barra. */
     paddingTop: 0,
-    paddingBottom: 16,
+    paddingBottom:
+      Platform.OS === 'android'
+        ? BOTTOM_BAR_LAYOUT.BOTTOM_BAR_ROW_PADDING_BOTTOM_ANDROID
+        : BOTTOM_BAR_LAYOUT.BOTTOM_BAR_ROW_PADDING_BOTTOM_IOS,
   },
   tab: {
     flex: 1,
