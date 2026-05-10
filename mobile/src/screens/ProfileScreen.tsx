@@ -325,6 +325,10 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
     [openDetailFeed, livePosts],
   );
 
+  const handleSeeMoreRecentPosts = useCallback(() => {
+    router.push({ pathname: '/latest-posts', params: { userId: profileWithLiveFollowers.id } });
+  }, [router, profileWithLiveFollowers.id]);
+
   const handleDetailAuthorPress = useCallback(
     (authorId: string) => {
       if (authorId === mockCurrentUser.id) {
@@ -395,7 +399,11 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
               totalReflections={liveReflectionCount}
               totalQuotes={liveQuoteCount}
             />
-            <RecentPostsSlider posts={livePosts} onPostPress={handlePostPress} />
+            <RecentPostsSlider
+              posts={livePosts}
+              onPostPress={handlePostPress}
+              onSeeMorePress={handleSeeMoreRecentPosts}
+            />
             <View style={styles.bottomSpacer} />
           </ScrollView>
         </ReflectionBackground>

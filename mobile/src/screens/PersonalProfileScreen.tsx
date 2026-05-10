@@ -196,6 +196,10 @@ export default function PersonalProfileScreen() {
     [openDetailFeed, posts],
   );
 
+  const handleSeeMoreRecentPosts = useCallback(() => {
+    router.push({ pathname: '/latest-posts' });
+  }, [router]);
+
   const handlePostMenuAction = useCallback(
     (action: 'hide' | 'delete', postId: string) => {
       if (action === 'hide') toggleHidePost(postId);
@@ -297,6 +301,7 @@ export default function PersonalProfileScreen() {
               onPostPress={handleRecentPostPress}
               onMenuAction={handlePostMenuAction}
               isHiddenFn={isHidden}
+              onSeeMorePress={handleSeeMoreRecentPosts}
             />
             <View style={styles.contentGap} />
             <PersonalBottomBlocks

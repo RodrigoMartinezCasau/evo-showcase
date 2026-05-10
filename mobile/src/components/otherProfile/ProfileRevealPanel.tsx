@@ -66,6 +66,10 @@ export const ProfileRevealPanel = React.memo(function ProfileRevealPanel({ autho
     [router],
   );
 
+  const handleSeeMoreRecentPosts = useCallback(() => {
+    router.push({ pathname: '/latest-posts', params: { userId: authorId } });
+  }, [router, authorId]);
+
   return (
     <View style={[styles.container, { height: contentHeight }]}>
       <ReflectionBackground clan={profile.clanId}>
@@ -85,7 +89,11 @@ export const ProfileRevealPanel = React.memo(function ProfileRevealPanel({ autho
           <UserInsigniaPhrase phrase={profile.insigniaPhrase} />
           <PhilosophyPercentagesPanel percentages={profile.philosophyPercentages} />
           <UserTotalsStats totalReflections={liveReflectionCount} totalQuotes={liveQuoteCount} />
-          <RecentPostsSlider posts={livePosts} onPostPress={handlePostPress} />
+          <RecentPostsSlider
+            posts={livePosts}
+            onPostPress={handlePostPress}
+            onSeeMorePress={handleSeeMoreRecentPosts}
+          />
           <View style={styles.spacer} />
         </ScrollView>
       </ReflectionBackground>

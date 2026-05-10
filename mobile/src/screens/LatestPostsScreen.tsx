@@ -1,8 +1,9 @@
 /**
  * Tras publicar frase/reflexión: feed vertical propio (mismo formato que Para ti),
  * con shell idéntico a Notificaciones (top bar, subcabecera atrás + título, barra inferior).
+ * Desde perfil ("ver más"): mismo layout filtrado por `userId` (sim vía feed; usuarios reales vía API).
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -10,6 +11,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   useWindowDimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,6 +31,8 @@ import {
   COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE,
   COMMUNITY_DETAIL_PREFETCH_POSTS,
 } from '@evoconn/constants/communityDetailFeed';
+import { fetchPostsByUser, isRealUserId } from '@evoconn/services/supabaseSocial';
+import { supabase } from '../../mobile/lib/supabase';
 
 const BG = '#0b0b0f';
 
@@ -38,34 +42,93 @@ function sortMyPostsNewestFirst(posts: CommunityPost[]): CommunityPost[] {
   );
 }
 
+function pinPostFirst(posts: CommunityPost[], postId: string | undefined): CommunityPost[] {
+  if (!postId) return posts;
+  const idx = posts.findIndex((p) => p.id === postId);
+  if (idx <= 0) return posts;
+  const copy = [...posts];
+  const [target] = copy.splice(idx, 1);
+  copy.unshift(target);
+  return copy;
+}
+
 export default function LatestPostsScreen() {
   const router = useRouter();
   const pathname = usePathname();
-  const params = useLocalSearchParams<{ postId?: string }>();
+  const params = useLocalSearchParams<{ postId?: string; userId?: string }>();
   const postId = typeof params.postId === 'string' ? params.postId : undefined;
+  const paramUserId = typeof params.userId === 'string' ? params.userId : undefined;
+  const targetUserId = paramUserId ?? mockCurrentUser.id;
+  const viewingOtherUser = targetUserId !== mockCurrentUser.id;
+  const needsRemoteFetch = isRealUserId(targetUserId) && viewingOtherUser;
+
   const insets = useSafeAreaInsets();
   const { height: screenH } = useWindowDimensions();
   const { posts: allPosts } = useFeedStore();
   const { thoughts } = useThoughts();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [feedScrollEnabled, setFeedScrollEnabled] = useState(true);
+  const [remotePosts, setRemotePosts] = useState<CommunityPost[] | null>(null);
 
   const handleReadingModeChange = useCallback((active: boolean) => {
     setFeedScrollEnabled(!active);
   }, []);
 
+  useEffect(() => {
+    if (!needsRemoteFetch) {
+      setRemotePosts(null);
+      return;
+    }
+    let cancelled = false;
+    setRemotePosts(null);
+    Promise.all([
+      supabase.from('profiles').select('username').eq('id', targetUserId).maybeSingle(),
+      fetchPostsByUser(targetUserId),
+    ])
+      .then(([{ data }, simPosts]) => {
+        if (cancelled) return;
+        const resolvedUsername = data?.username ? '@' + data.username.toUpperCase() : null;
+        const mapped: CommunityPost[] = simPosts.map((p) => ({
+          id: p.id,
+          type: p.type,
+          author: {
+            id: p.authorId,
+            username:
+              resolvedUsername ??
+              (p.authorUsername && p.authorUsername.length < 36 ? p.authorUsername : '?'),
+            clanId: p.authorClanId ?? null,
+            rank: p.authorRank ?? 'aprendiz',
+          },
+          title: p.title,
+          body: p.body,
+          quoteAuthor: p.quoteAuthor,
+          voteStats: {
+            up: p.upvoterIds.length,
+            down: p.downvoterIds.length,
+            save: p.saverIds.length,
+          },
+          createdAt: p.createdAt,
+        }));
+        setRemotePosts(mapped);
+      })
+      .catch(() => {
+        if (!cancelled) setRemotePosts([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [needsRemoteFetch, targetUserId]);
+
   const data = useMemo(() => {
-    const mine = sortMyPostsNewestFirst(
-      allPosts.filter((p) => p.author.id === mockCurrentUser.id),
+    if (needsRemoteFetch) {
+      if (remotePosts === null) return null;
+      return pinPostFirst(sortMyPostsNewestFirst(remotePosts), postId);
+    }
+    const fromFeed = sortMyPostsNewestFirst(
+      allPosts.filter((p) => p.author.id === targetUserId),
     );
-    if (!postId) return mine;
-    const idx = mine.findIndex((p) => p.id === postId);
-    if (idx <= 0) return mine;
-    const copy = [...mine];
-    const [target] = copy.splice(idx, 1);
-    copy.unshift(target);
-    return copy;
-  }, [allPosts, postId]);
+    return pinPostFirst(fromFeed, postId);
+  }, [allPosts, postId, targetUserId, needsRemoteFetch, remotePosts]);
 
   const initialIndex = 0;
 
@@ -138,10 +201,16 @@ export default function LatestPostsScreen() {
       </View>
 
       <View style={{ height: listPanelHeight, overflow: 'hidden' }}>
-        {data.length === 0 ? (
+        {data === null ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator color="rgba(255,255,255,0.35)" />
+          </View>
+        ) : data.length === 0 ? (
           <View style={styles.emptyWrap}>
             <Ionicons name="document-text-outline" size={44} color="rgba(255,255,255,0.18)" />
-            <Text style={styles.emptyText}>Aún no tienes publicaciones</Text>
+            <Text style={styles.emptyText}>
+              {viewingOtherUser ? 'Este usuario no tiene publicaciones' : 'Aún no tienes publicaciones'}
+            </Text>
           </View>
         ) : (
           <FlatList
@@ -214,6 +283,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 1.5,
+  },
+  loadingWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   emptyWrap: {
     flex: 1,
