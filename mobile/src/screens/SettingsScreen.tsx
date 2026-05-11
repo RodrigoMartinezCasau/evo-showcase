@@ -392,7 +392,16 @@ export default function SettingsScreen({
       id: 'account',
       title: 'CUENTA',
       rows: [
-        { id: 'email',  label: 'Correo electrónico', value: userEmail || '—', icon: 'mail-outline',        iconBg: IC.blue,  type: 'navigate', onPress: () => router.push('/account-email') },
+        {
+          id: 'email',
+          label: userEmail ? 'Correo electrónico' : 'Vincular correo electrónico',
+          subtitle: userEmail ? undefined : 'Tu cuenta usa teléfono. Añade un email para más opciones.',
+          value: userEmail || undefined,
+          icon: 'mail-outline',
+          iconBg: userEmail ? IC.blue : IC.green,
+          type: 'navigate',
+          onPress: () => router.push('/account-email'),
+        },
         {
           id: 'phone',
           label: 'Teléfono',
