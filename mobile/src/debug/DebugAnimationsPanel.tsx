@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useRouter } from 'expo-router';
 import { EvoAnimationWebView } from '../components/animations/EvoAnimationWebView';
 import { useActiveClan } from './DebugClanContext';
 import { mockCurrentUser } from '../data/mockUser';
@@ -50,6 +51,7 @@ const ANIM_OPTIONS: AnimOption[] = [
 
 export function DebugAnimationsPanel() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [playing, setPlaying] = useState<AnimKey | null>(null);
 
@@ -136,6 +138,21 @@ export function DebugAnimationsPanel() {
                 <Text style={styles.optionArrow}>▶</Text>
               </TouchableOpacity>
             ))}
+            <TouchableOpacity
+              style={styles.tutorialSimRow}
+              activeOpacity={0.75}
+              onPress={() => {
+                setMenuOpen(false);
+                router.push('/onboarding-tutorial?preview=1');
+              }}
+            >
+              <Text style={styles.optionEmoji}>📖</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.optionLabel}>Tutorial post-registro (simulación)</Text>
+                <Text style={styles.tutorialSimSub}>No guarda “completado”; solo vista previa.</Text>
+              </View>
+              <Text style={styles.optionArrow}>▶</Text>
+            </TouchableOpacity>
           </ScrollView>
         </View>
       </Modal>
@@ -198,4 +215,14 @@ const styles = StyleSheet.create({
   optionEmoji: { fontSize: 22, width: 32, textAlign: 'center' },
   optionLabel: { color: '#fff', fontSize: 15, fontWeight: '600', letterSpacing: 0.2 },
   optionArrow: { color: 'rgba(255,255,255,0.25)', fontSize: 12 },
+  tutorialSimRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    marginTop: 4,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(199,255,2,0.25)',
+  },
+  tutorialSimSub: { color: 'rgba(255,255,255,0.38)', fontSize: 12, marginTop: 2 },
 });
