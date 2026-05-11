@@ -1,7 +1,18 @@
 import { Suspense } from 'react'
 import { SupabaseAuthBridge } from '@/components/SupabaseAuthBridge'
 
+export const dynamic = 'force-dynamic'
+
 export default function AuthResetPage() {
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ||
+    process.env.SUPABASE_URL?.trim() ||
+    ''
+  const supabaseAnonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ||
+    process.env.SUPABASE_ANON_KEY?.trim() ||
+    ''
+
   return (
     <Suspense
       fallback={
@@ -20,7 +31,11 @@ export default function AuthResetPage() {
         </main>
       }
     >
-      <SupabaseAuthBridge mode="reset" />
+      <SupabaseAuthBridge
+        mode="reset"
+        supabaseUrl={supabaseUrl}
+        supabaseAnonKey={supabaseAnonKey}
+      />
     </Suspense>
   )
 }
