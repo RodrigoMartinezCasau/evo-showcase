@@ -35,7 +35,8 @@ import {
   IS_DEBUG_STREAK_MODE,
   useDebugStreak,
 } from '../debug/DebugStreakContext';
-import { IS_DEBUG_STATS_MODE, useDebugStats } from '../debug/DebugStatsContext';
+import { useDebugStats } from '../debug/DebugStatsContext';
+import { useAuth } from '../../mobile/lib/AuthContext';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -89,7 +90,13 @@ export default function StreakScreen() {
   const safeFrame = useSafeAreaFrame();
   const { height: screenH, width: screenW } = useWindowDimensions();
   const profile = getPersonalProfile();
+  const { profile: authProfile } = useAuth();
   const { thoughts } = useThoughts();
+
+  // Usa el ID real de Supabase si hay sesión; si no, cae al ID del perfil simulado.
+  // Esto garantiza que fetchStreak consulta los datos del usuario autenticado real
+  // y no los de la simulación (que provocaba que la pantalla mostrara datos de otro usuario).
+  const realUserId = authProfile?.id ?? profile.id;
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [data, setData] = useState<StreakData | null>(null);
@@ -107,10 +114,11 @@ export default function StreakScreen() {
   // ─── Debug stats (streak days / remaining uses simulation) ────────────────
   const { streakDays, setRealStreakDays } = useDebugStats();
 
-  // In debug mode generate a "last N consecutive days" calendar from the
-  // simulated streak count; in production use the real activity_log from the API.
+  // Siempre usa el activity_log real de la API cuando esté disponible.
+  // En modo debug sin datos de API (p.ej. sin sesión real) genera días sintéticos
+  // a partir del contador local para que el calendario no quede vacío.
   const computedActivityLog = React.useMemo(
-    () => (IS_DEBUG_STATS_MODE ? generateLastNDays(streakDays) : (data?.activity_log ?? [])),
+    () => (data?.activity_log?.length ? data.activity_log : generateLastNDays(streakDays)),
     [streakDays, data],
   );
 
@@ -126,16 +134,17 @@ export default function StreakScreen() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetchStreak(profile.id);
+      const res = await fetchStreak(realUserId);
       setData(res);
-      // Push real value into shared context so the top bar can reflect it in prod.
+      // Sincroniza el contador en el contexto compartido para que la barra superior
+      // refleje el valor de la API cuando hay sesión real.
       setRealStreakDays(res.streak_current);
     } catch {
       setError('No se pudo cargar la racha. Verifica tu conexión.');
     } finally {
       setLoading(false);
     }
-  }, [profile.id, setRealStreakDays]);
+  }, [realUserId, setRealStreakDays]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -318,7 +327,7 @@ export default function StreakScreen() {
                     </View>
                     <View style={styles.summaryTextGroup}>
                       <Text style={[styles.streakCount, { fontSize: STREAK_COUNT_FONT_SIZE }]}>
-                        {IS_DEBUG_STATS_MODE ? streakDays : data.streak_current}
+                        {streakDays}
                       </Text>
                       <Text style={styles.streakUnit}>días seguidos</Text>
                       <Text style={styles.streakSub}>Mantén tu consistencia diaria</Text>

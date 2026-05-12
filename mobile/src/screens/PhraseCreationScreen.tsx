@@ -26,6 +26,7 @@ import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { incrementProfileStat } from '@evoconn/services/supabaseSocial';
 import { recordActivity, recordUsesLog } from '@evoconn/services/streakApi';
+import { useAuth } from '../../mobile/lib/AuthContext';
 import { getPhraseSendButtonByHouse } from '@evoconn/utils/getPhraseSendButtonByHouse';
 import { getClanSecondaryColor } from '@evoconn/constants/clanColors';
 import { CHAT_SEND_BUTTON_LAYOUT } from '@evoconn/constants/chatInputBarLayout';
@@ -131,6 +132,8 @@ export default function PhraseCreationScreen() {
   const { publishPost } = useFeedStore();
   const { markStreakActivated } = useDebugStreak();
   const { decrementUses, remainingUses } = useDebugStats();
+  const { profile: authProfile } = useAuth();
+  const apiUserId = authProfile?.id ?? mockCurrentUser.id;
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const clanColor = getChatUserAccentColor(activeClan);
   const phraseCursorColor = getClanSecondaryColor(activeClan);
@@ -466,10 +469,10 @@ export default function PhraseCreationScreen() {
           requestNoUsesAnimation();
         }
         // Sync streak + uses to backend (fire-and-forget).
-        void recordActivity(mockCurrentUser.id, 'frase').catch(console.error);
-        void recordUsesLog(mockCurrentUser.id).catch(console.error);
+        void recordActivity(apiUserId, 'frase').catch(console.error);
+        void recordUsesLog(apiUserId).catch(console.error);
         // Increment total_quotes in Supabase profiles.
-        void incrementProfileStat(mockCurrentUser.id, 'total_quotes').catch(console.error);
+        void incrementProfileStat(apiUserId, 'total_quotes').catch(console.error);
         // ── Real philosophical-clan classification (same hybrid as reflections) ──
         // Phrases count toward the 30-input reveal gate together with reflections
         // (minimum 10 must be reflections).

@@ -26,7 +26,8 @@ import { AppTopBar, AppShellBottomTabsWrap, BottomCommunityTabs, SidebarDrawer }
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
-import { IS_DEBUG_STATS_MODE, useDebugStats } from '../debug/DebugStatsContext';
+import { useDebugStats } from '../debug/DebugStatsContext';
+import { useAuth } from '../../mobile/lib/AuthContext';
 import { getAppShellScrollableBodyHeight } from '@evoconn/constants/appShellLayout';
 import { fetchUsesLog, type UsesLogData } from '@evoconn/services/streakApi';
 import { DAILY_USES_LIMIT } from '@evoconn/services/userStatsStorage';
@@ -305,7 +306,11 @@ export default function DailyUsesScreen() {
   const safeFrame = useSafeAreaFrame();
   const { height: screenH, width: screenW } = useWindowDimensions();
   const profile = getPersonalProfile();
+  const { profile: authProfile } = useAuth();
   const { thoughts } = useThoughts();
+
+  // Usa el ID real de Supabase si hay sesión; si no, cae al ID del perfil simulado.
+  const realUserId = authProfile?.id ?? profile.id;
 
   const activeClan   = useActiveClan(mockCurrentUser.clanId);
   const HeartIcon    = getTopBarUsosByHouse(activeClan);
@@ -328,14 +333,14 @@ export default function DailyUsesScreen() {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchUsesLog(profile.id);
+      const data = await fetchUsesLog(realUserId);
       setLog(data);
     } catch {
       setError('No se pudo cargar el historial de usos.');
     } finally {
       setLoading(false);
     }
-  }, [profile.id]);
+  }, [realUserId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -364,17 +369,13 @@ export default function DailyUsesScreen() {
   }, [realRemaining, setRealRemainingUses]);
 
   // ─── Single source of truth for all usage UI ─────────────────────────────
-  // In debug mode every UI element (summary, bar, text, calendar) derives
-  // from remainingUses; in prod everything derives from the real API log.
-  const computedRemaining  = Math.min(
-    Math.max(IS_DEBUG_STATS_MODE ? remainingUses : realRemaining, 0),
-    DAILY_LIMIT,
-  );
+  // El contador siempre usa remainingUses del contexto (AsyncStorage) para
+  // coincidir exactamente con la barra superior, igual que el contador de racha.
+  // El calendario usa el log real de la API (con ID correcto tras el fix) y
+  // sobreescribe la entrada de hoy con el valor del contexto para coherencia.
+  const computedRemaining  = Math.min(Math.max(remainingUses, 0), DAILY_LIMIT);
   const computedUsedToday  = Math.min(Math.max(DAILY_LIMIT - computedRemaining, 0), DAILY_LIMIT);
-  // Override today's entry in the log so the calendar matches the simulated value.
-  const computedLog        = IS_DEBUG_STATS_MODE
-    ? { ...log, [today]: computedUsedToday }
-    : log;
+  const computedLog        = { ...log, [today]: computedUsedToday };
 
   const iconSlot = useMemo(() => heroIconSlotSize(screenW), [screenW]);
   const heartVisualScale = useMemo(

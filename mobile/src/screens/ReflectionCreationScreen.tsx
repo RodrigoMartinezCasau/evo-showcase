@@ -43,6 +43,7 @@ import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { incrementProfileStat } from '@evoconn/services/supabaseSocial';
 import { recordActivity, recordUsesLog } from '@evoconn/services/streakApi';
+import { useAuth } from '../../mobile/lib/AuthContext';
 import { AI_TEXT_SCALE } from '@evoconn/constants/textScale';
 import { useEvoPreferences } from '@evoconn/hooks/EvoPreferencesContext';
 import { getClanColor } from '@evoconn/constants/clanColors';
@@ -132,6 +133,8 @@ export default function ReflectionCreationScreen() {
 
   const { thoughts, createThought, updateThought, loadThread } = useThoughts();
   const { recordInput: recordClassificationInput } = useClassification();
+  const { profile: authProfile } = useAuth();
+  const apiUserId = authProfile?.id ?? mockCurrentUser.id;
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const clanColor = getChatUserAccentColor(activeClan);
   const { triggerHaptic, playSound } = useEvoPreferences();
@@ -392,10 +395,10 @@ export default function ReflectionCreationScreen() {
           requestNoUsesAnimation();
         }
         // Sync streak + uses to backend (fire-and-forget).
-        void recordActivity(mockCurrentUser.id, 'reflexion').catch(console.error);
-        void recordUsesLog(mockCurrentUser.id).catch(console.error);
+        void recordActivity(apiUserId, 'reflexion').catch(console.error);
+        void recordUsesLog(apiUserId).catch(console.error);
         // Increment total_reflections in Supabase profiles.
-        void incrementProfileStat(mockCurrentUser.id, 'total_reflections').catch(console.error);
+        void incrementProfileStat(apiUserId, 'total_reflections').catch(console.error);
         const pickedQuote = await selectAndUnlockQuote(text);
         const domainMeta = DOMAIN_MAP[pickedQuote.domain];
         const selectedPhrase: SelectedPhrase = {
