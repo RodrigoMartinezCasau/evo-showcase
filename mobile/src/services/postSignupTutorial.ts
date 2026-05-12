@@ -1,5 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+/** Pasa a `true` cuando el nuevo tutorial visual (imágenes + texto) esté listo. */
+export const POST_SIGNUP_TUTORIAL_ENABLED = false;
+
 const PENDING_KEY = '@evo/post_signup_tutorial_pending';
 
 function doneKey(userId: string): string {
@@ -8,6 +11,7 @@ function doneKey(userId: string): string {
 
 /** Tras crear cuenta (no inicio de sesión): mostrar tutorial cuando termine la animación de entrada. */
 export async function markPostSignupTutorialPending(): Promise<void> {
+  if (!POST_SIGNUP_TUTORIAL_ENABLED) return;
   await AsyncStorage.setItem(PENDING_KEY, '1');
 }
 

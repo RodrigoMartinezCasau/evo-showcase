@@ -24,6 +24,7 @@ import { useActiveClan } from './DebugClanContext';
 import { mockCurrentUser } from '../data/mockUser';
 import type { AnimClanId } from '../constants/evoAnimationClans';
 import { ANIM_CLAN_IDS } from '../constants/evoAnimationClans';
+import { POST_SIGNUP_TUTORIAL_ENABLED } from '../services/postSignupTutorial';
 
 function getPrevClan(current: AnimClanId): Exclude<AnimClanId, 'none'> {
   const options = ANIM_CLAN_IDS.filter(
@@ -138,6 +139,7 @@ export function DebugAnimationsPanel() {
                 <Text style={styles.optionArrow}>▶</Text>
               </TouchableOpacity>
             ))}
+            {POST_SIGNUP_TUTORIAL_ENABLED ? (
             <TouchableOpacity
               style={styles.tutorialSimRow}
               activeOpacity={0.75}
@@ -153,6 +155,15 @@ export function DebugAnimationsPanel() {
               </View>
               <Text style={styles.optionArrow}>▶</Text>
             </TouchableOpacity>
+            ) : (
+              <View style={styles.tutorialSimRow}>
+                <Text style={styles.optionEmoji}>📖</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.optionLabel, styles.tutorialDisabledLabel]}>Tutorial post-registro</Text>
+                  <Text style={styles.tutorialSimSub}>Desactivado en código (`POST_SIGNUP_TUTORIAL_ENABLED`).</Text>
+                </View>
+              </View>
+            )}
           </ScrollView>
         </View>
       </Modal>
@@ -225,4 +236,5 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(199,255,2,0.25)',
   },
   tutorialSimSub: { color: 'rgba(255,255,255,0.38)', fontSize: 12, marginTop: 2 },
+  tutorialDisabledLabel: { color: 'rgba(255,255,255,0.45)' },
 });
