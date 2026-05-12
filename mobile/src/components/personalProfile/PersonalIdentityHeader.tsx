@@ -8,7 +8,7 @@ import {
   useWindowDimensions,
   Platform,
 } from 'react-native';
-import { getTopBarInsigniaByHouse } from '@evoconn/utils/getTopBarInsigniaByHouse';
+import { getAppProfileOpenUrl } from '@evoconn/utils/appShareLinks';
 import type { Rank } from '@evoconn/types';
 import {
   SHIELD_OFFSET_X,
@@ -60,6 +60,7 @@ function clamp(value: number, min: number, max: number) {
 
 type Props = {
   username: string;
+  userId: string;
   clanId: string | null;
   rank: Rank;
   onShieldPress?: () => void;
@@ -67,6 +68,7 @@ type Props = {
 
 export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader({
   username,
+  userId,
   clanId,
   rank,
   onShieldPress,
@@ -109,11 +111,12 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
     : 'Sin clan';
 
   const handleShare = useCallback(() => {
+    const url = getAppProfileOpenUrl(userId);
     Share.share({
-      message: `Mira el perfil de ${username} en Evoconn`,
-      url: `https://evoconn.app/profile/${username}`,
+      message: `Mira el perfil de ${username} en EVO\n\n${url}`,
+      url,
     }).catch(() => {});
-  }, [username]);
+  }, [username, userId]);
 
 
   return (

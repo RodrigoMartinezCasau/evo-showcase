@@ -5,7 +5,7 @@ import {
   Share,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as Linking from 'expo-linking';
+import { getAppProfileOpenUrl } from '@evoconn/utils/appShareLinks';
 import { useRouter } from 'expo-router';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
 import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
@@ -54,10 +54,9 @@ export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({
 
   const handleShare = useCallback(async () => {
     try {
-      const path = `profile/${userId}`;
-      const url = Linking.createURL(path);
+      const url = getAppProfileOpenUrl(userId);
       await Share.share({
-        message: `Perfil de ${username} en EVO\n${url}`,
+        message: `Perfil de ${username} en EVO\n\n${url}`,
         url,
       });
     } catch {

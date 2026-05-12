@@ -416,6 +416,7 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
               postsCount={postsCountForRow}
             />
             <UserIdentityHeader
+              userId={profileWithLiveFollowers.id}
               username={profile.username}
               clanId={profile.clanId}
               rank={profile.rank}

@@ -272,6 +272,7 @@ export default function PersonalProfileScreen() {
             />
             <View style={styles.contentGap} />
             <PersonalIdentityHeader
+              userId={profileWithClan.id}
               username={profileWithClan.username}
               clanId={profileWithClan.clanId}
               rank={profileWithClan.rank}

@@ -52,6 +52,7 @@ import { blockUser, insertReport, isRealUserId } from '@evoconn/services/supabas
 import { useAuth } from '../../mobile/lib/AuthContext';
 import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
 import { computePhraseDetailTypography } from '@evoconn/utils/phraseDetailTypography';
+import { getAppPostOpenUrl } from '@evoconn/utils/appShareLinks';
 import {
   EvoActionSheetModal,
   EvoConfirmModal,
@@ -293,8 +294,12 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
         onPress: () => {
           void (async () => {
             try {
+              const text = (livePost.body || livePost.title || '').trim();
+              const preview = text.length > 240 ? `${text.slice(0, 237)}…` : text;
+              const url = getAppPostOpenUrl(livePost.id);
               await Share.share({
-                message: `${post.author.username}: "${post.body}"`,
+                message: `${livePost.author.username}: «${preview}»\n\n${url}`,
+                url,
               });
             } catch {
               /* user cancelled */
@@ -319,7 +324,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
         onPress: () => setBlockConfirmOpen(true),
       },
     ];
-  }, [post, checkFollowing, toggleFollow]);
+  }, [post, livePost, checkFollowing, toggleFollow]);
 
   const handleMorePress = useCallback(() => {
     setPostMoreSheetOpen(true);
