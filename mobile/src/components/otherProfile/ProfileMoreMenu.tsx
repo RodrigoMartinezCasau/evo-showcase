@@ -1,11 +1,10 @@
 import React, { useCallback, useState } from 'react';
 import {
   TouchableOpacity,
-  Text,
   StyleSheet,
   Share,
-  Platform,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
@@ -22,7 +21,6 @@ import {
   THREE_DOTS_OFFSET_X,
   THREE_DOTS_OFFSET_Y,
   THREE_DOTS_SIZE,
-  OTHER_PROFILE_FOLLOW_ROW_TRACK_HEIGHT,
 } from '@evoconn/constants/otherProfileLayout';
 
 type Props = {
@@ -112,8 +110,6 @@ export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({
 
   const pad = 8;
   const hit = Math.max(44, THREE_DOTS_SIZE + pad * 2);
-  const rowTrack = OTHER_PROFILE_FOLLOW_ROW_TRACK_HEIGHT;
-  const touchSize = Math.min(hit, rowTrack);
 
   if (isOwnProfile) {
     return null;
@@ -125,12 +121,13 @@ export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({
         onPress={() => setMainOpen(true)}
         hitSlop={12}
         activeOpacity={0.6}
+        accessibilityRole="button"
+        accessibilityLabel="Más opciones"
         style={[
           styles.button,
           {
-            minWidth: touchSize,
-            minHeight: touchSize,
-            maxHeight: rowTrack,
+            minWidth: hit,
+            minHeight: hit,
             transform: [
               { translateX: THREE_DOTS_OFFSET_X },
               { translateY: THREE_DOTS_OFFSET_Y },
@@ -138,18 +135,7 @@ export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({
           },
         ]}
       >
-        <Text
-          style={[
-            styles.dots,
-            {
-              fontSize: THREE_DOTS_SIZE,
-              lineHeight: THREE_DOTS_SIZE * 1.05,
-              ...Platform.select({ android: { includeFontPadding: false } }),
-            },
-          ]}
-        >
-          ⋮
-        </Text>
+        <Ionicons name="ellipsis-vertical" size={THREE_DOTS_SIZE} color="#FFFFFF" />
       </TouchableOpacity>
 
       <EvoActionSheetModal
@@ -230,11 +216,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'visible',
-  },
-  dots: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    textAlign: 'center',
-    includeFontPadding: false,
   },
 });

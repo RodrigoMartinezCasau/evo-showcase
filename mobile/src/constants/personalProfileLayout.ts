@@ -98,6 +98,11 @@ export const RANK_FONT_SIZE = 18;
 export const SHARE_BUTTON_OFFSET_X = -6;
 export const SHARE_BUTTON_OFFSET_Y = -4;
 export const SHARE_BUTTON_SIZE = 28;
+/**
+ * Tamaño del carácter ↗ junto al username (perfil personal y perfil ajeno).
+ * Valor fijo para que Android e iOS se vean alineados (evita flecha “enana” en Android).
+ */
+export const PROFILE_SHARE_ARROW_FONT_SIZE = 20;
 
 // ── Rank progression block ──────────────────────────────────────────
 // A. Full block (outer wrapper)

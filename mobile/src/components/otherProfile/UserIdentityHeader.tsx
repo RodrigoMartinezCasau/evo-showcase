@@ -28,6 +28,7 @@ import {
   CLAN_ROW_OFFSET_X,
   CLAN_ROW_MARGIN_BOTTOM,
   SHARE_BUTTON_SIZE,
+  PROFILE_SHARE_ARROW_FONT_SIZE,
 } from '@evoconn/constants/personalProfileLayout';
 
 const RANK_LABELS: Record<Rank, string> = {
@@ -82,7 +83,7 @@ export const UserIdentityHeader = React.memo(function UserIdentityHeader({
     MIN_RESERVED_RIGHT_SPACE,
     shieldDisplaySize + TEXT_BADGE_SAFE_GAP + Math.max(0, -clampedShieldOffsetX),
   );
-  const shareReserve = SHARE_BUTTON_SIZE + 14;
+  const shareReserve = Math.max(SHARE_BUTTON_SIZE, PROFILE_SHARE_ARROW_FONT_SIZE) + 14;
   const usernameMaxWidth = Math.max(120, screenW - 20 * 2 - shareReserve);
   const containerHeight = CONTAINER_HEIGHT;
   const clanLabel = clanId
@@ -206,7 +207,8 @@ const styles = StyleSheet.create({
     ...Platform.select({ android: { includeFontPadding: false } }),
   },
   shareInline: {
-    fontSize: USERNAME_FONT_SIZE * 0.75,
+    fontSize: PROFILE_SHARE_ARROW_FONT_SIZE,
+    lineHeight: Math.ceil(PROFILE_SHARE_ARROW_FONT_SIZE * 1.25),
     color: 'rgba(255,255,255,0.85)',
     fontWeight: '500',
     marginLeft: 5,

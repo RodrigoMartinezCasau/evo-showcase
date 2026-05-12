@@ -20,8 +20,8 @@ function formatCount(n: number): string {
   return String(n);
 }
 
-/** Misma anchura de referencia que la campana del perfil personal (~44 + badge). */
-const TRAILING_ACTION_SLOT = 52;
+/** Debe cubrir `minWidth`/`minHeight` del menú ⋯ (~55) sin recortar el glifo en Android. */
+const TRAILING_ACTION_SLOT = 58;
 /** Slot izquierdo para Seguir / Siguiendo; acotado para no comprimir los tres contadores flex. */
 const LEADING_ACTION_SLOT = 112;
 
