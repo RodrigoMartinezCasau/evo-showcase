@@ -1,5 +1,11 @@
 import React, { useCallback, useState } from 'react';
-import { TouchableOpacity, Text, StyleSheet, Share } from 'react-native';
+import {
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  Share,
+  Platform,
+} from 'react-native';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
@@ -16,6 +22,7 @@ import {
   THREE_DOTS_OFFSET_X,
   THREE_DOTS_OFFSET_Y,
   THREE_DOTS_SIZE,
+  OTHER_PROFILE_FOLLOW_ROW_TRACK_HEIGHT,
 } from '@evoconn/constants/otherProfileLayout';
 
 type Props = {
@@ -105,6 +112,8 @@ export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({
 
   const pad = 8;
   const hit = Math.max(44, THREE_DOTS_SIZE + pad * 2);
+  const rowTrack = OTHER_PROFILE_FOLLOW_ROW_TRACK_HEIGHT;
+  const touchSize = Math.min(hit, rowTrack);
 
   if (isOwnProfile) {
     return null;
@@ -119,8 +128,9 @@ export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({
         style={[
           styles.button,
           {
-            minWidth: hit,
-            minHeight: hit,
+            minWidth: touchSize,
+            minHeight: touchSize,
+            maxHeight: rowTrack,
             transform: [
               { translateX: THREE_DOTS_OFFSET_X },
               { translateY: THREE_DOTS_OFFSET_Y },
@@ -133,7 +143,8 @@ export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({
             styles.dots,
             {
               fontSize: THREE_DOTS_SIZE,
-              lineHeight: THREE_DOTS_SIZE * 1.15,
+              lineHeight: THREE_DOTS_SIZE * 1.05,
+              ...Platform.select({ android: { includeFontPadding: false } }),
             },
           ]}
         >

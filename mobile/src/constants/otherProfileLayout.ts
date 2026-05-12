@@ -46,9 +46,13 @@ export const PHILOSOPHY_PERCENTAGES_PANEL_WIDTH: number | undefined = undefined;
 /** undefined = alto automático según el contenido */
 export const PHILOSOPHY_PERCENTAGES_PANEL_HEIGHT: number | undefined = undefined;
 
+// ── Fila Seguir + Posts + stats (perfil ajeno): altura de pista para centrar en Y ─
+export const OTHER_PROFILE_FOLLOW_ROW_TRACK_HEIGHT = 56;
+
 // ── Botón 3-puntos (acciones avanzadas) ────────────────────────────
 export const THREE_DOTS_OFFSET_X = 0;
-export const THREE_DOTS_OFFSET_Y = 0;
+/** Positivo = bajar el glifo dentro del área táctil (no cambia el layout de la fila). */
+export const THREE_DOTS_OFFSET_Y = 4;
 export const THREE_DOTS_SIZE = 39;
 
 // ── Card background opacities (0 = transparente, 1 = sólido) ───────────────

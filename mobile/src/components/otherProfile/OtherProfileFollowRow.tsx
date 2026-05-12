@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
+import { OTHER_PROFILE_FOLLOW_ROW_TRACK_HEIGHT } from '@evoconn/constants/otherProfileLayout';
 import { ProfileFollowButton } from './ProfileFollowButton';
 import { ProfileMoreMenu } from './ProfileMoreMenu';
 
@@ -9,7 +10,7 @@ type Props = {
   clanId: string | null | undefined;
   followersCount: number;
   followingCount: number;
-  /** Total publicaciones (reflexiones + frases) mostrado en la fila de stats. */
+  /** Total publicaciones (reflexiones + frases). */
   postsCount: number;
 };
 
@@ -19,6 +20,15 @@ function formatCount(n: number): string {
   return String(n);
 }
 
+/** Misma anchura de referencia que la campana del perfil personal (~44 + badge). */
+const TRAILING_ACTION_SLOT = 52;
+/** Slot izquierdo para Seguir / Siguiendo; acotado para no comprimir los tres contadores flex. */
+const LEADING_ACTION_SLOT = 112;
+
+/**
+ * Posts | Seguidores | Seguidos + menú ⋯; a la izquierda, Seguir / Siguiendo.
+ * Cada bloque comparte la misma altura de pista para alinear centros en el eje Y.
+ */
 export const OtherProfileFollowRow = React.memo(function OtherProfileFollowRow({
   userId,
   username,
@@ -29,34 +39,54 @@ export const OtherProfileFollowRow = React.memo(function OtherProfileFollowRow({
 }: Props) {
   return (
     <View style={styles.row}>
-      {/* Seguir / Siguiendo button */}
-      <ProfileFollowButton userId={userId} clanId={clanId} />
-
-      <View style={styles.divider} />
-
-      {/* Seguidores */}
-      <View style={styles.stat}>
-        <Text style={styles.value}>{formatCount(followersCount)}</Text>
-        <Text style={styles.label}>Seguidores</Text>
+      <View style={styles.leadingSlot}>
+        <ProfileFollowButton userId={userId} clanId={clanId} compact />
       </View>
 
-      <View style={styles.divider} />
-
-      {/* Seguidos */}
-      <View style={styles.stat}>
-        <Text style={styles.value}>{formatCount(followingCount)}</Text>
-        <Text style={styles.label}>Seguidos</Text>
+      <View style={styles.statTrack}>
+        <View style={styles.statInner}>
+          <Text style={styles.value} numberOfLines={1}>
+            {formatCount(postsCount)}
+          </Text>
+          <Text style={styles.label} numberOfLines={1}>
+            Posts
+          </Text>
+        </View>
       </View>
 
-      <View style={styles.divider} />
-
-      <View style={styles.stat}>
-        <Text style={styles.value}>{formatCount(postsCount)}</Text>
-        <Text style={styles.label}>Posts</Text>
+      <View style={styles.dividerTrack}>
+        <View style={styles.divider} />
       </View>
 
-      {/* Three-dots menu */}
-      <ProfileMoreMenu userId={userId} username={username} clanId={clanId} />
+      <View style={styles.statTrack}>
+        <View style={styles.statInner}>
+          <Text style={styles.value} numberOfLines={1}>
+            {formatCount(followersCount)}
+          </Text>
+          <Text style={styles.label} numberOfLines={1}>
+            Seguidores
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.dividerTrack}>
+        <View style={styles.divider} />
+      </View>
+
+      <View style={styles.statTrack}>
+        <View style={styles.statInner}>
+          <Text style={styles.value} numberOfLines={1}>
+            {formatCount(followingCount)}
+          </Text>
+          <Text style={styles.label} numberOfLines={1}>
+            Seguidos
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.trailingSlot}>
+        <ProfileMoreMenu userId={userId} username={username} clanId={clanId} />
+      </View>
     </View>
   );
 });
@@ -65,21 +95,50 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    flexWrap: 'wrap',
-    rowGap: 8,
+    justifyContent: 'flex-start',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    minHeight: OTHER_PROFILE_FOLLOW_ROW_TRACK_HEIGHT + 16,
+    flexWrap: 'nowrap',
   },
-  stat: {
-    minWidth: 56,
-    flex: 1,
+  leadingSlot: {
+    width: LEADING_ACTION_SLOT,
+    height: OTHER_PROFILE_FOLLOW_ROW_TRACK_HEIGHT,
+    flexShrink: 0,
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trailingSlot: {
+    width: TRAILING_ACTION_SLOT,
+    height: OTHER_PROFILE_FOLLOW_ROW_TRACK_HEIGHT,
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statTrack: {
+    flex: 1,
+    flexBasis: 0,
+    minWidth: 0,
+    height: OTHER_PROFILE_FOLLOW_ROW_TRACK_HEIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statInner: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dividerTrack: {
+    height: OTHER_PROFILE_FOLLOW_ROW_TRACK_HEIGHT,
+    width: 1,
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   value: {
     fontSize: 20,
     fontWeight: '800',
     color: '#FFFFFF',
+    ...Platform.select({ android: { includeFontPadding: false } }),
   },
   label: {
     fontSize: 11,
@@ -87,6 +146,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
     letterSpacing: 0.4,
     opacity: 0.7,
+    textAlign: 'center',
+    ...Platform.select({ android: { includeFontPadding: false } }),
   },
   divider: {
     width: 1,

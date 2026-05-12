@@ -6,6 +6,11 @@ type Props = {
   userId: string;
   /** Conservado por compatibilidad con el layout; el icono es neutro (blanco). */
   clanId: string | null | undefined;
+  /**
+   * Fila de stats del perfil ajeno: padding y tipografía más compactos para alinear
+   * con Publicaciones / Seguidores / Seguidos (misma altura visual que el perfil personal).
+   */
+  compact?: boolean;
 };
 
 /** + dibujado con vistas: grosor real, no depende del trazo de la fuente del sistema. */
@@ -55,7 +60,11 @@ const followPlusStyles = StyleSheet.create({
 /** Espacio entre el + y «Seguir» (fila centrada en el botón). */
 const SEGUIR_ROW_GAP = 8;
 
-export const ProfileFollowButton = React.memo(function ProfileFollowButton({ userId }: Props) {
+export const ProfileFollowButton = React.memo(function ProfileFollowButton({
+  userId,
+  clanId: _clanId,
+  compact = false,
+}: Props) {
   const { isFollowing, isFollowPending, toggleFollow } = useFollowState();
   const following = isFollowing(userId);
   const pending = isFollowPending(userId);
@@ -70,18 +79,26 @@ export const ProfileFollowButton = React.memo(function ProfileFollowButton({ use
       activeOpacity={0.75}
       style={[
         styles.button,
+        compact && styles.buttonCompact,
         pending && styles.buttonPending,
         following && styles.buttonFollowing,
       ]}
     >
       {following ? (
-        <Text style={styles.followingText}>Siguiendo</Text>
+        <Text style={[styles.followingText, compact && styles.followingTextCompact]} numberOfLines={1}>
+          Siguiendo
+        </Text>
       ) : pending ? (
-        <Text style={styles.pendingText}>Solicitud enviada</Text>
+        <Text
+          style={[styles.pendingText, compact && styles.pendingTextCompact]}
+          numberOfLines={2}
+        >
+          Solicitud enviada
+        </Text>
       ) : (
-        <View style={styles.seguirRow}>
+        <View style={[styles.seguirRow, compact && styles.seguirRowCompact]}>
           <FollowPlusMark />
-          <Text style={styles.label}>Seguir</Text>
+          <Text style={[styles.label, compact && styles.labelCompact]}>Seguir</Text>
         </View>
       )}
     </TouchableOpacity>
@@ -101,6 +118,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  buttonCompact: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    minWidth: 0,
+    minHeight: 40,
+    maxWidth: 112,
+  },
   buttonPending: {
     borderColor: 'rgba(255,255,255,0.12)',
     backgroundColor: 'rgba(255,255,255,0.06)',
@@ -114,6 +138,10 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     color: '#FFFFFF',
   },
+  followingTextCompact: {
+    fontSize: 13,
+    letterSpacing: 0.35,
+  },
   pendingText: {
     fontSize: 14,
     fontWeight: '700',
@@ -121,11 +149,19 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.75)',
     textAlign: 'center',
   },
+  pendingTextCompact: {
+    fontSize: 11,
+    letterSpacing: 0.2,
+    lineHeight: 14,
+  },
   seguirRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: SEGUIR_ROW_GAP,
+  },
+  seguirRowCompact: {
+    gap: 5,
   },
   label: {
     fontSize: 16,
@@ -133,5 +169,9 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     color: '#FFFFFF',
     includeFontPadding: false,
+  },
+  labelCompact: {
+    fontSize: 13,
+    letterSpacing: 0.4,
   },
 });

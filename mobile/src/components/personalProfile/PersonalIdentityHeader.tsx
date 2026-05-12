@@ -1,5 +1,13 @@
 import React, { useMemo, useCallback } from 'react';
-import { View, Text, TouchableOpacity, Share, StyleSheet, useWindowDimensions } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Share,
+  StyleSheet,
+  useWindowDimensions,
+  Platform,
+} from 'react-native';
 import { getTopBarInsigniaByHouse } from '@evoconn/utils/getTopBarInsigniaByHouse';
 import type { Rank } from '@evoconn/types';
 import {
@@ -21,6 +29,7 @@ import {
   CLAN_ROW_SCALE,
   CLAN_ROW_OFFSET_X,
   CLAN_ROW_MARGIN_BOTTOM,
+  SHARE_BUTTON_SIZE,
 } from '@evoconn/constants/personalProfileLayout';
 
 const RANK_LABELS: Record<Rank, string> = {
@@ -88,7 +97,8 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
     MIN_RESERVED_RIGHT_SPACE,
     shieldDisplaySize + TEXT_BADGE_SAFE_GAP + Math.max(0, -clampedShieldOffsetX),
   );
-  const usernameMaxWidth = screenW - 20 * 2 - 28;
+  const shareReserve = SHARE_BUTTON_SIZE + 14;
+  const usernameMaxWidth = Math.max(120, screenW - 20 * 2 - shareReserve);
   // Container height is always TEXT-ONLY height. The badge is absolute and
   // overflows visually without pushing sibling components down — so we must
   // NOT expand containerHeight to accommodate the badge size.
@@ -133,13 +143,13 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
               },
             ]}
             numberOfLines={1}
-            ellipsizeMode="clip"
-            adjustsFontSizeToFit
-            minimumFontScale={0.25}
+            ellipsizeMode="tail"
           >
             {username}
           </Text>
-          <Text style={styles.shareInline}>↗</Text>
+          <Text style={styles.shareInline} accessibilityLabel="Compartir perfil">
+            ↗
+          </Text>
         </TouchableOpacity>
 
         {/* Clan + rank row — inline, same baseline */}
@@ -217,6 +227,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.6,
     flexShrink: 1,
+    ...Platform.select({ android: { includeFontPadding: false } }),
   },
   shareInline: {
     fontSize: USERNAME_FONT_SIZE * 0.75,
@@ -226,6 +237,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     zIndex: 10,
     elevation: 10,
+    ...Platform.select({ android: { includeFontPadding: false } }),
   },
   clanRankRow: {
     flexDirection: 'row',
