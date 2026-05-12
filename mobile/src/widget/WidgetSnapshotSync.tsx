@@ -6,8 +6,9 @@ import { pushTopPhraseWidgetSnapshot } from './iosWidgetBridge';
 const DEBOUNCE_MS = 400;
 
 /**
- * Keeps the iOS home-screen widget snapshot in sync with the in-app feed (simulation / future API).
- * Requires a native `EvoWidgetBridge` + WidgetKit target — see `iosWidgetBridge.ts`.
+ * Keeps the iOS home-screen widget snapshot in sync with the in-app feed.
+ * Uses `computeTopPhraseWidgetPayload` → same `posts` as `useFeedStore` (Supabase-backed via SimulationContext).
+ * Requires native `EvoWidgetBridge` + WidgetKit — see `iosWidgetBridge.ts`.
  */
 export function WidgetSnapshotSync() {
   const { posts } = useFeedStore();
