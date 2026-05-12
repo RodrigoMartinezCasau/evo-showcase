@@ -73,8 +73,16 @@ export const CLAN_SECONDARY_DEFAULT = '#7A3CFF';
 /** Sin clan / Evocon — verde lima (#c7ff02). */
 export const NO_CLAN_ACCENT_COLOR = evoconnColors.neonGreen;
 
-/** Marco/fondo de posts sin clan en Para ti y vista ampliada (SVG de tarjeta + noClan). */
-export const NO_CLAN_COMMUNITY_POST_FRAME_COLOR = '#a5d400';
+/**
+ * Color de superficie sin clan en Para ti / detalle reflexión:
+ * - Relleno del SVG `assets/reflectionBackground/noClan.svg` (mismo hex en los `fill`).
+ * - Borde izquierdo del panel negro en `ReflectionDetailItem`.
+ * Al cambiar el color de prueba, actualiza este valor y los fills del SVG a la vez.
+ */
+export const NO_CLAN_PARATI_SURFACE_COLOR = '#393939';
+
+/** Alias — mismo valor que `NO_CLAN_PARATI_SURFACE_COLOR` (marco panel en ReflectionDetailItem). */
+export const NO_CLAN_COMMUNITY_POST_FRAME_COLOR = NO_CLAN_PARATI_SURFACE_COLOR;
 
 export function getClanSecondaryColor(clanId: string | null | undefined): string {
   if (!clanId || String(clanId).trim() === '') return NO_CLAN_ACCENT_COLOR;

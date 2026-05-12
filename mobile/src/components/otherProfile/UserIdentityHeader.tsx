@@ -9,6 +9,7 @@ import {
   Platform,
 } from 'react-native';
 import { getAppProfileOpenUrl } from '@evoconn/utils/appShareLinks';
+import { getTopBarInsigniaByHouse } from '@evoconn/utils/getTopBarInsigniaByHouse';
 import type { Rank } from '@evoconn/types';
 import {
   SHIELD_OFFSET_X,

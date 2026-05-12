@@ -86,11 +86,11 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   onReadingModeChange,
   communityVerticalFeed = false,
 }: ReflectionDetailItemProps) {
-  const clanColor = getClanColor(post.author.clanId);
-  const reflectionPanelBorderColor =
-    post.author.clanId == null || String(post.author.clanId).trim() === ''
-      ? NO_CLAN_COMMUNITY_POST_FRAME_COLOR
-      : clanColor;
+  const isNoClanAuthor =
+    post.author.clanId == null || String(post.author.clanId).trim() === '';
+  const reflectionPanelBorderColor = isNoClanAuthor
+    ? NO_CLAN_COMMUNITY_POST_FRAME_COLOR
+    : clanColor;
   const actionColRef = useRef<DetailActionColumnHandle>(null);
   const { updatePostVote, updatePostSaveToggle, getPostById, getMyVote } = useFeedStore();
   const { savePost, unsavePost, isSaved } = usePersonalProfile();
@@ -802,6 +802,8 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                 paddingHorizontal: RP.paddingHorizontal,
                 paddingVertical: RP.paddingVertical,
                 borderLeftColor: reflectionPanelBorderColor,
+                borderBottomWidth: isNoClanAuthor ? 4 : 0,
+                borderBottomColor: reflectionPanelBorderColor,
                 transform: [
                   { translateX: RP.offsetX },
                   { translateY: RP.offsetY },
