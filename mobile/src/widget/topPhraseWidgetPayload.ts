@@ -1,4 +1,5 @@
 import type { CommunityPost } from '@evoconn/types';
+import { CLAN_TO_COLOR } from '@evoconn/constants/clanColors';
 
 /** JSON written to App Group UserDefaults for the iOS WidgetKit extension (contract for native code). */
 export type TopPhraseWidgetPayload = {
@@ -9,6 +10,8 @@ export type TopPhraseWidgetPayload = {
   upvotes: number;
   authorUsername: string;
   quoteAuthor?: string;
+  /** Hex color of the author's clan (e.g. "#529da2"). Defaults to lime (#c7ff02) for no-clan. */
+  clanColor: string;
   /** When this snapshot was computed (ISO 8601) */
   computedAt: string;
 };
@@ -50,6 +53,10 @@ export function computeTopPhraseWidgetPayload(
   });
 
   const top = candidates[0]!;
+  const clanColor =
+    top.author.clanId && top.author.clanId in CLAN_TO_COLOR
+      ? CLAN_TO_COLOR[top.author.clanId as keyof typeof CLAN_TO_COLOR]
+      : '#c7ff02';
   return {
     kind: 'top_phrase_24h',
     postId: top.id,
@@ -57,6 +64,7 @@ export function computeTopPhraseWidgetPayload(
     upvotes: top.voteStats.up,
     authorUsername: top.author.username,
     quoteAuthor: top.quoteAuthor,
+    clanColor,
     computedAt: now.toISOString(),
   };
 }
