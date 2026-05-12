@@ -1,6 +1,10 @@
-import React, { useCallback, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, Alert } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  EvoActionSheetModal,
+  EvoConfirmModal,
+} from '@evoconn/components/shared/EvoActionSheetModal';
 import type { CommunityPost } from '@evoconn/types';
 import { PROFILE_POST_PREVIEW_LAYOUT as L } from '@evoconn/constants/postPreviewLayout';
 import {
@@ -107,34 +111,42 @@ export const PersonalRecentPostCard = React.memo(function PersonalRecentPostCard
   const timeStr     = timeSince(post.createdAt);
 
   const [menuVisible, setMenuVisible] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const handleDotsPress = useCallback(() => {
     setMenuVisible(true);
   }, []);
 
-  const handleMenuSelect = useCallback(
-    (action: MenuAction) => {
-      setMenuVisible(false);
-      if (action === 'delete') {
-        Alert.alert(
-          'Eliminar post',
-          '¿Seguro que quieres eliminar esta publicación? Esta acción no se puede deshacer.',
-          [
-            { text: 'Cancelar', style: 'cancel' },
-            {
-              text: 'Eliminar',
-              style: 'destructive',
-              onPress: () => onMenuAction?.('delete', post.id),
-            },
-          ],
-        );
-      } else {
-        // 'hide' and 'unsave' need no confirmation
-        onMenuAction?.(action, post.id);
-      }
-    },
-    [onMenuAction, post.id],
-  );
+  const sheetOptions = useMemo(() => {
+    if (!onMenuAction) return [];
+    if (menuMode === 'saved') {
+      return [
+        {
+          key: 'unsave',
+          label: 'Quitar de guardados',
+          onPress: () => onMenuAction('unsave', post.id),
+        },
+      ];
+    }
+    return [
+      {
+        key: 'hide',
+        label: isHidden ? 'Hacer público' : 'Ocultar para el público',
+        onPress: () => onMenuAction('hide', post.id),
+      },
+      {
+        key: 'delete',
+        label: 'Eliminar post',
+        destructive: true,
+        onPress: () => setDeleteConfirmOpen(true),
+      },
+    ];
+  }, [onMenuAction, menuMode, post.id, isHidden]);
+
+  const confirmDeletePost = useCallback(() => {
+    setDeleteConfirmOpen(false);
+    onMenuAction?.('delete', post.id);
+  }, [onMenuAction, post.id]);
 
   // ── Derived stats-bar dimensions — all scale from ONE constant ──────────
   // gridStatsScale is 1 in the slider, and PERSONAL_POSTS_GRID_STATS_SCALE in the grid.
@@ -361,86 +373,25 @@ export const PersonalRecentPostCard = React.memo(function PersonalRecentPostCard
         </View>
       </TouchableOpacity>
 
-      {/* ── Three-dots action sheet ── */}
-      {onMenuAction && (
-        <Modal
-          visible={menuVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setMenuVisible(false)}
-        >
-          <TouchableOpacity
-            style={menuStyles.backdrop}
-            activeOpacity={1}
-            onPress={() => setMenuVisible(false)}
+      {onMenuAction ? (
+        <>
+          <EvoActionSheetModal
+            visible={menuVisible}
+            onClose={() => setMenuVisible(false)}
+            title="Publicación"
+            options={sheetOptions}
           />
-          <View style={menuStyles.sheet}>
-            {menuMode === 'saved' ? (
-              /* ── Saved-post menu: only "Quitar de guardados" ── */
-              <TouchableOpacity
-                style={menuStyles.action}
-                onPress={() => handleMenuSelect('unsave')}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name="bookmark-outline"
-                  size={18}
-                  color="#FFFFFF"
-                  style={menuStyles.actionIcon}
-                />
-                <Text style={menuStyles.actionText}>Quitar de guardados</Text>
-              </TouchableOpacity>
-            ) : (
-              /* ── Own-post menu: hide + delete ── */
-              <>
-                <TouchableOpacity
-                  style={menuStyles.action}
-                  onPress={() => handleMenuSelect('hide')}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons
-                    name={isHidden ? 'eye-outline' : 'eye-off-outline'}
-                    size={18}
-                    color="#FFFFFF"
-                    style={menuStyles.actionIcon}
-                  />
-                  <Text style={menuStyles.actionText}>
-                    {isHidden ? 'Hacer público' : 'Ocultar para el público'}
-                  </Text>
-                </TouchableOpacity>
-
-                <View style={menuStyles.divider} />
-
-                <TouchableOpacity
-                  style={menuStyles.action}
-                  onPress={() => handleMenuSelect('delete')}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons
-                    name="trash-outline"
-                    size={18}
-                    color="#ff4a31"
-                    style={menuStyles.actionIcon}
-                  />
-                  <Text style={[menuStyles.actionText, menuStyles.destructive]}>
-                    Eliminar post
-                  </Text>
-                </TouchableOpacity>
-              </>
-            )}
-
-            <TouchableOpacity
-              style={[menuStyles.action, menuStyles.cancelAction]}
-              onPress={() => setMenuVisible(false)}
-              activeOpacity={0.7}
-            >
-              <Text style={[menuStyles.actionText, menuStyles.cancelText]}>
-                Cancelar
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </Modal>
-      )}
+          <EvoConfirmModal
+            visible={deleteConfirmOpen}
+            onClose={() => setDeleteConfirmOpen(false)}
+            title="Eliminar post"
+            message="¿Seguro que quieres eliminar esta publicación? Esta acción no se puede deshacer."
+            confirmLabel="Eliminar"
+            destructive
+            onConfirm={confirmDeletePost}
+          />
+        </>
+      ) : null}
     </>
   );
 });
@@ -529,56 +480,5 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
     alignSelf: 'flex-end',
     includeFontPadding: false,
-  },
-});
-
-const menuStyles = StyleSheet.create({
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-  },
-  sheet: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#1a1a1a',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 32,
-    paddingTop: 8,
-    overflow: 'hidden',
-  },
-  action: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-  },
-  actionIcon: {
-    marginRight: 14,
-  },
-  actionText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  destructive: {
-    color: '#ff4a31',
-  },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    marginHorizontal: 0,
-  },
-  cancelAction: {
-    marginTop: 8,
-    justifyContent: 'center',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255,255,255,0.08)',
-  },
-  cancelText: {
-    color: 'rgba(255,255,255,0.5)',
-    fontWeight: '400',
   },
 });

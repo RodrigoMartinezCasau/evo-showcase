@@ -31,6 +31,7 @@ import { useDebugStats } from '@evoconn/debug/DebugStatsContext';
 import { useEvoPreferences } from '@evoconn/hooks/EvoPreferencesContext';
 import { useAuth } from '../../mobile/lib/AuthContext';
 import { isRealUserId, setProfilePrivate } from '@evoconn/services/supabaseSocial';
+import { EvoInfoModal } from '@evoconn/components/shared/EvoActionSheetModal';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -324,6 +325,10 @@ export default function SettingsScreen({
   const { remainingUses }         = useDebugStats();
   const { profile, refreshProfile } = useAuth();
   const [privateAccountLocal, setPrivateAccountLocal] = useState(false);
+  const [premiumInfoOpen, setPremiumInfoOpen] = useState(false);
+  const [privateSaveErrorOpen, setPrivateSaveErrorOpen] = useState(false);
+  const [deleteUnavailableOpen, setDeleteUnavailableOpen] = useState(false);
+  const [fallbackLogoutInfoOpen, setFallbackLogoutInfoOpen] = useState(false);
 
   useEffect(() => {
     setPrivateAccountLocal(Boolean(profile?.is_private));
@@ -335,7 +340,7 @@ export default function SettingsScreen({
     const ok = await setProfilePrivate(profile.id, next);
     if (!ok) {
       setPrivateAccountLocal(!next);
-      Alert.alert('No se pudo guardar', 'Revisa tu conexión e inténtalo de nuevo.');
+      setPrivateSaveErrorOpen(true);
       return;
     }
     await refreshProfile();
@@ -375,16 +380,18 @@ export default function SettingsScreen({
     safeFrame.height,
   );
 
-  const fallbackDeleteAccount = useCallback(() => Alert.alert('Eliminar cuenta', 'Función no disponible.'), []);
+  const fallbackDeleteAccount = useCallback(() => {
+    setDeleteUnavailableOpen(true);
+  }, []);
   const confirmDeleteAccount  = onDeleteAccount ?? fallbackDeleteAccount;
 
   const defaultLogout = useCallback(() => {
-    Alert.alert('Cerrar sesión', '¿Quieres cerrar tu sesión actual?', [{ text: 'Cancelar', style: 'cancel' }]);
+    setFallbackLogoutInfoOpen(true);
   }, []);
   const confirmLogout = onLogout ?? defaultLogout;
 
   const showSubscriptionAlert = useCallback(() => {
-    Alert.alert('', 'La app no cuenta con versiones premium todavía, gracias por la intención de apoyo igualmente ;)', [{ text: 'OK' }]);
+    setPremiumInfoOpen(true);
   }, []);
 
   const SECTIONS: SettingSection[] = useMemo(() => [
@@ -522,6 +529,7 @@ export default function SettingsScreen({
   const handleSoundsToggle  = useCallback((val: boolean) => setSoundsEnabled(val),  [setSoundsEnabled]);
 
   return (
+    <>
     <View style={styles.container}>
       <AppTopBar onMenuPress={() => setSidebarOpen(true)} onClanPress={() => router.back()} />
       <View style={[styles.contentWrap, { height: contentHeight }]}>
@@ -566,6 +574,31 @@ export default function SettingsScreen({
         onConversationPress={(id) => router.push({ pathname: '/reflection', params: { thoughtId: id } })}
       />
     </View>
+    <EvoInfoModal
+      visible={premiumInfoOpen}
+      onClose={() => setPremiumInfoOpen(false)}
+      title="Suscripción"
+      message="La app no cuenta con versiones premium todavía, gracias por la intención de apoyo igualmente ;)"
+    />
+    <EvoInfoModal
+      visible={privateSaveErrorOpen}
+      onClose={() => setPrivateSaveErrorOpen(false)}
+      title="No se pudo guardar"
+      message="Revisa tu conexión e inténtalo de nuevo."
+    />
+    <EvoInfoModal
+      visible={deleteUnavailableOpen}
+      onClose={() => setDeleteUnavailableOpen(false)}
+      title="Eliminar cuenta"
+      message="Función no disponible."
+    />
+    <EvoInfoModal
+      visible={fallbackLogoutInfoOpen}
+      onClose={() => setFallbackLogoutInfoOpen(false)}
+      title="Cerrar sesión"
+      message="¿Quieres cerrar tu sesión actual? Usa la opción desde la pantalla principal de la app cuando tengas sesión iniciada."
+    />
+    </>
   );
 }
 

@@ -5,7 +5,6 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   Share,
   Keyboard,
   Platform,
@@ -53,6 +52,13 @@ import { blockUser, insertReport, isRealUserId } from '@evoconn/services/supabas
 import { useAuth } from '../../mobile/lib/AuthContext';
 import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
 import { computePhraseDetailTypography } from '@evoconn/utils/phraseDetailTypography';
+import {
+  EvoActionSheetModal,
+  EvoConfirmModal,
+  EvoInfoModal,
+  EvoPickerModal,
+} from '@evoconn/components/shared/EvoActionSheetModal';
+import type { EvoActionOption } from '@evoconn/components/shared/EvoActionSheetModal';
 
 /** Matches `styles.content` horizontal padding — used until the reflection panel is measured. */
 const REFLECTION_DETAIL_CONTENT_PAD_H = 16;
@@ -187,6 +193,13 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   const [blockedUsers, setBlockedUsers] = useState<Set<string>>(new Set());
   const { session } = useAuth();
 
+  const [postMoreSheetOpen, setPostMoreSheetOpen] = useState(false);
+  const [reportReasonPickerOpen, setReportReasonPickerOpen] = useState(false);
+  const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
+  const [infoModalOpen, setInfoModalOpen] = useState(false);
+  const [infoModalTitle, setInfoModalTitle] = useState('');
+  const [infoModalMessage, setInfoModalMessage] = useState('');
+
   const handleBlockUser = useCallback(async (userId: string) => {
     setBlockedUsers((prev) => new Set(prev).add(userId));
     if (session?.user && isRealUserId(session.user.id) && isRealUserId(userId)) {
@@ -229,88 +242,93 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
 
   const { isFollowing: checkFollowing, toggleFollow } = useFollowState();
 
-  const handleMorePress = useCallback(() => {
+  const showInfo = useCallback((title: string, message: string) => {
+    setInfoModalTitle(title);
+    setInfoModalMessage(message);
+    setInfoModalOpen(true);
+  }, []);
+
+  const submitReport = useCallback(
+    async (reason: string) => {
+      if (session?.user) {
+        await insertReport({
+          reporterId: session.user.id,
+          targetType: 'post',
+          targetId: post.id,
+          reason,
+        }).catch(console.error);
+      }
+      showInfo('Publicación denunciada', 'Gracias por tu reporte. Lo revisaremos pronto.');
+    },
+    [session, post.id, showInfo],
+  );
+
+  const reportPickerItems = useMemo(
+    () => [
+      {
+        key: 'inap',
+        label: 'Contenido inapropiado',
+        onPress: () => void submitReport('Contenido inapropiado'),
+      },
+      {
+        key: 'spam',
+        label: 'Spam',
+        onPress: () => void submitReport('Spam'),
+      },
+      {
+        key: 'abuso',
+        label: 'Acoso o abuso',
+        onPress: () => void submitReport('Acoso o abuso'),
+      },
+    ],
+    [submitReport],
+  );
+
+  const postMoreOptions = useMemo((): EvoActionOption[] => {
     const following = checkFollowing(post.author.id);
-    Alert.alert(post.title ?? 'Publicación', undefined, [
+    return [
       {
-        text: 'Compartir',
-        onPress: async () => {
-          try {
-            await Share.share({
-              message: `${post.author.username}: "${post.body}"`,
-            });
-          } catch (_) { /* user cancelled */ }
-        },
-      },
-      {
-        text: following ? 'Dejar de seguir' : 'Seguir usuario',
+        key: 'share',
+        label: 'Compartir',
         onPress: () => {
-          toggleFollow(post.author.id);
+          void (async () => {
+            try {
+              await Share.share({
+                message: `${post.author.username}: "${post.body}"`,
+              });
+            } catch {
+              /* user cancelled */
+            }
+          })();
         },
       },
       {
-        text: 'Denunciar publicación',
-        onPress: () => {
-          Alert.alert(
-            'Denunciar publicación',
-            '¿Por qué quieres denunciar esta publicación?',
-            [
-              {
-                text: 'Contenido inapropiado',
-                onPress: async () => {
-                  if (session?.user) {
-                    await insertReport({ reporterId: session.user.id, targetType: 'post', targetId: post.id, reason: 'Contenido inapropiado' }).catch(console.error);
-                  }
-                  Alert.alert('Publicación denunciada', 'Gracias por tu reporte. Lo revisaremos pronto.');
-                },
-              },
-              {
-                text: 'Spam',
-                onPress: async () => {
-                  if (session?.user) {
-                    await insertReport({ reporterId: session.user.id, targetType: 'post', targetId: post.id, reason: 'Spam' }).catch(console.error);
-                  }
-                  Alert.alert('Publicación denunciada', 'Gracias por tu reporte. Lo revisaremos pronto.');
-                },
-              },
-              {
-                text: 'Acoso o abuso',
-                onPress: async () => {
-                  if (session?.user) {
-                    await insertReport({ reporterId: session.user.id, targetType: 'post', targetId: post.id, reason: 'Acoso o abuso' }).catch(console.error);
-                  }
-                  Alert.alert('Publicación denunciada', 'Gracias por tu reporte. Lo revisaremos pronto.');
-                },
-              },
-              { text: 'Cancelar', style: 'cancel' },
-            ],
-          );
-        },
+        key: 'follow',
+        label: following ? 'Dejar de seguir' : 'Seguir usuario',
+        onPress: () => toggleFollow(post.author.id),
       },
       {
-        text: 'Bloquear usuario',
-        style: 'destructive',
-        onPress: () => {
-          Alert.alert(
-            'Bloquear usuario',
-            `¿Bloquear a @${post.author.username}?`,
-            [
-              { text: 'Cancelar', style: 'cancel' },
-              {
-                text: 'Bloquear',
-                style: 'destructive',
-                onPress: () => {
-                  handleBlockUser(post.author.id);
-                  Alert.alert('Usuario bloqueado', `@${post.author.username} ha sido bloqueado.`);
-                },
-              },
-            ],
-          );
-        },
+        key: 'report',
+        label: 'Denunciar publicación',
+        onPress: () => setReportReasonPickerOpen(true),
       },
-      { text: 'Cancelar', style: 'cancel' },
-    ]);
-  }, [post, handleBlockUser, checkFollowing, toggleFollow]);
+      {
+        key: 'block',
+        label: 'Bloquear usuario',
+        destructive: true,
+        onPress: () => setBlockConfirmOpen(true),
+      },
+    ];
+  }, [post, checkFollowing, toggleFollow]);
+
+  const handleMorePress = useCallback(() => {
+    setPostMoreSheetOpen(true);
+  }, []);
+
+  const confirmBlockUser = useCallback(() => {
+    handleBlockUser(post.author.id);
+    showInfo('Usuario bloqueado', `@${post.author.username} ha sido bloqueado.`);
+  }, [handleBlockUser, post.author.id, post.author.username, showInfo]);
 
   const TAP_MOVE_THRESHOLD = 10;
   const panelLastTap = useRef(0);
@@ -741,6 +759,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   }, [kbOffset]);
 
   return (
+    <>
     <View
       style={[styles.container, { height: itemHeight }]}
       onStartShouldSetResponder={() => (communityVerticalFeed ? false : !readingMode)}
@@ -983,6 +1002,35 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
         />
       </View>
     </View>
+
+      <EvoActionSheetModal
+        visible={postMoreSheetOpen}
+        onClose={() => setPostMoreSheetOpen(false)}
+        title={post.title?.trim() ? String(post.title) : 'Publicación'}
+        options={postMoreOptions}
+      />
+      <EvoPickerModal
+        visible={reportReasonPickerOpen}
+        onClose={() => setReportReasonPickerOpen(false)}
+        title="Denunciar publicación"
+        items={reportPickerItems}
+      />
+      <EvoConfirmModal
+        visible={blockConfirmOpen}
+        onClose={() => setBlockConfirmOpen(false)}
+        title="Bloquear usuario"
+        message={`¿Bloquear a @${post.author.username}?`}
+        confirmLabel="Bloquear"
+        destructive
+        onConfirm={confirmBlockUser}
+      />
+      <EvoInfoModal
+        visible={infoModalOpen}
+        onClose={() => setInfoModalOpen(false)}
+        title={infoModalTitle}
+        message={infoModalMessage}
+      />
+    </>
   );
 });
 
