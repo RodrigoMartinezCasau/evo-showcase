@@ -79,7 +79,7 @@ export const NO_CLAN_ACCENT_COLOR = evoconnColors.neonGreen;
  * - Borde izquierdo del panel negro en `ReflectionDetailItem`.
  * Al cambiar el color de prueba, actualiza este valor y los fills del SVG a la vez.
  */
-export const NO_CLAN_PARATI_SURFACE_COLOR = '#393939';
+export const NO_CLAN_PARATI_SURFACE_COLOR = '#242424';
 
 /** Alias — mismo valor que `NO_CLAN_PARATI_SURFACE_COLOR` (marco panel en ReflectionDetailItem). */
 export const NO_CLAN_COMMUNITY_POST_FRAME_COLOR = NO_CLAN_PARATI_SURFACE_COLOR;
