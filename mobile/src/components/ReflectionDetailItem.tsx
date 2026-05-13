@@ -881,20 +881,26 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                   nestedScrollEnabled
                   bounces={readingMode && isLongText}
                   keyboardShouldPersistTaps="handled"
-                  contentContainerStyle={styles.reflectionScrollContent}
+                  contentContainerStyle={[
+                    styles.reflectionScrollContent,
+                    !isLongText && styles.reflectionScrollContentCentered,
+                  ]}
                   onLayout={handleReflectionScrollLayout}
                   onContentSizeChange={handleReflectionContentSize}
                 >
-                  <View style={styles.reflectionScrollTextOuter}>
-                    <View style={{ width: reflectionTextColumnWidth }}>
+                  <View style={[styles.reflectionScrollTextOuter, !isLongText && styles.reflectionScrollTextOuterCentered]}>
+                    <View style={{ width: reflectionTextColumnWidth, alignItems: !isLongText ? 'center' : 'flex-start' }}>
                       {post.title ? (
                         <Text
                           numberOfLines={1}
                           style={[
                             styles.title,
+                            !isLongText && styles.textCentered,
                             {
                               transform: [
-                                { translateX: TL.offsetX },
+                                // When centered, cancel the left-aligned offsetX so the
+                                // title's center axis aligns with the body's center axis.
+                                { translateX: isLongText ? TL.offsetX : 0 },
                                 { translateY: TL.offsetY },
                                 { scale: TL.scale },
                               ],
@@ -908,7 +914,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                       ) : null}
                       <Text
                         key={bodyLayoutKey}
-                        style={styles.bodyText}
+                        style={[styles.bodyText, !isLongText && styles.textCentered]}
                         numberOfLines={!readingMode && isLongText ? maxBodyLines : undefined}
                         onTextLayout={handleBodyTextLayout}
                       >
@@ -1004,6 +1010,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
         <DetailActionColumn
           ref={actionColRef}
           clanId={post.author.clanId}
+          avatarUri={post.author.avatarUri}
           upCount={livePost.voteStats.up}
           downCount={livePost.voteStats.down}
           saved={saved}
@@ -1089,10 +1096,21 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     width: '100%',
   },
+  /** Applied when the body fits without "Ver más" — centers the text block vertically inside the panel, matching phrase behavior. */
+  reflectionScrollContentCentered: {
+    justifyContent: 'center',
+  },
+  /** Applied to title and body when the reflection is short — centers text horizontally like a phrase. */
+  textCentered: {
+    textAlign: 'center',
+  },
   /** Full width so the inner column can stay left-aligned; a narrow-only child made the strip hug the wrong edge. */
   reflectionScrollTextOuter: {
     width: '100%',
     alignItems: 'flex-start',
+  },
+  reflectionScrollTextOuterCentered: {
+    alignItems: 'center',
   },
   reflectionScroll: {
     flex: 1,

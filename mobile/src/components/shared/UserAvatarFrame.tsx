@@ -97,10 +97,10 @@ export function UserAvatarFrame({
         </Defs>
         <SvgImage
           href={{ uri: avatarUri }}
-          x={128}
-          y={93}
-          width={344}
-          height={490}
+          x={100}
+          y={75}
+          width={400}
+          height={525}
           clipPath="url(#badgePhotoClip)"
           preserveAspectRatio="xMidYMid slice"
         />

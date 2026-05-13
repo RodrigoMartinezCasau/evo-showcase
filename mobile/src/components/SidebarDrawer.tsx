@@ -38,7 +38,7 @@ import EstrellaComunidadSvg from '../assets/sidebar/estrellaComunidadSvg/estrell
 import { SidebarSearchBar } from './SidebarSearchBar';
 import { SidebarConversationsPanel } from './SidebarConversationsPanel';
 import { SidebarHeaderNotificationsButton } from './SidebarHeaderNotificationsButton';
-import { getClanInsigniaByHouse } from '@evoconn/utils/getSidebarClanInsigniaByHouse';
+import { UserAvatarFrame } from './shared/UserAvatarFrame';
 import SettingsSvg from '../assets/sidebar/settingsIconSvg/settings.svg';
 import { getSidebarFooterClanLineColor } from '@evoconn/constants/clanColors';
 import { INRIA_SERIF_FONT_FAMILY } from '@evoconn/constants/inriaSerifFontFamily';
@@ -146,7 +146,7 @@ export function SidebarDrawer({
   const insets = useSafeAreaInsets();
 
   // Footer row: insignia, text, settings
-  const FooterInsignia = useMemo(() => getClanInsigniaByHouse(user.clanId), [user.clanId]);
+
   const footerClanColor = useMemo(() => getSidebarFooterClanLineColor(user.clanId), [user.clanId]);
   const footerClanLine = user.clanId?.trim()
     ? `CLAN ${user.clanId.trim().toUpperCase()}`
@@ -337,9 +337,10 @@ export function SidebarDrawer({
             accessibilityLabel="Perfil"
             style={styles.footerInsigniaHit}
           >
-            <FooterInsignia
-              width={SIDEBAR_DRAWER_FOOTER_INSIGNIA_SIZE}
-              height={SIDEBAR_DRAWER_FOOTER_INSIGNIA_SIZE}
+            <UserAvatarFrame
+              clanId={user.clanId}
+              avatarUri={mockCurrentUser.avatarUri}
+              size={SIDEBAR_DRAWER_FOOTER_INSIGNIA_SIZE}
             />
           </TouchableOpacity>
 
