@@ -18,7 +18,7 @@ import type { CommunityPost, Comment } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getClanColor, NO_CLAN_COMMUNITY_POST_FRAME_COLOR } from '@evoconn/constants/clanColors';
 import { ReflectionBackground } from './ReflectionBackground';
-import { DETAIL_HEADER_ROW_OFFSET_Y } from '@evoconn/constants/reflectionDetailRankBadgeLayout';
+import { DETAIL_HEADER_ROW_OFFSET_Y, DETAIL_HEADER_ROW_OFFSET_X } from '@evoconn/constants/reflectionDetailRankBadgeLayout';
 import { DetailActionColumn } from './DetailActionColumn';
 import type { DetailActionColumnHandle } from './DetailActionColumn';
 import { CommentCard } from './CommentCard';
@@ -699,10 +699,14 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
       // Clan badge protrudes 5% of panel height above the grey box top.
       // Container height extends 5% upward so the bottom stays at the panel bottom.
       const overhang = reflPanelLayout.height * 0.05;
+      const fullH = reflPanelLayout.height * 1.05;
+      // verticalFillRatio shrinks the icon group and centers it inside the panel.
+      const fillRatio = COL.verticalFillRatio;
+      const verticalShift = (fullH * (1 - fillRatio)) / 2;
       return {
         position: 'absolute' as const,
         left: panelVisualRight - COL_FIXED_WIDTH / 2 - COL.columnCenterInset,
-        top: reflPanelLayout.y - overhang,
+        top: reflPanelLayout.y - overhang + verticalShift,
         zIndex: 10,
       };
     }
@@ -776,7 +780,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
       <ReflectionBackground clan={post.author.clanId}>
         <View style={styles.content}>
           {/* ── Header ── */}
-          <View style={[styles.headerRow, { transform: [{ translateY: DETAIL_HEADER_ROW_OFFSET_Y }] }]}>
+          <View style={[styles.headerRow, { transform: [{ translateX: DETAIL_HEADER_ROW_OFFSET_X }, { translateY: DETAIL_HEADER_ROW_OFFSET_Y }] }]}>
             <View style={styles.usernameFollowRow}>
               <TouchableOpacity onPress={handleAuthorPressAction}>
                 <Text style={styles.username}>{post.author.username}</Text>
@@ -1009,7 +1013,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
           onSave={handleSave}
           onClanPress={handleClanPressAction}
           onMorePress={handleMorePress}
-          containerHeight={reflPanelLayout ? reflPanelLayout.height * 1.05 : undefined}
+          containerHeight={reflPanelLayout ? reflPanelLayout.height * 1.05 * COL.verticalFillRatio : undefined}
         />
       </View>
     </View>

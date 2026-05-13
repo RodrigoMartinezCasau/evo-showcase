@@ -7,6 +7,10 @@ import {
   COMMENT_UPVOTE_LAYOUT as UP,
   COMMENT_EXPANSION_CONFIG as EXP,
 } from '@evoconn/constants/commentCardLayout';
+import {
+  NEW_COMMENT_BOX_LAYOUT as INBOX,
+  NEW_COMMENT_SEND_BUTTON_LAYOUT as SEND_BTN,
+} from '@evoconn/constants/newCommentBoxLayout';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
 
 import UpvoteInactive from '../assets/detailActions/31.svg';
@@ -122,11 +126,14 @@ export const CommentCard = React.memo(function CommentCard({
     }
   }, [handleUpvote, isLong, isFullyExpanded]);
 
-  const iconSz = 24 * UP.scale;
+  const iconSz = SEND_BTN.size * 0.6 * UP.scale;
 
   return (
+    // Row mirrors NewCommentBox: card(flex:1) + gap(INBOX.gap) + upvote(SEND_BTN.size).
+    // INBOX.gap and SEND_BTN.size are the single source of truth → X-axis alignment
+    // with the send button is guaranteed on every device width.
     <View style={styles.wrapper}>
-      {/* Card — text content only, fills available width */}
+      {/* Card — flex:1, same width as the "Añadir comentario" pill */}
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={handleTap}
@@ -137,8 +144,7 @@ export const CommentCard = React.memo(function CommentCard({
           {
             backgroundColor: CARD.backgroundColor,
             borderRadius: CARD.borderRadius,
-            paddingLeft: CARD.paddingX,
-            paddingRight: CARD.paddingXRight,
+            paddingHorizontal: CARD.paddingX,
             paddingVertical: CARD.paddingY,
             borderLeftWidth: CARD.clanAccentWidth,
             borderLeftColor: clanColor,
@@ -155,20 +161,13 @@ export const CommentCard = React.memo(function CommentCard({
         </Text>
       </TouchableOpacity>
 
-      {/* Upvote — outside the card, at the right edge of the panel */}
+      {/* Upvote — sibling of the card, width = SEND_BTN.size, gap = INBOX.gap.
+          Aligns exactly with the send button column on every device. */}
       <TouchableOpacity
         onPress={handleUpvote}
         activeOpacity={0.7}
         hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
-        style={[
-          styles.upvoteAnchor,
-          {
-            transform: [
-              { translateX: UP.offsetX },
-              { translateY: UP.offsetY },
-            ],
-          },
-        ]}
+        style={styles.upvoteAnchor}
       >
         <Animated.View
           style={{ alignItems: 'center', transform: [{ scale: bounceScale }] }}
@@ -187,19 +186,18 @@ export const CommentCard = React.memo(function CommentCard({
 
 const styles = StyleSheet.create({
   wrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: INBOX.gap,
     marginBottom: CARD.gapBetweenComments,
   },
   card: {
-    // full width — same as the "Añadir comentario" bar
+    flex: 1,
   },
   upvoteAnchor: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
+    width: SEND_BTN.size,
     alignItems: 'center',
     justifyContent: 'center',
-    width: 32,
   },
   username: {
     color: evoconnColors.text,

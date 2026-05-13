@@ -8,8 +8,6 @@ export const COMMENT_CARD_LAYOUT = {
   backgroundColor: '#15151A',
   borderRadius: 16,
   paddingX: 14,
-  /** Padding derecho extra para dejar espacio al botón de upvote (posición absoluta). */
-  paddingXRight: 44,
   paddingY: 12,
   /** Espacio vertical entre tarjetas de comentario (px). */
   gapBetweenComments: 12,

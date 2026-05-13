@@ -17,8 +17,10 @@ export const REFLECTION_DETAIL_RANK_BADGE_LAYOUT = {
   offsetY: 0,
 } as const;
 
-/** Desplazamiento vertical del header completo (username + rango) en conjunto (px). */
-export const DETAIL_HEADER_ROW_OFFSET_Y = 3;
+/** Desplazamiento horizontal del header completo (username + seguir) en conjunto (px). Positivo = derecha. */
+export const DETAIL_HEADER_ROW_OFFSET_X = 12;
+/** Desplazamiento vertical del header completo (username + seguir) en conjunto (px). Positivo = abajo. Igualado a OFFSET_X para distancia equivalente en ambos ejes. */
+export const DETAIL_HEADER_ROW_OFFSET_Y = DETAIL_HEADER_ROW_OFFSET_X;
 
 /** Colores por rango. */
 export const RANK_BADGE_COLORS: Record<Rank, { backgroundColor: string; textColor: string }> = {

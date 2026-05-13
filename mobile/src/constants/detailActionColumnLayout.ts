@@ -32,7 +32,13 @@ export const DETAIL_ACTION_COLUMN_LAYOUT = {
    * sin alterar el `space-between` ni la posición de la columna.
    * 1.0 = tamaño derivado del panel. 0.65 = 35 % más pequeño.
    */
-  sizeScale: 0.65,
+  sizeScale: 0.8,
+  /**
+   * Fracción del alto del panel que ocupa el grupo de iconos (0–1).
+   * El grupo se centra verticalmente dentro del panel.
+   * 1.0 = ocupa todo el panel (original). 0.5 = ocupa la mitad central.
+   */
+  verticalFillRatio: 0.7,
 };
 
 // Fallback scales (usados antes de que containerHeight esté disponible).

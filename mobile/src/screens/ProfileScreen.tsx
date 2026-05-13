@@ -422,7 +422,6 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
               username={profile.username}
               clanId={profile.clanId}
               rank={profile.rank}
-              avatarUri={profile.avatarUri}
               onShieldPress={
                 profile.clanId
                   ? () =>
