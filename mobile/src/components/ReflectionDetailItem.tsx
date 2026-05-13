@@ -91,9 +91,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   const isNoClanAuthor =
     post.author.clanId == null || String(post.author.clanId).trim() === '';
   const clanColor = getClanColor(post.author.clanId);
-  const reflectionPanelBorderColor = isNoClanAuthor
-    ? NO_CLAN_COMMUNITY_POST_FRAME_COLOR
-    : clanColor;
+  const reflectionPanelBorderColor = evoconnColors.background;
   const actionColRef = useRef<DetailActionColumnHandle>(null);
   const { updatePostVote, updatePostSaveToggle, getPostById, getMyVote } = useFeedStore();
   const { savePost, unsavePost, isSaved } = usePersonalProfile();
@@ -805,11 +803,11 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
               {
                 height: reflectionH,
                 borderRadius: RP.borderRadius,
-                backgroundColor: isNoClanAuthor ? evoconnColors.background : RP.backgroundColor,
+                backgroundColor: evoconnColors.background,
                 paddingHorizontal: RP.paddingHorizontal,
                 paddingVertical: RP.paddingVertical,
                 borderLeftColor: reflectionPanelBorderColor,
-                borderBottomWidth: isNoClanAuthor ? 4 : 0,
+                borderBottomWidth: 4,
                 borderBottomColor: reflectionPanelBorderColor,
                 transform: [
                   { translateX: RP.offsetX },
@@ -819,7 +817,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
               },
             ]}
           >
-            {isNoClanAuthor ? <PanelStarField /> : null}
+            <PanelStarField />
             {isPhrase ? (
               <ScrollView
                 scrollEnabled={phraseOverflowScroll}
@@ -939,7 +937,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
               {
                 height: commentsH,
                 borderRadius: CP.borderRadius,
-                backgroundColor: isNoClanAuthor ? evoconnColors.background : CP.backgroundColor,
+                backgroundColor: evoconnColors.background,
                 paddingHorizontal: CP.paddingHorizontal,
                 paddingVertical: CP.paddingVertical,
                 transform: [

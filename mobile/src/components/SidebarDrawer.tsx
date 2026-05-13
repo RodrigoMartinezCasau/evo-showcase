@@ -40,7 +40,7 @@ import { SidebarConversationsPanel } from './SidebarConversationsPanel';
 import { SidebarHeaderNotificationsButton } from './SidebarHeaderNotificationsButton';
 import { UserAvatarFrame } from './shared/UserAvatarFrame';
 import SettingsSvg from '../assets/sidebar/settingsIconSvg/settings.svg';
-import { getSidebarFooterClanLineColor } from '@evoconn/constants/clanColors';
+import { getSidebarFooterClanLineColor, getClanColor } from '@evoconn/constants/clanColors';
 import { INRIA_SERIF_FONT_FAMILY } from '@evoconn/constants/inriaSerifFontFamily';
 import type { Rank } from '@evoconn/types';
 import type { ConversationItem as ConvItem } from '@evoconn/types';
@@ -244,6 +244,7 @@ export function SidebarDrawer({
           label="COMUNIDAD"
           accessibilityLabel="Comunidad"
           menuRowStyle={styles.communityMenuRow}
+          glowBorderColor={!user.clanId || user.clanId.trim() === '' ? getClanColor(user.clanId) : undefined}
           leftOverlay={{
             element: (
               <EstrellaComunidadSvg

@@ -144,6 +144,11 @@ type SidebarPngMenuButtonProps = {
    */
   textAdjustsFontSizeToFit?: boolean;
   leftOverlay?: SidebarPngMenuButtonLeftOverlay | null;
+  /**
+   * Cuando se pasa, reemplaza el PNG con un fondo oscuro + borde brillante de este color.
+   * Usado para usuarios sin clan, donde el botón muestra el estilo de "reborde" en lugar del relleno sólido.
+   */
+  glowBorderColor?: string;
 };
 
 export function SidebarPngMenuButton({
@@ -155,6 +160,7 @@ export function SidebarPngMenuButton({
   onPress,
   textAdjustsFontSizeToFit = true,
   leftOverlay = null,
+  glowBorderColor,
 }: SidebarPngMenuButtonProps) {
   const imgW = config.imageWidth;
   const imgH = config.imageHeight;
@@ -197,51 +203,71 @@ export function SidebarPngMenuButton({
           }}
         >
           <View style={{ position: 'relative', width: layoutW, height: visibleH, alignSelf: 'center' }}>
-            <View
-              style={{
-                position: 'absolute',
-                left: 0,
-                top: 0,
-                width: layoutW,
-                height: visibleH,
-                overflow: 'hidden',
-              }}
-            >
+            {glowBorderColor ? (
+              /* Full border variant: dark background + thin colored border all around.
+                 No glow, no shadow. Inset 10 px top/bottom to match the PNG button's
+                 internal padding (content runs from rendered y≈10 to y≈55). */
               <View
                 style={{
-                  width: visibleW,
+                  position: 'absolute',
+                  left: 0,
+                  top: 10,
+                  width: layoutW,
+                  height: visibleH - 20,
+                  backgroundColor: '#0B0B0F',
+                  borderRadius: 6,
+                  borderWidth: 1.5,
+                  borderColor: glowBorderColor,
+                }}
+              />
+            ) : (
+              /* Default PNG-based background */
+              <View
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  width: layoutW,
                   height: visibleH,
-                  transform: [{ scaleX: stretchH }],
+                  overflow: 'hidden',
                 }}
               >
                 <View
                   style={{
-                    position: 'absolute',
-                    left: 0,
-                    top: 0,
                     width: visibleW,
                     height: visibleH,
-                    overflow: 'hidden',
+                    transform: [{ scaleX: stretchH }],
                   }}
                 >
                   <View
                     style={{
                       position: 'absolute',
-                      left: -cropL,
-                      top: -cropT,
-                      width: imgW,
-                      height: imgH,
+                      left: 0,
+                      top: 0,
+                      width: visibleW,
+                      height: visibleH,
+                      overflow: 'hidden',
                     }}
                   >
-                    <Image
-                      source={source}
-                      style={{ width: imgW, height: imgH }}
-                      resizeMode="stretch"
-                    />
+                    <View
+                      style={{
+                        position: 'absolute',
+                        left: -cropL,
+                        top: -cropT,
+                        width: imgW,
+                        height: imgH,
+                      }}
+                    >
+                      <Image
+                        source={source}
+                        style={{ width: imgW, height: imgH }}
+                        resizeMode="stretch"
+                      />
+                    </View>
                   </View>
                 </View>
               </View>
-            </View>
+            )}
             {leftOverlay != null ? (
               <View
                 pointerEvents="none"

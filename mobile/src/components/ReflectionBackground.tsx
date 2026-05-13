@@ -3,24 +3,38 @@ import { View, StyleSheet, LayoutChangeEvent } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Path } from 'react-native-svg';
 import { REFLECTION_BACKGROUND_LAYOUT as L } from '@evoconn/constants/reflectionBackgroundLayout';
 import { getReflectionBackgroundByHouse } from '@evoconn/utils/getReflectionBackgroundByHouse';
+import { getClanColor } from '@evoconn/constants/clanColors';
 
-// ── Sin-clan rim constants ────────────────────────────────────────────────────
-const RIM_COLOR     = '#c7ff02';
-const RIM_HIGHLIGHT = '#e8ff99';
-const RIM_WIDTH     = 1.8;
-/** Longitud del tramo recto desde cada esquina (pt). */
-const RIM_ARM       = 52;
+// ── Clan rim constants ────────────────────────────────────────────────────────
+const RIM_WIDTH = 1.8;
+/** Length of the straight arm from each corner (pt). */
+const RIM_ARM   = 52;
 
-/** Dos arcos brillantes en esquinas opuestas, al estilo del widget iOS. */
-function NoClanRimOverlay({ width, height }: { width: number; height: number }) {
-  const r = L.borderRadius;
-  const a = RIM_ARM;
-  const w = width;
-  const h = height;
+/** Blend a #RRGGBB color 55 % toward white to produce a brighter highlight. */
+function lightenHex(hex: string): string {
+  const h = hex.replace('#', '');
+  if (h.length !== 6) return '#ffffff';
+  const blend = (c: number) => Math.min(255, Math.round(c + (255 - c) * 0.55));
+  const x = (c: number) => blend(parseInt(h.slice(c, c + 2), 16)).toString(16).padStart(2, '0');
+  return `#${x(0)}${x(2)}${x(4)}`;
+}
 
-  // Superior izquierda: brazo vertical → arco → brazo horizontal
+/** Two glowing arcs at opposite corners — color adapts to the post's clan. */
+function ClanRimOverlay({ width, height, clanColor }: { width: number; height: number; clanColor: string }) {
+  const r   = L.borderRadius;
+  const a   = RIM_ARM;
+  const w   = width;
+  const h   = height;
+  const hl  = lightenHex(clanColor);
+  // Gradient IDs are scoped per <Svg> in react-native-svg, but include the color
+  // slug for clarity when debugging.
+  const slug = clanColor.replace('#', '');
+  const idTL = `rimTL_${slug}`;
+  const idBR = `rimBR_${slug}`;
+
+  // Top-left:     vertical arm → arc → horizontal arm
   const tlD = `M 0 ${r + a} L 0 ${r} A ${r} ${r} 0 0 1 ${r} 0 L ${r + a} 0`;
-  // Inferior derecha: brazo vertical → arco → brazo horizontal
+  // Bottom-right: vertical arm → arc → horizontal arm
   const brD = `M ${w} ${h - r - a} L ${w} ${h - r} A ${r} ${r} 0 0 1 ${w - r} ${h} L ${w - r - a} ${h}`;
 
   return (
@@ -31,47 +45,23 @@ function NoClanRimOverlay({ width, height }: { width: number; height: number }) 
       pointerEvents="none"
     >
       <Defs>
-        <LinearGradient
-          id="noClanRimTL"
-          x1={0} y1={r + a}
-          x2={r + a} y2={0}
-          gradientUnits="userSpaceOnUse"
-        >
-          <Stop offset="0"   stopColor={RIM_COLOR}     stopOpacity={0}    />
-          <Stop offset="0.3" stopColor={RIM_COLOR}     stopOpacity={0.85} />
-          <Stop offset="0.5" stopColor={RIM_HIGHLIGHT} stopOpacity={1}    />
-          <Stop offset="0.7" stopColor={RIM_COLOR}     stopOpacity={0.85} />
-          <Stop offset="1"   stopColor={RIM_COLOR}     stopOpacity={0}    />
+        <LinearGradient id={idTL} x1={0} y1={r + a} x2={r + a} y2={0} gradientUnits="userSpaceOnUse">
+          <Stop offset="0"   stopColor={clanColor} stopOpacity={0}    />
+          <Stop offset="0.3" stopColor={clanColor} stopOpacity={0.85} />
+          <Stop offset="0.5" stopColor={hl}        stopOpacity={1}    />
+          <Stop offset="0.7" stopColor={clanColor} stopOpacity={0.85} />
+          <Stop offset="1"   stopColor={clanColor} stopOpacity={0}    />
         </LinearGradient>
-        <LinearGradient
-          id="noClanRimBR"
-          x1={w}     y1={h - r - a}
-          x2={w - r - a} y2={h}
-          gradientUnits="userSpaceOnUse"
-        >
-          <Stop offset="0"   stopColor={RIM_COLOR}     stopOpacity={0}    />
-          <Stop offset="0.3" stopColor={RIM_COLOR}     stopOpacity={0.85} />
-          <Stop offset="0.5" stopColor={RIM_HIGHLIGHT} stopOpacity={1}    />
-          <Stop offset="0.7" stopColor={RIM_COLOR}     stopOpacity={0.85} />
-          <Stop offset="1"   stopColor={RIM_COLOR}     stopOpacity={0}    />
+        <LinearGradient id={idBR} x1={w} y1={h - r - a} x2={w - r - a} y2={h} gradientUnits="userSpaceOnUse">
+          <Stop offset="0"   stopColor={clanColor} stopOpacity={0}    />
+          <Stop offset="0.3" stopColor={clanColor} stopOpacity={0.85} />
+          <Stop offset="0.5" stopColor={hl}        stopOpacity={1}    />
+          <Stop offset="0.7" stopColor={clanColor} stopOpacity={0.85} />
+          <Stop offset="1"   stopColor={clanColor} stopOpacity={0}    />
         </LinearGradient>
       </Defs>
-      <Path
-        d={tlD}
-        fill="none"
-        stroke="url(#noClanRimTL)"
-        strokeWidth={RIM_WIDTH}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <Path
-        d={brD}
-        fill="none"
-        stroke="url(#noClanRimBR)"
-        strokeWidth={RIM_WIDTH}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <Path d={tlD} fill="none" stroke={`url(#${idTL})`} strokeWidth={RIM_WIDTH} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d={brD} fill="none" stroke={`url(#${idBR})`} strokeWidth={RIM_WIDTH} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
@@ -89,7 +79,7 @@ type ReflectionBackgroundProps = {
  */
 export const ReflectionBackground = React.memo(function ReflectionBackground({ clan, children }: ReflectionBackgroundProps) {
   const BgIcon    = useMemo(() => getReflectionBackgroundByHouse(clan), [clan]);
-  const isNoClan  = !clan || String(clan).trim() === '';
+  const clanColor = useMemo(() => getClanColor(clan), [clan]);
 
   const [dims, setDims] = useState<{ width: number; height: number } | null>(null);
 
@@ -101,7 +91,7 @@ export const ReflectionBackground = React.memo(function ReflectionBackground({ c
   }, []);
 
   return (
-    <View style={styles.root} onLayout={isNoClan ? handleLayout : undefined}>
+    <View style={styles.root} onLayout={handleLayout}>
       <View
         pointerEvents="none"
         style={[styles.bgClip, { borderRadius: L.borderRadius }]}
@@ -122,8 +112,8 @@ export const ReflectionBackground = React.memo(function ReflectionBackground({ c
         </View>
       </View>
       {children}
-      {isNoClan && dims ? (
-        <NoClanRimOverlay width={dims.width} height={dims.height} />
+      {dims ? (
+        <ClanRimOverlay width={dims.width} height={dims.height} clanColor={clanColor} />
       ) : null}
     </View>
   );
