@@ -243,7 +243,7 @@ export default function PersonalProfileScreen() {
   const handleBottomTabChange = useCallback((tab: TabId) => {
     // Always navigate immediately — replacing the route unmounts this screen
     // along with any open detail overlay, so no explicit closeDetailFeed needed.
-    router.replace({ pathname: '/(tabs)', params: { tab } });
+    router.navigate({ pathname: '/(tabs)', params: { tab } });
   }, [router]);
 
   return (

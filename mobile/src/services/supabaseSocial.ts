@@ -352,6 +352,7 @@ export type BasicProfile = {
   username: string;
   clanId: string | null;
   rank: string;
+  avatarUri?: string | null;
 };
 
 /** Fetch basic profile info for a list of user IDs (for followers/following display). */
@@ -375,7 +376,7 @@ export async function searchSupabaseUsers(query: string): Promise<BasicProfile[]
   if (!query.trim()) return [];
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, username, clan_id, rank')
+    .select('id, username, clan_id, rank, avatar_url')
     .ilike('username', `%${query.trim()}%`)
     .limit(30);
   if (error) { console.error('[Social] searchSupabaseUsers:', error.message); return []; }
@@ -384,6 +385,7 @@ export async function searchSupabaseUsers(query: string): Promise<BasicProfile[]
     username: r.username ?? r.id.slice(0, 8),
     clanId: r.clan_id ?? null,
     rank: r.rank ?? 'aprendiz',
+    avatarUri: (r as { avatar_url?: string | null }).avatar_url ?? null,
   }));
 }
 

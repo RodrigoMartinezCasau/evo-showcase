@@ -34,7 +34,7 @@ import type { CommunityPost } from '@evoconn/types';
 const ANIM_DURATION = 200;
 
 export default function ProfileScreen() {
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { id, username: initialUsername } = useLocalSearchParams<{ id?: string; username?: string }>();
   const router = useRouter();
   const isOwn = !id || id === mockCurrentUser.id;
 
@@ -42,7 +42,7 @@ export default function ProfileScreen() {
     return <OwnProfileView />;
   }
 
-  return <OtherUserProfileView userId={id} router={router} />;
+  return <OtherUserProfileView userId={id} router={router} initialUsername={initialUsername} />;
 }
 
 function OwnProfileView() {
@@ -95,7 +95,7 @@ function OwnProfileView() {
   );
 }
 
-function OtherUserProfileView({ userId, router }: { userId: string; router: ReturnType<typeof useRouter> }) {
+function OtherUserProfileView({ userId, router, initialUsername }: { userId: string; router: ReturnType<typeof useRouter>; initialUsername?: string }) {
   const pathname = usePathname();
   // Try the 9-user simulation first; if not found, fetch from Supabase.
   const mockProfile = getOtherUserProfile(userId);
@@ -195,9 +195,13 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
 
   // Static profile data (username, rank, insignia, etc.)
   // Falls back to supabaseProfile for real users, or first mock user as last resort.
+  const loadingUsername = initialUsername
+    ? (initialUsername.startsWith('@') ? initialUsername.toUpperCase() : `@${initialUsername.toUpperCase()}`)
+    : '?';
+
   const baseProfile = mockProfile ?? supabaseProfile ?? {
     id: userId,
-    username: '?',
+    username: loadingUsername,
     clanId: null,
     rank: 'aprendiz' as const,
     followersCount: 0,
@@ -392,7 +396,7 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
       closeDetailFeed();
       return;
     }
-    router.replace({ pathname: '/(tabs)', params: { tab } });
+    router.navigate({ pathname: '/(tabs)', params: { tab } });
   }, [detailFeed, closeDetailFeed, router]);
 
   return (

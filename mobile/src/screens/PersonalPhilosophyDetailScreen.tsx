@@ -226,7 +226,7 @@ export default function PersonalPhilosophyDetailScreen() {
   // ─── Navigation ─────────────────────────────────────────────────────────
   const handleBottomTabChange = useCallback(
     (tab: TabId) => {
-      router.replace({ pathname: '/(tabs)', params: { tab } });
+      router.navigate({ pathname: '/(tabs)', params: { tab } });
     },
     [router],
   );

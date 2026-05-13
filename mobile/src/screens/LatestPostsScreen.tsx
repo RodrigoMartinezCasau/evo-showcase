@@ -135,7 +135,7 @@ export default function LatestPostsScreen() {
 
   const handleTabChange = useCallback(
     (tab: TabId) => {
-      router.replace({ pathname: '/(tabs)', params: { tab } });
+      router.navigate({ pathname: '/(tabs)', params: { tab } });
     },
     [router],
   );

@@ -373,7 +373,7 @@ export default function SettingsScreen({
   } = useEvoPreferences();
 
   const handleBottomTabChange = useCallback(
-    (tab: TabId) => { router.replace({ pathname: '/(tabs)', params: { tab } }); },
+    (tab: TabId) => { router.navigate({ pathname: '/(tabs)', params: { tab } }); },
     [router],
   );
 

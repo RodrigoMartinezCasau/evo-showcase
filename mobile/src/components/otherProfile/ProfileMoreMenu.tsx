@@ -79,7 +79,7 @@ export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({
     recordBlockUser(userId, clanId ?? null);
     openInfo('Usuario bloqueado', 'Ya no verás su contenido. Puedes desbloquear desde Ajustes.');
     if (router.canGoBack()) router.back();
-    else router.replace('/(tabs)');
+    else router.navigate('/(tabs)');
   }, [
     session,
     following,

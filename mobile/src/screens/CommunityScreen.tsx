@@ -366,11 +366,14 @@ export default function CommunityScreen() {
   );
 
   const handleAuthorPress = useCallback(
-    (userId: string) => {
+    (userId: string, username?: string) => {
       if (userId === mockCurrentUser.id) {
         pushUnlessCurrent(pathname, '/my-profile');
       } else {
-        router.push({ pathname: '/profile/[id]', params: { id: userId } });
+        router.push({
+          pathname: '/profile/[id]',
+          params: { id: userId, ...(username ? { username } : {}) },
+        });
       }
     },
     [router, pathname],

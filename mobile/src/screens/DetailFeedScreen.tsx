@@ -179,13 +179,13 @@ export default function DetailFeedScreen() {
   const handleTabChange = useCallback(
     (tab: string) => {
       if (tab === 'search') {
-        router.replace('/(tabs)');
+        router.navigate('/(tabs)');
         return;
       }
       const newMode: FeedMode = tab === 'siguiendo' ? 'following' : 'foryou';
 
       if (tab === 'siguiendo') {
-        router.replace('/(tabs)');
+        router.navigate('/(tabs)');
         return;
       }
       if (newMode !== mode) {

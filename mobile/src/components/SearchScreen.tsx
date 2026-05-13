@@ -27,7 +27,7 @@ const SEARCH_PROFILE_ICON_OFFSET_X  = 0;   // positive = right
 const SEARCH_PROFILE_ICON_OFFSET_Y  = 0;   // positive = down
 
 type SearchScreenProps = {
-  onUserPress: (userId: string) => void;
+  onUserPress: (userId: string, username?: string) => void;
 };
 
 export function SearchScreen({ onUserPress }: SearchScreenProps) {
@@ -66,6 +66,7 @@ export function SearchScreen({ onUserPress }: SearchScreenProps) {
         clanId: p.clanId,
         rank: p.rank as ScoredUser['rank'],
         score: 1,
+        avatarUri: p.avatarUri ?? null,
       })));
     });
   }, [debouncedQuery]);
@@ -110,7 +111,7 @@ export function SearchScreen({ onUserPress }: SearchScreenProps) {
 
   const handleUserPress = useCallback((user: ScoredUser) => {
     addRecent(user.username);
-    onUserPress(user.id);
+    onUserPress(user.id, user.username);
   }, [addRecent, onUserPress]);
 
   const showResults = debouncedQuery.trim().length > 0;
@@ -122,6 +123,7 @@ export function SearchScreen({ onUserPress }: SearchScreenProps) {
       clanId={item.clanId}
       rank={item.rank}
       followersCount={item.followersCount ?? 0}
+      avatarUri={item.avatarUri}
       onPress={() => handleUserPress(item)}
     />
   ), [handleUserPress]);

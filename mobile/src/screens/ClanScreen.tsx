@@ -24,7 +24,7 @@ export default function ClanScreen() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleBottomTabChange = useCallback((tab: TabId) => {
-    router.replace({ pathname: '/(tabs)', params: { tab } });
+    router.navigate({ pathname: '/(tabs)', params: { tab } });
   }, [router]);
 
   const bodyHeight = getClanPhrasesShellBodyHeight(
