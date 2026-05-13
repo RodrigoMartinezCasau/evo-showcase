@@ -74,12 +74,12 @@ export const CLAN_SECONDARY_DEFAULT = '#7A3CFF';
 export const NO_CLAN_ACCENT_COLOR = evoconnColors.neonGreen;
 
 /**
- * Color de superficie sin clan en Para ti / detalle reflexión:
- * - Relleno del SVG `assets/reflectionBackground/noClan.svg` (mismo hex en los `fill`).
- * - Borde izquierdo del panel negro en `ReflectionDetailItem`.
- * Al cambiar el color de prueba, actualiza este valor y los fills del SVG a la vez.
+ * Color de superficie sin clan en Para ti / detalle reflexión: mismo que el fondo de app
+ * (`evoconnColors.background`). El SVG `noClan.svg` no puede leer TS: mantén sus `fill` alineados
+ * con el hex de `background` en `theme/colors.ts`. Rebordes brillantes del asset: `#c7ff02`
+ * (alineado con `NO_CLAN_ACCENT_COLOR` en iOS).
  */
-export const NO_CLAN_PARATI_SURFACE_COLOR = '#242424';
+export const NO_CLAN_PARATI_SURFACE_COLOR = evoconnColors.background;
 
 /** Alias — mismo valor que `NO_CLAN_PARATI_SURFACE_COLOR` (marco panel en ReflectionDetailItem). */
 export const NO_CLAN_COMMUNITY_POST_FRAME_COLOR = NO_CLAN_PARATI_SURFACE_COLOR;
