@@ -101,8 +101,10 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
   // Solve: ICON_RATIO_SUM * effectiveSz + FIXED_H = containerHeight
   // Clan = 2.2 × other (120% bigger).  Icons fill the panel; gaps from space-between.
   // Fixed: 3 text lines (~18px) + 2× VOTE_STAT_ICON_GAP (up count↔icon, down icon↔count).
+  // COL.sizeScale shrinks all icons uniformly without affecting column position or spacing.
   const ICON_RATIO_SUM = 2.2 + 1 + 1 + 0.92 + 0.6; // clan + up + down + save + dots
   const FIXED_H = 3 * 18 + 2 * VOTE_STAT_ICON_GAP;
+  const SCALE = COL.sizeScale;
 
   let clanSz: number;
   let otherSz: number;
@@ -112,16 +114,16 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
   if (containerHeight && containerHeight > 0) {
     const derivedSz = Math.max(1, (containerHeight - FIXED_H) / ICON_RATIO_SUM);
     const rawClanH = derivedSz * 2.2;
-    clanSz = Math.min(rawClanH, COL.maxClanW);
+    clanSz = Math.min(rawClanH, COL.maxClanW) * SCALE;
     const effSz = clanSz / 2.2;
     otherSz = effSz;
     saveSz = effSz * 0.92;
-    dotsFontSz = Math.max(12, effSz * 0.6);
+    dotsFontSz = Math.max(10, effSz * 0.6);
   } else {
-    clanSz = sz * CLAN_L.scale;
-    otherSz = sz * UP_L.scale;
-    saveSz = sz * SAVE_L.scale;
-    dotsFontSz = Math.max(12, 22 * MORE_L.scale);
+    clanSz = sz * CLAN_L.scale * SCALE;
+    otherSz = sz * UP_L.scale * SCALE;
+    saveSz = sz * SAVE_L.scale * SCALE;
+    dotsFontSz = Math.max(10, 22 * MORE_L.scale * SCALE);
   }
   // ──────────────────────────────────────────────────────────────────────────
 
