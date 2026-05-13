@@ -37,32 +37,31 @@ function ClanRimOverlay({ width, height, clanColor }: { width: number; height: n
   // Bottom-right: vertical arm → arc → horizontal arm
   const brD = `M ${w} ${h - r - a} L ${w} ${h - r} A ${r} ${r} 0 0 1 ${w - r} ${h} L ${w - r - a} ${h}`;
 
+  // IMPORTANT: pointerEvents must be set on the View wrapper, NOT on <Svg>.
+  // react-native-svg does not forward pointerEvents to the native touch system.
   return (
-    <Svg
-      style={StyleSheet.absoluteFill}
-      width={w}
-      height={h}
-      pointerEvents="none"
-    >
-      <Defs>
-        <LinearGradient id={idTL} x1={0} y1={r + a} x2={r + a} y2={0} gradientUnits="userSpaceOnUse">
-          <Stop offset="0"   stopColor={clanColor} stopOpacity={0}    />
-          <Stop offset="0.3" stopColor={clanColor} stopOpacity={0.85} />
-          <Stop offset="0.5" stopColor={hl}        stopOpacity={1}    />
-          <Stop offset="0.7" stopColor={clanColor} stopOpacity={0.85} />
-          <Stop offset="1"   stopColor={clanColor} stopOpacity={0}    />
-        </LinearGradient>
-        <LinearGradient id={idBR} x1={w} y1={h - r - a} x2={w - r - a} y2={h} gradientUnits="userSpaceOnUse">
-          <Stop offset="0"   stopColor={clanColor} stopOpacity={0}    />
-          <Stop offset="0.3" stopColor={clanColor} stopOpacity={0.85} />
-          <Stop offset="0.5" stopColor={hl}        stopOpacity={1}    />
-          <Stop offset="0.7" stopColor={clanColor} stopOpacity={0.85} />
-          <Stop offset="1"   stopColor={clanColor} stopOpacity={0}    />
-        </LinearGradient>
-      </Defs>
-      <Path d={tlD} fill="none" stroke={`url(#${idTL})`} strokeWidth={RIM_WIDTH} strokeLinecap="round" strokeLinejoin="round" />
-      <Path d={brD} fill="none" stroke={`url(#${idBR})`} strokeWidth={RIM_WIDTH} strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Svg width={w} height={h}>
+        <Defs>
+          <LinearGradient id={idTL} x1={0} y1={r + a} x2={r + a} y2={0} gradientUnits="userSpaceOnUse">
+            <Stop offset="0"   stopColor={clanColor} stopOpacity={0}    />
+            <Stop offset="0.3" stopColor={clanColor} stopOpacity={0.85} />
+            <Stop offset="0.5" stopColor={hl}        stopOpacity={1}    />
+            <Stop offset="0.7" stopColor={clanColor} stopOpacity={0.85} />
+            <Stop offset="1"   stopColor={clanColor} stopOpacity={0}    />
+          </LinearGradient>
+          <LinearGradient id={idBR} x1={w} y1={h - r - a} x2={w - r - a} y2={h} gradientUnits="userSpaceOnUse">
+            <Stop offset="0"   stopColor={clanColor} stopOpacity={0}    />
+            <Stop offset="0.3" stopColor={clanColor} stopOpacity={0.85} />
+            <Stop offset="0.5" stopColor={hl}        stopOpacity={1}    />
+            <Stop offset="0.7" stopColor={clanColor} stopOpacity={0.85} />
+            <Stop offset="1"   stopColor={clanColor} stopOpacity={0}    />
+          </LinearGradient>
+        </Defs>
+        <Path d={tlD} fill="none" stroke={`url(#${idTL})`} strokeWidth={RIM_WIDTH} strokeLinecap="round" strokeLinejoin="round" />
+        <Path d={brD} fill="none" stroke={`url(#${idBR})`} strokeWidth={RIM_WIDTH} strokeLinecap="round" strokeLinejoin="round" />
+      </Svg>
+    </View>
   );
 }
 
