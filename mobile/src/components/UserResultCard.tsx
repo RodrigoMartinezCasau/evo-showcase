@@ -7,8 +7,8 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { evoconnColors } from '@evoconn/theme/colors';
-import { getClanProfileByHouse } from '@evoconn/utils/getClanProfileByHouse';
 import { getClanColor } from '@evoconn/constants/clanColors';
+import { UserAvatarFrame } from '@evoconn/components/shared/UserAvatarFrame';
 
 const ICON_SIZE    = 40;
 const ICON_SCALE   = 1.2;
@@ -27,6 +27,7 @@ export type UserResultCardProps = {
   clanId: string | null;
   rank: string;
   followersCount?: number;
+  avatarUri?: string | null;
   /** Porcentaje de afinidad con el clan (opcional, mostrado en display de clan) */
   clanPct?: string;
   onPress?: () => void;
@@ -37,10 +38,10 @@ export function UserResultCard({
   clanId,
   rank,
   followersCount,
+  avatarUri,
   clanPct,
   onPress,
 }: UserResultCardProps) {
-  const ProfileSvg = getClanProfileByHouse(clanId);
   const clanColor  = getClanColor(clanId);
 
   return (
@@ -50,19 +51,16 @@ export function UserResultCard({
       onPress={onPress}
       disabled={!onPress}
     >
-      {/* Avatar con perfil de clan */}
+      {/* Avatar con foto de perfil o icono de clan */}
       <View style={styles.avatarWrap}>
-        <View
-          style={{
-            transform: [
-              { translateX: ICON_OFFSET_X },
-              { translateY: ICON_OFFSET_Y },
-              { scale: ICON_SCALE },
-            ],
-          }}
-        >
-          <ProfileSvg width={ICON_SIZE} height={ICON_SIZE} />
-        </View>
+        <UserAvatarFrame
+          clanId={clanId}
+          avatarUri={avatarUri}
+          size={ICON_SIZE}
+          iconScale={ICON_SCALE}
+          iconOffsetX={ICON_OFFSET_X}
+          iconOffsetY={ICON_OFFSET_Y}
+        />
       </View>
 
       {/* Info */}

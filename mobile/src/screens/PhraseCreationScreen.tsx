@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AppTopBar, ChatInputBar, SidebarDrawer, useKeyboardAnim } from '@evoconn/components';
+import { ClanSendButton } from '@evoconn/components/ChatInputBar';
 import { PublishBlock, PhraseNotesCard, PhraseFolderManagerCard } from '@evoconn/components/debate';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
@@ -27,7 +28,6 @@ import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { incrementProfileStat } from '@evoconn/services/supabaseSocial';
 import { recordActivity, recordUsesLog } from '@evoconn/services/streakApi';
 import { useAuth } from '../../mobile/lib/AuthContext';
-import { getPhraseSendButtonByHouse } from '@evoconn/utils/getPhraseSendButtonByHouse';
 import { getClanSecondaryColor } from '@evoconn/constants/clanColors';
 import { CHAT_SEND_BUTTON_LAYOUT } from '@evoconn/constants/chatInputBarLayout';
 import {
@@ -138,11 +138,10 @@ export default function PhraseCreationScreen() {
   const clanColor = getChatUserAccentColor(activeClan);
   const phraseCursorColor = getClanSecondaryColor(activeClan);
 
-  const SendIcon = useMemo(() => getPhraseSendButtonByHouse(activeClan), [activeClan]);
   const sendBtnSize = CHAT_SEND_BUTTON_LAYOUT.size;
   const sendIconNode = useMemo(
-    () => <SendIcon width={sendBtnSize} height={sendBtnSize} />,
-    [SendIcon, sendBtnSize],
+    () => <ClanSendButton size={sendBtnSize} clanColor={clanColor} />,
+    [sendBtnSize, clanColor],
   );
   const PublishStar = useMemo(() => getPublishStarByClan(activeClan), [activeClan]);
 

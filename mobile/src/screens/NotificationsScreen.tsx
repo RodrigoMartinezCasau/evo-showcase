@@ -31,7 +31,7 @@ import { getMainColumnHeightForFloatingBottomBar } from '@evoconn/constants/appS
 import { useNotifications } from '@evoconn/hooks/NotificationsContext';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
-import { getClanProfileByHouse } from '@evoconn/utils/getClanProfileByHouse';
+import { UserAvatarFrame } from '@evoconn/components/shared/UserAvatarFrame';
 import type { AppNotification } from '@evoconn/services/notificationsStorage';
 import {
   acceptFollowRequestRpc,
@@ -81,6 +81,7 @@ function actionLabel(n: AppNotification): string {
 type RowProps = {
   notification: AppNotification;
   clanId: string | null | undefined;
+  avatarUri?: string | null;
   onPressProfile: (n: AppNotification) => void;
   onPressContent: (n: AppNotification) => void;
 };
@@ -88,10 +89,10 @@ type RowProps = {
 const NotificationRow = React.memo(function NotificationRow({
   notification: n,
   clanId,
+  avatarUri,
   onPressProfile,
   onPressContent,
 }: RowProps) {
-  const ProfileSvg = getClanProfileByHouse(clanId ?? null);
   const username = n.fromUsername.replace(/^@+/, '');
 
   // Follow / solicitud: destino perfil.
@@ -111,9 +112,12 @@ const NotificationRow = React.memo(function NotificationRow({
         hitSlop={4}
       >
         <View style={styles.avatarWrap}>
-          <View style={{ transform: [{ scale: PROFILE_ICON_SCALE }] }}>
-            <ProfileSvg width={AVATAR_SIZE} height={AVATAR_SIZE} />
-          </View>
+          <UserAvatarFrame
+            clanId={clanId}
+            avatarUri={avatarUri}
+            size={AVATAR_SIZE}
+            iconScale={PROFILE_ICON_SCALE}
+          />
         </View>
       </TouchableOpacity>
 
@@ -148,6 +152,7 @@ const NotificationRow = React.memo(function NotificationRow({
 type FollowRequestRowProps = {
   notification: AppNotification;
   clanId: string | null | undefined;
+  avatarUri?: string | null;
   onPressProfile: (n: AppNotification) => void;
   busy: boolean;
   onAccept: (n: AppNotification) => void;
@@ -157,12 +162,12 @@ type FollowRequestRowProps = {
 const FollowRequestRow = React.memo(function FollowRequestRow({
   notification: n,
   clanId,
+  avatarUri,
   onPressProfile,
   busy,
   onAccept,
   onReject,
 }: FollowRequestRowProps) {
-  const ProfileSvg = getClanProfileByHouse(clanId ?? null);
   const username = n.fromUsername.replace(/^@+/, '');
 
   return (
@@ -174,9 +179,12 @@ const FollowRequestRow = React.memo(function FollowRequestRow({
         hitSlop={4}
       >
         <View style={styles.avatarWrap}>
-          <View style={{ transform: [{ scale: PROFILE_ICON_SCALE }] }}>
-            <ProfileSvg width={AVATAR_SIZE} height={AVATAR_SIZE} />
-          </View>
+          <UserAvatarFrame
+            clanId={clanId}
+            avatarUri={avatarUri}
+            size={AVATAR_SIZE}
+            iconScale={PROFILE_ICON_SCALE}
+          />
         </View>
       </TouchableOpacity>
       <View style={styles.followRequestMid}>

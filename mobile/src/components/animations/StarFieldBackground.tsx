@@ -6,9 +6,12 @@
  * a placeholder while the animation assets / WebView are loading, or as the
  * gating screen for tabs while auth state is settling, so the user never
  * sees a transition from black ↔ stars ↔ animation.
+ *
+ * `PanelStarField` is the lightweight variant: no background, pointerEvents none,
+ * absoluteFill — overlay it inside any dark panel (e.g. no-clan reflection panel).
  */
-import React, { useMemo } from 'react';
-import { View, StyleSheet, Animated, Easing, useWindowDimensions } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, StyleSheet, Animated, Easing, useWindowDimensions, LayoutChangeEvent } from 'react-native';
 
 const STAR_COUNT = 28;
 const BG_COLOR = '#0f0f12';
@@ -84,7 +87,50 @@ export default function StarFieldBackground({ children }: { children?: React.Rea
   );
 }
 
+/**
+ * Lightweight overlay variant: no background, absoluteFill, pointerEvents none.
+ * Drop it inside any dark panel to get the same twinkling-stars effect.
+ * Star count and seed offset are separate from StarFieldBackground so both
+ * can coexist on screen without duplicating positions.
+ */
+const PANEL_STAR_COUNT = 18;
+const PANEL_SEED_OFFSET = 500;
+
+export function PanelStarField() {
+  const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
+
+  const handleLayout = (e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    setDims(prev =>
+      prev?.w === width && prev?.h === height ? prev : { w: width, h: height },
+    );
+  };
+
+  const stars = useMemo(() => {
+    if (!dims) return [];
+    return Array.from({ length: PANEL_STAR_COUNT }, (_, i) => ({
+      x: pseudoRandom((i + PANEL_SEED_OFFSET) * 2 + 1) * dims.w,
+      y: pseudoRandom((i + PANEL_SEED_OFFSET) * 2 + 2) * dims.h,
+      size: 1.2 + pseudoRandom((i + PANEL_SEED_OFFSET) * 3 + 7) * 1.4,
+      delay: Math.floor(pseudoRandom((i + PANEL_SEED_OFFSET) * 4 + 11) * 2200),
+    }));
+  }, [dims]);
+
+  return (
+    <View
+      style={styles.panelOverlay}
+      pointerEvents="none"
+      onLayout={handleLayout}
+    >
+      {stars.map((s, i) => (
+        <Star key={i} x={s.x} y={s.y} size={s.size} delay={s.delay} />
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG_COLOR },
   star: { position: 'absolute', backgroundColor: '#ffffff' },
+  panelOverlay: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
 });

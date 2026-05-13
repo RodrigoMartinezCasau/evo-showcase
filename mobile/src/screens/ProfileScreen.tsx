@@ -136,7 +136,7 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
     Promise.all([
       supabase
         .from('profiles')
-        .select('id, username, clan_id, rank, insignia_phrase, total_reflections, total_quotes, is_private')
+        .select('id, username, clan_id, rank, insignia_phrase, total_reflections, total_quotes, is_private, avatar_url')
         .eq('id', userId)
         .maybeSingle(),
       fetchFollowCounts(userId),
@@ -167,6 +167,7 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
           totalReflections: data.total_reflections ?? 0,
           totalQuotes: data.total_quotes ?? 0,
           recentPosts: [],
+          avatarUri: (data as { avatar_url?: string | null }).avatar_url ?? null,
         });
       }
       // Convert SimPost → CommunityPost for the slider.
@@ -414,12 +415,14 @@ function OtherUserProfileView({ userId, router }: { userId: string; router: Retu
               followersCount={profileWithLiveFollowers.followersCount}
               followingCount={profileWithLiveFollowers.followingCount}
               postsCount={postsCountForRow}
+              avatarUri={profile.avatarUri}
             />
             <UserIdentityHeader
               userId={profileWithLiveFollowers.id}
               username={profile.username}
               clanId={profile.clanId}
               rank={profile.rank}
+              avatarUri={profile.avatarUri}
               onShieldPress={
                 profile.clanId
                   ? () =>

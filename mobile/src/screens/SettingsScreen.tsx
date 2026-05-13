@@ -24,9 +24,9 @@ import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { getAppShellScrollableBodyHeight } from '@evoconn/constants/appShellLayout';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
-import { getClanProfileByHouse } from '@evoconn/utils/getClanProfileByHouse';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import { CLAN_TO_COLOR } from '@evoconn/constants/clanColors';
+import { UserAvatarFrame } from '@evoconn/components/shared/UserAvatarFrame';
 import { useDebugStats } from '@evoconn/debug/DebugStatsContext';
 import { useEvoPreferences } from '@evoconn/hooks/EvoPreferencesContext';
 import { useAuth } from '../../mobile/lib/AuthContext';
@@ -262,7 +262,6 @@ function SettingsSection({
 
 function ProfileHeader({ username, rank: rawRank, onPress }: { username: string; rank: string; onPress: () => void }) {
   const activeClan  = useActiveClan(mockCurrentUser.clanId);
-  const ProfileIcon = useMemo(() => getClanProfileByHouse(activeClan), [activeClan]);
   const { visibleClanId } = useClassification();
   const effectiveClan = visibleClanId ?? activeClan;
   const clanColor     = effectiveClan ? CLAN_TO_COLOR[effectiveClan as keyof typeof CLAN_TO_COLOR] ?? null : null;
@@ -273,9 +272,14 @@ function ProfileHeader({ username, rank: rawRank, onPress }: { username: string;
     <TouchableOpacity style={styles.profileHeader} activeOpacity={0.8} onPress={onPress}>
       <View style={styles.avatarWrap}>
         <View style={[styles.avatar, clanColor ? { backgroundColor: `${clanColor}1F`, borderRadius: 30 } : undefined]}>
-          <View style={{ transform: [{ translateX: PROFILE_ICON_OFFSET_X }, { translateY: PROFILE_ICON_OFFSET_Y }, { scale: PROFILE_ICON_SCALE }] }}>
-            <ProfileIcon width={PROFILE_ICON_BASE_SIZE} height={PROFILE_ICON_BASE_SIZE} />
-          </View>
+          <UserAvatarFrame
+            clanId={effectiveClan}
+            avatarUri={mockCurrentUser.avatarUri}
+            size={PROFILE_ICON_BASE_SIZE}
+            iconScale={PROFILE_ICON_SCALE}
+            iconOffsetX={PROFILE_ICON_OFFSET_X}
+            iconOffsetY={PROFILE_ICON_OFFSET_Y}
+          />
         </View>
         <View style={styles.avatarEditBadge}><Text style={styles.avatarEditChar}>✎</Text></View>
       </View>

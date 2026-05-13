@@ -85,12 +85,14 @@ export const ProfileRevealPanel = React.memo(function ProfileRevealPanel({ autho
             followersCount={profile.followersCount}
             followingCount={profile.followingCount}
             postsCount={liveReflectionCount + liveQuoteCount}
+            avatarUri={profile.avatarUri}
           />
           <UserIdentityHeader
             userId={profile.id}
             username={profile.username}
             clanId={profile.clanId}
             rank={profile.rank}
+            avatarUri={profile.avatarUri}
           />
           <UserInsigniaPhrase phrase={profile.insigniaPhrase} />
           <PhilosophyPercentagesPanel percentages={profile.philosophyPercentages} />

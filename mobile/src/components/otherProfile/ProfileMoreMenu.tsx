@@ -27,12 +27,14 @@ type Props = {
   userId: string;
   username: string;
   clanId: string | null | undefined;
+  avatarUri?: string | null;
 };
 
 export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({
   userId,
   username,
   clanId,
+  avatarUri,
 }: Props) {
   const router = useRouter();
   const { session } = useAuth();
@@ -42,6 +44,7 @@ export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({
 
   const [mainOpen, setMainOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [reportAvatarOpen, setReportAvatarOpen] = useState(false);
   const [blockOpen, setBlockOpen] = useState(false);
   const [info, setInfo] = useState<{ title: string; message?: string } | null>(null);
 
@@ -107,6 +110,25 @@ export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({
     [session, userId, openInfo],
   );
 
+  const submitAvatarReport = useCallback(
+    async (reason: string) => {
+      if (!session?.user) {
+        openInfo('Sesión requerida', 'Inicia sesión para denunciar.');
+        return;
+      }
+      if (isRealUserId(session.user.id) && isRealUserId(userId)) {
+        await insertReport({
+          reporterId: session.user.id,
+          targetType: 'user',
+          targetId: userId,
+          reason: `Foto de perfil: ${reason}`,
+        }).catch(console.error);
+      }
+      openInfo('Denuncia enviada', 'Gracias. Revisaremos la foto de perfil.');
+    },
+    [session, userId, openInfo],
+  );
+
   const pad = 8;
   const hit = Math.max(44, THREE_DOTS_SIZE + pad * 2);
 
@@ -152,6 +174,14 @@ export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({
             label: 'Compartir perfil',
             onPress: () => void handleShare(),
           },
+          ...(avatarUri
+            ? [{
+                key: 'reportAvatar',
+                label: 'Denunciar foto de perfil',
+                destructive: true,
+                onPress: () => setReportAvatarOpen(true),
+              }]
+            : []),
           {
             key: 'report',
             label: 'Denunciar perfil',
@@ -186,6 +216,29 @@ export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({
             key: 'r3',
             label: 'Acoso o abuso',
             onPress: () => void submitReport('Acoso o abuso (perfil)'),
+          },
+        ]}
+      />
+
+      <EvoActionSheetModal
+        visible={reportAvatarOpen}
+        onClose={() => setReportAvatarOpen(false)}
+        title="Denunciar foto de perfil"
+        options={[
+          {
+            key: 'a1',
+            label: 'Imagen inapropiada o explícita',
+            onPress: () => void submitAvatarReport('Imagen inapropiada o explícita'),
+          },
+          {
+            key: 'a2',
+            label: 'Suplantación de identidad',
+            onPress: () => void submitAvatarReport('Suplantación de identidad'),
+          },
+          {
+            key: 'a3',
+            label: 'Odio o discriminación',
+            onPress: () => void submitAvatarReport('Odio o discriminación'),
           },
         ]}
       />

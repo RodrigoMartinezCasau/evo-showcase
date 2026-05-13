@@ -23,6 +23,7 @@ import { DetailActionColumn } from './DetailActionColumn';
 import type { DetailActionColumnHandle } from './DetailActionColumn';
 import { CommentCard } from './CommentCard';
 import { NewCommentBox } from './NewCommentBox';
+import { ClanSendButton } from './ChatInputBar';
 import {
   REFLECTION_PANEL_LAYOUT as RP,
   COMMENTS_PANEL_LAYOUT as CP,
@@ -60,6 +61,7 @@ import {
   EvoPickerModal,
 } from '@evoconn/components/shared/EvoActionSheetModal';
 import type { EvoActionOption } from '@evoconn/components/shared/EvoActionSheetModal';
+import { PanelStarField } from '@evoconn/components/animations/StarFieldBackground';
 
 /** Matches `styles.content` horizontal padding — used until the reflection panel is measured. */
 const REFLECTION_DETAIL_CONTENT_PAD_H = 16;
@@ -88,6 +90,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
 }: ReflectionDetailItemProps) {
   const isNoClanAuthor =
     post.author.clanId == null || String(post.author.clanId).trim() === '';
+  const clanColor = getClanColor(post.author.clanId);
   const reflectionPanelBorderColor = isNoClanAuthor
     ? NO_CLAN_COMMUNITY_POST_FRAME_COLOR
     : clanColor;
@@ -798,7 +801,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
               {
                 height: reflectionH,
                 borderRadius: RP.borderRadius,
-                backgroundColor: RP.backgroundColor,
+                backgroundColor: isNoClanAuthor ? evoconnColors.background : RP.backgroundColor,
                 paddingHorizontal: RP.paddingHorizontal,
                 paddingVertical: RP.paddingVertical,
                 borderLeftColor: reflectionPanelBorderColor,
@@ -812,6 +815,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
               },
             ]}
           >
+            {isNoClanAuthor ? <PanelStarField /> : null}
             {isPhrase ? (
               <ScrollView
                 scrollEnabled={phraseOverflowScroll}
@@ -925,7 +929,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
               {
                 height: commentsH,
                 borderRadius: CP.borderRadius,
-                backgroundColor: CP.backgroundColor,
+                backgroundColor: isNoClanAuthor ? evoconnColors.background : CP.backgroundColor,
                 paddingHorizontal: CP.paddingHorizontal,
                 paddingVertical: CP.paddingVertical,
                 transform: [
@@ -978,7 +982,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                       { top: kbOffset, zIndex: 30 },
                     ]}
                   >
-                    <NewCommentBox onSend={handleAddComment} />
+                    <NewCommentBox onSend={handleAddComment} clanColor={clanColor} />
                   </Animated.View>
                 </View>
               </>

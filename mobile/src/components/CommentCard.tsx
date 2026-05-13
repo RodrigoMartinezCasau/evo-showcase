@@ -126,6 +126,7 @@ export const CommentCard = React.memo(function CommentCard({
 
   return (
     <View style={styles.wrapper}>
+      {/* Card — text content only, fills available width */}
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={handleTap}
@@ -136,7 +137,8 @@ export const CommentCard = React.memo(function CommentCard({
           {
             backgroundColor: CARD.backgroundColor,
             borderRadius: CARD.borderRadius,
-            paddingHorizontal: CARD.paddingX,
+            paddingLeft: CARD.paddingX,
+            paddingRight: CARD.paddingXRight,
             paddingVertical: CARD.paddingY,
             borderLeftWidth: CARD.clanAccentWidth,
             borderLeftColor: clanColor,
@@ -153,8 +155,11 @@ export const CommentCard = React.memo(function CommentCard({
         </Text>
       </TouchableOpacity>
 
-      {/* Upvote button — anchored to card, centered vertically */}
-      <View
+      {/* Upvote — outside the card, at the right edge of the panel */}
+      <TouchableOpacity
+        onPress={handleUpvote}
+        activeOpacity={0.7}
+        hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
         style={[
           styles.upvoteAnchor,
           {
@@ -165,35 +170,36 @@ export const CommentCard = React.memo(function CommentCard({
           },
         ]}
       >
-        <TouchableOpacity onPress={handleUpvote} activeOpacity={0.7}>
-          <Animated.View
-            style={{
-              alignItems: 'center',
-              transform: [{ scale: bounceScale }],
-            }}
-          >
-            {isUpvoted ? (
-              <UpvoteActive key="c-up-a" width={iconSz} height={iconSz} />
-            ) : (
-              <UpvoteInactive key="c-up-i" width={iconSz} height={iconSz} />
-            )}
-            <Text style={[styles.upCount, { fontSize: UP.countFontSize }]}>{upvotes}</Text>
-          </Animated.View>
-        </TouchableOpacity>
-      </View>
+        <Animated.View
+          style={{ alignItems: 'center', transform: [{ scale: bounceScale }] }}
+        >
+          {isUpvoted ? (
+            <UpvoteActive key="c-up-a" width={iconSz} height={iconSz} />
+          ) : (
+            <UpvoteInactive key="c-up-i" width={iconSz} height={iconSz} />
+          )}
+          <Text style={[styles.upCount, { fontSize: UP.countFontSize }]}>{upvotes}</Text>
+        </Animated.View>
+      </TouchableOpacity>
     </View>
   );
 });
 
 const styles = StyleSheet.create({
   wrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
     marginBottom: CARD.gapBetweenComments,
   },
   card: {
-    flex: 1,
-    marginRight: 28,
+    // full width — same as the "Añadir comentario" bar
+  },
+  upvoteAnchor: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 32,
   },
   username: {
     color: evoconnColors.text,
@@ -203,15 +209,6 @@ const styles = StyleSheet.create({
   body: {
     color: '#CCCCCC',
     lineHeight: 18,
-  },
-  upvoteAnchor: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: 32,
   },
   upCount: {
     fontWeight: '700',

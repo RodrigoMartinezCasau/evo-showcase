@@ -276,6 +276,7 @@ export default function PersonalProfileScreen() {
               username={profileWithClan.username}
               clanId={profileWithClan.clanId}
               rank={profileWithClan.rank}
+              avatarUri={mockCurrentUser.avatarUri}
               onShieldPress={
                 profileWithClan.clanId
                   ? () =>

@@ -23,7 +23,7 @@ import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { BOTTOM_BAR_LAYOUT, getBottomBarScrollContentPaddingBottom } from '@evoconn/constants/bottomBarLayout';
 import { getMainColumnHeightForFloatingBottomBar } from '@evoconn/constants/appShellLayout';
-import { getClanProfileByHouse } from '@evoconn/utils/getClanProfileByHouse';
+import { UserAvatarFrame } from '@evoconn/components/shared/UserAvatarFrame';
 import { usePersonalProfile } from '@evoconn/hooks/PersonalProfileContext';
 import type { FollowerEntry } from '@evoconn/data/mockPersonalProfile';
 
@@ -43,7 +43,6 @@ function FollowerRow({
   onUnfollowBack: (id: string) => void;
   onUserPress: (id: string) => void;
 }) {
-  const ProfileSvg = getClanProfileByHouse(follower.clanId);
   const clanLabel = follower.clanId
     ? follower.clanId.charAt(0).toUpperCase() + follower.clanId.slice(1)
     : 'Sin clan';
@@ -60,9 +59,12 @@ function FollowerRow({
         hitSlop={4}
       >
         <View style={styles.avatarWrap}>
-          <View style={{ transform: [{ scale: PROFILE_ICON_SCALE }] }}>
-            <ProfileSvg width={AVATAR_SIZE} height={AVATAR_SIZE} />
-          </View>
+          <UserAvatarFrame
+            clanId={follower.clanId}
+            avatarUri={follower.avatarUri}
+            size={AVATAR_SIZE}
+            iconScale={PROFILE_ICON_SCALE}
+          />
         </View>
       </TouchableOpacity>
 

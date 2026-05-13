@@ -4,7 +4,6 @@ import {
   TextInput,
   TouchableOpacity,
   Pressable,
-  Text,
   StyleSheet,
   Keyboard,
 } from 'react-native';
@@ -13,13 +12,17 @@ import {
   NEW_COMMENT_BOX_LAYOUT as BOX,
   NEW_COMMENT_SEND_BUTTON_LAYOUT as BTN,
 } from '@evoconn/constants/newCommentBoxLayout';
+import { ClanSendButton } from './ChatInputBar';
 
 type NewCommentBoxProps = {
   onSend: (text: string) => void;
+  /** Primary color of the post's clan — used for the send button circle. */
+  clanColor?: string;
 };
 
 export const NewCommentBox = React.memo(function NewCommentBox({
   onSend,
+  clanColor = '#c7ff02',
 }: NewCommentBoxProps) {
   const [value, setValue] = useState('');
   const inputRef = useRef<TextInput>(null);
@@ -38,37 +41,46 @@ export const NewCommentBox = React.memo(function NewCommentBox({
     inputRef.current?.focus();
   }, []);
 
-  const btnColor = hasText ? BTN.activeColor : BTN.inactiveColor;
-
   return (
-    <Pressable
-      onPress={handleBoxPress}
+    // Row wrapper: input pill (flex:1) + gap + send button (fixed size).
+    // Using flexbox means the gap is always identical regardless of device width.
+    <View
       style={[
-        styles.container,
+        styles.row,
         {
-          height: BOX.height,
-          borderRadius: BOX.borderRadius,
-          backgroundColor: BOX.backgroundColor,
           transform: [
             { translateX: BOX.offsetX },
             { translateY: BOX.offsetY },
-            { scaleX: BOX.widthScale },
           ],
         },
       ]}
     >
-      <TextInput
-        ref={inputRef}
-        value={value}
-        onChangeText={setValue}
-        placeholder="Añadir comentario..."
-        placeholderTextColor={BOX.placeholderColor}
-        returnKeyType="send"
-        onSubmitEditing={handleSend}
-        blurOnSubmit
-        style={[styles.input, { fontSize: BOX.fontSize }]}
-      />
+      {/* Input pill — grows to fill all remaining space */}
+      <Pressable
+        onPress={handleBoxPress}
+        style={[
+          styles.inputPill,
+          {
+            height: BOX.height,
+            borderRadius: BOX.borderRadius,
+            backgroundColor: BOX.backgroundColor,
+          },
+        ]}
+      >
+        <TextInput
+          ref={inputRef}
+          value={value}
+          onChangeText={setValue}
+          placeholder="Añadir comentario..."
+          placeholderTextColor={BOX.placeholderColor}
+          returnKeyType="send"
+          onSubmitEditing={handleSend}
+          blurOnSubmit
+          style={[styles.input, { fontSize: BOX.fontSize }]}
+        />
+      </Pressable>
 
+      {/* Send button — fixed size, separated from pill by BOX.gap */}
       <TouchableOpacity
         onPress={handleSend}
         disabled={!hasText}
@@ -77,32 +89,30 @@ export const NewCommentBox = React.memo(function NewCommentBox({
         style={[
           styles.sendBtn,
           {
-            width: BTN.width,
-            height: BTN.height,
-            borderRadius: BTN.borderRadius,
-            borderColor: btnColor,
-            transform: [
-              { translateX: BTN.offsetX },
-              { translateY: BTN.offsetY },
-              { scale: BTN.scale },
-            ],
+            width: BTN.size,
+            height: BTN.size,
+            opacity: hasText ? 1 : 0.35,
+            transform: [{ scale: BTN.scale }],
           },
         ]}
       >
-        <Text style={[styles.sendText, { color: btnColor, fontSize: BTN.fontSize }]}>
-          Enviar
-        </Text>
+        <ClanSendButton size={BTN.size} clanColor={clanColor} />
       </TouchableOpacity>
-    </Pressable>
+    </View>
   );
 });
 
 const styles = StyleSheet.create({
-  container: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    gap: 8,
+    gap: BOX.gap,
+  },
+  inputPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: BOX.paddingHorizontal,
   },
   input: {
     flex: 1,
@@ -110,11 +120,7 @@ const styles = StyleSheet.create({
     padding: 0,
   },
   sendBtn: {
-    borderWidth: 1.5,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  sendText: {
-    fontWeight: '700',
   },
 });

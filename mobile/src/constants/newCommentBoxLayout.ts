@@ -6,26 +6,22 @@
 export const NEW_COMMENT_BOX_LAYOUT = {
   offsetX: 0,
   offsetY: 2,
-  /** 1 = full panel width; < 1 narrower. */
-  widthScale: 1,
-  /** Fixed height of the input row (px). */
+  /** Fixed height of the input pill (px). */
   height: 40,
   borderRadius: 14,
-  backgroundColor: '#2A2A2E',
+  backgroundColor: '#15151A',
   fontSize: 14,
   placeholderColor: '#888888',
+  /** Horizontal padding inside the text input pill. */
+  paddingHorizontal: 14,
+  /** Gap between the input pill and the send button — same on every device. */
+  gap: 8,
 } as const;
 
 export const NEW_COMMENT_SEND_BUTTON_LAYOUT = {
   offsetX: 0,
   offsetY: 0,
   scale: 1,
-  /** Width of the send button (px). */
-  width: 56,
-  /** Height of the send button (px). */
-  height: 32,
-  borderRadius: 10,
-  activeColor: '#FFFFFF',
-  inactiveColor: '#555555',
-  fontSize: 13,
+  /** Diameter of the circular send button (px). */
+  size: 32,
 } as const;

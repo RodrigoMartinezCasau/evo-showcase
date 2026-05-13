@@ -7,6 +7,7 @@ import {
   StyleSheet,
   useWindowDimensions,
   Platform,
+  Image,
 } from 'react-native';
 import { getAppProfileOpenUrl } from '@evoconn/utils/appShareLinks';
 import { getTopBarInsigniaByHouse } from '@evoconn/utils/getTopBarInsigniaByHouse';
@@ -64,6 +65,7 @@ type Props = {
   userId: string;
   clanId: string | null;
   rank: Rank;
+  avatarUri?: string | null;
   onShieldPress?: () => void;
 };
 
@@ -72,6 +74,7 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
   userId,
   clanId,
   rank,
+  avatarUri,
   onShieldPress,
 }: Props) {
   const { width: screenW } = useWindowDimensions();
@@ -209,6 +212,22 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
         ]}
       >
         <ShieldSvg width={shieldDisplaySize} height={shieldDisplaySize} />
+        {avatarUri ? (
+          <Image
+            source={{ uri: avatarUri }}
+            style={[
+              styles.shieldAvatarOverlay,
+              {
+                width: Math.round(shieldDisplaySize * 0.48),
+                height: Math.round(shieldDisplaySize * 0.48),
+                borderRadius: Math.round(shieldDisplaySize * 0.24),
+                top: Math.round(shieldDisplaySize * 0.26),
+                left: Math.round(shieldDisplaySize * 0.26),
+              },
+            ]}
+            resizeMode="cover"
+          />
+        ) : null}
       </TouchableOpacity>
     </View>
   );
@@ -265,5 +284,9 @@ const styles = StyleSheet.create({
     zIndex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  shieldAvatarOverlay: {
+    position: 'absolute',
+    zIndex: 2,
   },
 });

@@ -34,6 +34,7 @@ export type FollowerEntry = {
   username: string;
   clanId: string | null;
   rank?: string;
+  avatarUri?: string | null;
 };
 
 export type FollowingEntry = {
@@ -41,6 +42,7 @@ export type FollowingEntry = {
   username: string;
   clanId: string | null;
   rank?: string;
+  avatarUri?: string | null;
 };
 
 export type PersonalProfile = {

@@ -22,6 +22,7 @@ export type OtherUserProfile = {
   totalReflections: number;
   totalQuotes: number;
   recentPosts: CommunityPost[];
+  avatarUri?: string | null;
 };
 
 function followersCount(userId: string): number {

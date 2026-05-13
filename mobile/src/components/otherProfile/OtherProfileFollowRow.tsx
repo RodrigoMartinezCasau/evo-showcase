@@ -12,6 +12,7 @@ type Props = {
   followingCount: number;
   /** Total publicaciones (reflexiones + frases). */
   postsCount: number;
+  avatarUri?: string | null;
 };
 
 function formatCount(n: number): string {
@@ -36,6 +37,7 @@ export const OtherProfileFollowRow = React.memo(function OtherProfileFollowRow({
   followersCount,
   followingCount,
   postsCount,
+  avatarUri,
 }: Props) {
   return (
     <View style={styles.row}>
@@ -85,7 +87,7 @@ export const OtherProfileFollowRow = React.memo(function OtherProfileFollowRow({
       </View>
 
       <View style={styles.trailingSlot}>
-        <ProfileMoreMenu userId={userId} username={username} clanId={clanId} />
+        <ProfileMoreMenu userId={userId} username={username} clanId={clanId} avatarUri={avatarUri} />
       </View>
     </View>
   );

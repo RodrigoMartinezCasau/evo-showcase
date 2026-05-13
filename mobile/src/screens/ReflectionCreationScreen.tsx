@@ -27,6 +27,7 @@ import { useLocalSearchParams, useRouter, usePathname } from 'expo-router';
 import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppTopBar, ChatInputBar, SidebarDrawer } from '@evoconn/components';
+import { ClanSendButton } from '@evoconn/components/ChatInputBar';
 import { getAppTopBarLayoutHeight } from '@evoconn/constants/topBarLayout';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
@@ -47,7 +48,6 @@ import { useAuth } from '../../mobile/lib/AuthContext';
 import { AI_TEXT_SCALE } from '@evoconn/constants/textScale';
 import { useEvoPreferences } from '@evoconn/hooks/EvoPreferencesContext';
 import { getClanColor } from '@evoconn/constants/clanColors';
-import { getChatSendButtonByHouse } from '@evoconn/utils/getChatSendButtonByHouse';
 import {
   CHAT_SEND_BUTTON_LAYOUT,
   CHAT_BOTTOM_AREA_LAYOUT as CHAT_BOTTOM_AREA,
@@ -142,11 +142,10 @@ export default function ReflectionCreationScreen() {
   const islandBgColor = activeClan ? getClanColor(activeClan) : '#c7ff02';
   const islandFgColor = activeClan ? '#FFFFFF' : '#000000';
 
-  const SendIcon = useMemo(() => getChatSendButtonByHouse(activeClan), [activeClan]);
   const sendButtonSize = CHAT_SEND_BUTTON_LAYOUT.size;
   const sendIconNode = useMemo(
-    () => <SendIcon width={sendButtonSize} height={sendButtonSize} />,
-    [SendIcon, sendButtonSize],
+    () => <ClanSendButton size={sendButtonSize} clanColor={islandBgColor} />,
+    [sendButtonSize, islandBgColor],
   );
 
   const { publishPost } = useFeedStore();

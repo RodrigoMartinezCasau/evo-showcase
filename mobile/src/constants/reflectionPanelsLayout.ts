@@ -19,9 +19,9 @@ export const REFLECTION_PANEL_LAYOUT = {
 
 /** Panel inferior: comentarios. */
 export const COMMENTS_PANEL_LAYOUT = {
-  offsetX: -15,
+  offsetX: 0,
   offsetY: 0,
-  widthScale: 0.95,
+  widthScale: 1.0,
   /** Altura fija del panel de comentarios (px). null = automática (espacio restante). */
   height: null as number | null,
   borderRadius: 15,

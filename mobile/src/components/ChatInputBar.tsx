@@ -30,7 +30,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { evoconnColors } from '@evoconn/theme/colors';
 import {
   CHAT_BOTTOM_AREA_LAYOUT as AREA,
@@ -74,6 +74,51 @@ function AppleKeyboardMicIcon({ color = '#8E8E93' }: { color?: string }) {
         strokeWidth={1.75}
         strokeLinecap="round"
       />
+    </Svg>
+  );
+}
+
+// ─── Clan send button ────────────────────────────────────────────────────────
+
+/** Parse a #RRGGBB hex color into [r, g, b] 0–255. */
+function parseHexColor(hex: string): [number, number, number] {
+  const h = hex.replace('#', '');
+  if (h.length !== 6) return [0, 0, 0];
+  return [
+    parseInt(h.slice(0, 2), 16),
+    parseInt(h.slice(2, 4), 16),
+    parseInt(h.slice(4, 6), 16),
+  ];
+}
+
+/**
+ * Circular send button with a 5-pointed star.
+ * Star color auto-switches: white on dark clan backgrounds, near-black on light.
+ */
+export function ClanSendButton({ size, clanColor }: { size: number; clanColor: string }) {
+  const cx = size / 2;
+  const cy = size / 2;
+  const outerR = size * 0.265;
+  const innerR = outerR * 0.40;
+  const NUM_POINTS = 5;
+  const step = Math.PI / NUM_POINTS;
+
+  const pts: string[] = [];
+  for (let i = 0; i < 2 * NUM_POINTS; i++) {
+    const r = i % 2 === 0 ? outerR : innerR;
+    const theta = i * step - Math.PI / 2;
+    pts.push(`${(cx + r * Math.cos(theta)).toFixed(2)},${(cy + r * Math.sin(theta)).toFixed(2)}`);
+  }
+  const starPath = `M ${pts.join(' L ')} Z`;
+
+  const [r, g, b] = parseHexColor(clanColor);
+  const luminance = r * 0.299 + g * 0.587 + b * 0.114;
+  const starColor = luminance > 145 ? '#0b0b0f' : '#FFFFFF';
+
+  return (
+    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <Circle cx={cx} cy={cy} r={size / 2} fill={clanColor} />
+      <Path d={starPath} fill={starColor} />
     </Svg>
   );
 }
