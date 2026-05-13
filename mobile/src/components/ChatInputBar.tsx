@@ -111,9 +111,7 @@ export function ClanSendButton({ size, clanColor }: { size: number; clanColor: s
   }
   const starPath = `M ${pts.join(' L ')} Z`;
 
-  const [r, g, b] = parseHexColor(clanColor);
-  const luminance = r * 0.299 + g * 0.587 + b * 0.114;
-  const starColor = luminance > 145 ? '#0b0b0f' : '#FFFFFF';
+  const starColor = '#0b0b0f';
 
   return (
     <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
