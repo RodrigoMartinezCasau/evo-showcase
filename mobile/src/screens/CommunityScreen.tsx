@@ -176,8 +176,7 @@ export default function CommunityScreen() {
   const [foryouSeenFrozen, setForyouSeenFrozen] = useState<Set<string> | null>(null);
 
   // Track which tabParam value we have already reacted to so we never
-  // re-trigger the same navigation when openDetailFeed's reference changes
-  // (it depends on allPosts / followingSet which can update after mount).
+  // re-trigger the same navigation when openDetailFeed's reference changes.
   const consumedTabParamRef = useRef<string | undefined>(undefined);
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -199,6 +198,7 @@ export default function CommunityScreen() {
 
   const slideAnim = useRef(new Animated.Value(0)).current;
   const detailMounted = detailFeed !== null;
+  const detailFeedListRef = useRef<FlatList<CommunityPost>>(null);
   const detailFeedModeRef = useRef<FeedMode | null>(null);
   detailFeedModeRef.current = detailFeed?.mode ?? null;
   const markParatiSeenRef = useRef(markParatiPostSeen);
@@ -249,7 +249,7 @@ export default function CommunityScreen() {
   );
 
   const openDetailFeed = useCallback(
-    (mode: FeedMode, postId?: string) => {
+    (mode: FeedMode, postId?: string, skipAnimation?: boolean) => {
       if (mode === 'foryou') {
         const snap = new Set(paratiSeenIds);
         setForyouSeenFrozen(snap);
@@ -270,6 +270,11 @@ export default function CommunityScreen() {
         }
         initialIndex = clampDetailInitialIndex(data.length, initialIndex);
         setDetailFeed({ mode, data, initialIndex });
+        if (skipAnimation) {
+          slideAnim.setValue(1);
+          detailFeedListRef.current?.scrollToOffset({ offset: 0, animated: false });
+          return;
+        }
       } else {
         setForyouSeenFrozen(null);
         const data = followingFeedOrdered;
@@ -280,6 +285,10 @@ export default function CommunityScreen() {
         }
         initialIndex = clampDetailInitialIndex(data.length, initialIndex);
         setDetailFeed({ mode, data, initialIndex });
+        if (skipAnimation) {
+          slideAnim.setValue(1);
+          return;
+        }
       }
       slideAnim.stopAnimation();
       slideAnim.setValue(0);
@@ -308,7 +317,14 @@ export default function CommunityScreen() {
   // salte o parezca que la publicación “desaparece”. La lista es snapshot al abrir; al cerrar,
   // la próxima apertura trae el orden actual.
 
-  useEffect(() => {
+  /**
+   * useLayoutEffect fires synchronously after React commits but BEFORE the
+   * native thread paints the frame. This means state changes made here are
+   * included in the very first native frame — so Para Ti is already open by
+   * the time the navigation animation reveals CommunityScreen, eliminating
+   * the card-list flash entirely.
+   */
+  useLayoutEffect(() => {
     if (!tabParam) return;
     const normalized =
       tabParam === 'mas-votadas' ? 'para-ti' : (tabParam as TabId);
@@ -319,7 +335,9 @@ export default function CommunityScreen() {
     const tab = normalized;
     if (tab === 'para-ti') {
       const pid = typeof postIdParam === 'string' ? postIdParam : undefined;
-      openDetailFeed('foryou', pid);
+      // skipAnimation=true: sets slideAnim=1 immediately so the detail panel
+      // is fully visible in the same native frame — no slide-in required.
+      openDetailFeed('foryou', pid, true);
     } else {
       setActiveTab(tab);
     }
@@ -335,6 +353,9 @@ export default function CommunityScreen() {
       if (finished) {
         setForyouSeenFrozen(null);
         setDetailFeed(null);
+        // Reset so that navigating back to Para Ti from another screen correctly
+        // re-opens the detail feed (consumedTabParamRef would otherwise block it).
+        consumedTabParamRef.current = undefined;
       }
     });
   }, [slideAnim]);
@@ -391,7 +412,9 @@ export default function CommunityScreen() {
       const tabId = tab as TabId;
 
       if (tabId === 'para-ti') {
-        openDetailFeed('foryou');
+        // Already on Para Ti → silently reload posts and scroll to top
+        const alreadyOpen = detailFeed?.mode === 'foryou';
+        openDetailFeed('foryou', undefined, alreadyOpen);
         return;
       }
 
@@ -869,6 +892,7 @@ export default function CommunityScreen() {
             ]}
           >
             <FlatList
+              ref={detailFeedListRef}
               data={detailFeed?.data ?? []}
               renderItem={renderFeedItem}
               keyExtractor={(item) => item.id}

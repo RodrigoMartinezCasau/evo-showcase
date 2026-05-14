@@ -3,6 +3,7 @@ import {
   View,
   Text,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   StyleSheet,
   Platform,
   useWindowDimensions,
@@ -427,61 +428,66 @@ export function BottomCommunityTabs({
         statusBarTranslucent
         onRequestClose={closeCreate}
       >
-        <View style={styles.sortModalRoot} pointerEvents="box-none">
-          <Pressable style={styles.modalBackdrop} onPress={closeCreate} accessibilityRole="button" />
-          <View
-            style={[
-              styles.sortMenuCard,
-              { marginBottom: sortMenuBottomOffset, width: screenW },
-            ]}
-          >
-            {CREATE_MENU_ROWS.map(({ row, label, a11y }) => {
-              const BgSvg = getBottomBarCreateMenuBackgroundSvg(activeClan, row);
-              const onPress = row === 'reflection' ? onNewReflection : onNewPhrase;
-              return (
-                <Pressable
-                  key={row}
-                  onPress={onPress}
-                  style={({ pressed }) => [
-                    styles.sortMenuRowPressable,
-                    pressed && styles.sortMenuRowPressablePressed,
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel={a11y}
-                >
-                  <View style={styles.sortMenuRowSvgWrap}>
-                    <View style={styles.sortMenuRowSvgBgWrap} pointerEvents="none">
-                      <BgSvg
-                        width="100%"
-                        height="100%"
-                        viewBox={FOLLOWING_SORT_DROPDOWN_VIEWBOX}
-                        preserveAspectRatio="none"
-                      />
-                    </View>
-                    <View
-                      style={[
-                        styles.sortMenuLabelSvgWrap,
-                        {
-                          transform: [
-                            {
-                              translateY: BOTTOM_BAR_LAYOUT.FOLLOWING_SORT_DROPDOWN_TEXT_UNIVERSAL_OFFSET_Y,
-                            },
-                          ],
-                        },
+        {/* Outer TouchableWithoutFeedback covers the full screen — one tap closes */}
+        <TouchableWithoutFeedback onPress={closeCreate} accessibilityRole="button">
+          <View style={[styles.sortModalRoot, styles.modalBackdrop]}>
+            {/* Inner TouchableWithoutFeedback swallows touches on the card so they don't bubble up */}
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View
+                style={[
+                  styles.sortMenuCard,
+                  { marginBottom: sortMenuBottomOffset, width: screenW },
+                ]}
+              >
+                {CREATE_MENU_ROWS.map(({ row, label, a11y }) => {
+                  const BgSvg = getBottomBarCreateMenuBackgroundSvg(activeClan, row);
+                  const onPress = row === 'reflection' ? onNewReflection : onNewPhrase;
+                  return (
+                    <Pressable
+                      key={row}
+                      onPress={onPress}
+                      style={({ pressed }) => [
+                        styles.sortMenuRowPressable,
+                        pressed && styles.sortMenuRowPressablePressed,
                       ]}
-                      pointerEvents="none"
+                      accessibilityRole="button"
+                      accessibilityLabel={a11y}
                     >
-                      <View style={styles.createMenuLabelRow}>
-                        <Text style={styles.createMenuPlusGlyph}>+</Text>
-                        <Text style={styles.createMenuTitleText}>{label}</Text>
+                      <View style={styles.sortMenuRowSvgWrap}>
+                        <View style={styles.sortMenuRowSvgBgWrap} pointerEvents="none">
+                          <BgSvg
+                            width="100%"
+                            height="100%"
+                            viewBox={FOLLOWING_SORT_DROPDOWN_VIEWBOX}
+                            preserveAspectRatio="none"
+                          />
+                        </View>
+                        <View
+                          style={[
+                            styles.sortMenuLabelSvgWrap,
+                            {
+                              transform: [
+                                {
+                                  translateY: BOTTOM_BAR_LAYOUT.FOLLOWING_SORT_DROPDOWN_TEXT_UNIVERSAL_OFFSET_Y,
+                                },
+                              ],
+                            },
+                          ]}
+                          pointerEvents="none"
+                        >
+                          <View style={styles.createMenuLabelRow}>
+                            <Text style={styles.createMenuPlusGlyph}>+</Text>
+                            <Text style={styles.createMenuTitleText}>{label}</Text>
+                          </View>
+                        </View>
                       </View>
-                    </View>
-                  </View>
-                </Pressable>
-              );
-            })}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </TouchableWithoutFeedback>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
     </>
   );

@@ -244,7 +244,6 @@ export function SidebarDrawer({
           label="COMUNIDAD"
           accessibilityLabel="Comunidad"
           menuRowStyle={styles.communityMenuRow}
-          glowBorderColor={!user.clanId || user.clanId.trim() === '' ? getClanColor(user.clanId) : undefined}
           leftOverlay={{
             element: (
               <EstrellaComunidadSvg
