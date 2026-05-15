@@ -167,6 +167,13 @@ export function CommunityPostCard({
     ],
   );
 
+  /** Inner black rounded rect in card SVGs — rx ≈ 15.77 in 600 viewBox; clip stars to same silhouette. */
+  const innerGrayPanelBorderRadius = useMemo(
+    () => Math.max(8, Math.round((15.77 / 600) * cardWidth)),
+    [cardWidth],
+  );
+  const innerGrayPanelHeight = Math.max(0, layout.blackBottomPx - layout.blackTopPx);
+
   const renderFeedStats = () => (
     <View style={styles.feedStatsRow}>
       <View style={styles.feedStatItem}>
@@ -250,7 +257,23 @@ export function CommunityPostCard({
           />
         </View>
 
-        {/* Inner black area — title + body + twinkling stars (same as reflection panel). */}
+        {/* Full inner gray panel (entire SVG inner black box) — stars cover whole rect, not only text padding. */}
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: layout.blackTopPx,
+            left: layout.blackLeftPx,
+            right: layout.blackRightPx,
+            height: innerGrayPanelHeight,
+            overflow: 'hidden',
+            borderRadius: innerGrayPanelBorderRadius,
+          }}
+        >
+          <PanelStarField />
+        </View>
+
+        {/* Text inset inside gray panel */}
         <View
           style={{
             position: 'absolute',
@@ -259,53 +282,51 @@ export function CommunityPostCard({
             right: layout.blackRightPx + feedContent.paddingRight,
             bottom: layout.cardHeight - textContentBottomY,
             overflow: 'hidden',
+            zIndex: 1,
           }}
         >
-          <PanelStarField />
-          <View style={{ zIndex: 1 }}>
-            {post.title ? (
-              <Text
-                style={[
-                  styles.title,
-                  {
-                    fontSize: feedContent.titleFontSize,
-                    marginBottom: feedContent.titleMarginBottom,
-                    lineHeight: Math.round(feedContent.titleFontSize * 1.2),
-                  },
-                ]}
-                numberOfLines={V.TITLE_MAX_LINES}
-              >
-                {post.title}
-              </Text>
-            ) : null}
+          {post.title ? (
             <Text
               style={[
-                styles.bodyInner,
+                styles.title,
                 {
-                  fontSize: feedContent.bodyFontSize,
-                  lineHeight: feedContent.bodyLineHeight,
+                  fontSize: feedContent.titleFontSize,
+                  marginBottom: feedContent.titleMarginBottom,
+                  lineHeight: Math.round(feedContent.titleFontSize * 1.2),
                 },
-                isQuoteCard && { fontWeight: '700' as const, fontStyle: 'italic' as const },
               ]}
-              numberOfLines={bodyMaxLines}
+              numberOfLines={V.TITLE_MAX_LINES}
             >
-              {isQuoteCard ? formatPhraseBodyForDisplay(post.body) : post.body}
+              {post.title}
             </Text>
-            {isQuoteCard && showPhraseAuthor && post.quoteAuthor ? (
-              <Text
-                style={[
-                  styles.phraseQuoteAuthorInFeed,
-                  {
-                    fontSize: feedContent.phraseAuthorFontSize,
-                    lineHeight: Math.round(feedContent.phraseAuthorFontSize * 1.25),
-                  },
-                ]}
-                numberOfLines={2}
-              >
-                {post.quoteAuthor}
-              </Text>
-            ) : null}
-          </View>
+          ) : null}
+          <Text
+            style={[
+              styles.bodyInner,
+              {
+                fontSize: feedContent.bodyFontSize,
+                lineHeight: feedContent.bodyLineHeight,
+              },
+              isQuoteCard && { fontWeight: '700' as const, fontStyle: 'italic' as const },
+            ]}
+            numberOfLines={bodyMaxLines}
+          >
+            {isQuoteCard ? formatPhraseBodyForDisplay(post.body) : post.body}
+          </Text>
+          {isQuoteCard && showPhraseAuthor && post.quoteAuthor ? (
+            <Text
+              style={[
+                styles.phraseQuoteAuthorInFeed,
+                {
+                  fontSize: feedContent.phraseAuthorFontSize,
+                  lineHeight: Math.round(feedContent.phraseAuthorFontSize * 1.25),
+                },
+              ]}
+              numberOfLines={2}
+            >
+              {post.quoteAuthor}
+            </Text>
+          ) : null}
         </View>
 
         {/* Rim: under stats so the stroke does not paint over icons. */}

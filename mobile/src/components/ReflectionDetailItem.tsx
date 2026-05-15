@@ -9,6 +9,7 @@ import {
   Keyboard,
   Platform,
   Animated,
+  Easing,
   useWindowDimensions,
   InteractionManager,
   type LayoutChangeEvent,
@@ -736,27 +737,30 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
 
-    const onShow = (e: { endCoordinates: { screenY: number; height: number }; duration?: number }) => {
+    const onShow = (e: { endCoordinates: { screenY: number }; duration?: number }) => {
       const kbTopY = e.endCoordinates.screenY;
-      newCommentMeasureRef.current?.measure((_x, _y, _w, h, _px, pageY) => {
-        if (h <= 0) return;
-        const boxBottom = pageY + h;
+      const duration = Platform.OS === 'ios' ? (e.duration ?? 250) : 220;
+      newCommentMeasureRef.current?.measureInWindow((x, y, _w, h) => {
+        const boxBottom = y + h;
         const overlap = boxBottom - kbTopY;
-        if (overlap > 0) {
-          Animated.timing(kbOffset, {
-            toValue: -(overlap + 10),
-            duration: Platform.OS === 'ios' ? (e.duration ?? 250) : 220,
-            useNativeDriver: false,
-          }).start();
-        }
+        const target = overlap > 0 ? -(overlap + 10) : 0;
+        kbOffset.stopAnimation();
+        Animated.timing(kbOffset, {
+          toValue: target,
+          duration,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }).start();
       });
     };
 
     const onHide = (e: { duration?: number }) => {
+      kbOffset.stopAnimation();
       Animated.timing(kbOffset, {
         toValue: 0,
         duration: Platform.OS === 'ios' ? (e.duration ?? 250) : 220,
-        useNativeDriver: false,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
       }).start();
     };
 
@@ -987,7 +991,10 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                   <Animated.View
                     style={[
                       styles.newCommentRow,
-                      { top: kbOffset, zIndex: 30 },
+                      {
+                        zIndex: 30,
+                        transform: [{ translateY: kbOffset }],
+                      },
                     ]}
                   >
                     <NewCommentBox onSend={handleAddComment} clanColor={clanColor} />
