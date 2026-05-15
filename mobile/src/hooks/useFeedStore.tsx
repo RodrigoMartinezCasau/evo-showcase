@@ -21,7 +21,7 @@ import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContex
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function simPostToCommunityPost(p: SimPost): CommunityPost {
+export function simPostToCommunityPost(p: SimPost): CommunityPost {
   const simAuthor = SIM_USERS_BY_ID[p.authorId];
   // Fall back to the mutable mockCurrentUser when the authorId is a real
   // Supabase UUID (not in the 9-user simulation). This covers posts published

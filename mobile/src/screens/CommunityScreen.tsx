@@ -7,6 +7,7 @@ import {
   Easing,
   Platform,
   useWindowDimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
@@ -21,7 +22,8 @@ import {
   SidebarDrawer,
 } from '@evoconn/components';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
-import { useFeedStore } from '@evoconn/hooks/useFeedStore';
+import { useFeedStore, simPostToCommunityPost } from '@evoconn/hooks/useFeedStore';
+import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
 import { useParatiSeenPosts } from '@evoconn/hooks/ParatiSeenPostsContext';
 import type { CommunityPost } from '@evoconn/types';
@@ -50,6 +52,7 @@ import {
 import { ReflectionDetailItem } from '@evoconn/components/ReflectionDetailItem';
 import { SearchScreen } from '@evoconn/components/SearchScreen';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
+import { getClanColor } from '@evoconn/constants/clanColors';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
 import { ProfileRevealPanel } from '@evoconn/components/otherProfile';
 import {
@@ -137,6 +140,9 @@ function clampDetailInitialIndex(dataLength: number, initialIndex: number): numb
 const ANIM_DURATION = 200;
 const RIGHT_EDGE_ZONE_WIDTH = 28;
 
+/** Para ti pull-to-refresh style: content slides down while clan-colored spinner shows at top. */
+const PARATI_REFRESH_SHIFT = 56;
+
 const TAB_INDEX: Record<TabId, number> = {
   'siguiendo': 0,
   'para-ti': 1,
@@ -164,9 +170,23 @@ export default function CommunityScreen() {
   const { followingSet } = useFollowState();
   const { thoughts } = useThoughts();
   const { posts: allPosts, getPostById } = useFeedStore();
+  const { refreshSocialFromSupabase } = useSimulation();
   const { getBoost, revision: tasteRevision, recordDwell } = useRecommendationTaste();
   const { seenIds: paratiSeenIds, markParatiPostSeen } = useParatiSeenPosts();
   const { triggerHaptic } = useEvoPreferences();
+  const [paratiDetailFeedKey, setParatiDetailFeedKey] = useState(0);
+  const paratiRefreshShiftAnim = useRef(new Animated.Value(0)).current;
+  /** Opacity del loader = posición del slide (aparece al bajar, desaparece al volver el post arriba). */
+  const paratiRefreshSpinnerOpacity = useMemo(
+    () =>
+      paratiRefreshShiftAnim.interpolate({
+        inputRange: [0, PARATI_REFRESH_SHIFT],
+        outputRange: [0, 1],
+        extrapolate: 'clamp',
+      }),
+    [paratiRefreshShiftAnim],
+  );
+  const paratiUserClanColor = useMemo(() => getClanColor(mockCurrentUser.clanId), []);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const drawerOpenProgress = useRef(new Animated.Value(0)).current;
   const gestureCommittingRef = useRef(false);
@@ -343,6 +363,12 @@ export default function CommunityScreen() {
     }
   }, [tabParam, postIdParam, openDetailFeed]);
 
+  useEffect(() => {
+    if (!detailFeed || detailFeed.mode !== 'foryou') {
+      paratiRefreshShiftAnim.setValue(0);
+    }
+  }, [detailFeed, paratiRefreshShiftAnim]);
+
   const closeDetailFeed = useCallback(() => {
     Animated.timing(slideAnim, {
       toValue: 0,
@@ -412,9 +438,56 @@ export default function CommunityScreen() {
       const tabId = tab as TabId;
 
       if (tabId === 'para-ti') {
-        // Already on Para Ti → silently reload posts and scroll to top
         const alreadyOpen = detailFeed?.mode === 'foryou';
-        openDetailFeed('foryou', undefined, alreadyOpen);
+        if (alreadyOpen) {
+          void (async () => {
+            const shift = PARATI_REFRESH_SHIFT;
+            paratiRefreshShiftAnim.setValue(0);
+            try {
+              const [, simPosts] = await Promise.all([
+                new Promise<void>((resolve) => {
+                  Animated.spring(paratiRefreshShiftAnim, {
+                    toValue: shift,
+                    useNativeDriver: true,
+                    tension: 128,
+                    friction: 15,
+                  }).start(() => resolve());
+                }),
+                refreshSocialFromSupabase(),
+              ]);
+              const freshAll = simPosts.map(simPostToCommunityPost);
+              const emptySeen = new Set<string>();
+              setForyouSeenFrozen(emptySeen);
+              const data = getDataForMode(
+                'foryou',
+                freshAll,
+                followingSet,
+                mockCurrentUser.clanId,
+                mockCurrentUser.id,
+                followingSort,
+                getBoost,
+                emptySeen,
+              );
+              setParatiDetailFeedKey((k) => k + 1);
+              setDetailFeed({
+                mode: 'foryou',
+                data,
+                initialIndex: clampDetailInitialIndex(data.length, 0),
+              });
+            } finally {
+              await new Promise<void>((resolve) => {
+                Animated.spring(paratiRefreshShiftAnim, {
+                  toValue: 0,
+                  useNativeDriver: true,
+                  tension: 132,
+                  friction: 17,
+                }).start(() => resolve());
+              });
+            }
+          })();
+          return;
+        }
+        openDetailFeed('foryou', undefined, false);
         return;
       }
 
@@ -438,7 +511,18 @@ export default function CommunityScreen() {
       setActiveTab(tabId);
       setTransitionTab(oldTab);
     },
-    [activeTab, detailFeed, transitionTab, openDetailFeed, closeDetailFeed, tabSlideAnim],
+    [
+      activeTab,
+      detailFeed,
+      transitionTab,
+      openDetailFeed,
+      closeDetailFeed,
+      tabSlideAnim,
+      refreshSocialFromSupabase,
+      followingSet,
+      followingSort,
+      getBoost,
+    ],
   );
 
   useLayoutEffect(() => {
@@ -505,6 +589,7 @@ export default function CommunityScreen() {
         post={item}
         showPhraseAuthor={activeTab === 'para-ti'}
         slotOuterHeight={feedCardSlotOuterHeight}
+        followingFeedStyle={activeTab === 'siguiendo'}
         onPress={() => handlePostPress(item)}
         onAuthorPress={() => handleAuthorPress(item.author.id)}
         onClanPress={() => {
@@ -522,6 +607,7 @@ export default function CommunityScreen() {
         post={item}
         showPhraseAuthor={false}
         slotOuterHeight={feedCardSlotOuterHeight}
+        followingFeedStyle
         onPress={() => handlePostPress(item)}
         onAuthorPress={() => handleAuthorPress(item.author.id)}
         onClanPress={() => {
@@ -891,32 +977,81 @@ export default function CommunityScreen() {
               { transform: [{ translateX: detailTranslateX }] },
             ]}
           >
-            <FlatList
-              ref={detailFeedListRef}
-              data={detailFeed?.data ?? []}
-              renderItem={renderFeedItem}
-              keyExtractor={(item) => item.id}
-              pagingEnabled
-              nestedScrollEnabled
-              scrollEnabled={feedScrollEnabled && !profileOverlayActive}
-              decelerationRate={
-                Platform.OS === 'ios' ? COMMUNITY_DETAIL_DECELERATION_RATE_IOS : 'fast'
-              }
-              showsVerticalScrollIndicator={false}
-              getItemLayout={getFeedItemLayout}
-              initialScrollIndex={
-                detailFeed && detailFeed.data.length > 0
-                  ? clampDetailInitialIndex(detailFeed.data.length, detailFeed.initialIndex)
-                  : 0
-              }
-              initialNumToRender={COMMUNITY_DETAIL_PREFETCH_POSTS}
-              maxToRenderPerBatch={COMMUNITY_DETAIL_PREFETCH_POSTS}
-              windowSize={COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE}
-              removeClippedSubviews={false}
-              style={styles.panelInner}
-              viewabilityConfig={detailViewabilityConfig}
-              onViewableItemsChanged={onDetailViewableItemsChanged}
-            />
+            {detailFeed?.mode === 'foryou' ? (
+              <View style={styles.paratiDetailWithRefreshWrap}>
+                <Animated.View
+                  pointerEvents="none"
+                  style={[
+                    styles.paratiRefreshHeader,
+                    { height: PARATI_REFRESH_SHIFT, opacity: paratiRefreshSpinnerOpacity },
+                  ]}
+                >
+                  <ActivityIndicator size="large" color={paratiUserClanColor} />
+                </Animated.View>
+                <Animated.View
+                  style={[
+                    styles.panelInner,
+                    { transform: [{ translateY: paratiRefreshShiftAnim }] },
+                  ]}
+                >
+                  <FlatList
+                    key={`parati-${paratiDetailFeedKey}`}
+                    ref={detailFeedListRef}
+                    data={detailFeed?.data ?? []}
+                    renderItem={renderFeedItem}
+                    keyExtractor={(item) => item.id}
+                    pagingEnabled
+                    nestedScrollEnabled
+                    scrollEnabled={feedScrollEnabled && !profileOverlayActive}
+                    decelerationRate={
+                      Platform.OS === 'ios' ? COMMUNITY_DETAIL_DECELERATION_RATE_IOS : 'fast'
+                    }
+                    showsVerticalScrollIndicator={false}
+                    getItemLayout={getFeedItemLayout}
+                    initialScrollIndex={
+                      detailFeed && detailFeed.data.length > 0
+                        ? clampDetailInitialIndex(detailFeed.data.length, detailFeed.initialIndex)
+                        : 0
+                    }
+                    initialNumToRender={COMMUNITY_DETAIL_PREFETCH_POSTS}
+                    maxToRenderPerBatch={COMMUNITY_DETAIL_PREFETCH_POSTS}
+                    windowSize={COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE}
+                    removeClippedSubviews={false}
+                    style={styles.panelInner}
+                    viewabilityConfig={detailViewabilityConfig}
+                    onViewableItemsChanged={onDetailViewableItemsChanged}
+                  />
+                </Animated.View>
+              </View>
+            ) : (
+              <FlatList
+                key="following-detail"
+                ref={detailFeedListRef}
+                data={detailFeed?.data ?? []}
+                renderItem={renderFeedItem}
+                keyExtractor={(item) => item.id}
+                pagingEnabled
+                nestedScrollEnabled
+                scrollEnabled={feedScrollEnabled && !profileOverlayActive}
+                decelerationRate={
+                  Platform.OS === 'ios' ? COMMUNITY_DETAIL_DECELERATION_RATE_IOS : 'fast'
+                }
+                showsVerticalScrollIndicator={false}
+                getItemLayout={getFeedItemLayout}
+                initialScrollIndex={
+                  detailFeed && detailFeed.data.length > 0
+                    ? clampDetailInitialIndex(detailFeed.data.length, detailFeed.initialIndex)
+                    : 0
+                }
+                initialNumToRender={COMMUNITY_DETAIL_PREFETCH_POSTS}
+                maxToRenderPerBatch={COMMUNITY_DETAIL_PREFETCH_POSTS}
+                windowSize={COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE}
+                removeClippedSubviews={false}
+                style={styles.panelInner}
+                viewabilityConfig={detailViewabilityConfig}
+                onViewableItemsChanged={onDetailViewableItemsChanged}
+              />
+            )}
           </Animated.View>
         ) : null}
 
@@ -1036,5 +1171,18 @@ const styles = StyleSheet.create({
     backgroundColor: evoconnColors.background,
   },
   panelInner: { flex: 1 },
+  paratiDetailWithRefreshWrap: {
+    flex: 1,
+    overflow: 'hidden',
+  },
+  paratiRefreshHeader: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    zIndex: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   list: { paddingTop: 8 },
 });

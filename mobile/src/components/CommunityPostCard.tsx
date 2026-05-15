@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -6,15 +6,13 @@ import {
   StyleSheet,
   Image,
   useWindowDimensions,
+  LayoutChangeEvent,
 } from 'react-native';
 import { FollowButton } from './FollowButton';
 import type { CommunityPost } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getReflectionCardTier } from '@evoconn/utils/getCardSizeFromText';
 import { formatNumber } from '@evoconn/utils/formatNumber';
-import { getSmallClanBannerAsset, type BannerAsset } from '@evoconn/assets/cards/smallClanBanners';
-import { getMediumClanBannerAsset } from '@evoconn/assets/cards/mediumClanBanners';
-import { getQuoteClanBannerAsset } from '@evoconn/assets/cards/quoteClanBanners';
 import { getSmallClanBackgroundSvg } from '@evoconn/assets/cards/smallClanBackgroundsSvg';
 import { getMediumClanBackgroundSvg } from '@evoconn/assets/cards/mediumClanBackgroundsSvg';
 import { getQuoteClanBackgroundSvg } from '@evoconn/assets/cards/quoteClanBackgroundsSvg';
@@ -33,6 +31,9 @@ import {
   maxCardWidthForInnerCardHeightPx,
   SVG_CARD_VISUAL,
 } from '@evoconn/constants/svgCardLayout';
+import { ClanCardFeedRimOverlay } from './ClanCardFeedRimOverlay';
+import { getClanColor } from '@evoconn/constants/clanColors';
+import { PanelStarField } from '@evoconn/components/animations/StarFieldBackground';
 
 const V = SVG_CARD_VISUAL;
 
@@ -51,6 +52,10 @@ type CommunityPostCardProps = {
    * Si la tarjeta “natural” lo supera, se reduce el ancho para acortar la altura y mantener bordes redondeados visibles.
    */
   slotOuterHeight?: number;
+  /**
+   * Siguiendo: fondo de tarjeta al color de app + rebordes brillantes en las 4 esquinas (color clan).
+   */
+  followingFeedStyle?: boolean;
 };
 
 export function CommunityPostCard({
@@ -60,6 +65,7 @@ export function CommunityPostCard({
   onClanPress: _onClanPress,
   showPhraseAuthor = false,
   slotOuterHeight,
+  followingFeedStyle = false,
 }: CommunityPostCardProps) {
   const { updatePostVote, updatePostSaveToggle, getMyVote } = useFeedStore();
   const { savePost, unsavePost, isSaved } = usePersonalProfile();
@@ -94,12 +100,6 @@ export function CommunityPostCard({
     return getQuoteClanBackgroundSvg(post.author.clanId);
   }, [cardTier, post.author.clanId]);
 
-  const bannerAsset = useMemo(() => {
-    if (cardTier === 'small') return getSmallClanBannerAsset(post.author.clanId);
-    if (cardTier === 'medium') return getMediumClanBannerAsset(post.author.clanId);
-    return getQuoteClanBannerAsset(post.author.clanId);
-  }, [cardTier, post.author.clanId]);
-
   const { width: screenWidth } = useWindowDimensions();
   const maxUsableWidth = screenWidth - V.CARD_HORIZONTAL_MARGIN * 2;
   const baseCardWidth = Math.min(maxUsableWidth, COMMUNITY_FEED_CARD_MAX_INNER_WIDTH);
@@ -130,6 +130,19 @@ export function CommunityPostCard({
   const statsRowHeight = useMemo(
     () => Math.max(statsIcon, feedContent.statsCountFontSize + 3) + 2,
     [statsIcon, feedContent.statsCountFontSize],
+  );
+
+  const clanRimColor = useMemo(() => getClanColor(post.author.clanId), [post.author.clanId]);
+  const [cardDims, setCardDims] = useState<{ width: number; height: number } | null>(null);
+  const onCardLayout = useCallback(
+    (e: LayoutChangeEvent) => {
+      if (!followingFeedStyle) return;
+      const { width, height } = e.nativeEvent.layout;
+      setCardDims((prev) =>
+        prev?.width === width && prev?.height === height ? prev : { width, height },
+      );
+    },
+    [followingFeedStyle],
   );
 
   const textContentBottomY = useMemo(
@@ -188,6 +201,7 @@ export function CommunityPostCard({
   return (
     <TouchableOpacity activeOpacity={0.92} onPress={onPress}>
       <View
+        onLayout={onCardLayout}
         style={{
           width: cardWidth,
           height: layout.cardHeight,
@@ -236,7 +250,7 @@ export function CommunityPostCard({
           />
         </View>
 
-        {/* Inner black area — title + body */}
+        {/* Inner black area — title + body + twinkling stars (same as reflection panel). */}
         <View
           style={{
             position: 'absolute',
@@ -247,49 +261,62 @@ export function CommunityPostCard({
             overflow: 'hidden',
           }}
         >
-          {post.title ? (
+          <PanelStarField />
+          <View style={{ zIndex: 1 }}>
+            {post.title ? (
+              <Text
+                style={[
+                  styles.title,
+                  {
+                    fontSize: feedContent.titleFontSize,
+                    marginBottom: feedContent.titleMarginBottom,
+                    lineHeight: Math.round(feedContent.titleFontSize * 1.2),
+                  },
+                ]}
+                numberOfLines={V.TITLE_MAX_LINES}
+              >
+                {post.title}
+              </Text>
+            ) : null}
             <Text
               style={[
-                styles.title,
+                styles.bodyInner,
                 {
-                  fontSize: feedContent.titleFontSize,
-                  marginBottom: feedContent.titleMarginBottom,
-                  lineHeight: Math.round(feedContent.titleFontSize * 1.2),
+                  fontSize: feedContent.bodyFontSize,
+                  lineHeight: feedContent.bodyLineHeight,
                 },
+                isQuoteCard && { fontWeight: '700' as const, fontStyle: 'italic' as const },
               ]}
-              numberOfLines={V.TITLE_MAX_LINES}
+              numberOfLines={bodyMaxLines}
             >
-              {post.title}
+              {isQuoteCard ? formatPhraseBodyForDisplay(post.body) : post.body}
             </Text>
-          ) : null}
-          <Text
-            style={[
-              styles.bodyInner,
-              {
-                fontSize: feedContent.bodyFontSize,
-                lineHeight: feedContent.bodyLineHeight,
-              },
-              isQuoteCard && { fontWeight: '700' as const, fontStyle: 'italic' as const },
-            ]}
-            numberOfLines={bodyMaxLines}
-          >
-            {isQuoteCard ? formatPhraseBodyForDisplay(post.body) : post.body}
-          </Text>
-          {isQuoteCard && showPhraseAuthor && post.quoteAuthor ? (
-            <Text
-              style={[
-                styles.phraseQuoteAuthorInFeed,
-                {
-                  fontSize: feedContent.phraseAuthorFontSize,
-                  lineHeight: Math.round(feedContent.phraseAuthorFontSize * 1.25),
-                },
-              ]}
-              numberOfLines={2}
-            >
-              {post.quoteAuthor}
-            </Text>
-          ) : null}
+            {isQuoteCard && showPhraseAuthor && post.quoteAuthor ? (
+              <Text
+                style={[
+                  styles.phraseQuoteAuthorInFeed,
+                  {
+                    fontSize: feedContent.phraseAuthorFontSize,
+                    lineHeight: Math.round(feedContent.phraseAuthorFontSize * 1.25),
+                  },
+                ]}
+                numberOfLines={2}
+              >
+                {post.quoteAuthor}
+              </Text>
+            ) : null}
+          </View>
         </View>
+
+        {/* Rim: under stats so the stroke does not paint over icons. */}
+        {followingFeedStyle && cardDims ? (
+          <ClanCardFeedRimOverlay
+            width={cardDims.width}
+            height={cardDims.height}
+            borderRadius={V.CARD_BORDER_RADIUS}
+            clanColor={clanRimColor}
+          />
+        ) : null}
 
         {/* Stats — horizontal, bottom-right of the colored frame (below black box) */}
         <View
@@ -297,39 +324,12 @@ export function CommunityPostCard({
             position: 'absolute',
             bottom: V.STATS_BOTTOM,
             right: V.STATS_RIGHT,
+            zIndex: 2,
+            elevation: 4,
           }}
         >
           {renderFeedStats()}
         </View>
-
-        {/* Banner (estandarte) — top-right corner.
-            PNG clans → <Image source={number}>.
-            Sin-clan → SVG component rendered directly. */}
-        {bannerAsset ? (
-          <View
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              top: feedContent.bannerTop,
-              right: feedContent.bannerRight,
-              width: feedContent.bannerSize,
-              height: feedContent.bannerSize,
-            }}
-          >
-            {typeof bannerAsset === 'function' ? (() => {
-                const BannerSvg = bannerAsset as React.ComponentType<{ width?: number; height?: number }>;
-                return (
-                  <BannerSvg width={feedContent.bannerSize} height={feedContent.bannerSize} />
-                );
-              })() : (
-              <Image
-                source={bannerAsset as number}
-                resizeMode="contain"
-                style={{ width: feedContent.bannerSize, height: feedContent.bannerSize }}
-              />
-            )}
-          </View>
-        ) : null}
       </View>
     </TouchableOpacity>
   );

@@ -61,6 +61,46 @@ const SIM_COMMENTS_STORAGE_KEY = '@physicscopilot/sim_comments_v3';
 const SIM_SAVED_STORAGE_KEY    = '@physicscopilot/sim_saved_v1';
 const SIM_HIDDEN_STORAGE_KEY   = '@physicscopilot/sim_hidden_v1';
 
+/** Shared fetch for real-user Supabase hydration + manual “Para ti” feed refresh. */
+async function loadSupabaseHydrationPayload(hydrateFor: string): Promise<{
+  sbPosts: SimPost[];
+  myVotesMap: Record<string, 'up' | 'down'>;
+  mySavedPostIds: string[];
+  following: string[];
+  followers: string[];
+  commentsByPost: Record<string, SimComment[]>;
+}> {
+  const sbPosts = await fetchAllPosts();
+  const postIds = sbPosts.map(p => p.id);
+  const allVoteRows = await fetchVotesForPosts(postIds);
+  for (const row of allVoteRows) {
+    const post = sbPosts.find(p => p.id === row.post_id);
+    if (!post) continue;
+    if (row.vote === 'up') post.upvoterIds = [...post.upvoterIds, row.user_id];
+    if (row.vote === 'down') post.downvoterIds = [...post.downvoterIds, row.user_id];
+  }
+
+  const myVotesMap = await fetchMyVotes(hydrateFor);
+  const mySavedPostIds = await fetchMySaves(hydrateFor);
+  for (const pid of mySavedPostIds) {
+    const post = sbPosts.find(p => p.id === pid);
+    if (post) post.saverIds = [...post.saverIds, hydrateFor];
+  }
+
+  const [following, followers] = await Promise.all([
+    fetchFollowing(hydrateFor),
+    fetchFollowers(hydrateFor),
+  ]);
+
+  const allComments = await Promise.all(postIds.map(id => fetchCommentsForPost(id)));
+  const commentsByPost: Record<string, SimComment[]> = {};
+  postIds.forEach((id, i) => {
+    if (allComments[i].length > 0) commentsByPost[id] = allComments[i];
+  });
+
+  return { sbPosts, myVotesMap, mySavedPostIds, following, followers, commentsByPost };
+}
+
 // ─── State initialisers ───────────────────────────────────────────────────────
 
 /** userId → Set of postIds the user has saved. Initialised from SIM_POSTS.saverIds. */
@@ -147,6 +187,11 @@ export type SimulationContextValue = {
   addComment: (comment: SimComment) => Promise<void>;
   /** Lazily fetch fresh comments from Supabase for a specific post. */
   ensureCommentsForPost: (postId: string) => Promise<void>;
+  /**
+   * Re-fetch posts, votes, saves, follows, and comments from Supabase (real users only).
+   * Sim users: resets the post list to `SIM_POSTS`. Returns the post array after refresh.
+   */
+  refreshSocialFromSupabase: () => Promise<SimPost[]>;
 };
 
 // ─── Context ─────────────────────────────────────────────────────────────────
@@ -202,76 +247,40 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     (async () => {
       console.log('[Social] Hydrating from Supabase for user', hydrateFor);
 
-      // 1. Posts — the full global feed.
-      const sbPosts = await fetchAllPosts();
-
-      // 2. Vote counts — reconstruct upvoterIds / downvoterIds on each post.
-      const postIds = sbPosts.map(p => p.id);
-      const allVoteRows = await fetchVotesForPosts(postIds);
-      for (const row of allVoteRows) {
-        const post = sbPosts.find(p => p.id === row.post_id);
-        if (!post) continue;
-        if (row.vote === 'up')   post.upvoterIds   = [...post.upvoterIds,   row.user_id];
-        if (row.vote === 'down') post.downvoterIds = [...post.downvoterIds, row.user_id];
-      }
-
-      // 3. My votes → voteMap.
-      const myVotesMap = await fetchMyVotes(hydrateFor);
-
-      // 4. My saves → savedMap.
-      const mySavedPostIds = await fetchMySaves(hydrateFor);
-      for (const pid of mySavedPostIds) {
-        const post = sbPosts.find(p => p.id === pid);
-        if (post) post.saverIds = [...post.saverIds, hydrateFor];
-      }
-
-      // 5. Follow graph — who I follow + who follows me.
-      const [following, followers] = await Promise.all([
-        fetchFollowing(hydrateFor),
-        fetchFollowers(hydrateFor),
-      ]);
-
-      // 6. Comments — fetch for all loaded posts in one query.
-      const allComments = await Promise.all(postIds.map(id => fetchCommentsForPost(id)));
-      const commentsByPost: Record<string, SimComment[]> = {};
-      postIds.forEach((id, i) => {
-        if (allComments[i].length > 0) commentsByPost[id] = allComments[i];
-      });
+      const payload = await loadSupabaseHydrationPayload(hydrateFor);
 
       if (cancelled || activeUserIdRef.current !== hydrateFor) return;
 
       // ── Apply to state ──────────────────────────────────────────────────
-      setPosts(() => sbPosts);
+      setPosts(() => payload.sbPosts);
       setVoteMapRaw(prev => ({
         ...prev,
-        [hydrateFor]: myVotesMap,
+        [hydrateFor]: payload.myVotesMap,
       }));
       setSavedMapArr(prev => {
         const updated = { ...prev };
-        updated[hydrateFor] = mySavedPostIds;
+        updated[hydrateFor] = payload.mySavedPostIds;
         return updated;
       });
       setFollowGraph(prev => {
         const updated = { ...prev };
         const prevMine = prev[hydrateFor] ?? [];
-        // Union with server list so optimistic follows (insert still in flight) are not wiped.
-        updated[hydrateFor] = [...new Set([...following, ...prevMine])];
-        // Populate reverse edges so followers appear in activeFollowersCount.
-        for (const followerId of followers) {
+        updated[hydrateFor] = [...new Set([...payload.following, ...prevMine])];
+        for (const followerId of payload.followers) {
           updated[followerId] = [
             ...new Set([...(updated[followerId] ?? []), hydrateFor]),
           ];
         }
         return updated;
       });
-      setCommentsMap(prev => ({ ...prev, ...commentsByPost }));
+      setCommentsMap(prev => ({ ...prev, ...payload.commentsByPost }));
 
       postsHydrated.current  = true;
       votesHydrated.current  = true;
       followHydrated.current = true;
       commentsHydrated.current = true;
       savedHydrated.current  = true;
-      console.log('[Social] Supabase hydration complete. Posts:', sbPosts.length);
+      console.log('[Social] Supabase hydration complete. Posts:', payload.sbPosts.length);
     })();
 
     return () => {
@@ -825,6 +834,48 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const refreshSocialFromSupabase = useCallback(async (): Promise<SimPost[]> => {
+    if (!isRealUserId(activeUserId)) {
+      const seed = SIM_POSTS.map(p => ({ ...p }));
+      setPosts(() => seed);
+      return seed;
+    }
+    const hydrateFor = activeUserId;
+    console.log('[Social] Manual refresh from Supabase for user', hydrateFor);
+    const payload = await loadSupabaseHydrationPayload(hydrateFor);
+    if (activeUserIdRef.current !== hydrateFor) {
+      return payload.sbPosts;
+    }
+    setPosts(() => payload.sbPosts);
+    setVoteMapRaw(prev => ({
+      ...prev,
+      [hydrateFor]: payload.myVotesMap,
+    }));
+    setSavedMapArr(prev => {
+      const updated = { ...prev };
+      updated[hydrateFor] = payload.mySavedPostIds;
+      return updated;
+    });
+    setFollowGraph(prev => {
+      const updated = { ...prev };
+      const prevMine = prev[hydrateFor] ?? [];
+      updated[hydrateFor] = [...new Set([...payload.following, ...prevMine])];
+      for (const followerId of payload.followers) {
+        updated[followerId] = [
+          ...new Set([...(updated[followerId] ?? []), hydrateFor]),
+        ];
+      }
+      return updated;
+    });
+    setCommentsMap(prev => ({ ...prev, ...payload.commentsByPost }));
+    postsHydrated.current  = true;
+    votesHydrated.current  = true;
+    followHydrated.current = true;
+    commentsHydrated.current = true;
+    savedHydrated.current  = true;
+    return payload.sbPosts;
+  }, [activeUserId]);
+
   // ─── Context value ─────────────────────────────────────────────────────────
   const value = useMemo<SimulationContextValue>(
     () => ({
@@ -850,6 +901,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       publishPost,
       addComment,
       ensureCommentsForPost,
+      refreshSocialFromSupabase,
     }),
     [
       activeUserId, setActiveUserId, users, posts,
@@ -858,6 +910,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       activeUser, activeFollowersCount, activeFollowingCount,
       follow, unfollow, toggleFollow, castVote, toggleSave,
       deletePost, toggleHidePost, publishPost, addComment, ensureCommentsForPost,
+      refreshSocialFromSupabase,
     ],
   );
 
