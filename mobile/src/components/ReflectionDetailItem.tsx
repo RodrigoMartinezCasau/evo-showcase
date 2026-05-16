@@ -784,8 +784,8 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   }, [screenW, itemHeight, reflPanelLayout]);
 
   const handleClanPressAction = useCallback(() => {
-    if (post.author.clanId) onClanPress(post.author.clanId);
-  }, [post.author.clanId, onClanPress]);
+    onAuthorPress(post.author.id);
+  }, [post.author.id, onAuthorPress]);
 
   const handleAuthorPressAction = useCallback(() => {
     onAuthorPress(post.author.id);

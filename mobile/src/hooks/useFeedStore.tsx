@@ -9,7 +9,9 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import type { CommunityPost, PhrasePost, User, VoteStats } from '../types';
@@ -18,26 +20,41 @@ import { SIM_USERS_BY_ID, isPublishedSimPostType, type SimPost } from '@evoconn/
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { useNotifications } from '@evoconn/hooks/NotificationsContext';
 import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
+import { isRealUserId, fetchProfilesBatch } from '@evoconn/services/supabaseSocial';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-export function simPostToCommunityPost(p: SimPost): CommunityPost {
+export function simPostToCommunityPost(
+  p: SimPost,
+  avatarCache?: Record<string, string | null>,
+): CommunityPost {
   const simAuthor = SIM_USERS_BY_ID[p.authorId];
   // Fall back to the mutable mockCurrentUser when the authorId is a real
   // Supabase UUID (not in the 9-user simulation). This covers posts published
   // by the authenticated user during the current session.
   const author = simAuthor ?? (p.authorId === mockCurrentUser.id ? mockCurrentUser : undefined);
+  const cachedAvatarUri = avatarCache?.[p.authorId];
   return {
     id: p.id,
     type: p.type,
     author: author
-      ? { id: author.id, username: author.username, clanId: author.clanId, rank: author.rank }
+      ? {
+          id: author.id,
+          username: author.username,
+          clanId: author.clanId,
+          rank: author.rank,
+          // Include avatarUri for the current user (set by AuthContext) or from cache.
+          avatarUri:
+            ('avatarUri' in author ? (author as User).avatarUri : undefined) ??
+            (cachedAvatarUri ?? undefined),
+        }
       // Use the author snapshot stored at publish time so names survive restarts.
       : {
           id: p.authorId,
           username: p.authorUsername ?? '?',
           clanId: p.authorClanId ?? null,
           rank: p.authorRank ?? 'aprendiz',
+          avatarUri: cachedAvatarUri ?? undefined,
         },
     title: p.title,
     body: p.body,
@@ -75,11 +92,44 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
   const taste = useRecommendationTaste();
   const [publishedIds, setPublishedIds] = useState<Set<string>>(new Set());
 
+  // ── Author avatar cache for real Supabase users not in the 9-user sim ──────
+  const [authorAvatarCache, setAuthorAvatarCache] = useState<Record<string, string | null>>({});
+  const fetchedAuthorIds = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const missingIds = sim.posts
+      .filter(p => isPublishedSimPostType(p.type))
+      .map(p => p.authorId)
+      .filter(id =>
+        isRealUserId(id) &&
+        id !== mockCurrentUser.id &&
+        !fetchedAuthorIds.current.has(id),
+      );
+    const uniqueMissing = [...new Set(missingIds)];
+    if (uniqueMissing.length === 0) return;
+    uniqueMissing.forEach(id => fetchedAuthorIds.current.add(id));
+    fetchProfilesBatch(uniqueMissing)
+      .then(profiles => {
+        setAuthorAvatarCache(prev => {
+          const next = { ...prev };
+          profiles.forEach(prof => { next[prof.id] = prof.avatarUri ?? null; });
+          return next;
+        });
+      })
+      .catch(() => {
+        // Allow retry on next posts update by removing from fetched set.
+        uniqueMissing.forEach(id => fetchedAuthorIds.current.delete(id));
+      });
+  }, [sim.posts]);
+
   // All posts: derive CommunityPost[] from the live SimPost[] so vote/save
   // counts always reflect the current simulation state.
   const posts = useMemo<CommunityPost[]>(
-    () => sim.posts.filter((p) => isPublishedSimPostType(p.type)).map(simPostToCommunityPost),
-    [sim.posts],
+    () =>
+      sim.posts
+        .filter(p => isPublishedSimPostType(p.type))
+        .map(p => simPostToCommunityPost(p, authorAvatarCache)),
+    [sim.posts, authorAvatarCache],
   );
 
   const publishPost = useCallback(

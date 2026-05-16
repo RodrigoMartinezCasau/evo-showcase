@@ -59,6 +59,7 @@ function simPostToCommunityPost(
         username: cached.username,
         clanId: cached.clanId,
         rank: cached.rank as Rank,
+        avatarUri: cached.avatarUri ?? undefined,
       };
     } else {
       userAuthor = {

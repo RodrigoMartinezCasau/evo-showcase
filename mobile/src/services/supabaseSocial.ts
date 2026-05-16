@@ -371,7 +371,7 @@ export async function fetchProfilesBatch(userIds: string[]): Promise<BasicProfil
   if (userIds.length === 0) return [];
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, username, clan_id, rank')
+    .select('id, username, clan_id, rank, avatar_url')
     .in('id', userIds);
   if (error) { console.error('[Social] fetchProfilesBatch:', error.message); return []; }
   return (data ?? []).map(r => ({
@@ -379,6 +379,7 @@ export async function fetchProfilesBatch(userIds: string[]): Promise<BasicProfil
     username: r.username ? `@${r.username.toUpperCase()}` : `@${r.id.slice(0, 8)}`,
     clanId: r.clan_id ?? null,
     rank: r.rank ?? 'aprendiz',
+    avatarUri: (r as { avatar_url?: string | null }).avatar_url ?? null,
   }));
 }
 
