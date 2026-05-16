@@ -36,14 +36,24 @@ export function sortFollowingPosts(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       );
     case 'votadas_24h': {
-      const cutoff = now - 24 * MS_DAY;
-      const inWindow = posts.filter((p) => new Date(p.createdAt).getTime() >= cutoff);
-      return [...inWindow].sort((a, b) => b.voteStats.up - a.voteStats.up);
+      const cutoff = now - MS_DAY;
+      return posts
+        .filter(
+          (p) =>
+            new Date(p.createdAt).getTime() >= cutoff &&
+            p.voteStats.up >= 1,
+        )
+        .sort((a, b) => b.voteStats.up - a.voteStats.up);
     }
     case 'votadas_mes': {
       const cutoff = now - 30 * MS_DAY;
-      const inWindow = posts.filter((p) => new Date(p.createdAt).getTime() >= cutoff);
-      return [...inWindow].sort((a, b) => b.voteStats.up - a.voteStats.up);
+      return posts
+        .filter(
+          (p) =>
+            new Date(p.createdAt).getTime() >= cutoff &&
+            p.voteStats.up >= 1,
+        )
+        .sort((a, b) => b.voteStats.up - a.voteStats.up);
     }
   }
 }
