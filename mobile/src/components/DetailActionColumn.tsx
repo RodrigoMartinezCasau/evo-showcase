@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useCallback, useImperativeHandle, forwardRef } from 'react';
+import React, { useRef, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { View, Text, TouchableOpacity, Animated, StyleSheet } from 'react-native';
 import {
   DETAIL_ACTION_COLUMN_LAYOUT as COL,
@@ -8,7 +8,6 @@ import {
   DETAIL_SAVE_BUTTON_LAYOUT as SAVE_L,
   DETAIL_MORE_BUTTON_LAYOUT as MORE_L,
 } from '@evoconn/constants/detailActionColumnLayout';
-import { getTopBarInsigniaByHouse } from '@evoconn/utils/getTopBarInsigniaByHouse';
 import { UserAvatarFrame } from './shared/UserAvatarFrame';
 
 import UpvoteInactive from '../assets/detailActions/31.svg';
@@ -84,7 +83,6 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
     },
     ref,
   ) {
-  const InsigniaIcon = useMemo(() => getTopBarInsigniaByHouse(clanId), [clanId]);
   const sz = COL.iconSize;
 
   const upBounce = useBounce();
@@ -139,15 +137,9 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
       {/* ── 6-item column: clan / up block / approval% / down block / save / dots (same count↔icon gap up & down) ── */}
       <View style={columnStyle}>
 
-        {/* 1. Clan badge — shows profile photo when set, clan insignia otherwise */}
+        {/* 1. Clan badge — shows profile photo when set, flat clan icon otherwise */}
         <TouchableOpacity onPress={onClanPress} activeOpacity={0.7}>
-          {avatarUri ? (
-            <UserAvatarFrame clanId={clanId} avatarUri={avatarUri} size={clanSz} />
-          ) : (
-            <View style={{ width: clanSz, height: clanSz }}>
-              <InsigniaIcon width={clanSz} height={clanSz} />
-            </View>
-          )}
+          <UserAvatarFrame clanId={clanId} avatarUri={avatarUri} size={clanSz} />
         </TouchableOpacity>
 
         {/* 2. Upvote: count then icon — gap matches down block */}
