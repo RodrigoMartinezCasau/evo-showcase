@@ -7,8 +7,8 @@
  * gating screen for tabs while auth state is settling, so the user never
  * sees a transition from black ↔ stars ↔ animation.
  *
- * `PanelStarField` is the lightweight variant: solid inner fill matching clan card panels,
- * pointerEvents none, absoluteFill — overlay it inside any dark panel.
+ * `PanelStarField` is the lightweight variant: configurable panel fill, pointerEvents none,
+ * absoluteFill — overlay it inside any dark panel (feed: Siguiendo vs Para ti use different fills).
  */
 import React, { useMemo, useState } from 'react';
 import { View, StyleSheet, Animated, Easing, useWindowDimensions, LayoutChangeEvent } from 'react-native';
@@ -88,17 +88,22 @@ export default function StarFieldBackground({ children }: { children?: React.Rea
 }
 
 /**
- * Lightweight overlay variant: inner surface `#0d0d11`, absoluteFill, pointerEvents none.
+ * Lightweight overlay variant: solid panel fill (configurable), absoluteFill, pointerEvents none.
  * Drop it inside any dark panel to get the same twinkling-stars effect.
  * Star count and seed offset are separate from StarFieldBackground so both
  * can coexist on screen without duplicating positions.
  */
 const PANEL_STAR_COUNT = 18;
 const PANEL_SEED_OFFSET = 500;
-/** Matches SVG inner text/star panel fill (`#0d0d11`) so gaps between stars are not pure black. */
-const PANEL_STAR_SURFACE = '#0d0d11';
+/** Default: clan card inner panel (`#0d0d11`) — e.g. Siguiendo / detail. */
+export const PANEL_STAR_SURFACE_DEFAULT = '#0d0d11';
 
-export function PanelStarField() {
+type PanelStarFieldProps = {
+  /** Panel fill behind stars. Para ti feed uses app background; Siguiendo uses inner gray. */
+  surfaceColor?: string;
+};
+
+export function PanelStarField({ surfaceColor = PANEL_STAR_SURFACE_DEFAULT }: PanelStarFieldProps) {
   const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
 
   const handleLayout = (e: LayoutChangeEvent) => {
@@ -120,7 +125,7 @@ export function PanelStarField() {
 
   return (
     <View
-      style={styles.panelOverlay}
+      style={[styles.panelOverlay, { backgroundColor: surfaceColor }]}
       pointerEvents="none"
       onLayout={handleLayout}
     >
@@ -137,6 +142,5 @@ const styles = StyleSheet.create({
   panelOverlay: {
     ...StyleSheet.absoluteFillObject,
     overflow: 'hidden',
-    backgroundColor: PANEL_STAR_SURFACE,
   },
 });

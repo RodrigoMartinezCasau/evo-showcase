@@ -36,7 +36,7 @@ import { ClanCardFeedRimOverlay } from './ClanCardFeedRimOverlay';
 import { getClanColor } from '@evoconn/constants/clanColors';
 import { COMMUNITY_FOLLOW_BUTTON_LAYOUT } from '@evoconn/constants/followButtonLayout';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
-import { PanelStarField } from '@evoconn/components/animations/StarFieldBackground';
+import { PanelStarField, PANEL_STAR_SURFACE_DEFAULT } from '@evoconn/components/animations/StarFieldBackground';
 
 const V = SVG_CARD_VISUAL;
 
@@ -266,7 +266,11 @@ export function CommunityPostCard({
             borderRadius: innerGrayPanelBorderRadius,
           }}
         >
-          <PanelStarField />
+          <PanelStarField
+            surfaceColor={
+              followingFeedStyle ? PANEL_STAR_SURFACE_DEFAULT : evoconnColors.background
+            }
+          />
         </View>
 
         {/* Username + follow over stars — paddingTop from star top matches body paddingBottom band. */}
