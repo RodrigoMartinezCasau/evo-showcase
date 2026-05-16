@@ -58,7 +58,10 @@ export function getRankForUser(pct: number, clanId: string | null): Rank {
 }
 
 /**
- * Minimum total reflections required to trigger clan assignment reveal.
+ * Minimum total inputs (reflections + phrases) to trigger clan assignment reveal.
  * Used to calculate sin-clan progress bar fill.
+ * Keep in sync with REVEAL_TOTAL_INPUTS_THRESHOLD in ClassificationContext.
  */
-export const CLAN_REVEAL_MIN_REFLECTIONS = 30;
+export const CLAN_REVEAL_MIN_INPUTS = 10;
+/** @deprecated Use CLAN_REVEAL_MIN_INPUTS */
+export const CLAN_REVEAL_MIN_REFLECTIONS = CLAN_REVEAL_MIN_INPUTS;

@@ -17,14 +17,12 @@ import {
 } from 'react-native';
 import type { CommunityPost, Comment } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
-import { getClanColor, NO_CLAN_COMMUNITY_POST_FRAME_COLOR } from '@evoconn/constants/clanColors';
 import { ReflectionBackground } from './ReflectionBackground';
 import { DETAIL_HEADER_ROW_OFFSET_Y, DETAIL_HEADER_ROW_OFFSET_X } from '@evoconn/constants/reflectionDetailRankBadgeLayout';
 import { DetailActionColumn } from './DetailActionColumn';
 import type { DetailActionColumnHandle } from './DetailActionColumn';
 import { CommentCard } from './CommentCard';
 import { NewCommentBox } from './NewCommentBox';
-import { ClanSendButton } from './ChatInputBar';
 import {
   REFLECTION_PANEL_LAYOUT as RP,
   COMMENTS_PANEL_LAYOUT as CP,
@@ -135,7 +133,6 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
 }: ReflectionDetailItemProps) {
   const isNoClanAuthor =
     post.author.clanId == null || String(post.author.clanId).trim() === '';
-  const clanColor = getClanColor(post.author.clanId);
   const reflectionPanelBorderColor = evoconnColors.background;
   const starFieldSurfaceColor =
     reflectionStarSurfaceColor ?? evoconnColors.background;
@@ -1096,7 +1093,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                       },
                     ]}
                   >
-                    <NewCommentBox onSend={handleAddComment} clanColor={clanColor} />
+                    <NewCommentBox onSend={handleAddComment} clanId={post.author.clanId} />
                   </Animated.View>
                 </View>
               </>

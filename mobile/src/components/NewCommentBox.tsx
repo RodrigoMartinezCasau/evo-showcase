@@ -12,18 +12,19 @@ import {
   NEW_COMMENT_BOX_LAYOUT as BOX,
   NEW_COMMENT_SEND_BUTTON_LAYOUT as BTN,
 } from '@evoconn/constants/newCommentBoxLayout';
-import { ClanSendButton } from './ChatInputBar';
+import { getChatSendButtonByHouse } from '@evoconn/utils/getChatSendButtonByHouse';
 
 type NewCommentBoxProps = {
   onSend: (text: string) => void;
-  /** Primary color of the post's clan — used for the send button circle. */
-  clanColor?: string;
+  /** Clan id of the post author — selects the correct enviar-1 SVG. */
+  clanId?: string | null;
 };
 
 export const NewCommentBox = React.memo(function NewCommentBox({
   onSend,
-  clanColor = '#c7ff02',
+  clanId,
 }: NewCommentBoxProps) {
+  const SendSvg = getChatSendButtonByHouse(clanId);
   const [value, setValue] = useState('');
   const inputRef = useRef<TextInput>(null);
 
@@ -96,7 +97,7 @@ export const NewCommentBox = React.memo(function NewCommentBox({
           },
         ]}
       >
-        <ClanSendButton size={BTN.size} clanColor={clanColor} />
+        <SendSvg width={BTN.size} height={BTN.size} />
       </TouchableOpacity>
     </View>
   );

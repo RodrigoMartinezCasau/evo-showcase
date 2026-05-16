@@ -292,7 +292,8 @@ export default function PersonalProfileScreen() {
             <PersonalRankProgression
               rank={profileWithClan.rank}
               clanId={profileWithClan.clanId}
-              totalReflections={thoughts.length}
+              totalReflections={classification.getReflectionCount(profile.id)}
+              totalPhrases={classification.getPhraseCount(profile.id)}
               onPress={profileWithClan.clanId ? () => router.push('/philosophy-profile') : undefined}
             />
             <View style={styles.contentGap} />

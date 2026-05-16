@@ -13,8 +13,8 @@
  * Each user has:
  *   - `inputs`              recent per-input score records (capped to last N)
  *   - `totals`              accumulated weighted clan totals
- *   - `totalReflectionsSent` / `totalPhrasesSent` — reveal needs ≥10 reflections
- *     and ≥30 combined (see ClassificationContext)
+ *   - `totalReflectionsSent` / `totalPhrasesSent` — reveal needs ≥4 reflections,
+ *     ≥6 phrases, and ≥10 combined (see ClassificationContext)
  *   - `totalPhrasesSent`     counter for completeness
  *   - `visibleClanId`        currently-revealed clan ('Sin clan' = null)
  *   - `lastActivityAt`       ISO date of the last reflection or phrase

@@ -102,11 +102,14 @@ async function _fetchClaudeScores(text: string): Promise<ClanScores | null> {
 
 // ─── Tunable rules ──────────────────────────────────────────────────────────
 
-/** Minimum reflections before any clan can be revealed (quotes alone never unlock). */
-export const REVEAL_MIN_REFLECTIONS = 10;
+/** Minimum reflections before any clan can be revealed. */
+export const REVEAL_MIN_REFLECTIONS = 4;
 
-/** Reflections + phrases must reach this total for reveal (with min reflections above). */
-export const REVEAL_TOTAL_INPUTS_THRESHOLD = 30;
+/** Minimum phrases (quotes) before any clan can be revealed. */
+export const REVEAL_MIN_PHRASES = 6;
+
+/** Reflections + phrases must reach this total for reveal (with the mins above). */
+export const REVEAL_TOTAL_INPUTS_THRESHOLD = 10;
 
 /** Minimum percentage for the leading clan (reveal + switch). */
 export const REVEAL_PCT_THRESHOLD = 25;
@@ -321,6 +324,7 @@ function deriveVisibleClan(
   const totalInputs = totalReflectionsSent + totalPhrasesSent;
   const meetsCount =
     totalReflectionsSent >= REVEAL_MIN_REFLECTIONS &&
+    totalPhrasesSent >= REVEAL_MIN_PHRASES &&
     totalInputs >= REVEAL_TOTAL_INPUTS_THRESHOLD;
   const meetsTopPct = top.pct >= REVEAL_PCT_THRESHOLD;
   const meetsLeadOverSecond = top.pct - runnerUp.pct >= REVEAL_LEAD_OVER_SECOND_PP;

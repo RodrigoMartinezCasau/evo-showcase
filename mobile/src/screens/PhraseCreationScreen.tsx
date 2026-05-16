@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AppTopBar, ChatInputBar, SidebarDrawer, useKeyboardAnim } from '@evoconn/components';
-import { ClanSendButton } from '@evoconn/components/ChatInputBar';
+import { getPhraseSendButtonByHouse } from '@evoconn/utils/getPhraseSendButtonByHouse';
 import { PublishBlock, PhraseNotesCard, PhraseFolderManagerCard } from '@evoconn/components/debate';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
@@ -139,10 +139,10 @@ export default function PhraseCreationScreen() {
   const phraseCursorColor = getClanSecondaryColor(activeClan);
 
   const sendBtnSize = CHAT_SEND_BUTTON_LAYOUT.size;
-  const sendIconNode = useMemo(
-    () => <ClanSendButton size={sendBtnSize} clanColor={clanColor} />,
-    [sendBtnSize, clanColor],
-  );
+  const sendIconNode = useMemo(() => {
+    const SendSvg = getPhraseSendButtonByHouse(activeClan);
+    return <SendSvg width={sendBtnSize} height={sendBtnSize} />;
+  }, [sendBtnSize, activeClan]);
   const PublishStar = useMemo(() => getPublishStarByClan(activeClan), [activeClan]);
 
   const insets = useSafeAreaInsets();

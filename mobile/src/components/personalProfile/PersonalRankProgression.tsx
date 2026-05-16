@@ -42,7 +42,7 @@ import {
   RANK_TEXT_BLACK_COLOR,
   RANK_PROGRESS_VALUE,
 } from '@evoconn/constants/personalProfileLayout';
-import { CLAN_REVEAL_MIN_REFLECTIONS } from '@evoconn/utils/getRankFromPct';
+import { CLAN_REVEAL_MIN_INPUTS } from '@evoconn/utils/getRankFromPct';
 
 /**
  * All gradient stop-colors are STATIC strings defined once at module load.
@@ -80,8 +80,10 @@ type Props = {
   onPress?: () => void;
   /** Pass the user's clanId. When null the bar shows sin-clan progression. */
   clanId?: string | null;
-  /** Total reflections — used to compute sin-clan bar fill. */
+  /** Total reflections sent — used together with totalPhrases for sin-clan bar fill. */
   totalReflections?: number;
+  /** Total phrases sent — used together with totalReflections for sin-clan bar fill. */
+  totalPhrases?: number;
 };
 
 /**
@@ -89,7 +91,7 @@ type Props = {
  * no nested scaleY transforms. The layout footprint is 100 % deterministic.
  *
  * When `clanId === null` the bar switches to "Sin Clan → Nuevo Clan" mode:
- * progress is calculated from totalReflections / CLAN_REVEAL_MIN_REFLECTIONS.
+ * progress is calculated from (totalReflections + totalPhrases) / CLAN_REVEAL_MIN_INPUTS.
  */
 export const PersonalRankProgression = React.memo(function PersonalRankProgression({
   rank,
@@ -97,14 +99,15 @@ export const PersonalRankProgression = React.memo(function PersonalRankProgressi
   onPress,
   clanId = undefined,
   totalReflections = 0,
+  totalPhrases = 0,
 }: Props) {
   const { width: screenW } = useWindowDimensions();
 
   const isSinClan = clanId === null;
 
-  // Sin-clan mode: progress toward clan assignment (0 → 30 reflections)
+  // Sin-clan mode: progress toward clan assignment (0 → 10 total inputs)
   const sinClanProgress = isSinClan
-    ? Math.min(1, totalReflections / CLAN_REVEAL_MIN_REFLECTIONS)
+    ? Math.min(1, (totalReflections + totalPhrases) / CLAN_REVEAL_MIN_INPUTS)
     : null;
 
   const currentIndex = RANK_ORDER.indexOf(rank);

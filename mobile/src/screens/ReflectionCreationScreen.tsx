@@ -27,7 +27,7 @@ import { useLocalSearchParams, useRouter, usePathname } from 'expo-router';
 import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppTopBar, ChatInputBar, SidebarDrawer } from '@evoconn/components';
-import { ClanSendButton } from '@evoconn/components/ChatInputBar';
+import { getChatSendButtonByHouse } from '@evoconn/utils/getChatSendButtonByHouse';
 import { getAppTopBarLayoutHeight } from '@evoconn/constants/topBarLayout';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
@@ -143,10 +143,10 @@ export default function ReflectionCreationScreen() {
   const islandFgColor = activeClan ? '#FFFFFF' : '#000000';
 
   const sendButtonSize = CHAT_SEND_BUTTON_LAYOUT.size;
-  const sendIconNode = useMemo(
-    () => <ClanSendButton size={sendButtonSize} clanColor={islandBgColor} />,
-    [sendButtonSize, islandBgColor],
-  );
+  const sendIconNode = useMemo(() => {
+    const SendSvg = getChatSendButtonByHouse(activeClan);
+    return <SendSvg width={sendButtonSize} height={sendButtonSize} />;
+  }, [sendButtonSize, activeClan]);
 
   const { publishPost } = useFeedStore();
   const publishedRef = useRef<Set<string>>(new Set());
