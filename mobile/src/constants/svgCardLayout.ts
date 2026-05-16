@@ -135,19 +135,19 @@ export function getBodyMaxLines(tier: CardSizeTier): number {
  */
 export function computeFeedCardTextContentBottomY(args: {
   cardHeight: number;
-  blackTopPx: number;
   blackBottomPx: number;
-  paddingTop: number;
   paddingBottom: number;
   statsBottom: number;
   statsRowHeight: number;
   clearanceAboveStats: number;
+  /** Minimum Y for the top of the title/body stack; floors the text block bottom calculation. */
+  feedStackMinTopPx: number;
 }): number {
   const innerBottom = args.blackBottomPx - args.paddingBottom;
   const statsTopY =
     args.cardHeight - args.statsBottom - args.statsRowHeight - args.clearanceAboveStats;
   const y = Math.min(innerBottom, statsTopY);
-  const minY = args.blackTopPx + args.paddingTop + 1;
+  const minY = args.feedStackMinTopPx + 1;
   return Math.max(y, minY);
 }
 

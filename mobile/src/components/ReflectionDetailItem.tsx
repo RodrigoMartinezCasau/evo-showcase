@@ -63,9 +63,43 @@ import {
 } from '@evoconn/components/shared/EvoActionSheetModal';
 import type { EvoActionOption } from '@evoconn/components/shared/EvoActionSheetModal';
 import { PanelStarField } from '@evoconn/components/animations/StarFieldBackground';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 /** Matches `styles.content` horizontal padding — used until the reflection panel is measured. */
 const REFLECTION_DETAIL_CONTENT_PAD_H = 16;
+
+/**
+ * Android OEMs often disagree between `endCoordinates.screenY` and `height` vs the app window.
+ * Prefer `windowHeight - height` when `height` is known, and only blend with `screenY` when it
+ * matches that estimate (otherwise `screenY` can sit under the keys and clip the composer).
+ */
+function androidKeyboardTopY(
+  end: { screenY: number; height?: number },
+  windowHeight: number,
+): number {
+  if (!Number.isFinite(windowHeight) || windowHeight < 120) {
+    const sy = end.screenY;
+    return sy > 0 ? sy : 0;
+  }
+  const h = end.height ?? 0;
+  const { screenY } = end;
+  if (h > 0) {
+    const fromHeight = windowHeight - h;
+    const tolerance = Math.max(64, windowHeight * 0.15);
+    const plausible =
+      screenY > 40 &&
+      screenY < windowHeight - 24 &&
+      Math.abs(screenY - fromHeight) < tolerance;
+    if (plausible) {
+      return Math.min(fromHeight, screenY);
+    }
+    return fromHeight;
+  }
+  if (screenY > 40 && screenY < windowHeight - 24) {
+    return screenY;
+  }
+  return windowHeight;
+}
 
 type ReflectionDetailItemProps = {
   post: CommunityPost;
@@ -411,7 +445,8 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     }
   }, []);
 
-  const { width: screenW } = useWindowDimensions();
+  const { width: screenW, height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
   /**
    * The reflection panel uses `transform: [{ scaleX: widthScale }]`. Layout still uses the unscaled
@@ -737,21 +772,43 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
 
-    const onShow = (e: { endCoordinates: { screenY: number }; duration?: number }) => {
-      const kbTopY = e.endCoordinates.screenY;
+    const onShow = (e: {
+      endCoordinates: { screenY: number; height?: number };
+      duration?: number;
+    }) => {
+      const kbTopY =
+        Platform.OS === 'android'
+          ? androidKeyboardTopY(e.endCoordinates, windowHeight)
+          : e.endCoordinates.screenY;
       const duration = Platform.OS === 'ios' ? (e.duration ?? 250) : 220;
-      newCommentMeasureRef.current?.measureInWindow((x, y, _w, h) => {
-        const boxBottom = y + h;
-        const overlap = boxBottom - kbTopY;
-        const target = overlap > 0 ? -(overlap + 10) : 0;
-        kbOffset.stopAnimation();
-        Animated.timing(kbOffset, {
-          toValue: target,
-          duration,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }).start();
-      });
+
+      const applyMeasure = () => {
+        newCommentMeasureRef.current?.measureInWindow((x, y, _w, h) => {
+          const boxBottom = y + h;
+          const overlap = boxBottom - kbTopY;
+          const cushion =
+            10 +
+            (Platform.OS === 'android'
+              ? 12 + Math.min(28, Math.max(0, insets.bottom * 0.45))
+              : 0);
+          const target = overlap > 0 ? -(overlap + cushion) : 0;
+          kbOffset.stopAnimation();
+          Animated.timing(kbOffset, {
+            toValue: target,
+            duration,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }).start();
+        });
+      };
+
+      if (Platform.OS === 'android') {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(applyMeasure);
+        });
+      } else {
+        applyMeasure();
+      }
     };
 
     const onHide = (e: { duration?: number }) => {
@@ -770,7 +827,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
       showSub.remove();
       hideSub.remove();
     };
-  }, [kbOffset]);
+  }, [kbOffset, windowHeight, insets.bottom]);
 
   return (
     <>

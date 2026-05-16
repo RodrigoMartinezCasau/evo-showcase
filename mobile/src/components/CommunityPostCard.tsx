@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Image,
+  Platform,
   useWindowDimensions,
   LayoutChangeEvent,
 } from 'react-native';
@@ -33,6 +34,8 @@ import {
 } from '@evoconn/constants/svgCardLayout';
 import { ClanCardFeedRimOverlay } from './ClanCardFeedRimOverlay';
 import { getClanColor } from '@evoconn/constants/clanColors';
+import { COMMUNITY_FOLLOW_BUTTON_LAYOUT } from '@evoconn/constants/followButtonLayout';
+import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { PanelStarField } from '@evoconn/components/animations/StarFieldBackground';
 
 const V = SVG_CARD_VISUAL;
@@ -132,6 +135,22 @@ export function CommunityPostCard({
     [statsIcon, feedContent.statsCountFontSize],
   );
 
+  /** Symmetric vertical inset of the star panel from the card rim (matches the larger content pad). */
+  const starPanelVInset = Math.max(feedContent.paddingTop, feedContent.paddingBottom);
+  const usernameLineHeight = Math.round(feedContent.usernameFontSize * 1.12);
+  const showCommunityFollow = post.author.id !== mockCurrentUser.id;
+  const followIconHeight = Math.ceil(28 * COMMUNITY_FOLLOW_BUTTON_LAYOUT.scale);
+  const feedUsernameRowHeight = Math.max(
+    usernameLineHeight,
+    showCommunityFollow ? followIconHeight : 0,
+  );
+  /** Top Y of title/body stack — same vertical rhythm as paddingTop + gap after username row. */
+  const feedStackMinTopPx =
+    starPanelVInset +
+    feedContent.paddingTop +
+    feedUsernameRowHeight +
+    feedContent.titleMarginBottom;
+
   const clanRimColor = useMemo(() => getClanColor(post.author.clanId), [post.author.clanId]);
   const [cardDims, setCardDims] = useState<{ width: number; height: number } | null>(null);
   const onCardLayout = useCallback(
@@ -149,21 +168,19 @@ export function CommunityPostCard({
     () =>
       computeFeedCardTextContentBottomY({
         cardHeight: layout.cardHeight,
-        blackTopPx: layout.blackTopPx,
         blackBottomPx: layout.blackBottomPx,
-        paddingTop: feedContent.paddingTop,
         paddingBottom: feedContent.paddingBottom,
         statsBottom: V.STATS_BOTTOM,
         statsRowHeight,
         clearanceAboveStats: V.STATS_TEXT_CLEARANCE_ABOVE_CHIP,
+        feedStackMinTopPx,
       }),
     [
       layout.cardHeight,
-      layout.blackTopPx,
       layout.blackBottomPx,
-      feedContent.paddingTop,
       feedContent.paddingBottom,
       statsRowHeight,
+      feedStackMinTopPx,
     ],
   );
 
@@ -172,7 +189,6 @@ export function CommunityPostCard({
     () => Math.max(8, Math.round((15.77 / 600) * cardWidth)),
     [cardWidth],
   );
-  const innerGrayPanelHeight = Math.max(0, layout.blackBottomPx - layout.blackTopPx);
 
   const renderFeedStats = () => (
     <View style={styles.feedStatsRow}>
@@ -214,6 +230,8 @@ export function CommunityPostCard({
           height: layout.cardHeight,
           marginHorizontal: cardMarginH,
           marginVertical: V.CARD_VERTICAL_MARGIN,
+          borderRadius: V.CARD_BORDER_RADIUS,
+          overflow: 'hidden',
         }}
       >
         {/* SVG background — cropped to the colored frame area */}
@@ -232,40 +250,15 @@ export function CommunityPostCard({
           />
         </View>
 
-        {/* Top colored strip — username + follow button */}
-        <View
-          style={[
-            styles.topStrip,
-            {
-              height: layout.blackTopPx,
-              paddingHorizontal: feedContent.topStripPaddingX,
-            },
-          ]}
-        >
-          <TouchableOpacity onPress={onAuthorPress} hitSlop={6} style={styles.usernameHit}>
-            <Text
-              style={[styles.usernameHeader, { fontSize: feedContent.usernameFontSize }]}
-              numberOfLines={1}
-            >
-              {post.author.username}
-            </Text>
-          </TouchableOpacity>
-          <FollowButton
-            authorId={post.author.id}
-            authorClanId={post.author.clanId}
-            context="community"
-          />
-        </View>
-
-        {/* Full inner gray panel (entire SVG inner black box) — stars cover whole rect, not only text padding. */}
+        {/* Star field — full inner height with symmetric vertical inset (= paddingBottom band). */}
         <View
           pointerEvents="none"
           style={{
             position: 'absolute',
-            top: layout.blackTopPx,
+            top: starPanelVInset,
+            bottom: starPanelVInset,
             left: layout.blackLeftPx,
             right: layout.blackRightPx,
-            height: innerGrayPanelHeight,
             overflow: 'hidden',
             borderRadius: innerGrayPanelBorderRadius,
           }}
@@ -273,11 +266,48 @@ export function CommunityPostCard({
           <PanelStarField />
         </View>
 
-        {/* Text inset inside gray panel */}
+        {/* Username + follow over stars — paddingTop from star top matches body paddingBottom band. */}
+        <View
+          pointerEvents="box-none"
+          style={{
+            position: 'absolute',
+            top: starPanelVInset + feedContent.paddingTop,
+            left: layout.blackLeftPx + feedContent.paddingLeft,
+            right: layout.blackRightPx + feedContent.paddingRight,
+            zIndex: 2,
+          }}
+        >
+          <View style={styles.feedUsernameRow}>
+            <TouchableOpacity onPress={onAuthorPress} hitSlop={6} style={styles.usernameHit}>
+              <Text
+                style={[
+                  styles.usernameHeader,
+                  {
+                    fontSize: feedContent.usernameFontSize,
+                    lineHeight: usernameLineHeight,
+                    ...(Platform.OS === 'android'
+                      ? { includeFontPadding: false, textAlignVertical: 'center' as const }
+                      : {}),
+                  },
+                ]}
+                numberOfLines={1}
+              >
+                {post.author.username}
+              </Text>
+            </TouchableOpacity>
+            <FollowButton
+              authorId={post.author.id}
+              authorClanId={post.author.clanId}
+              context="community"
+            />
+          </View>
+        </View>
+
+        {/* Title + body — starts after username row with same gap as under title. */}
         <View
           style={{
             position: 'absolute',
-            top: layout.blackTopPx + feedContent.paddingTop,
+            top: feedStackMinTopPx,
             left: layout.blackLeftPx + feedContent.paddingLeft,
             right: layout.blackRightPx + feedContent.paddingRight,
             bottom: layout.cardHeight - textContentBottomY,
@@ -363,15 +393,11 @@ const styles = StyleSheet.create({
     left: 0,
     overflow: 'hidden',
   },
-  topStrip: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
+  feedUsernameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    overflow: 'hidden',
+    width: '100%',
   },
   usernameHit: {
     flex: 1,
