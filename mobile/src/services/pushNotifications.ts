@@ -1,11 +1,14 @@
 /**
- * Push Notifications — registro de token y mostrar notificaciones locales.
+ * Push Notifications — registro de token y notificaciones locales (racha).
  *
- * Flujo:
- * 1. Al iniciar sesión, registramos el Expo Push Token del dispositivo en Supabase (profiles.push_token).
- * 2. Cuando llega una notificación por Realtime (NotificationsContext), mostramos una notificación
- *    local nativa con sonido y vibración usando expo-notifications.
- * 3. Para notificaciones push reales entre dispositivos, el token se usa desde el backend/Edge Functions.
+ * Flujo social (burbujas del sistema con la app cerrada):
+ * 1. Al iniciar sesión, registramos el Expo Push Token en Supabase (`profiles.push_token`).
+ * 2. Al insertar una fila en `notifications`, el trigger `send_expo_push_for_notification_row`
+ *    (supabase_push_remote.sql) llama a la API de Expo → burbuja en el móvil del destinatario.
+ *
+ * Flujo in-app: Realtime en NotificationsContext actualiza la campana (sin depender del push).
+ *
+ * Racha: notificaciones locales programadas en el dispositivo (22:00 / 23:30).
  */
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -86,10 +89,13 @@ export async function registerPushToken(userId: string): Promise<void> {
     const token = tokenData.data;
     console.log('[Push] Token registrado:', token);
 
-    await supabase
+    const { error } = await supabase
       .from('profiles')
       .update({ push_token: token })
       .eq('id', userId);
+    if (error) {
+      console.error('[Push] Error guardando push_token en profiles:', error.message);
+    }
   } catch (err) {
     console.error('[Push] Error registrando token:', err);
   }

@@ -39,11 +39,7 @@ import {
   markNotificationsRead,
 } from '@evoconn/services/supabaseSocial';
 import { supabase } from '../../mobile/lib/supabase';
-import {
-  showLocalNotification,
-  registerPushToken,
-  shouldDeliverSocialPush,
-} from '@evoconn/services/pushNotifications';
+import { registerPushToken } from '@evoconn/services/pushNotifications';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -90,16 +86,8 @@ const NotificationsCtx = createContext<NotificationsContextValue | null>(null);
 
 // ─── Provider ────────────────────────────────────────────────────────────────
 
-function formatAtUsername(username: string): string {
-  const u = username.trim();
-  if (!u) return '';
-  return u.startsWith('@') ? u : `@${u}`;
-}
-
 export function NotificationsProvider({ children }: { children: ReactNode }) {
-  const { activeUserId, activeFollowersCount } = useSimulation();
-  const followersCountRef = useRef(activeFollowersCount);
-  followersCountRef.current = activeFollowersCount;
+  const { activeUserId } = useSimulation();
 
   const [db, setDb] = useState<NotificationsDatabase>({});
   const dbRef = useRef<NotificationsDatabase>({});
@@ -134,10 +122,14 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     return () => sub.remove();
   }, [activeUserId, refreshNotifications]);
 
-  // ── Register push token when a real user is active ───────────────────────
+  // ── Register / refresh Expo push token (necesario para burbujas con app cerrada) ──
   useEffect(() => {
     if (!isRealUserId(activeUserId)) return;
     registerPushToken(activeUserId).catch(console.error);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') registerPushToken(activeUserId).catch(console.error);
+    });
+    return () => sub.remove();
   }, [activeUserId]);
 
   // ── Realtime subscription — new notifications arrive instantly ───────────
@@ -171,33 +163,8 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
             ...prev,
             [activeUserId]: [notif, ...(prev[activeUserId] ?? [])],
           }));
-          // Only show native push (sound + vibration) for follow and comment.
-          // Likes, dislikes and saves are shown in the in-app bell only.
-          // Cuentas muy seguidas no reciben estas pushes (anti-spam).
-          if (notif.type === 'follow' || notif.type === 'follow_request' || notif.type === 'comment') {
-            if (!shouldDeliverSocialPush(followersCountRef.current)) return;
-            const who = formatAtUsername(notif.fromUsername);
-            if (notif.type === 'comment') {
-              const preview = notif.textPreview?.trim() ?? '';
-              const body =
-                who && preview
-                  ? `${who}: «${preview}»`
-                  : who
-                    ? `${who} comentó tu publicación.`
-                    : 'Nuevo comentario en tu publicación.';
-              showLocalNotification('💬 Nuevo comentario', body).catch(console.error);
-            } else if (notif.type === 'follow_request') {
-              const body = who
-                ? `${who} quiere seguirte. Abre la app para aceptar.`
-                : 'Nueva solicitud de seguimiento.';
-              showLocalNotification('🔒 Solicitud de seguimiento', body).catch(console.error);
-            } else {
-              const body = who
-                ? `${who} te ha empezado a seguir.`
-                : 'Tienes un nuevo seguidor.';
-              showLocalNotification('✨ Nuevo seguidor', body).catch(console.error);
-            }
-          }
+          // Burbujas del sistema: trigger en Supabase → Expo Push (supabase_push_remote.sql).
+          // Aquí solo actualizamos la campana in-app vía Realtime.
         },
       )
       .subscribe();
