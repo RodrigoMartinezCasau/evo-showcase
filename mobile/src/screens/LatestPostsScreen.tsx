@@ -3,7 +3,7 @@
  * con shell idéntico a Notificaciones (top bar, subcabecera atrás + título, barra inferior).
  * Desde perfil ("ver más"): mismo layout filtrado por `userId` (sim vía feed; usuarios reales vía API).
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   StyleSheet,
   useWindowDimensions,
   ActivityIndicator,
+  Keyboard,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, usePathname } from 'expo-router';
 import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
@@ -194,6 +195,20 @@ export default function LatestPostsScreen() {
 
   const keyExtractor = useCallback((item: CommunityPost) => item.id, []);
 
+  const verticalFeedVisiblePostIdRef = useRef<string | null>(null);
+  const verticalFeedViewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
+  const onVerticalFeedViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: Array<{ item?: CommunityPost }> }) => {
+      const id = viewableItems[0]?.item?.id;
+      if (!id) return;
+      const prev = verticalFeedVisiblePostIdRef.current;
+      verticalFeedVisiblePostIdRef.current = id;
+      if (prev !== null && prev !== id) {
+        Keyboard.dismiss();
+      }
+    },
+  ).current;
+
   return (
     <View style={styles.container}>
       <AppTopBar onMenuPress={() => setSidebarOpen(true)} />
@@ -236,6 +251,8 @@ export default function LatestPostsScreen() {
             maxToRenderPerBatch={COMMUNITY_DETAIL_PREFETCH_POSTS}
             windowSize={COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE}
             removeClippedSubviews
+            viewabilityConfig={verticalFeedViewabilityConfig}
+            onViewableItemsChanged={onVerticalFeedViewableItemsChanged}
           />
         )}
       </View>

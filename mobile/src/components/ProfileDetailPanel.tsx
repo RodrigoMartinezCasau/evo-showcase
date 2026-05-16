@@ -1,9 +1,9 @@
-import React, { useCallback, useState, useMemo } from 'react';
+import React, { useCallback, useState, useMemo, useRef } from 'react';
 import {
   Animated,
-  Easing,
   FlatList,
   StyleSheet,
+  Keyboard,
 } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
@@ -110,6 +110,20 @@ export function ProfileDetailPanel({
     [itemHeight, onAuthorPress, onClanPress, handleReadingModeChange],
   );
 
+  const verticalFeedVisiblePostIdRef = useRef<string | null>(null);
+  const verticalFeedViewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
+  const onVerticalFeedViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: Array<{ item?: CommunityPost }> }) => {
+      const id = viewableItems[0]?.item?.id;
+      if (!id) return;
+      const prev = verticalFeedVisiblePostIdRef.current;
+      verticalFeedVisiblePostIdRef.current = id;
+      if (prev !== null && prev !== id) {
+        Keyboard.dismiss();
+      }
+    },
+  ).current;
+
   return (
     <GestureHandlerRootView style={StyleSheet.absoluteFillObject}>
       <GestureDetector gesture={swipeBackGesture}>
@@ -136,6 +150,8 @@ export function ProfileDetailPanel({
             windowSize={COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE}
             removeClippedSubviews
             style={styles.list}
+            viewabilityConfig={verticalFeedViewabilityConfig}
+            onViewableItemsChanged={onVerticalFeedViewableItemsChanged}
           />
         </Animated.View>
       </GestureDetector>

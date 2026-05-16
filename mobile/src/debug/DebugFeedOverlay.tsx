@@ -21,6 +21,7 @@ import {
   Modal,
   StyleSheet,
   useWindowDimensions,
+  Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { ReflectionDetailItem } from '@evoconn/components/ReflectionDetailItem';
@@ -92,6 +93,20 @@ export function DebugFeedOverlay() {
   );
 
   const keyExtractor = useCallback((item: CommunityPost) => item.id, []);
+
+  const verticalFeedVisiblePostIdRef = useRef<string | null>(null);
+  const verticalFeedViewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
+  const onVerticalFeedViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: Array<{ item?: CommunityPost }> }) => {
+      const id = viewableItems[0]?.item?.id;
+      if (!id) return;
+      const prev = verticalFeedVisiblePostIdRef.current;
+      verticalFeedVisiblePostIdRef.current = id;
+      if (prev !== null && prev !== id) {
+        Keyboard.dismiss();
+      }
+    },
+  ).current;
 
   // ── Following panel ────────────────────────────────────────────────────────
   const [showFollowPanel, setShowFollowPanel] = useState(false);
@@ -193,6 +208,8 @@ export function DebugFeedOverlay() {
               initialNumToRender={1}
               removeClippedSubviews={false}
               style={{ flex: 1 }}
+              viewabilityConfig={verticalFeedViewabilityConfig}
+              onViewableItemsChanged={onVerticalFeedViewableItemsChanged}
             />
           )}
 

@@ -6,6 +6,7 @@ import {
   Animated,
   Easing,
   useWindowDimensions,
+  Keyboard,
 } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
@@ -176,6 +177,20 @@ export default function DetailFeedScreen() {
     [itemHeight, handleAuthorPress, handleClanPress, handleReadingModeChange],
   );
 
+  const detailPagerVisiblePostIdRef = useRef<string | null>(null);
+  const detailPagerViewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
+  const onDetailPagerViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: Array<{ item?: CommunityPost }> }) => {
+      const id = viewableItems[0]?.item?.id;
+      if (!id) return;
+      const prev = detailPagerVisiblePostIdRef.current;
+      detailPagerVisiblePostIdRef.current = id;
+      if (prev !== null && prev !== id) {
+        Keyboard.dismiss();
+      }
+    },
+  ).current;
+
   const handleTabChange = useCallback(
     (tab: string) => {
       if (tab === 'search') {
@@ -289,6 +304,8 @@ export default function DetailFeedScreen() {
         windowSize={COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE}
         removeClippedSubviews
         style={styles.list}
+        viewabilityConfig={detailPagerViewabilityConfig}
+        onViewableItemsChanged={onDetailPagerViewableItemsChanged}
       />
 
       <AppShellBottomTabsWrap>

@@ -135,8 +135,11 @@ export function CommunityPostCard({
     [statsIcon, feedContent.statsCountFontSize],
   );
 
-  /** Symmetric vertical inset of the star panel from the card rim (matches the larger content pad). */
-  const starPanelVInset = Math.max(feedContent.paddingTop, feedContent.paddingBottom);
+  /**
+   * Vertical inset from the card rim — same px as the lateral gutter (`blackLeftPx` / `blackRightPx`)
+   * so the star panel keeps the same margin on all four sides.
+   */
+  const starPanelVInset = layout.blackLeftPx;
   const usernameLineHeight = Math.round(feedContent.usernameFontSize * 1.12);
   const showCommunityFollow = post.author.id !== mockCurrentUser.id;
   const followIconHeight = Math.ceil(28 * COMMUNITY_FOLLOW_BUTTON_LAYOUT.scale);
@@ -250,7 +253,7 @@ export function CommunityPostCard({
           />
         </View>
 
-        {/* Star field — full inner height with symmetric vertical inset (= paddingBottom band). */}
+        {/* Star field — same rim margin on all sides as horizontal gutter (blackLeft/blackRight). */}
         <View
           pointerEvents="none"
           style={{

@@ -8,6 +8,7 @@ import {
   Platform,
   useWindowDimensions,
   ActivityIndicator,
+  Keyboard,
 } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
@@ -776,6 +777,7 @@ export default function CommunityScreen() {
           const prevPost = tasteDwellRefs.current.getPostById(prev.postId);
           if (prevPost && ms >= 450) tasteDwellRefs.current.recordDwell(prevPost, ms);
           triggerHapticRef.current('light');
+          Keyboard.dismiss();
         }
         dwellRef.current = { postId: post.id, since: now };
 
