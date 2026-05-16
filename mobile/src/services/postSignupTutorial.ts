@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-/** Pasa a `true` cuando el nuevo tutorial visual (imágenes + texto) esté listo. */
-export const POST_SIGNUP_TUTORIAL_ENABLED = false;
+/** Tutorial visual con imágenes y pantallas interactivas. */
+export const POST_SIGNUP_TUTORIAL_ENABLED = true;
 
 const PENDING_KEY = '@evo/post_signup_tutorial_pending';
 

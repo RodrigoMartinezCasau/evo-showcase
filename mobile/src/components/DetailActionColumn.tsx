@@ -9,6 +9,9 @@ import {
   DETAIL_MORE_BUTTON_LAYOUT as MORE_L,
 } from '@evoconn/constants/detailActionColumnLayout';
 import { UserAvatarFrame } from './shared/UserAvatarFrame';
+import { getPhilosophyClanBadgeIcon } from '@evoconn/utils/getPhilosophyClanBadgeIcon';
+import type { ClanId } from '@evoconn/constants/clanColors';
+import type { Rank } from '@evoconn/types';
 
 import UpvoteInactive from '../assets/detailActions/31.svg';
 import UpvoteActive from '../assets/detailActions/32.svg';
@@ -59,6 +62,13 @@ type DetailActionColumnProps = {
    * reflection panel top and three-dots bottom to the panel bottom.
    */
   containerHeight?: number;
+  /**
+   * When true (Para Ti feed) and the user has a clan but no photo,
+   * shows the clan philosophy badge (with animal) instead of the flat profile icon.
+   */
+  showClanBadge?: boolean;
+  /** Author rank — required when showClanBadge is true to pick the correct badge tier. */
+  authorRank?: Rank;
 };
 
 export type DetailActionColumnHandle = {
@@ -80,6 +90,8 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
       onClanPress,
       onMorePress,
       containerHeight,
+      showClanBadge = false,
+      authorRank,
     },
     ref,
   ) {
@@ -126,6 +138,16 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
     saveSz = sz * SAVE_L.scale * SCALE;
     dotsFontSz = Math.max(10, 22 * MORE_L.scale * SCALE);
   }
+  // ── Top icon: clan badge (animal) or profile icon ─────────────────────────
+  // Para Ti (showClanBadge=true), no photo, has clan → philosophy badge (animal, rank-aware).
+  // Any other case (no clan, has photo, showClanBadge=false) → UserAvatarFrame.
+  let TopIcon: React.ReactNode;
+  if (showClanBadge && clanId && !avatarUri) {
+    const BadgeSvg = getPhilosophyClanBadgeIcon(clanId as ClanId, authorRank ?? null);
+    TopIcon = <BadgeSvg width={clanSz} height={clanSz} />;
+  } else {
+    TopIcon = <UserAvatarFrame clanId={clanId} avatarUri={avatarUri} size={clanSz} />;
+  }
   // ──────────────────────────────────────────────────────────────────────────
 
   const columnStyle = containerHeight != null
@@ -137,9 +159,9 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
       {/* ── 6-item column: clan / up block / approval% / down block / save / dots (same count↔icon gap up & down) ── */}
       <View style={columnStyle}>
 
-        {/* 1. Clan badge — shows profile photo when set, flat clan icon otherwise */}
+        {/* 1. Profile / clan badge — Para Ti uses philosophy badge (animal) when no photo */}
         <TouchableOpacity onPress={onClanPress} activeOpacity={0.7}>
-          <UserAvatarFrame clanId={clanId} avatarUri={avatarUri} size={clanSz} />
+          {TopIcon}
         </TouchableOpacity>
 
         {/* 2. Upvote: count then icon — gap matches down block */}
