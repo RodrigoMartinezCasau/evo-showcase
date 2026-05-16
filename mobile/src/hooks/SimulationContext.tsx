@@ -21,6 +21,7 @@ import {
   SIM_USERS_BY_ID,
   SIM_POSTS,
   SIM_FOLLOW_GRAPH,
+  isPublishedSimPostType,
   type SimUser,
   type SimPost,
   type SimComment,
@@ -302,9 +303,10 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'posts' },
           (payload: { new: Record<string, unknown> }) => {
+            if (!isPublishedSimPostType(payload.new.type)) return;
             const newPost: SimPost = dbRowToSimPost(payload.new);
-            setPosts(prev => {
-              if (prev.some(p => p.id === newPost.id)) return prev;
+            setPosts((prev) => {
+              if (prev.some((p) => p.id === newPost.id)) return prev;
               return [newPost, ...prev];
             });
           },
@@ -426,7 +428,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
               const saved = raw_parsed.filter((p) => {
                 if (seenIds.has(p.id)) return false;
                 seenIds.add(p.id);
-                return true;
+                return isPublishedSimPostType(p.type);
               });
               if (saved.length !== raw_parsed.length) {
                 AsyncStorage.setItem(SIM_POSTS_STORAGE_KEY, JSON.stringify(saved)).catch(console.error);
@@ -822,6 +824,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
 
   // ── Publish ───────────────────────────────────────────────────────────────
   const publishPost = useCallback((post: SimPost) => {
+    if (!isPublishedSimPostType(post.type)) return;
     insertPost(post); // persist to Supabase (no-op for sim users)
     setPosts((prev) => {
       // Deduplicate: ignore if a post with the same id already exists.

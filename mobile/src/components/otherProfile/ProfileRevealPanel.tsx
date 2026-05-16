@@ -2,6 +2,7 @@ import React, { useCallback, useMemo } from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { getOtherUserProfileOrFallback } from '@evoconn/data/mockOtherUsers';
+import { isPublishedSimPostType } from '@evoconn/data/simulation/simulatedNetwork';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
 import { OtherProfileFollowRow } from './OtherProfileFollowRow';
@@ -26,7 +27,7 @@ export const ProfileRevealPanel = React.memo(function ProfileRevealPanel({ autho
   const livePosts = useMemo<CommunityPost[]>(
     () =>
       allSimPosts
-        .filter((p) => p.authorId === authorId)
+        .filter((p) => p.authorId === authorId && isPublishedSimPostType(p.type))
         .sort((a, b) => (b.createdAt > a.createdAt ? 1 : b.createdAt < a.createdAt ? -1 : 0))
         .map((p): CommunityPost => {
           const author = simUsers[p.authorId];

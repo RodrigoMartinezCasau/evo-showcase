@@ -9,6 +9,7 @@ import { mockCurrentUser, mockUserStats } from '@evoconn/data/mockUser';
 import { getOtherUserProfile } from '@evoconn/data/mockOtherUsers';
 import type { OtherUserProfile } from '@evoconn/data/mockOtherUsers';
 import { supabase } from '../../mobile/lib/supabase';
+import { isPublishedSimPostType } from '@evoconn/data/simulation/simulatedNetwork';
 import { fetchFollowCounts, fetchPostsByUser, isRealUserId } from '@evoconn/services/supabaseSocial';
 import { AppTopBar, AppShellBottomTabsWrap, RankBadge, ClanBanner, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
@@ -259,7 +260,7 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
         return supabasePosts;
       }
       return allSimPosts
-        .filter((p) => p.authorId === userId)
+        .filter((p) => p.authorId === userId && isPublishedSimPostType(p.type))
         .sort((a, b) => (b.createdAt > a.createdAt ? 1 : b.createdAt < a.createdAt ? -1 : 0))
         .map((p): CommunityPost => {
           const author = simUsers[p.authorId];

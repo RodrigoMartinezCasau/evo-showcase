@@ -14,7 +14,7 @@ import React, {
 } from 'react';
 import type { CommunityPost, PhrasePost, User, VoteStats } from '../types';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
-import { SIM_USERS_BY_ID, type SimPost } from '@evoconn/data/simulation/simulatedNetwork';
+import { SIM_USERS_BY_ID, isPublishedSimPostType, type SimPost } from '@evoconn/data/simulation/simulatedNetwork';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { useNotifications } from '@evoconn/hooks/NotificationsContext';
 import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
@@ -78,7 +78,7 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
   // All posts: derive CommunityPost[] from the live SimPost[] so vote/save
   // counts always reflect the current simulation state.
   const posts = useMemo<CommunityPost[]>(
-    () => sim.posts.map(simPostToCommunityPost),
+    () => sim.posts.filter((p) => isPublishedSimPostType(p.type)).map(simPostToCommunityPost),
     [sim.posts],
   );
 

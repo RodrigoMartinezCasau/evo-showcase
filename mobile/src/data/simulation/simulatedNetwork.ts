@@ -51,6 +51,11 @@ export type SimPost = {
   saverIds: string[];
 };
 
+/** True for frases y reflexiones publicadas (excluye cualquier otro `type` en `posts`). */
+export function isPublishedSimPostType(t: unknown): t is SimPost['type'] {
+  return t === 'reflection' || t === 'phrase';
+}
+
 export type SimComment = {
   id: string;
   postId: string;

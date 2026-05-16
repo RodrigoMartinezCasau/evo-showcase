@@ -51,6 +51,7 @@ import {
   COMMUNITY_DETAIL_PREFETCH_POSTS,
 } from '@evoconn/constants/communityDetailFeed';
 import { ReflectionDetailItem } from '@evoconn/components/ReflectionDetailItem';
+import { PANEL_STAR_SURFACE_DEFAULT } from '@evoconn/components/animations/StarFieldBackground';
 import { SearchScreen } from '@evoconn/components/SearchScreen';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { getClanColor } from '@evoconn/constants/clanColors';
@@ -629,9 +630,18 @@ export default function CommunityScreen() {
         onClanPress={handleClanPress}
         onReadingModeChange={handleReadingModeChange}
         communityVerticalFeed
+        reflectionStarSurfaceColor={
+          detailFeed?.mode === 'foryou' ? evoconnColors.background : PANEL_STAR_SURFACE_DEFAULT
+        }
       />
     ),
-    [feedItemHeight, handleAuthorPress, handleClanPress, handleReadingModeChange],
+    [
+      feedItemHeight,
+      handleAuthorPress,
+      handleClanPress,
+      handleReadingModeChange,
+      detailFeed?.mode,
+    ],
   );
 
   const getFeedItemLayout = useCallback(

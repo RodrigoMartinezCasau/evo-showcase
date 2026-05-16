@@ -65,6 +65,10 @@ import type { EvoActionOption } from '@evoconn/components/shared/EvoActionSheetM
 import { PanelStarField } from '@evoconn/components/animations/StarFieldBackground';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+/** “Ver más” / lectura: mismo tamaño aprox. que el título escalado, sin `transform: scale` (evita recorte por `overflow: hidden` del panel). */
+const REFLECTION_TITLE_LONG_FONT_SIZE = Math.round(20 * TL.scale);
+const REFLECTION_TITLE_LONG_LINE_HEIGHT = Math.round(REFLECTION_TITLE_LONG_FONT_SIZE * 1.28);
+
 /** Matches `styles.content` horizontal padding — used until the reflection panel is measured. */
 const REFLECTION_DETAIL_CONTENT_PAD_H = 16;
 
@@ -113,6 +117,11 @@ type ReflectionDetailItemProps = {
    * outer FlatList can scroll; enable long-reflection “Ver más” reliably with nested scroll.
    */
   communityVerticalFeed?: boolean;
+  /**
+   * Fill behind twinkling stars in the reflection panel. Vertical feed: Para ti = app background,
+   * Siguiendo = inner gray (`PANEL_STAR_SURFACE_DEFAULT`). Other screens: omit → app background.
+   */
+  reflectionStarSurfaceColor?: string;
 };
 
 export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
@@ -122,11 +131,14 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   onClanPress,
   onReadingModeChange,
   communityVerticalFeed = false,
+  reflectionStarSurfaceColor,
 }: ReflectionDetailItemProps) {
   const isNoClanAuthor =
     post.author.clanId == null || String(post.author.clanId).trim() === '';
   const clanColor = getClanColor(post.author.clanId);
   const reflectionPanelBorderColor = evoconnColors.background;
+  const starFieldSurfaceColor =
+    reflectionStarSurfaceColor ?? evoconnColors.background;
   const actionColRef = useRef<DetailActionColumnHandle>(null);
   const { updatePostVote, updatePostSaveToggle, getPostById, getMyVote } = useFeedStore();
   const { savePost, unsavePost, isSaved } = usePersonalProfile();
@@ -829,6 +841,8 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     };
   }, [kbOffset, windowHeight, insets.bottom]);
 
+  const reflectionTitleUsesLongLayout = isLongText || readingMode;
+
   return (
     <>
     <View
@@ -878,7 +892,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
               },
             ]}
           >
-            <PanelStarField />
+            <PanelStarField surfaceColor={starFieldSurfaceColor} />
             {isPhrase ? (
               <ScrollView
                 scrollEnabled={phraseOverflowScroll}
@@ -951,14 +965,18 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                     <View style={{ width: reflectionTextColumnWidth, alignItems: !isLongText ? 'center' : 'flex-start' }}>
                       {post.title ? (
                         <Text
-                          numberOfLines={1}
+                          {...(reflectionTitleUsesLongLayout
+                            ? {}
+                            : { numberOfLines: 1, ellipsizeMode: 'tail' as const })}
                           style={[
                             styles.title,
-                            !isLongText && styles.textCentered,
-                            {
+                            !reflectionTitleUsesLongLayout && styles.textCentered,
+                            reflectionTitleUsesLongLayout && styles.titleDetailLongMode,
+                            !reflectionTitleUsesLongLayout && {
+                              // Misma caja horizontal que el cuerpo: el centro geométrico del título
+                              // coincide con el del párrafo (sin TL.offsetX, que rompía ese eje).
+                              width: '100%',
                               transform: [
-                                // `TL.offsetX` was shifting the title right in long mode while the body
-                                // stays flush left — keep X at 0 so title aligns with body when "Ver más" shows.
                                 { translateX: 0 },
                                 { translateY: TL.offsetY },
                                 { scale: TL.scale },
@@ -966,14 +984,20 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                             },
                           ]}
                         >
-                          {post.title.length > TL.maxCharacters
-                            ? post.title.slice(0, TL.maxCharacters) + '…'
-                            : post.title}
+                          {reflectionTitleUsesLongLayout
+                            ? post.title
+                            : post.title.length > TL.maxCharacters
+                              ? post.title.slice(0, TL.maxCharacters) + '…'
+                              : post.title}
                         </Text>
                       ) : null}
                       <Text
                         key={bodyLayoutKey}
-                        style={[styles.bodyText, !isLongText && styles.textCentered]}
+                        style={[
+                          styles.bodyText,
+                          !isLongText && styles.textCentered,
+                          !isLongText && styles.reflectBodyShortFill,
+                        ]}
                         numberOfLines={!readingMode && isLongText ? maxBodyLines : undefined}
                         onTextLayout={handleBodyTextLayout}
                       >
@@ -1185,6 +1209,17 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontSize: 20,
     marginBottom: 10,
+  },
+  /** Título en “Ver más” / lectura: alineado con el cuerpo (eje X), sin scale que el panel recorta; texto completo (varias líneas). */
+  titleDetailLongMode: {
+    alignSelf: 'stretch',
+    textAlign: 'left',
+    fontSize: REFLECTION_TITLE_LONG_FONT_SIZE,
+    lineHeight: REFLECTION_TITLE_LONG_LINE_HEIGHT,
+  },
+  /** Misma anchura de columna que el título corto: eje vertical de simetría compartido. */
+  reflectBodyShortFill: {
+    width: '100%',
   },
   bodyText: {
     color: evoconnColors.text,

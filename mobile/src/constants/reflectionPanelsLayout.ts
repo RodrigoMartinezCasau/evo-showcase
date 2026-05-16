@@ -46,6 +46,10 @@ export const REFLECTION_TEXT_RIGHT_INSET = 50;
 
 /** Control del título de la reflexión/frase. */
 export const DETAIL_TITLE_LAYOUT = {
+  /**
+   * Antes se usaba como translateX en modo corto; desalineaba el centro del título respecto al cuerpo.
+   * Se mantiene por compatibilidad con otros layouts si hiciera falta; en detalle reflexión corta → 0.
+   */
   offsetX: 27,
   offsetY: 0,
   scale: 1.16,

@@ -8,7 +8,11 @@
  * focused on React state management.
  */
 import { supabase } from '../../mobile/lib/supabase';
-import type { SimPost, SimComment } from '../data/simulation/simulatedNetwork';
+import {
+  isPublishedSimPostType,
+  type SimPost,
+  type SimComment,
+} from '../data/simulation/simulatedNetwork';
 import type { Rank } from '../types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -46,12 +50,16 @@ export async function fetchAllPosts(): Promise<SimPost[]> {
   const { data, error } = await supabase
     .from('posts')
     .select('*')
+    .in('type', ['reflection', 'phrase'])
     .order('created_at', { ascending: false })
     .limit(200);
   if (error) { console.error('[Social] fetchAllPosts:', error.message); return []; }
   // Filter out hidden posts client-side; is_hidden column may not exist yet.
   return (data ?? [])
-    .filter((row: Record<string, unknown>) => row['is_hidden'] !== true)
+    .filter(
+      (row: Record<string, unknown>) =>
+        row['is_hidden'] !== true && isPublishedSimPostType(row['type']),
+    )
     .map(dbRowToSimPost);
 }
 
@@ -312,10 +320,13 @@ export async function fetchPostsByUser(userId: string): Promise<SimPost[]> {
     .from('posts')
     .select('*')
     .eq('author_id', userId)
+    .in('type', ['reflection', 'phrase'])
     .order('created_at', { ascending: false })
     .limit(50);
   if (error) { console.error('[Social] fetchPostsByUser:', error.message); return []; }
-  const posts = (data ?? []).map(dbRowToSimPost);
+  const posts = (data ?? [])
+    .filter((row: Record<string, unknown>) => isPublishedSimPostType(row['type']))
+    .map(dbRowToSimPost);
   if (posts.length === 0) return posts;
   // Hydrate vote counts.
   const voteRows = await fetchVotesForPosts(posts.map(p => p.id));

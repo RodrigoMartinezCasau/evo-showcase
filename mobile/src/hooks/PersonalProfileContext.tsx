@@ -27,6 +27,7 @@ import type { FollowerEntry, FollowingEntry } from '@evoconn/data/mockPersonalPr
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import {
   SIM_USERS_BY_ID,
+  isPublishedSimPostType,
   type SimPost,
   type SimUser,
 } from '@evoconn/data/simulation/simulatedNetwork';
@@ -193,9 +194,10 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
 
   // ── Posts ──────────────────────────────────────────────────────────────────
   const posts = useMemo<CommunityPost[]>(
-    () => simPosts
-      .filter(p => p.authorId === activeUserId)
-      .map(p => simPostToCommunityPost(p, users, profileCache)),
+    () =>
+      simPosts
+        .filter((p) => p.authorId === activeUserId && isPublishedSimPostType(p.type))
+        .map((p) => simPostToCommunityPost(p, users, profileCache)),
     [simPosts, activeUserId, users, profileCache],
   );
 
@@ -292,10 +294,11 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
   );
 
   const savedPosts = useMemo<CommunityPost[]>(
-    () => [...savedPostIds]
-      .map(postId => simPosts.find(p => p.id === postId))
-      .filter((p): p is SimPost => p !== undefined)
-      .map(p => simPostToCommunityPost(p, users, profileCache)),
+    () =>
+      [...savedPostIds]
+        .map((postId) => simPosts.find((p) => p.id === postId))
+        .filter((p): p is SimPost => p !== undefined && isPublishedSimPostType(p.type))
+        .map((p) => simPostToCommunityPost(p, users, profileCache)),
     [savedPostIds, simPosts, users, profileCache],
   );
 
