@@ -383,12 +383,16 @@ export function CommunityPostCard({
           />
         ) : null}
 
-        {/* Stats — horizontal, bottom-right of the colored frame (below black box) */}
+        {/* Stats — symmetric with the username block (same inset from frame edge on all sides). */}
         <View
           style={{
             position: 'absolute',
-            bottom: V.STATS_BOTTOM,
-            right: V.STATS_RIGHT,
+            bottom: followingFeedStyle
+              ? starPanelVInset + feedContent.paddingBottom
+              : V.STATS_BOTTOM,
+            right: followingFeedStyle
+              ? layout.blackRightPx + feedContent.paddingLeft
+              : V.STATS_RIGHT,
             zIndex: 2,
             elevation: 4,
           }}
