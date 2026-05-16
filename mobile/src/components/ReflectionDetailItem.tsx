@@ -957,9 +957,9 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                             !isLongText && styles.textCentered,
                             {
                               transform: [
-                                // When centered, cancel the left-aligned offsetX so the
-                                // title's center axis aligns with the body's center axis.
-                                { translateX: isLongText ? TL.offsetX : 0 },
+                                // `TL.offsetX` was shifting the title right in long mode while the body
+                                // stays flush left — keep X at 0 so title aligns with body when "Ver más" shows.
+                                { translateX: 0 },
                                 { translateY: TL.offsetY },
                                 { scale: TL.scale },
                               ],
