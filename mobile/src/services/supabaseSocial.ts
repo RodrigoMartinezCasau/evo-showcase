@@ -429,10 +429,20 @@ export async function fetchMyNotifications(userId: string): Promise<DbNotificati
   return (data ?? []) as DbNotification[];
 }
 
-export async function insertNotification(n: DbNotificationInsert): Promise<void> {
-  if (!isRealUserId(n.recipient_id)) return;
+export async function insertNotification(n: DbNotificationInsert): Promise<boolean> {
+  if (!isRealUserId(n.recipient_id)) return false;
   const { error } = await supabase.from('notifications').insert(n);
-  if (error) console.error('[Social] insertNotification:', error.message);
+  if (!error) return true;
+  // Si el comentario aún no está visible para la FK, guardar la notificación sin comment_id.
+  if (n.comment_id) {
+    const { comment_id: _omit, ...withoutComment } = n;
+    const { error: retryErr } = await supabase.from('notifications').insert(withoutComment);
+    if (!retryErr) return true;
+    console.error('[Social] insertNotification:', retryErr.message);
+    return false;
+  }
+  console.error('[Social] insertNotification:', error.message);
+  return false;
 }
 
 export async function markNotificationsRead(userId: string): Promise<void> {

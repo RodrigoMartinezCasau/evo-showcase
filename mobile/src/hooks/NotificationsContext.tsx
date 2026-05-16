@@ -23,6 +23,7 @@ import React, {
   useState,
   type ReactNode,
 } from 'react';
+import { AppState } from 'react-native';
 import {
   loadNotificationsDB,
   saveNotificationsDB,
@@ -62,7 +63,7 @@ export type NotificationsContextValue = {
   /** Count of unread notifications for the active user. */
   unreadCount: number;
   /** Emit a notification for another user (no-op if recipient === sender). */
-  addNotification: (args: AddNotificationArgs) => void;
+  addNotification: (args: AddNotificationArgs) => Promise<void>;
   /** Mark all active user's notifications as read (call on screen open). */
   markAllRead: () => void;
   /** Reload from Supabase / AsyncStorage (e.g. when opening the notifications screen). */
@@ -123,6 +124,15 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     refreshNotifications();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeUserId]);
+
+  // Si Realtime no está habilitado en Supabase, refrescar al volver a primer plano.
+  useEffect(() => {
+    if (!isRealUserId(activeUserId)) return;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refreshNotifications().catch(console.error);
+    });
+    return () => sub.remove();
+  }, [activeUserId, refreshNotifications]);
 
   // ── Register push token when a real user is active ───────────────────────
   useEffect(() => {
@@ -211,7 +221,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   // ── Public actions ───────────────────────────────────────────────────────
 
   const addNotification = useCallback(
-    (args: AddNotificationArgs) => {
+    async (args: AddNotificationArgs) => {
       // Never notify a user about their own actions.
       if (args.recipientUserId === args.fromUserId) return;
 
@@ -227,22 +237,27 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         read: false,
       };
 
+      const recipientIsReal = isRealUserId(args.recipientUserId);
+
       // Persist to Supabase for real users so the recipient sees it on any device.
-      if (isRealUserId(args.recipientUserId)) {
-        insertNotification({
-          recipient_id:  args.recipientUserId,
-          type:          args.type,
-          from_user_id:  args.fromUserId,
+      if (recipientIsReal) {
+        await insertNotification({
+          recipient_id: args.recipientUserId,
+          type: args.type,
+          from_user_id: args.fromUserId,
           from_username: args.fromUsername,
-          post_id:       args.targetPostId,
-          comment_id:    args.targetCommentId,
-          text_preview:  args.textPreview,
+          post_id: args.targetPostId,
+          comment_id: args.targetCommentId,
+          text_preview: args.textPreview,
         });
       }
 
-      mutateSlice(args.recipientUserId, (prev) => [notif, ...prev]);
+      // Sim users: solo estado local. Usuarios reales: el destinatario recibe fila vía Supabase/realtime.
+      if (!recipientIsReal || args.recipientUserId === activeUserId) {
+        mutateSlice(args.recipientUserId, (prev) => [notif, ...prev]);
+      }
     },
-    [mutateSlice],
+    [mutateSlice, activeUserId],
   );
 
   const markAllRead = useCallback(() => {

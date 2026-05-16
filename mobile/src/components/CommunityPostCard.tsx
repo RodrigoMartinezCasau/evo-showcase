@@ -316,7 +316,14 @@ export function CommunityPostCard({
             position: 'absolute',
             top: feedStackMinTopPx,
             left: layout.blackLeftPx + feedContent.paddingLeft,
-            right: layout.blackRightPx + feedContent.paddingRight,
+            // Siguiendo reflection: right margin matches left so text reaches the full width.
+            // Para ti and quote cards keep the wider right gutter (banner corridor / stats horizontal guard).
+            // Vertical overlap with stats is prevented by textContentBottomY regardless of device size.
+            right: layout.blackRightPx + (
+              followingFeedStyle && !isQuoteCard
+                ? feedContent.paddingLeft
+                : feedContent.paddingRight
+            ),
             bottom: layout.cardHeight - textContentBottomY,
             overflow: 'hidden',
             zIndex: 1,

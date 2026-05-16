@@ -240,7 +240,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   }, [commentsMap, post.id, simUsers]);
 
   const [blockedUsers, setBlockedUsers] = useState<Set<string>>(new Set());
-  const { session } = useAuth();
+  const { session, profile: authProfile } = useAuth();
 
   const [postMoreSheetOpen, setPostMoreSheetOpen] = useState(false);
   const [reportReasonPickerOpen, setReportReasonPickerOpen] = useState(false);
@@ -261,32 +261,50 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
 
   const handleAddComment = useCallback(
     async (text: string) => {
+      const authorId =
+        session?.user?.id && isRealUserId(session.user.id)
+          ? session.user.id
+          : mockCurrentUser.id;
+      const authorUsername =
+        authProfile?.username != null && authProfile.username.trim().length > 0
+          ? `@${authProfile.username.trim().toUpperCase()}`
+          : mockCurrentUser.username;
       const newId = `co-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       const simComment: SimComment = {
         id: newId,
         postId: post.id,
-        authorId: mockCurrentUser.id,
-        // Snapshot so the username survives restarts and is visible to other users.
-        authorUsername: mockCurrentUser.username,
-        authorClanId: mockCurrentUser.clanId,
-        authorRank: mockCurrentUser.rank,
+        authorId,
+        authorUsername,
+        authorClanId: authProfile?.clan_id ?? mockCurrentUser.clanId,
+        authorRank: authProfile?.rank ?? mockCurrentUser.rank,
         body: text,
         upCount: 0,
         createdAt: new Date().toISOString(),
       };
       await addSimComment(simComment);
       recordComment(post);
-      addNotification({
+      void addNotification({
         recipientUserId: post.author.id,
         type: 'comment',
-        fromUserId: mockCurrentUser.id,
-        fromUsername: mockCurrentUser.username,
+        fromUserId: authorId,
+        fromUsername: authorUsername,
         targetPostId: post.id,
         targetCommentId: newId,
         textPreview: text.trim().slice(0, 80),
       });
     },
-    [addSimComment, addNotification, recordComment, post, post.author.id, post.id],
+    [
+      addSimComment,
+      addNotification,
+      recordComment,
+      post,
+      post.author.id,
+      post.id,
+      session?.user?.id,
+      authProfile?.username,
+      authProfile?.clan_id,
+      authProfile?.rank,
+    ],
   );
 
   const { isFollowing: checkFollowing, toggleFollow } = useFollowState();

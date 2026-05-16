@@ -163,7 +163,7 @@ export function FollowProvider({ children }: { children: React.ReactNode }) {
 
         simToggle(activeUserId, uid);
         taste.recordFollow(uid);
-        addNotification({
+        void addNotification({
           recipientUserId: uid,
           type: 'follow',
           fromUserId: activeUserId,
