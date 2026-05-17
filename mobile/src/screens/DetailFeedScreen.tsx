@@ -2,6 +2,7 @@ import React, { useRef, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   FlatList,
+  Platform,
   StyleSheet,
   Animated,
   Easing,
@@ -24,7 +25,11 @@ import { getAppShellScrollableBodyHeight } from '@evoconn/constants/appShellLayo
 import { getAppTopBarLayoutHeight } from '@evoconn/constants/topBarLayout';
 import {
   COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE,
+  COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE_ANDROID,
+  COMMUNITY_DETAIL_MAX_TO_RENDER_PER_BATCH_ANDROID,
   COMMUNITY_DETAIL_PREFETCH_POSTS,
+  COMMUNITY_DETAIL_PREFETCH_POSTS_ANDROID,
+  COMMUNITY_DETAIL_UPDATE_CELLS_PERIOD_ANDROID,
 } from '@evoconn/constants/communityDetailFeed';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import {
@@ -299,9 +304,10 @@ export default function DetailFeedScreen() {
         showsVerticalScrollIndicator={false}
         getItemLayout={getItemLayout}
         initialScrollIndex={initialIndex}
-        initialNumToRender={COMMUNITY_DETAIL_PREFETCH_POSTS}
-        maxToRenderPerBatch={COMMUNITY_DETAIL_PREFETCH_POSTS}
-        windowSize={COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE}
+        initialNumToRender={Platform.OS === 'android' ? COMMUNITY_DETAIL_PREFETCH_POSTS_ANDROID : COMMUNITY_DETAIL_PREFETCH_POSTS}
+        maxToRenderPerBatch={Platform.OS === 'android' ? COMMUNITY_DETAIL_MAX_TO_RENDER_PER_BATCH_ANDROID : COMMUNITY_DETAIL_PREFETCH_POSTS}
+        updateCellsBatchingPeriod={Platform.OS === 'android' ? COMMUNITY_DETAIL_UPDATE_CELLS_PERIOD_ANDROID : 50}
+        windowSize={Platform.OS === 'android' ? COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE_ANDROID : COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE}
         removeClippedSubviews
         style={styles.list}
         viewabilityConfig={detailPagerViewabilityConfig}

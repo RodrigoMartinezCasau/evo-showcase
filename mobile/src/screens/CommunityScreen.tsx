@@ -48,7 +48,11 @@ import {
 import {
   COMMUNITY_DETAIL_DECELERATION_RATE_IOS,
   COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE,
+  COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE_ANDROID,
+  COMMUNITY_DETAIL_MAX_TO_RENDER_PER_BATCH_ANDROID,
   COMMUNITY_DETAIL_PREFETCH_POSTS,
+  COMMUNITY_DETAIL_PREFETCH_POSTS_ANDROID,
+  COMMUNITY_DETAIL_UPDATE_CELLS_PERIOD_ANDROID,
 } from '@evoconn/constants/communityDetailFeed';
 import { ReflectionDetailItem } from '@evoconn/components/ReflectionDetailItem';
 import { PANEL_STAR_SURFACE_DEFAULT } from '@evoconn/components/animations/StarFieldBackground';
@@ -155,6 +159,15 @@ const VALID_TAB_IDS: TabId[] = ['siguiendo', 'para-ti', 'search'];
 
 /** Debe coincidir con `styles.list.paddingTop` — define el hueco vertical útil de cada fila del feed. */
 const COMMUNITY_FEED_LIST_PADDING_TOP = 8;
+
+// ── Android FlatList params — valores más conservadores para evitar lag en JS thread ──
+const IS_ANDROID = Platform.OS === 'android';
+const FEED_WINDOW_SIZE    = IS_ANDROID ? COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE_ANDROID : COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE;
+const FEED_PREFETCH       = IS_ANDROID ? COMMUNITY_DETAIL_PREFETCH_POSTS_ANDROID : COMMUNITY_DETAIL_PREFETCH_POSTS;
+const FEED_MAX_BATCH      = IS_ANDROID ? COMMUNITY_DETAIL_MAX_TO_RENDER_PER_BATCH_ANDROID : COMMUNITY_DETAIL_PREFETCH_POSTS;
+const FEED_BATCH_PERIOD   = IS_ANDROID ? COMMUNITY_DETAIL_UPDATE_CELLS_PERIOD_ANDROID : 50;
+/** removeClippedSubviews: en Android mejora el rendimiento; en iOS puede causar flashes con pagingEnabled. */
+const FEED_CLIP_SUBVIEWS  = IS_ANDROID;
 /**
  * Android: respiro extra bajo la tarjeta (dentro del área del feed) para acercar el margen al de iOS.
  */
@@ -1025,10 +1038,11 @@ export default function CommunityScreen() {
                         ? clampDetailInitialIndex(detailFeed.data.length, detailFeed.initialIndex)
                         : 0
                     }
-                    initialNumToRender={COMMUNITY_DETAIL_PREFETCH_POSTS}
-                    maxToRenderPerBatch={COMMUNITY_DETAIL_PREFETCH_POSTS}
-                    windowSize={COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE}
-                    removeClippedSubviews={false}
+                    initialNumToRender={FEED_PREFETCH}
+                    maxToRenderPerBatch={FEED_MAX_BATCH}
+                    updateCellsBatchingPeriod={FEED_BATCH_PERIOD}
+                    windowSize={FEED_WINDOW_SIZE}
+                    removeClippedSubviews={FEED_CLIP_SUBVIEWS}
                     style={styles.panelInner}
                     viewabilityConfig={detailViewabilityConfig}
                     onViewableItemsChanged={onDetailViewableItemsChanged}
@@ -1055,10 +1069,11 @@ export default function CommunityScreen() {
                     ? clampDetailInitialIndex(detailFeed.data.length, detailFeed.initialIndex)
                     : 0
                 }
-                initialNumToRender={COMMUNITY_DETAIL_PREFETCH_POSTS}
-                maxToRenderPerBatch={COMMUNITY_DETAIL_PREFETCH_POSTS}
-                windowSize={COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE}
-                removeClippedSubviews={false}
+                initialNumToRender={FEED_PREFETCH}
+                maxToRenderPerBatch={FEED_MAX_BATCH}
+                updateCellsBatchingPeriod={FEED_BATCH_PERIOD}
+                windowSize={FEED_WINDOW_SIZE}
+                removeClippedSubviews={FEED_CLIP_SUBVIEWS}
                 style={styles.panelInner}
                 viewabilityConfig={detailViewabilityConfig}
                 onViewableItemsChanged={onDetailViewableItemsChanged}

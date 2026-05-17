@@ -1,13 +1,25 @@
 /**
  * Feed a pantalla completa (Para ti / Siguiendo): cuántas tarjetas mantener
- * montadas por delante/detrás para que el paging vertical no “pinte” bajo demanda.
+ * montadas por delante/detrás para que el paging vertical no "pinte" bajo demanda.
  *
  * `windowSize` en FlatList es un múltiplo de la altura de viewport (~1 post).
+ *
+ * Android usa valores más ajustados para reducir la presión de memoria y el lag
+ * del JS thread que causa stutters al scrollear. El número de posts renderizados
+ * en paralelo es mucho menor (3 vs 15 viewports), lo que mejora el rendimiento.
  */
 export const COMMUNITY_DETAIL_PREFETCH_POSTS = 7;
+export const COMMUNITY_DETAIL_PREFETCH_POSTS_ANDROID = 3;
 
 /** ~7 viewports arriba + abajo del buffer (default RN es 21). */
 export const COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE = 15;
+/** Android: ventana más pequeña = menos posts montados = menos lag en JS thread. */
+export const COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE_ANDROID = 5;
+
+/** Android: batch menor para distribuir el trabajo de render en más frames. */
+export const COMMUNITY_DETAIL_MAX_TO_RENDER_PER_BATCH_ANDROID = 2;
+/** Android: más tiempo entre batches para no bloquear el JS thread mientras se scrollea. */
+export const COMMUNITY_DETAIL_UPDATE_CELLS_PERIOD_ANDROID = 150;
 
 /**
  * iOS: deceleración del scroll con `pagingEnabled` (una publicación por viewport).
