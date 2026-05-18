@@ -8,7 +8,6 @@ import {
   Keyboard,
   Alert,
   Animated,
-  Platform,
 } from 'react-native';
 import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AppTopBar, ChatInputBar, SidebarDrawer, useKeyboardAnim } from '@evoconn/components';
@@ -656,14 +655,7 @@ export default function PhraseCreationScreen() {
                     },
                   ]}
                 >
-                  <Text
-                    style={styles.userText}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={Platform.OS === 'ios' ? 0.45 : 0.5}
-                  >
-                    {msg.content}
-                  </Text>
+                  <Text style={styles.userText}>{msg.content}</Text>
                 </View>
               );
             }
@@ -879,9 +871,15 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 16,
     maxWidth: '92%',
+    flexShrink: 1,
     borderBottomRightRadius: 4,
   },
-  userText: { color: evoconnColors.text, fontSize: 15, lineHeight: 22, width: '100%' },
+  userText: {
+    color: evoconnColors.text,
+    fontSize: 15,
+    lineHeight: 22,
+    flexShrink: 1,
+  },
   introStaticText: {
     color: evoconnColors.text,
     fontSize: 15,

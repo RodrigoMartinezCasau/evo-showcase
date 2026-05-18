@@ -65,6 +65,7 @@ import {
   sortFollowingPosts,
   type FollowingSortOption,
 } from '@evoconn/constants/followingFeedSort';
+import { getParatiAuthorClanMembershipMultiplier } from '@evoconn/logic/feed/paratiFeedRanking';
 
 type TabId = 'siguiendo' | 'para-ti' | 'search';
 type FeedMode = 'following' | 'foryou';
@@ -80,10 +81,11 @@ function tabToFeedMode(tab: TabId): FeedMode {
 
 /**
  * "PARA TI" ranking algorithm.
- * Score = net_votes × recency_boost × clan_boost
+ * Score = net_votes × recency_boost × clan_boost × membership_boost × taste_boost
  * - Net votes: upvotes × 2 - downvotes + saves (engagement signal)
  * - Recency boost: ×2 if post is < 6 h old, ×1.5 if < 24 h, ×1 otherwise
  * - Clan boost: ×1.4 if author's clan matches viewer's clan
+ * - Membership: ×1.25 si el autor tiene uno de los 8 clanes; ×0.7 si es sin clan
  * Discovery-mode: discovery posts (not from followed users) are ranked first.
  * Siguiendo is only posts from users you follow (empty if you follow no one).
  *
@@ -100,7 +102,8 @@ function scorePostForYou(
   const ageH = ageMs / 3_600_000;
   const recency = ageH < 6 ? 2 : ageH < 24 ? 1.5 : 1;
   const clanBoost = viewerClanId && post.author.clanId === viewerClanId ? 1.4 : 1;
-  return net * recency * clanBoost * tasteBoost(post);
+  const membershipBoost = getParatiAuthorClanMembershipMultiplier(post.author.clanId);
+  return net * recency * clanBoost * membershipBoost * tasteBoost(post);
 }
 
 function getDataForMode(
