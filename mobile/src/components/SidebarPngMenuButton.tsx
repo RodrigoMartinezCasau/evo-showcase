@@ -8,7 +8,10 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { SIDEBAR_COMMUNITY_LAYOUT as SC } from '@evoconn/constants/sidebarCommunityLayout';
+import {
+  SIDEBAR_COMMUNITY_LAYOUT as SC,
+  resolveSidebarSinClanRim,
+} from '@evoconn/constants/sidebarCommunityLayout';
 import { SIDEBAR_NEW_REFLECTION_LAYOUT as SR } from '@evoconn/constants/sidebarNewReflectionLayout';
 import { SIDEBAR_NEW_PHRASE_LAYOUT as SP } from '@evoconn/constants/sidebarNewPhraseLayout';
 import { PanelStarField } from '@evoconn/components/animations/StarFieldBackground';
@@ -181,11 +184,9 @@ export function SidebarPngMenuButton({
   const textTop =
     (visibleH - config.textBoxHeight) / 2 + config.textContainerOffsetY;
 
-  const sinClanInsetTop = 10;
-  const sinClanBodyH = Math.max(1, visibleH - 20);
-  const sinClanRimR = 6;
-  const sinClanRimArmY = Math.max(4, Math.floor((sinClanBodyH - 2 * sinClanRimR) / 2));
-  const sinClanRimArmX = Math.floor((layoutW - 2 * sinClanRimR) * 0.48);
+  const sinClanRim = sinClanCommunityStyle
+    ? resolveSidebarSinClanRim(layoutW, visibleH)
+    : null;
 
   return (
     <TouchableOpacity
@@ -213,15 +214,15 @@ export function SidebarPngMenuButton({
           }}
         >
           <View style={{ position: 'relative', width: layoutW, height: visibleH, alignSelf: 'center' }}>
-            {sinClanCommunityStyle ? (
+            {sinClanRim != null ? (
               <View
                 style={{
                   position: 'absolute',
                   left: 0,
-                  top: sinClanInsetTop,
+                  top: sinClanRim.insetTop,
                   width: layoutW,
-                  height: sinClanBodyH,
-                  borderRadius: 6,
+                  height: sinClanRim.bodyHeight,
+                  borderRadius: sinClanRim.borderRadius,
                   overflow: 'hidden',
                   backgroundColor: evoconnColors.background,
                 }}
@@ -229,11 +230,11 @@ export function SidebarPngMenuButton({
                 <PanelStarField surfaceColor={evoconnColors.background} />
                 <ClanCardFeedRimOverlay
                   width={layoutW}
-                  height={sinClanBodyH}
-                  borderRadius={sinClanRimR}
+                  height={sinClanRim.bodyHeight}
+                  borderRadius={sinClanRim.borderRadius}
                   clanColor={NO_CLAN_ACCENT_COLOR}
-                  rimArmX={sinClanRimArmX}
-                  rimArmY={sinClanRimArmY}
+                  rimArmX={sinClanRim.rimArmX}
+                  rimArmY={sinClanRim.rimArmY}
                 />
               </View>
             ) : (

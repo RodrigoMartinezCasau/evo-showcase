@@ -46,3 +46,71 @@ export const SIDEBAR_COMMUNITY_LAYOUT = {
   /** Escala uniforme de la estrella (1 = tamaño base según WIDTH/HEIGHT). */
   SIDEBAR_COMMUNITY_STAR_SCALE: 0.9,
 } as const;
+
+/**
+ * Botón COMUNIDAD cuando el usuario no tiene clan (fondo app + destellos + reborde verde lima).
+ * Edita estos valores y recarga la app; no hace falta tocar SidebarPngMenuButton.tsx.
+ */
+export const SIDEBAR_COMMUNITY_SIN_CLAN = {
+  /** Margen superior del rectángulo de fondo/reborde (px). */
+  INSET_TOP: 10,
+  /** Margen inferior (px). */
+  INSET_BOTTOM: 10,
+  /** Esquinas redondeadas del fondo y del reborde. */
+  BORDER_RADIUS: 6,
+
+  /**
+   * Largo del brazo horizontal del reborde en cada esquina (arriba/abajo), en px.
+   * `null` = automático hasta casi el centro: (ancho útil − 2×radio) / 2.
+   * Número fijo = ese largo siempre (ej. 100).
+   */
+  RIM_ARM_X: null as number | null,
+  /** Suma extra al brazo horizontal (auto o fijo). Positivo = más largo / puede solaparse en el centro. */
+  RIM_ARM_X_EXTRA: 25,
+
+  /**
+   * Largo del brazo vertical del reborde en cada esquina (izq/der), en px.
+   * `null` = automático: (alto útil − 2×radio) / 2.
+   */
+  RIM_ARM_Y: null as number | null,
+  /** Suma extra al brazo vertical. */
+  RIM_ARM_Y_EXTRA: 50,
+  /** Mínimo del brazo vertical cuando RIM_ARM_Y es null. */
+  RIM_ARM_Y_MIN: 4,
+} as const;
+
+export type SidebarSinClanRimResolved = {
+  insetTop: number;
+  bodyHeight: number;
+  borderRadius: number;
+  rimArmX: number;
+  rimArmY: number;
+};
+
+/** Calcula inset y brazos del reborde a partir del tamaño visible del botón. */
+export function resolveSidebarSinClanRim(
+  layoutW: number,
+  visibleH: number,
+): SidebarSinClanRimResolved {
+  const cfg = SIDEBAR_COMMUNITY_SIN_CLAN;
+  const r = cfg.BORDER_RADIUS;
+  const bodyHeight = Math.max(
+    1,
+    visibleH - cfg.INSET_TOP - cfg.INSET_BOTTOM,
+  );
+  const maxArmX = Math.floor((layoutW - 2 * r) / 2);
+  const maxArmY = Math.max(
+    cfg.RIM_ARM_Y_MIN,
+    Math.floor((bodyHeight - 2 * r) / 2),
+  );
+  const baseX = cfg.RIM_ARM_X ?? maxArmX;
+  const baseY = cfg.RIM_ARM_Y ?? maxArmY;
+
+  return {
+    insetTop: cfg.INSET_TOP,
+    bodyHeight,
+    borderRadius: r,
+    rimArmX: baseX + cfg.RIM_ARM_X_EXTRA,
+    rimArmY: baseY + cfg.RIM_ARM_Y_EXTRA,
+  };
+}
