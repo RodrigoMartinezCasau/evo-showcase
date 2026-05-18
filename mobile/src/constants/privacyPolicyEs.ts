@@ -82,13 +82,13 @@ Transcripción de voz: convertir su voz en texto para facilitar la creación de 
 Personalización: adaptar su experiencia según su clan asignado y perfil filosófico.
 Notificaciones: enviarle comunicaciones sobre actividad relevante en su cuenta y recordatorios de racha, sin fines publicitarios de terceros.
 Foto de perfil: permitirle personalizar su perfil mediante una imagen almacenada en la nube.
-Mantenimiento, seguridad y diagnóstico: verificar el correcto funcionamiento del servicio, detectar usos fraudulentos y garantizar la integridad del sistema.
+Mantenimiento, seguridad y diagnóstico de errores: verificar el correcto funcionamiento del servicio, detectar usos fraudulentos, garantizar la integridad del sistema y diagnosticar fallos técnicos mediante Sentry.
 Mejora del producto: analizar datos de uso agregados o anonimizados para mejorar las funcionalidades de la aplicación.
 
 4. Base legal del tratamiento (art. 6 RGPD)
 El tratamiento de sus datos se sustenta en las siguientes bases jurídicas previstas en el artículo 6 del RGPD:
 Ejecución de un contrato (art. 6.1.b RGPD): el tratamiento es necesario para la prestación del servicio que usted solicita al crear una cuenta y utilizar la aplicación Evo. Abarca la gestión de cuenta, autenticación, funciones sociales, debates con IA, racha y límites de uso.
-Interés legítimo (art. 6.1.f RGPD): para el mantenimiento de la seguridad del servicio, la prevención del abuso y la mejora técnica del producto, siempre que no prevalezcan sus derechos y libertades fundamentales.
+Interés legítimo (art. 6.1.f RGPD): para el mantenimiento de la seguridad del servicio, la prevención del abuso, el diagnóstico de errores técnicos (Sentry) y la mejora técnica del producto, siempre que no prevalezcan sus derechos y libertades fundamentales.
 Consentimiento (art. 6.1.a RGPD): para el acceso al micrófono, a la biblioteca de fotos, a la cámara y el envío de notificaciones push, cuyos permisos se solicitan expresamente al usuario en el momento en que se requieren. Puede retirar este consentimiento en cualquier momento desde los ajustes del dispositivo, sin que ello afecte a la licitud del tratamiento anterior.
 
 5. Plazos de conservación
@@ -99,6 +99,7 @@ Contenido publicado: se conserva mientras el contenido esté activo en el servic
 Avatar en Supabase Storage: se elimina cuando usted cambia la imagen de perfil o solicita la supresión de su cuenta.
 Token push: se conserva mientras la cuenta esté activa o hasta que se desactive la función de notificaciones.
 Registros de uso y estadísticas: según las necesidades operativas del servicio; los datos agregados o anonimizados pueden conservarse por más tiempo.
+Registros de errores (Sentry): conforme a los plazos establecidos en la política de retención de Sentry (habitualmente 90 días para eventos de error); pueden contener datos técnicos del dispositivo.
 
 6. Destinatarios y terceros
 Para prestar el servicio utilizamos los siguientes proveedores externos, que pueden actuar como encargados del tratamiento o como responsables independientes según el caso:
@@ -130,10 +131,14 @@ Política de privacidad de Expo: https://expo.dev/privacy
 6.7 Sistema operativo del dispositivo (reconocimiento de voz)
 El reconocimiento de voz utiliza las APIs nativas del sistema operativo (expo-speech-recognition): Apple Speech Framework en iOS y Android Speech Recognition en Android. Apple y Google/Android son responsables independientes del tratamiento que puedan realizar en el marco de sus servicios de reconocimiento de voz del sistema.
 
+6.8 Sentry (monitorización de errores)
+La aplicación integra Sentry (Sentry.io) para la monitorización de errores y el diagnóstico del rendimiento. Sentry puede recopilar información técnica sobre los errores producidos en la aplicación, como tipo de error, traza de la pila, versión de la aplicación, tipo y versión del sistema operativo y, en su caso, datos técnicos del dispositivo. Asociamos los eventos al identificador de usuario de la cuenta solo para diagnosticar incidencias; no enviamos correo ni nombre a Sentry por defecto. Esta información se utiliza exclusivamente para detectar y corregir errores técnicos, y no con fines publicitarios ni de rastreo entre aplicaciones. Nuestro proyecto de Sentry está configurado con almacenamiento de datos en la Unión Europea.
+Política de privacidad de Sentry: https://sentry.io/privacy/
+
 No vendemos sus datos personales a terceros ni los compartimos con fines publicitarios propios de terceros. No integramos SDKs de publicidad ni de rastreo entre aplicaciones.
 
 7. Transferencias internacionales
-Algunos de los proveedores mencionados (Supabase, Google, Apple, Meta, Railway) pueden almacenar o procesar datos fuera del Espacio Económico Europeo (EEE). En tales casos, las transferencias se amparan en mecanismos adecuados conforme al RGPD, como las Cláusulas Contractuales Tipo adoptadas por la Comisión Europea, el Marco de Privacidad de Datos UE-EE.UU. (Data Privacy Framework, cuando aplique), u otras garantías equivalentes reconocidas por la normativa vigente. Le recomendamos consultar las políticas de privacidad de cada proveedor para conocer los detalles de sus transferencias internacionales.
+Algunos de los proveedores mencionados (Supabase, Google, Apple, Meta, Railway, Sentry) pueden almacenar o procesar datos fuera del Espacio Económico Europeo (EEE). En tales casos, las transferencias se amparan en mecanismos adecuados conforme al RGPD, como las Cláusulas Contractuales Tipo adoptadas por la Comisión Europea, el Marco de Privacidad de Datos UE-EE.UU. (Data Privacy Framework, cuando aplique), u otras garantías equivalentes reconocidas por la normativa vigente. Le recomendamos consultar las políticas de privacidad de cada proveedor para conocer los detalles de sus transferencias internacionales.
 
 8. Menores de edad
 Evo es un servicio dirigido a personas mayores de 16 años en el ámbito de la Unión Europea (y mayores de 13 años en otras jurisdicciones donde sea aplicable una edad mínima inferior, como determinados estados de EE.UU.). Dado que la aplicación incluye contenido generado por usuarios y funciones sociales, la supervisión parental del uso de la aplicación por parte de menores es responsabilidad de los progenitores o tutores legales.
@@ -144,6 +149,7 @@ Evo es una aplicación móvil nativa y no utiliza cookies en el sentido tradicio
 El almacenamiento local de datos en el dispositivo se realiza mediante los siguientes mecanismos:
 AsyncStorage: almacenamiento local de React Native/Expo utilizado para mantener tokens de sesión y preferencias de la aplicación. Es intrínseco al funcionamiento del servicio y no se emplea con fines de rastreo entre aplicaciones o sitios web.
 SecureStore: almacenamiento cifrado de la plataforma Expo/React Native empleado para guardar de forma segura credenciales temporales durante el proceso de verificación de correo electrónico. Los datos se cifran y almacenan exclusivamente en el dispositivo del usuario.
+Sentry: la aplicación integra el SDK de Sentry para el diagnóstico de errores técnicos. Sentry puede almacenar identificadores técnicos de sesión y de usuario (identificador de cuenta) con fines exclusivos de diagnóstico, no con fines publicitarios ni de seguimiento comportamental entre aplicaciones.
 Si en el futuro incorporásemos herramientas de medición de rendimiento o análisis de uso adicionales que requiriesen actualizar esta política, lo haríamos con anterioridad a su implementación e informaríamos a los usuarios según proceda.
 
 10. Sus derechos en materia de protección de datos

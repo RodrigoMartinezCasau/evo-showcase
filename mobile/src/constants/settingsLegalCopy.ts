@@ -6,10 +6,12 @@ import { PRIVACY_POLICY_FULL_ES } from './privacyPolicyEs';
 export const TERMS_OF_SERVICE_ES = `
 TÉRMINOS DE SERVICIO DE EVO
 
-Última actualización: resumen orientativo para usuarios de la aplicación móvil EVO.
+Aplicación Evo · com.evoconn.evo
+Desarrollada y operada por EvoConn (cuenta de desarrollador: evoconn)
+Última actualización: 18 de mayo de 2026
 
 1. Aceptación
-Al crear una cuenta o usar EVO, aceptas estos términos. Si no estás de acuerdo, no uses el servicio.
+Al crear una cuenta o usar EVO, aceptas estos términos y nuestra Política de privacidad. Si no estás de acuerdo, no uses el servicio. En el registro debes marcar expresamente que aceptas ambos documentos.
 
 2. El servicio
 EVO ofrece una experiencia de comunidad, reflexión y contenido asociado a perfiles y publicaciones. Las funciones pueden cambiar o interrumpirse por mantenimiento o decisiones del equipo.
@@ -36,7 +38,7 @@ Podemos actualizar estos términos. El uso continuado tras los cambios implica a
 Para dudas sobre estos términos: hello@evoconn.com
 `.trim();
 
-/** Misma versión que App Store Connect (sin Sentry; ver privacyPolicyEs.ts). */
+/** Misma versión que App Store Connect (ver privacyPolicyEs.ts). */
 export const PRIVACY_POLICY_ES = PRIVACY_POLICY_FULL_ES;
 
 export const SUPPORT_EMAIL = 'hello@evoconn.com';
