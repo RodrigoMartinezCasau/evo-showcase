@@ -20,6 +20,8 @@ type ClanCardFeedRimOverlayProps = {
   /** Matches `SVG_CARD_VISUAL.CARD_BORDER_RADIUS` on the feed cards. */
   borderRadius: number;
   clanColor: string;
+  /** Straight segment length from each corner (pt). Default feed cards. */
+  rimArm?: number;
 };
 
 /**
@@ -31,9 +33,10 @@ export function ClanCardFeedRimOverlay({
   height,
   borderRadius,
   clanColor,
+  rimArm = RIM_ARM,
 }: ClanCardFeedRimOverlayProps) {
   const r = borderRadius;
-  const a = RIM_ARM;
+  const a = rimArm;
   const w = width;
   const h = height;
   const hl = lightenHex(clanColor);

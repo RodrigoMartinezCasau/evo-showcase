@@ -11,6 +11,10 @@ import {
 import { SIDEBAR_COMMUNITY_LAYOUT as SC } from '@evoconn/constants/sidebarCommunityLayout';
 import { SIDEBAR_NEW_REFLECTION_LAYOUT as SR } from '@evoconn/constants/sidebarNewReflectionLayout';
 import { SIDEBAR_NEW_PHRASE_LAYOUT as SP } from '@evoconn/constants/sidebarNewPhraseLayout';
+import { PanelStarField } from '@evoconn/components/animations/StarFieldBackground';
+import { ClanCardFeedRimOverlay } from '@evoconn/components/ClanCardFeedRimOverlay';
+import { NO_CLAN_ACCENT_COLOR } from '@evoconn/constants/clanColors';
+import { evoconnColors } from '@evoconn/theme/colors';
 
 /** Config normalizada: misma forma para COMUNIDAD, NUEVA REFLEXIÓN y NUEVA FRASE. */
 export type SidebarPngMenuButtonConfig = {
@@ -145,10 +149,10 @@ type SidebarPngMenuButtonProps = {
   textAdjustsFontSizeToFit?: boolean;
   leftOverlay?: SidebarPngMenuButtonLeftOverlay | null;
   /**
-   * Cuando se pasa, reemplaza el PNG con un fondo oscuro + borde brillante de este color.
-   * Usado para usuarios sin clan, donde el botón muestra el estilo de "reborde" en lugar del relleno sólido.
+   * Sin clan: sustituye el PNG verde lima por fondo de app + destellos + reborde Apple (verde lima).
+   * El color define el reborde; el interior (estrella, texto) no se modifica.
    */
-  glowBorderColor?: string;
+  sinClanCommunityStyle?: boolean;
 };
 
 export function SidebarPngMenuButton({
@@ -160,7 +164,7 @@ export function SidebarPngMenuButton({
   onPress,
   textAdjustsFontSizeToFit = true,
   leftOverlay = null,
-  glowBorderColor,
+  sinClanCommunityStyle = false,
 }: SidebarPngMenuButtonProps) {
   const imgW = config.imageWidth;
   const imgH = config.imageHeight;
@@ -176,6 +180,10 @@ export function SidebarPngMenuButton({
     (layoutW - config.textBoxWidth) / 2 + config.textContainerOffsetX;
   const textTop =
     (visibleH - config.textBoxHeight) / 2 + config.textContainerOffsetY;
+
+  const sinClanInsetTop = 10;
+  const sinClanBodyH = Math.max(1, visibleH - 20);
+  const sinClanRimArm = Math.min(16, Math.max(8, Math.floor(sinClanBodyH * 0.32)));
 
   return (
     <TouchableOpacity
@@ -203,23 +211,28 @@ export function SidebarPngMenuButton({
           }}
         >
           <View style={{ position: 'relative', width: layoutW, height: visibleH, alignSelf: 'center' }}>
-            {glowBorderColor ? (
-              /* Full border variant: dark background + thin colored border all around.
-                 No glow, no shadow. Inset 10 px top/bottom to match the PNG button's
-                 internal padding (content runs from rendered y≈10 to y≈55). */
+            {sinClanCommunityStyle ? (
               <View
                 style={{
                   position: 'absolute',
                   left: 0,
-                  top: 10,
+                  top: sinClanInsetTop,
                   width: layoutW,
-                  height: visibleH - 20,
-                  backgroundColor: '#0B0B0F',
+                  height: sinClanBodyH,
                   borderRadius: 6,
-                  borderWidth: 1.5,
-                  borderColor: glowBorderColor,
+                  overflow: 'hidden',
+                  backgroundColor: evoconnColors.background,
                 }}
-              />
+              >
+                <PanelStarField surfaceColor={evoconnColors.background} />
+                <ClanCardFeedRimOverlay
+                  width={layoutW}
+                  height={sinClanBodyH}
+                  borderRadius={6}
+                  clanColor={NO_CLAN_ACCENT_COLOR}
+                  rimArm={sinClanRimArm}
+                />
+              </View>
             ) : (
               /* Default PNG-based background */
               <View

@@ -156,6 +156,8 @@ export function SidebarDrawer({
 
   const StarSvg = getSidebarStarSvgByHouse(user.clanId);
   const communityButtonSource = getCommunityButtonByHouse(user.clanId);
+  const isSinClan =
+    user.clanId == null || String(user.clanId).trim() === '';
   const newReflectionButtonSource = getNewReflectionButtonByHouse(user.clanId);
   const newReflectionPlusSource = getNewReflectionPlusIconByHouse(user.clanId);
   const newReflectionPlusLayout = getNewReflectionPlusLayoutByHouse(user.clanId);
@@ -244,6 +246,7 @@ export function SidebarDrawer({
           label="COMUNIDAD"
           accessibilityLabel="Comunidad"
           menuRowStyle={styles.communityMenuRow}
+          sinClanCommunityStyle={isSinClan}
           leftOverlay={{
             element: (
               <EstrellaComunidadSvg
