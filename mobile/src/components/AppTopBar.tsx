@@ -87,7 +87,7 @@ export function AppTopBar({
   const insets = useSafeAreaInsets();
   const { width: winW, height: winH } = useWindowDimensions();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
-  const { isPreviewActive, previewClanId } = usePreviewMode();
+  const { isPreviewActive } = usePreviewMode();
   const { getVisibleClanId, getReflectionCount, getPhraseCount } = useClassification();
   const visibleClanId     = getVisibleClanId();
   const totalReflections  = getReflectionCount();
@@ -112,7 +112,7 @@ export function AppTopBar({
 
   const clanLabel =
     clanShortLabel ??
-    (isPreviewActive ? 'MOD' : (effectiveClan ? effectiveClan.slice(0, 2).toUpperCase() : '??'));
+    (effectiveClan ? effectiveClan.slice(0, 2).toUpperCase() : '??');
 
   const { streakDays, remainingUses } = useDebugStats();
   const { totalUnlocked } = useQuotes();
@@ -244,10 +244,6 @@ export function AppTopBar({
   const unifiedStatsRowGap = TOP_BAR_LAYOUT.UNIFIED_STATS_ROW_GAP * statsScale;
   const menuDisplaySize = Math.round(TOP_BAR_LAYOUT.MENU_SIZE * statsScale);
 
-  const previewClanLabel = isPreviewActive
-    ? (previewClanId ? previewClanId.toUpperCase() : 'SIN CLAN')
-    : null;
-
   return (
     <>
     <View
@@ -374,15 +370,6 @@ export function AppTopBar({
         </View>
       </View>
     </View>
-
-    {/* Banner de preview — solo visible cuando el modo diseño está activo */}
-    {isPreviewActive && previewClanLabel && (
-      <View style={styles.previewBanner} pointerEvents="none">
-        <Text style={styles.previewBannerText}>
-          MOD — {previewClanLabel}
-        </Text>
-      </View>
-    )}
     </>
   );
 }
@@ -447,19 +434,5 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textAlign: 'left',
     includeFontPadding: false,
-  },
-  previewBanner: {
-    backgroundColor: 'rgba(199,255,2,0.12)',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(199,255,2,0.25)',
-    alignItems: 'center',
-    paddingVertical: 3,
-  },
-  previewBannerText: {
-    color: '#c7ff02',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
   },
 });

@@ -61,6 +61,7 @@ import { SIM_USERS } from '@evoconn/data/simulation/simulatedNetwork';
 import { ClanRankingCard } from './ClanRankingCard';
 import { useAuth } from '../../../mobile/lib/AuthContext';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
+import { useEffectiveClanId } from '@evoconn/hooks/useEffectiveClanId';
 import type { CommunityPost } from '@evoconn/types';
 import type { ClanMember } from '@evoconn/data/mockClanProfiles';
 
@@ -193,7 +194,7 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
   // ── Usuario autenticado real ──────────────────────────────────────────────
   const { profile: authProfile } = useAuth();
   const classification = useClassification();
-  const realUserClanId = authProfile?.clan_id ?? null;
+  const realUserClanId = useEffectiveClanId();
 
   // ── Miembros destacados — solo usuario real si su clan coincide ──────────
   // Se filtra cualquier usuario simulado (u1–u9) de la lista hardcodeada.

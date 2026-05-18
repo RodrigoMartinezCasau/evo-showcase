@@ -58,6 +58,7 @@ import { ReflectionDetailItem } from '@evoconn/components/ReflectionDetailItem';
 import { PANEL_STAR_SURFACE_DEFAULT } from '@evoconn/components/animations/StarFieldBackground';
 import { SearchScreen } from '@evoconn/components/SearchScreen';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
+import { useEffectiveClanId } from '@evoconn/hooks/useEffectiveClanId';
 import { getClanColor } from '@evoconn/constants/clanColors';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
 import { ProfileRevealPanel } from '@evoconn/components/otherProfile';
@@ -204,7 +205,8 @@ export default function CommunityScreen() {
       }),
     [paratiRefreshShiftAnim],
   );
-  const paratiUserClanColor = useMemo(() => getClanColor(mockCurrentUser.clanId), []);
+  const viewerClanId = useEffectiveClanId();
+  const paratiUserClanColor = useMemo(() => getClanColor(viewerClanId), [viewerClanId]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const drawerOpenProgress = useRef(new Animated.Value(0)).current;
   const gestureCommittingRef = useRef(false);
@@ -253,7 +255,7 @@ export default function CommunityScreen() {
         'foryou',
         allPosts,
         followingSet,
-        mockCurrentUser.clanId,
+        viewerClanId,
         mockCurrentUser.id,
         followingSort,
         getBoost,
@@ -264,7 +266,7 @@ export default function CommunityScreen() {
     [
       allPosts,
       followingSet,
-      mockCurrentUser.clanId,
+      viewerClanId,
       mockCurrentUser.id,
       followingSort,
       getBoost,
@@ -279,11 +281,11 @@ export default function CommunityScreen() {
         'following',
         allPosts,
         followingSet,
-        mockCurrentUser.clanId,
+        viewerClanId,
         mockCurrentUser.id,
         followingSort,
       ),
-    [allPosts, followingSet, mockCurrentUser.clanId, mockCurrentUser.id, followingSort],
+    [allPosts, followingSet, viewerClanId, mockCurrentUser.id, followingSort],
   );
 
   const openDetailFeed = useCallback(
@@ -295,7 +297,7 @@ export default function CommunityScreen() {
           'foryou',
           allPosts,
           followingSet,
-          mockCurrentUser.clanId,
+          viewerClanId,
           mockCurrentUser.id,
           followingSort,
           getBoost,
@@ -480,7 +482,7 @@ export default function CommunityScreen() {
                 'foryou',
                 freshAll,
                 followingSet,
-                mockCurrentUser.clanId,
+                viewerClanId,
                 mockCurrentUser.id,
                 followingSort,
                 getBoost,

@@ -15,6 +15,8 @@ import { mockSearchableUsers } from '../data/mockSearchUsers';
 import { searchUsers, type ScoredUser } from '../utils/searchUsers';
 import { UserResultCard } from './UserResultCard';
 import { fetchFollowersCountsBatch, searchSupabaseUsers } from '../services/supabaseSocial';
+import { useAuth } from '../../mobile/lib/AuthContext';
+import { useEffectiveClanId } from '@evoconn/hooks/useEffectiveClanId';
 
 const MAX_RECENTS = 10;
 const DEBOUNCE_MS = 250;
@@ -31,6 +33,8 @@ type SearchScreenProps = {
 };
 
 export function SearchScreen({ onUserPress }: SearchScreenProps) {
+  const { profile } = useAuth();
+  const myEffectiveClanId = useEffectiveClanId();
   const inputRef = useRef<TextInput>(null);
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -94,8 +98,12 @@ export function SearchScreen({ onUserPress }: SearchScreenProps) {
   const results: ScoredUser[] = useMemo(() => {
     const sbIds = new Set(supabaseResults.map(r => r.id));
     const localOnly = localResults.filter(r => !sbIds.has(r.id));
-    return [...supabaseResults, ...localOnly];
-  }, [supabaseResults, localResults]);
+    const merged = [...supabaseResults, ...localOnly];
+    if (!profile?.id || !myEffectiveClanId) return merged;
+    return merged.map((r) =>
+      r.id === profile.id ? { ...r, clanId: myEffectiveClanId } : r,
+    );
+  }, [supabaseResults, localResults, profile?.id, myEffectiveClanId]);
 
   const addRecent = useCallback((term: string) => {
     const trimmed = term.trim();

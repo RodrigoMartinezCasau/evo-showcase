@@ -20,8 +20,7 @@
 import React, { useCallback, type ReactNode } from 'react';
 import type { ClanId } from '@evoconn/constants/clanColors';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
-import { useClassification } from '@evoconn/hooks/ClassificationContext';
-import { usePreviewMode } from '@evoconn/debug/PreviewModeContext';
+import { useEffectiveClanId } from '@evoconn/hooks/useEffectiveClanId';
 import { CLAN_TO_USER_ID } from '@evoconn/data/simulation/simulatedNetwork';
 
 // ─── Provider (kept as a transparent pass-through for backward compat) ────────
@@ -43,11 +42,7 @@ export function DebugClanProvider({ children }: { children: ReactNode }) {
  * superseded by the classification result.
  */
 export function useActiveClan(_realClan: string | null): string | null {
-  const sim = useSimulation();
-  const classification = useClassification();
-  const { isPreviewActive, previewClanId } = usePreviewMode();
-  if (isPreviewActive) return previewClanId;
-  return classification.getVisibleClanId(sim.activeUserId);
+  return useEffectiveClanId();
 }
 
 /**
@@ -55,11 +50,7 @@ export function useActiveClan(_realClan: string | null): string | null {
  * Reflects the real classification state — null until reveal conditions met.
  */
 export function useDebugClan(): ClanId | null {
-  const sim = useSimulation();
-  const classification = useClassification();
-  const { isPreviewActive, previewClanId } = usePreviewMode();
-  if (isPreviewActive) return previewClanId as ClanId ?? null;
-  return (classification.getVisibleClanId(sim.activeUserId) as ClanId) ?? null;
+  return (useEffectiveClanId() as ClanId) ?? null;
 }
 
 /**

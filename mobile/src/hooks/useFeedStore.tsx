@@ -34,6 +34,10 @@ export function simPostToCommunityPost(
   // by the authenticated user during the current session.
   const author = simAuthor ?? (p.authorId === mockCurrentUser.id ? mockCurrentUser : undefined);
   const cachedAvatarUri = avatarCache?.[p.authorId];
+  const resolvedClanId =
+    p.authorId === mockCurrentUser.id
+      ? (mockCurrentUser.clanId ?? author?.clanId ?? p.authorClanId ?? null)
+      : (author?.clanId ?? p.authorClanId ?? null);
   return {
     id: p.id,
     type: p.type,
@@ -41,7 +45,7 @@ export function simPostToCommunityPost(
       ? {
           id: author.id,
           username: author.username,
-          clanId: author.clanId,
+          clanId: resolvedClanId,
           rank: author.rank,
           // Include avatarUri for the current user (set by AuthContext) or from cache.
           avatarUri:
@@ -52,7 +56,7 @@ export function simPostToCommunityPost(
       : {
           id: p.authorId,
           username: p.authorUsername ?? '?',
-          clanId: p.authorClanId ?? null,
+          clanId: resolvedClanId,
           rank: p.authorRank ?? 'aprendiz',
           avatarUri: cachedAvatarUri ?? undefined,
         },

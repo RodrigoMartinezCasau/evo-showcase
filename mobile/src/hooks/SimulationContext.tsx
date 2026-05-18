@@ -642,21 +642,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     });
   }, [activeUser, activeFollowersCount, activeFollowingCount]);
 
-  // For real Supabase users: sync id, username, clanId and rank from AuthContext
-  // so that simPostToCommunityPost can resolve the author dynamically.
-  // This ensures posts show the user's current clan colors even if the post was
-  // published before clan assignment.
-  useEffect(() => {
-    if (!authProfile || SIM_USERS_BY_ID[authProfile.id]) return;
-    setActiveSimUser({
-      id: authProfile.id,
-      username: authProfile.username ?? '',
-      clanId: authProfile.clan_id ?? null,
-      rank: authProfile.rank,
-      followersCount: 0,
-      followingCount: 0,
-    });
-  }, [authProfile?.id, authProfile?.username, authProfile?.clan_id, authProfile?.rank]);
+  // Real-user clan sync → EffectiveClanSync (ClassificationProvider tree).
 
   // ── setActiveUserId ───────────────────────────────────────────────────────
   const setActiveUserId = useCallback((id: string) => {
