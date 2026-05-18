@@ -80,7 +80,7 @@ export async function ensureAnimationAssets(): Promise<void> {
 
   _copyPromise = (async () => {
     const STAMP_FILE = ANIM_DIR + '.stamp';
-    const APP_VERSION = '53';
+    const APP_VERSION = '54';
 
     try {
       const stampInfo = await FileSystem.getInfoAsync(STAMP_FILE);
@@ -363,15 +363,28 @@ export function EvoAnimationWebView({
     return () => { cancelled = true; };
   }, [visible, name, onClose]);
 
+  const fadeInWebView = useCallback(
+    (durationMs: number, onVisible?: () => void) => {
+      Animated.timing(webOpacity, {
+        toValue: 1,
+        duration: durationMs,
+        useNativeDriver: true,
+      }).start(() => onVisible?.());
+    },
+    [webOpacity],
+  );
+
+  const startClanEntrySequence = useCallback(() => {
+    webRef.current?.injectJavaScript(
+      'window.EVO_BRIDGE && window.EVO_BRIDGE.beginEntry && window.EVO_BRIDGE.beginEntry(); true;',
+    );
+  }, []);
+
   const handleWebLoadEnd = useCallback(() => {
-    // Once the WebView has painted its first frame, fade it in so the user
-    // never sees a white flash or hard swap from the starfield.
-    Animated.timing(webOpacity, {
-      toValue: 1,
-      duration: 350,
-      useNativeDriver: true,
-    }).start();
-  }, [webOpacity]);
+    // clan-entry: fade + start are driven by the HTML `ready` message (synced start).
+    if (name === 'clanEntry') return;
+    fadeInWebView(350);
+  }, [name, fadeInWebView]);
 
   const { width: winW, height: winH } = useWindowDimensions();
 
@@ -379,7 +392,7 @@ export function EvoAnimationWebView({
   // Merge soundsEnabled so HTML animations can gate their Web Audio synthesis.
   const injectedBeforeLoad = useMemo(() => {
     const base: Record<string, unknown> = { ...params, soundsEnabled: prefSounds };
-    if (Platform.OS === 'android' && name === 'streak') {
+    if (Platform.OS === 'android' && (name === 'streak' || name === 'clanEntry')) {
       base.animationLowGpu = true;
     }
     return `window.EVO_PROPS = ${JSON.stringify(base)}; window.EVO_SCREEN_WIDTH = ${winW}; window.EVO_SCREEN_HEIGHT = ${winH}; true;`;
@@ -395,6 +408,10 @@ export function EvoAnimationWebView({
       }
       switch (msg.type) {
         case 'ready':
+          if (name === 'clanEntry') {
+            const fadeMs = Platform.OS === 'android' ? 150 : 280;
+            fadeInWebView(fadeMs, startClanEntrySequence);
+          }
           break;
 
         case 'phase': {
@@ -466,7 +483,7 @@ export function EvoAnimationWebView({
       }
     },
     [effectiveHaptics, closeAndCall, name, onComplete, onClose, onPhase,
-     startHapticLoop, stopHapticLoop],
+     fadeInWebView, startClanEntrySequence, startHapticLoop, stopHapticLoop],
   );
 
   if (!visible) return null;
@@ -491,11 +508,10 @@ export function EvoAnimationWebView({
         ]}
       >
         {/*
-          Layer 1 — Static starfield. Always visible while the modal is open.
-          Serves as both the loading state and the seamless base for the animation
-          (same dark background color + star style).
+          clan-entry draws its own star-field in HTML; a second RN starfield behind a
+          hidden WebView caused a visible jump on Android when the WebView appeared mid-spin.
         */}
-        <StarFieldBackground />
+        {name !== 'clanEntry' ? <StarFieldBackground /> : null}
 
         {/*
           Layer 2 — WebView animation. Rendered on top once htmlContent is ready,

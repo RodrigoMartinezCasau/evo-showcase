@@ -183,7 +183,9 @@ export function SidebarPngMenuButton({
 
   const sinClanInsetTop = 10;
   const sinClanBodyH = Math.max(1, visibleH - 20);
-  const sinClanRimArm = Math.min(16, Math.max(8, Math.floor(sinClanBodyH * 0.32)));
+  const sinClanRimR = 6;
+  const sinClanRimArmY = Math.max(4, Math.floor((sinClanBodyH - 2 * sinClanRimR) / 2));
+  const sinClanRimArmX = Math.floor((layoutW - 2 * sinClanRimR) * 0.48);
 
   return (
     <TouchableOpacity
@@ -228,9 +230,10 @@ export function SidebarPngMenuButton({
                 <ClanCardFeedRimOverlay
                   width={layoutW}
                   height={sinClanBodyH}
-                  borderRadius={6}
+                  borderRadius={sinClanRimR}
                   clanColor={NO_CLAN_ACCENT_COLOR}
-                  rimArm={sinClanRimArm}
+                  rimArmX={sinClanRimArmX}
+                  rimArmY={sinClanRimArmY}
                 />
               </View>
             ) : (

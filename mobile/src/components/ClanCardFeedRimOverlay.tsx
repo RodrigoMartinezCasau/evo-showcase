@@ -22,6 +22,10 @@ type ClanCardFeedRimOverlayProps = {
   clanColor: string;
   /** Straight segment length from each corner (pt). Default feed cards. */
   rimArm?: number;
+  /** Horizontal arm length; defaults to `rimArm`. */
+  rimArmX?: number;
+  /** Vertical arm length; defaults to `rimArm`. */
+  rimArmY?: number;
 };
 
 /**
@@ -34,9 +38,12 @@ export function ClanCardFeedRimOverlay({
   borderRadius,
   clanColor,
   rimArm = RIM_ARM,
+  rimArmX,
+  rimArmY,
 }: ClanCardFeedRimOverlayProps) {
   const r = borderRadius;
-  const a = rimArm;
+  const ax = rimArmX ?? rimArm;
+  const ay = rimArmY ?? rimArm;
   const w = width;
   const h = height;
   const hl = lightenHex(clanColor);
@@ -46,38 +53,38 @@ export function ClanCardFeedRimOverlay({
   const idBL = `cardRimBL_${slug}`;
   const idBR = `cardRimBR_${slug}`;
 
-  const tlD = `M 0 ${r + a} L 0 ${r} A ${r} ${r} 0 0 1 ${r} 0 L ${r + a} 0`;
+  const tlD = `M 0 ${r + ay} L 0 ${r} A ${r} ${r} 0 0 1 ${r} 0 L ${r + ax} 0`;
   // sweep=1 (not 0): same quarter as a clockwise rounded-rect outline; sweep 0 draws the concave arc (“socabón”).
-  const trD = `M ${w - r - a} 0 L ${w - r} 0 A ${r} ${r} 0 0 1 ${w} ${r} L ${w} ${r + a}`;
-  const blD = `M 0 ${h - r - a} L 0 ${h - r} A ${r} ${r} 0 0 0 ${r} ${h} L ${r + a} ${h}`;
-  const brD = `M ${w} ${h - r - a} L ${w} ${h - r} A ${r} ${r} 0 0 1 ${w - r} ${h} L ${w - r - a} ${h}`;
+  const trD = `M ${w - r - ax} 0 L ${w - r} 0 A ${r} ${r} 0 0 1 ${w} ${r} L ${w} ${r + ay}`;
+  const blD = `M 0 ${h - r - ay} L 0 ${h - r} A ${r} ${r} 0 0 0 ${r} ${h} L ${r + ax} ${h}`;
+  const brD = `M ${w} ${h - r - ay} L ${w} ${h - r} A ${r} ${r} 0 0 1 ${w - r} ${h} L ${w - r - ax} ${h}`;
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       <Svg width={w} height={h}>
         <Defs>
-          <LinearGradient id={idTL} x1={0} y1={r + a} x2={r + a} y2={0} gradientUnits="userSpaceOnUse">
+          <LinearGradient id={idTL} x1={0} y1={r + ay} x2={r + ax} y2={0} gradientUnits="userSpaceOnUse">
             <Stop offset="0" stopColor={clanColor} stopOpacity={0} />
             <Stop offset="0.3" stopColor={clanColor} stopOpacity={0.85} />
             <Stop offset="0.5" stopColor={hl} stopOpacity={1} />
             <Stop offset="0.7" stopColor={clanColor} stopOpacity={0.85} />
             <Stop offset="1" stopColor={clanColor} stopOpacity={0} />
           </LinearGradient>
-          <LinearGradient id={idTR} x1={w - r - a} y1={0} x2={w} y2={r + a} gradientUnits="userSpaceOnUse">
+          <LinearGradient id={idTR} x1={w - r - ax} y1={0} x2={w} y2={r + ay} gradientUnits="userSpaceOnUse">
             <Stop offset="0" stopColor={clanColor} stopOpacity={0} />
             <Stop offset="0.3" stopColor={clanColor} stopOpacity={0.85} />
             <Stop offset="0.5" stopColor={hl} stopOpacity={1} />
             <Stop offset="0.7" stopColor={clanColor} stopOpacity={0.85} />
             <Stop offset="1" stopColor={clanColor} stopOpacity={0} />
           </LinearGradient>
-          <LinearGradient id={idBL} x1={0} y1={h - r - a} x2={r + a} y2={h} gradientUnits="userSpaceOnUse">
+          <LinearGradient id={idBL} x1={0} y1={h - r - ay} x2={r + ax} y2={h} gradientUnits="userSpaceOnUse">
             <Stop offset="0" stopColor={clanColor} stopOpacity={0} />
             <Stop offset="0.3" stopColor={clanColor} stopOpacity={0.85} />
             <Stop offset="0.5" stopColor={hl} stopOpacity={1} />
             <Stop offset="0.7" stopColor={clanColor} stopOpacity={0.85} />
             <Stop offset="1" stopColor={clanColor} stopOpacity={0} />
           </LinearGradient>
-          <LinearGradient id={idBR} x1={w} y1={h - r - a} x2={w - r - a} y2={h} gradientUnits="userSpaceOnUse">
+          <LinearGradient id={idBR} x1={w} y1={h - r - ay} x2={w - r - ax} y2={h} gradientUnits="userSpaceOnUse">
             <Stop offset="0" stopColor={clanColor} stopOpacity={0} />
             <Stop offset="0.3" stopColor={clanColor} stopOpacity={0.85} />
             <Stop offset="0.5" stopColor={hl} stopOpacity={1} />
