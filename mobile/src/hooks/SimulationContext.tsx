@@ -628,10 +628,10 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     [followGraph, activeUserId],
   );
 
-  // ── Keep mockCurrentUser in sync (simulation users only) ─────────────────
-  // Skip when a real Supabase auth user is active (activeUser is undefined for UUIDs).
+  // ── Keep mockCurrentUser in sync ─────────────────────────────────────────
+  // For simulated users: sync from SimulationContext.
   useEffect(() => {
-    if (!activeUser) return; // Real auth user — don't touch mockCurrentUser.
+    if (!activeUser) return;
     setActiveSimUser({
       id: activeUser.id,
       username: activeUser.username,
@@ -641,6 +641,22 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       followingCount: activeFollowingCount,
     });
   }, [activeUser, activeFollowersCount, activeFollowingCount]);
+
+  // For real Supabase users: sync id, username, clanId and rank from AuthContext
+  // so that simPostToCommunityPost can resolve the author dynamically.
+  // This ensures posts show the user's current clan colors even if the post was
+  // published before clan assignment.
+  useEffect(() => {
+    if (!authProfile || SIM_USERS_BY_ID[authProfile.id]) return;
+    setActiveSimUser({
+      id: authProfile.id,
+      username: authProfile.username ?? '',
+      clanId: authProfile.clan_id ?? null,
+      rank: authProfile.rank,
+      followersCount: 0,
+      followingCount: 0,
+    });
+  }, [authProfile?.id, authProfile?.username, authProfile?.clan_id, authProfile?.rank]);
 
   // ── setActiveUserId ───────────────────────────────────────────────────────
   const setActiveUserId = useCallback((id: string) => {

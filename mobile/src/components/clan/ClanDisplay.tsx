@@ -59,6 +59,8 @@ import { PersonalRecentPostCard } from '@evoconn/components/personalProfile/Pers
 import { useFeedStore } from '@evoconn/hooks/useFeedStore';
 import { SIM_USERS } from '@evoconn/data/simulation/simulatedNetwork';
 import { ClanRankingCard } from './ClanRankingCard';
+import { useAuth } from '../../../mobile/lib/AuthContext';
+import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import type { CommunityPost } from '@evoconn/types';
 import type { ClanMember } from '@evoconn/data/mockClanProfiles';
 
@@ -94,8 +96,13 @@ function getDaysLeft(): number {
 
 type ClanRankInfo = { rank: number; points: number; daysLeft: number };
 
-/** Calcula puntos y ranking para todos los clanes dado un array de posts. */
-function computeAllClanRankings(posts: CommunityPost[]): Record<string, ClanRankInfo> {
+/** Calcula puntos y ranking para todos los clanes dado un array de posts.
+ *  `realUserClanId` es el clan del usuario autenticado (si tiene uno), para
+ *  sumarlo al conteo de miembros y no subestimar su clan. */
+function computeAllClanRankings(
+  posts: CommunityPost[],
+  realUserClanId?: string | null,
+): Record<string, ClanRankInfo> {
   const periodStart = getPeriodStart();
   const daysLeft = getDaysLeft();
 
@@ -115,13 +122,17 @@ function computeAllClanRankings(posts: CommunityPost[]): Record<string, ClanRank
     }
   }
 
-  // Contar miembros de cada clan desde SIM_USERS (mínimo 1 para evitar /0)
+  // Contar miembros: sim users + usuario real (sin duplicar si ya es u1-u9)
   const clanMemberCounts: Record<string, number> = {};
   for (const clan of REAL_CLANS) { clanMemberCounts[clan] = 0; }
   for (const user of SIM_USERS) {
     if (user.clanId && user.clanId in clanMemberCounts) {
       clanMemberCounts[user.clanId]++;
     }
+  }
+  // Añadir el usuario real al conteo si tiene clan asignado
+  if (realUserClanId && realUserClanId in clanMemberCounts) {
+    clanMemberCounts[realUserClanId]++;
   }
 
   // Calcular puntos = posts del período / max(miembros, 1)
@@ -179,6 +190,43 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
   const ShieldSvg      = useMemo(() => getTopBarInsigniaByHouse(clanId), [clanId]);
   const EstandarteSvg  = useMemo(() => getClanEstandarte(clanId), [clanId]);
 
+  // ── Usuario autenticado real ──────────────────────────────────────────────
+  const { profile: authProfile } = useAuth();
+  const classification = useClassification();
+  const realUserClanId = authProfile?.clan_id ?? null;
+
+  // ── Miembros destacados — solo usuario real si su clan coincide ──────────
+  // Se filtra cualquier usuario simulado (u1–u9) de la lista hardcodeada.
+  const SIM_IDS = useMemo(
+    () => new Set(['u1','u2','u3','u4','u5','u6','u7','u8','u9']),
+    [],
+  );
+
+  const topMembers = useMemo<ClanMember[]>(() => {
+    const members: ClanMember[] = [];
+
+    // Añadir usuario real si pertenece a este clan
+    if (authProfile && realUserClanId === clanId) {
+      const pcts = classification.getPercentages();
+      const dominantPct = pcts.find((p) => p.clanId === clanId)?.pct ?? 0;
+      members.push({
+        id: authProfile.id,
+        username: authProfile.username,
+        clanId: realUserClanId,
+        rank: authProfile.rank,
+        followersCount: 0,
+        // Guardamos pct en un campo extra para renderizarlo
+        _clanPct: dominantPct.toFixed(1),
+      } as ClanMember & { _clanPct: string });
+    }
+
+    // Filtrar usuarios simulados del perfil hardcodeado
+    const filteredSim = clan.topMembers.filter((m) => !SIM_IDS.has(m.id));
+    members.push(...filteredSim);
+
+    return members;
+  }, [authProfile, realUserClanId, clanId, clan.topMembers, classification, SIM_IDS]);
+
   // ── Top posts en vivo — publicaciones del clan con ≥1 voto en las últimas 24h ──
   // Para 'indefinido', los autores sin clan asignado tienen clanId: null.
   const { posts: allPosts } = useFeedStore();
@@ -205,7 +253,10 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
   }, [allPosts, clanId]);
 
   // ── Ranking del clan ──────────────────────────────────────────────────────
-  const allRankings = useMemo(() => computeAllClanRankings(allPosts), [allPosts]);
+  const allRankings = useMemo(
+    () => computeAllClanRankings(allPosts, realUserClanId),
+    [allPosts, realUserClanId],
+  );
   const clanRanking: ClanRankInfo = allRankings[clanId] ?? { rank: 1, points: 0, daysLeft: getDaysLeft() };
 
   // ── Detail panel state ────────────────────────────────────────────────────
@@ -283,17 +334,21 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
 
   // ── Render: member row (Section 3) ────────────────────────────────────────
   const renderMember = useCallback(
-    ({ item, index }: { item: ClanMember; index: number }) => (
-      <UserResultCard
-        id={item.id}
-        username={item.username}
-        clanId={item.clanId}
-        rank={item.rank}
-        followersCount={item.followersCount ?? 0}
-        clanPct={mockClanPct(item.rank, index)}
-        onPress={() => handleMemberPress(item)}
-      />
-    ),
+    ({ item, index }: { item: ClanMember; index: number }) => {
+      const extItem = item as ClanMember & { _clanPct?: string };
+      const pct = extItem._clanPct ?? mockClanPct(item.rank, index);
+      return (
+        <UserResultCard
+          id={item.id}
+          username={item.username}
+          clanId={item.clanId}
+          rank={item.rank}
+          followersCount={item.followersCount ?? 0}
+          clanPct={pct}
+          onPress={() => handleMemberPress(item)}
+        />
+      );
+    },
     [handleMemberPress],
   );
 
@@ -373,7 +428,7 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
               {/* Miembros destacados */}
               <View style={[styles.panel, { borderWidth: 1, borderColor: `${clanColor}22` }]}>
                 <Text style={[styles.panelTitle, { color: clanColor }]}>Miembros destacados</Text>
-                {clan.topMembers.length === 0 ? (
+                {topMembers.length === 0 ? (
                   <View style={styles.emptyState}>
                     <Text style={styles.emptyIcon}>🏛</Text>
                     <Text style={styles.emptyText}>Aún no hay miembros destacados</Text>
@@ -381,7 +436,7 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
                   </View>
                 ) : (
                   <FlatList
-                    data={clan.topMembers}
+                    data={topMembers}
                     keyExtractor={(m) => m.id}
                     renderItem={renderMember}
                     scrollEnabled={false}

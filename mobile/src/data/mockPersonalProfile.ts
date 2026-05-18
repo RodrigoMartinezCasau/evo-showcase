@@ -113,7 +113,7 @@ export function getPersonalProfile(): PersonalProfile {
       rank: currentUser.rank,
       followersCount: currentUser.followersCount,
       followingCount: currentUser.followingCount,
-      insigniaPhrase: '',
+      insigniaPhrase: 'Evo es la mejor app del mundo',
       philosophyPercentages: [],
       totalReflections: 0,
       totalQuotes: 0,

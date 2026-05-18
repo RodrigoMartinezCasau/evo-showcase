@@ -10,9 +10,6 @@ import { View, Text, StyleSheet } from 'react-native';
 import { AiBlockCard, type AiBlockState } from './AiBlockCard';
 import type { BookRecord } from '@evoconn/data/books/bookDatabase';
 import {
-  RECOMMENDED_BOOKS_OFFSET_X,
-  RECOMMENDED_BOOKS_OFFSET_Y,
-  RECOMMENDED_BOOKS_SCALE,
   RECOMMENDED_BOOKS_ITEM_GAP,
 } from '@evoconn/constants/personalProfileLayout';
 
@@ -50,19 +47,8 @@ export const BookRecommendationsCard = React.memo(function BookRecommendationsCa
           </Text>
         </View>
       ) : books && books.length > 0 ? (
-        /* ── Content block: centered, driven by layout constants ── */
-        <View
-          style={[
-            styles.contentOuter,
-            {
-              transform: [
-                { translateX: RECOMMENDED_BOOKS_OFFSET_X },
-                { translateY: RECOMMENDED_BOOKS_OFFSET_Y },
-                { scale: RECOMMENDED_BOOKS_SCALE },
-              ],
-            },
-          ]}
-        >
+        /* ── Content block ── */
+        <View style={styles.contentOuter}>
           <View style={[styles.list, { gap: RECOMMENDED_BOOKS_ITEM_GAP }]}>
             {books.map((b) => (
               <View key={b.id} style={styles.item}>
