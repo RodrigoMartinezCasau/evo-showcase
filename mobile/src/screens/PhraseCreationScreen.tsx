@@ -55,6 +55,8 @@ import { useFeedStore, createPhrasePost } from '@evoconn/hooks/useFeedStore';
 import { useDebugStreak } from '../debug/DebugStreakContext';
 import { useDebugStats } from '../debug/DebugStatsContext';
 import { requestNoUsesAnimation } from '@evoconn/components/animations/AppAnimationLayer';
+import { LockedAiButtonIcon } from '@evoconn/components/shared/LockedAiButtonIcon';
+import { useDailyUsesGate } from '@evoconn/hooks/useDailyUsesGate';
 import { normalizePhraseInnerForPublish } from '@evoconn/utils/phrasePublish';
 import type { SidebarFolder } from '@evoconn/types';
 import {
@@ -131,6 +133,7 @@ export default function PhraseCreationScreen() {
   const { publishPost } = useFeedStore();
   const { markStreakActivated } = useDebugStreak();
   const { decrementUses, remainingUses } = useDebugStats();
+  const { hasAiUses, blockIfNoUses } = useDailyUsesGate();
   const { profile: authProfile } = useAuth();
   const apiUserId = authProfile?.id ?? mockCurrentUser.id;
   const activeClan = useActiveClan(mockCurrentUser.clanId);
@@ -139,9 +142,12 @@ export default function PhraseCreationScreen() {
 
   const sendBtnSize = CHAT_SEND_BUTTON_LAYOUT.size;
   const sendIconNode = useMemo(() => {
+    if (!hasAiUses) {
+      return <LockedAiButtonIcon size={sendBtnSize} circleColor={clanColor} />;
+    }
     const SendSvg = getPhraseSendButtonByHouse(activeClan);
     return <SendSvg width={sendBtnSize} height={sendBtnSize} />;
-  }, [sendBtnSize, activeClan]);
+  }, [sendBtnSize, activeClan, hasAiUses, clanColor]);
   const PublishStar = useMemo(() => getPublishStarByClan(activeClan), [activeClan]);
 
   const insets = useSafeAreaInsets();
@@ -450,6 +456,7 @@ export default function PhraseCreationScreen() {
     async (text: string) => {
       const t = text.trim();
       if (!t || sending) return;
+      if (blockIfNoUses()) return;
       if (publishPending) return;
       if (phraseId || messages.length > 0) return;
 
@@ -512,6 +519,7 @@ export default function PhraseCreationScreen() {
     },
     [
       sending,
+      blockIfNoUses,
       publishPending,
       phraseId,
       messages.length,
@@ -795,6 +803,7 @@ export default function PhraseCreationScreen() {
         contentAboveBar={emptyPhraseWelcome}
         clanColor={clanColor}
         inputCursorColor={phraseCursorColor}
+        aiUsesAvailable={hasAiUses}
       />
 
       {!sidebarOpen ? (

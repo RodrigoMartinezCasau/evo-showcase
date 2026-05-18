@@ -11,6 +11,7 @@ type Props = {
   state: AiBlockState;
   errorMessage?: string;
   onReload: () => void;
+  usesAvailable?: boolean;
 };
 
 export const AiSummaryCard = React.memo(function AiSummaryCard({
@@ -18,9 +19,16 @@ export const AiSummaryCard = React.memo(function AiSummaryCard({
   state,
   errorMessage,
   onReload,
+  usesAvailable = true,
 }: Props) {
   return (
-    <AiBlockCard title="Perfil filosófico" state={state} errorMessage={errorMessage} onReload={onReload}>
+    <AiBlockCard
+      title="Perfil filosófico"
+      state={state}
+      errorMessage={errorMessage}
+      onReload={onReload}
+      usesAvailable={usesAvailable}
+    >
       {summary ? (
         <Text style={styles.body}>{summary}</Text>
       ) : (

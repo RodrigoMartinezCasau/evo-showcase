@@ -43,6 +43,7 @@ import { SimilarPhilosophersCard } from '@evoconn/components/philosophyProfile/S
 import { BookRecommendationsCard } from '@evoconn/components/philosophyProfile/BookRecommendationsCard';
 import { StudyRecommendationsCard } from '@evoconn/components/philosophyProfile/StudyRecommendationsCard';
 import type { AiBlockState } from '@evoconn/components/philosophyProfile/AiBlockCard';
+import { useDailyUsesGate } from '@evoconn/hooks/useDailyUsesGate';
 
 import {
   fetchPhilosophyProfile,
@@ -112,6 +113,7 @@ export default function PersonalPhilosophyDetailScreen() {
   };
   /** Misma regla que racha/usos: Supabase cuando hay sesión, si no el perfil activo. */
   const apiUserId = authProfile?.id ?? profile.id;
+  const { hasAiUses, blockIfNoUses } = useDailyUsesGate();
   const clanId = activeClan;
 
   // Dominant clan (highest pct)
@@ -156,6 +158,7 @@ export default function PersonalPhilosophyDetailScreen() {
 
   // ─── Generation handlers ─────────────────────────────────────────────────
   const handleSummaryReload = useCallback(async () => {
+    if (blockIfNoUses()) return;
     setSummaryState('loading');
     setSummaryError(undefined);
     try {
@@ -168,9 +171,10 @@ export default function PersonalPhilosophyDetailScreen() {
       setSummaryState(isNoUsesError(msg) ? 'no_uses' : 'error');
       setSummaryError(msg);
     }
-  }, [apiUserId, ctx]);
+  }, [apiUserId, ctx, blockIfNoUses]);
 
   const handlePhilosophersReload = useCallback(async () => {
+    if (blockIfNoUses()) return;
     setPhilosophersState('loading');
     setPhilosophersError(undefined);
     try {
@@ -183,9 +187,10 @@ export default function PersonalPhilosophyDetailScreen() {
       setPhilosophersState(isNoUsesError(msg) ? 'no_uses' : 'error');
       setPhilosophersError(msg);
     }
-  }, [apiUserId, ctx]);
+  }, [apiUserId, ctx, blockIfNoUses]);
 
   const handleBooksReload = useCallback(() => {
+    if (blockIfNoUses()) return;
     // Local deterministic engine — instant, no network needed.
     const result = getBookRecommendations(
       profile.rank,
@@ -206,9 +211,10 @@ export default function PersonalPhilosophyDetailScreen() {
     // Add newly shown book ids to the history so they are never repeated
     setShownBookIds((prev) => [...prev, ...newBooks.map((b) => b.id)]);
     recordUsesLog(apiUserId).catch(() => {});
-  }, [apiUserId, profile.rank, profile.philosophyPercentages, shownBookIds]);
+  }, [apiUserId, profile.rank, profile.philosophyPercentages, shownBookIds, blockIfNoUses]);
 
   const handleJobsReload = useCallback(async () => {
+    if (blockIfNoUses()) return;
     setJobsState('loading');
     setJobsError(undefined);
     try {
@@ -221,7 +227,7 @@ export default function PersonalPhilosophyDetailScreen() {
       setJobsState(isNoUsesError(msg) ? 'no_uses' : 'error');
       setJobsError(msg);
     }
-  }, [apiUserId, ctx]);
+  }, [apiUserId, ctx, blockIfNoUses]);
 
   // ─── Navigation ─────────────────────────────────────────────────────────
   const handleBottomTabChange = useCallback(
@@ -267,6 +273,7 @@ export default function PersonalPhilosophyDetailScreen() {
               state={summaryState}
               errorMessage={summaryError}
               onReload={handleSummaryReload}
+              usesAvailable={hasAiUses}
             />
 
             <View style={styles.gap} />
@@ -291,6 +298,7 @@ export default function PersonalPhilosophyDetailScreen() {
               state={philosophersState}
               errorMessage={philosophersError}
               onReload={handlePhilosophersReload}
+              usesAvailable={hasAiUses}
             />
 
             <View style={styles.gap} />
@@ -303,6 +311,7 @@ export default function PersonalPhilosophyDetailScreen() {
                   exhausted={booksExhausted}
                   state={booksState}
                   onReload={handleBooksReload}
+                  usesAvailable={hasAiUses}
                 />
               </View>
               <View style={styles.halfCard}>
@@ -311,6 +320,7 @@ export default function PersonalPhilosophyDetailScreen() {
                   state={jobsState}
                   errorMessage={jobsError}
                   onReload={handleJobsReload}
+                  usesAvailable={hasAiUses}
                 />
               </View>
             </View>

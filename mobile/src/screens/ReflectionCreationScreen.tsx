@@ -117,6 +117,8 @@ import { getPublishStarByClan } from '@evoconn/utils/getDebateStarByClan';
 import { useDebugStreak } from '../debug/DebugStreakContext';
 import { useDebugStats } from '../debug/DebugStatsContext';
 import { requestNoUsesAnimation } from '@evoconn/components/animations/AppAnimationLayer';
+import { LockedAiButtonIcon } from '@evoconn/components/shared/LockedAiButtonIcon';
+import { useDailyUsesGate } from '@evoconn/hooks/useDailyUsesGate';
 import { useQuotes } from '@evoconn/hooks/QuotesContext';
 import { useAISettings } from '@evoconn/hooks/AISettingsContext';
 import { COMMUNITY_DRAWER_EDGE_ZONE_WIDTH } from '@evoconn/constants/communityDrawerGesture';
@@ -142,11 +144,15 @@ export default function ReflectionCreationScreen() {
   const islandBgColor = activeClan ? getClanColor(activeClan) : '#c7ff02';
   const islandFgColor = activeClan ? '#FFFFFF' : '#000000';
 
+  const { hasAiUses, blockIfNoUses } = useDailyUsesGate();
   const sendButtonSize = CHAT_SEND_BUTTON_LAYOUT.size;
   const sendIconNode = useMemo(() => {
+    if (!hasAiUses) {
+      return <LockedAiButtonIcon size={sendButtonSize} circleColor={clanColor} />;
+    }
     const SendSvg = getChatSendButtonByHouse(activeClan);
     return <SendSvg width={sendButtonSize} height={sendButtonSize} />;
-  }, [sendButtonSize, activeClan]);
+  }, [sendButtonSize, activeClan, hasAiUses, clanColor]);
 
   const { publishPost } = useFeedStore();
   const publishedRef = useRef<Set<string>>(new Set());
@@ -329,6 +335,7 @@ export default function ReflectionCreationScreen() {
   const handleSend = useCallback(
     async (text: string) => {
       if (sending) return;
+      if (blockIfNoUses()) return;
       Keyboard.dismiss();
       setError(null);
       setSending(true);
@@ -479,7 +486,7 @@ export default function ReflectionCreationScreen() {
         setSending(false);
       }
     },
-    [sending, debateId, createThought, updateThought, scrollToEnd, thoughts, markStreakActivated, decrementUses, remainingUses, selectAndUnlockQuote, includeReflectiveQuestion, includePhilosophicalReferences, toPersistedMessage, recordClassificationInput, triggerHaptic, playSound],
+    [sending, blockIfNoUses, debateId, createThought, updateThought, scrollToEnd, thoughts, markStreakActivated, decrementUses, remainingUses, selectAndUnlockQuote, includeReflectiveQuestion, includePhilosophicalReferences, toPersistedMessage, recordClassificationInput, triggerHaptic, playSound],
   );
 
   const conversationItems = useMemo(
@@ -721,6 +728,7 @@ export default function ReflectionCreationScreen() {
         contentAboveBar={emptyReflectionWelcome}
         clanColor={clanColor}
         inputCursorColor={clanColor}
+        aiUsesAvailable={hasAiUses}
       />
 
       {!sidebarOpen ? (

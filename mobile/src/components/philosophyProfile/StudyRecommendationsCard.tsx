@@ -12,6 +12,7 @@ type Props = {
   state: AiBlockState;
   errorMessage?: string;
   onReload: () => void;
+  usesAvailable?: boolean;
 };
 
 export const StudyRecommendationsCard = React.memo(function StudyRecommendationsCard({
@@ -19,6 +20,7 @@ export const StudyRecommendationsCard = React.memo(function StudyRecommendations
   state,
   errorMessage,
   onReload,
+  usesAvailable = true,
 }: Props) {
   return (
     <AiBlockCard
@@ -26,6 +28,7 @@ export const StudyRecommendationsCard = React.memo(function StudyRecommendations
       state={state}
       errorMessage={errorMessage}
       onReload={onReload}
+      usesAvailable={usesAvailable}
     >
       {jobs && jobs.length > 0 ? (
         <View style={styles.list}>

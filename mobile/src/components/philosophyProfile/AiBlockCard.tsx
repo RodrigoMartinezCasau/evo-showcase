@@ -11,6 +11,8 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { showOutOfUsesAlert } from '@evoconn/utils/dailyUsesGate';
 
 export type AiBlockState = 'idle' | 'loading' | 'success' | 'error' | 'no_uses';
 
@@ -19,6 +21,8 @@ type Props = {
   state: AiBlockState;
   errorMessage?: string;
   onReload: () => void;
+  /** false = candado en lugar de ↻ y aviso al pulsar. */
+  usesAvailable?: boolean;
   children?: React.ReactNode;
 };
 
@@ -27,19 +31,36 @@ export const AiBlockCard = React.memo(function AiBlockCard({
   state,
   errorMessage,
   onReload,
+  usesAvailable = true,
   children,
 }: Props) {
+  const handleReloadPress = () => {
+    if (!usesAvailable) {
+      showOutOfUsesAlert();
+      return;
+    }
+    onReload();
+  };
+
   return (
     <View style={styles.card}>
       <View style={styles.header}>
         <Text style={styles.title}>{title}</Text>
         <TouchableOpacity
-          style={[styles.reloadBtn, state === 'loading' && styles.reloadBtnDisabled]}
-          onPress={onReload}
+          style={[
+            styles.reloadBtn,
+            (state === 'loading' || !usesAvailable) && styles.reloadBtnDisabled,
+          ]}
+          onPress={handleReloadPress}
           disabled={state === 'loading'}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityLabel={usesAvailable ? 'Recargar' : 'Sin usos disponibles'}
         >
-          <Text style={styles.reloadIcon}>↻</Text>
+          {usesAvailable ? (
+            <Text style={styles.reloadIcon}>↻</Text>
+          ) : (
+            <Ionicons name="lock-closed" size={15} color="rgba(255,255,255,0.85)" />
+          )}
         </TouchableOpacity>
       </View>
 

@@ -40,6 +40,8 @@ import {
 } from '@evoconn/constants/chatInputBarLayout';
 import { useVoiceInput } from '@evoconn/hooks/useVoiceInput';
 import { VoiceWaveform } from './VoiceWaveform';
+import { LockedAiButtonIcon } from '@evoconn/components/shared/LockedAiButtonIcon';
+import { showOutOfUsesAlert } from '@evoconn/utils/dailyUsesGate';
 
 // ─── Background color (parsed once for gradient strips) ───────────────────────
 
@@ -250,6 +252,8 @@ type ChatInputBarProps = {
   contentAboveBar?: React.ReactNode;
   clanColor?: string;
   inputCursorColor?: string;
+  /** false = no enviar (reflexión/frase); botón con candado y aviso. */
+  aiUsesAvailable?: boolean;
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -261,6 +265,7 @@ export function ChatInputBar({
   contentAboveBar,
   clanColor = '#c7ff02',
   inputCursorColor = clanColor,
+  aiUsesAvailable = true,
 }: ChatInputBarProps) {
   const insets = useSafeAreaInsets();
   const [text, setText] = useState('');
@@ -293,11 +298,23 @@ export function ChatInputBar({
   const isTranscribing = voiceState === 'transcribing';
 
   const handleSend = () => {
+    if (!aiUsesAvailable) {
+      showOutOfUsesAlert();
+      return;
+    }
     const t = text.trim();
     if (t) {
       onSend(t);
       setText('');
     }
+  };
+
+  const handleStartRecording = () => {
+    if (!aiUsesAvailable) {
+      showOutOfUsesAlert();
+      return;
+    }
+    void startRecording();
   };
 
   const keyboardAnim = useKeyboardAnim();
@@ -321,13 +338,16 @@ export function ChatInputBar({
 
   // ── Action button ──────────────────────────────────────────────────────────
 
-  const actionButtonBg      = isRecording ? clanColor : BTN.backgroundColor;
-  const handleActionButton  = isRecording ? stopRecording : handleSend;
+  const outOfUses = !aiUsesAvailable;
+  const actionButtonBg = isRecording ? clanColor : BTN.backgroundColor;
+  const handleActionButton = isRecording ? stopRecording : handleSend;
 
   const actionButtonContent = isRecording ? (
     <View style={styles.stopSquare} />
   ) : isTranscribing ? (
     <ActivityIndicator size="small" color="#0b0b0f" />
+  ) : outOfUses ? (
+    <LockedAiButtonIcon size={BTN.size} circleColor={clanColor} />
   ) : (
     sendIcon ?? <Text style={{ color: '#0b0b0f', fontSize: 20 }}>★</Text>
   );
@@ -464,7 +484,7 @@ export function ChatInputBar({
                 maxLength={2000}
               />
               <TouchableOpacity
-                onPress={startRecording}
+                onPress={handleStartRecording}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 style={styles.micBtn}
               >

@@ -23,6 +23,7 @@ type Props = {
   state: AiBlockState;
   errorMessage?: string;
   onReload: () => void;
+  usesAvailable?: boolean;
 };
 
 export const BookRecommendationsCard = React.memo(function BookRecommendationsCard({
@@ -31,6 +32,7 @@ export const BookRecommendationsCard = React.memo(function BookRecommendationsCa
   state,
   errorMessage,
   onReload,
+  usesAvailable = true,
 }: Props) {
   return (
     <AiBlockCard
@@ -38,6 +40,7 @@ export const BookRecommendationsCard = React.memo(function BookRecommendationsCa
       state={state}
       errorMessage={errorMessage}
       onReload={onReload}
+      usesAvailable={usesAvailable}
     >
       {/* Exhausted — no more unique books available */}
       {exhausted ? (
