@@ -74,7 +74,7 @@ export const SIDEBAR_COMMUNITY_SIN_CLAN = {
    */
   RIM_ARM_Y: null as number | null,
   /** Suma extra al brazo vertical. */
-  RIM_ARM_Y_EXTRA: 50,
+  RIM_ARM_Y_EXTRA: 80,
   /** Mínimo del brazo vertical cuando RIM_ARM_Y es null. */
   RIM_ARM_Y_MIN: 4,
 } as const;
