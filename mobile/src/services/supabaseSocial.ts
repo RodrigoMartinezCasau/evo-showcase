@@ -356,6 +356,31 @@ export async function fetchFollowCounts(
   };
 }
 
+/** Follower totals for many users (e.g. search result lists) in one query. */
+export async function fetchFollowersCountsBatch(
+  userIds: string[],
+): Promise<Record<string, number>> {
+  const ids = [...new Set(userIds.filter(isRealUserId))];
+  if (ids.length === 0) return {};
+
+  const { data, error } = await supabase
+    .from('follows')
+    .select('following_id')
+    .in('following_id', ids);
+
+  if (error) {
+    console.error('[Social] fetchFollowersCountsBatch:', error.message);
+    return Object.fromEntries(ids.map((id) => [id, 0]));
+  }
+
+  const counts = Object.fromEntries(ids.map((id) => [id, 0])) as Record<string, number>;
+  for (const row of data ?? []) {
+    const targetId = row.following_id as string;
+    counts[targetId] = (counts[targetId] ?? 0) + 1;
+  }
+  return counts;
+}
+
 // ─── Profiles batch fetch ─────────────────────────────────────────────────────
 
 export type BasicProfile = {

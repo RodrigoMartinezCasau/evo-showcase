@@ -14,7 +14,7 @@ import { SEARCH_LAYOUT as SL } from '../constants/searchScreenLayout';
 import { mockSearchableUsers } from '../data/mockSearchUsers';
 import { searchUsers, type ScoredUser } from '../utils/searchUsers';
 import { UserResultCard } from './UserResultCard';
-import { searchSupabaseUsers } from '../services/supabaseSocial';
+import { fetchFollowersCountsBatch, searchSupabaseUsers } from '../services/supabaseSocial';
 
 const MAX_RECENTS = 10;
 const DEBOUNCE_MS = 250;
@@ -58,17 +58,31 @@ export function SearchScreen({ onUserPress }: SearchScreenProps) {
 
   const [supabaseResults, setSupabaseResults] = useState<ScoredUser[]>([]);
   useEffect(() => {
-    if (!debouncedQuery.trim()) { setSupabaseResults([]); return; }
-    searchSupabaseUsers(debouncedQuery).then(profiles => {
-      setSupabaseResults(profiles.map(p => ({
-        id: p.id,
-        username: p.username,
-        clanId: p.clanId,
-        rank: p.rank as ScoredUser['rank'],
-        score: 1,
-        avatarUri: p.avatarUri ?? null,
-      })));
-    });
+    if (!debouncedQuery.trim()) {
+      setSupabaseResults([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const profiles = await searchSupabaseUsers(debouncedQuery);
+      if (cancelled) return;
+      const followerCounts = await fetchFollowersCountsBatch(profiles.map((p) => p.id));
+      if (cancelled) return;
+      setSupabaseResults(
+        profiles.map((p) => ({
+          id: p.id,
+          username: p.username,
+          clanId: p.clanId,
+          rank: p.rank as ScoredUser['rank'],
+          score: 1,
+          avatarUri: p.avatarUri ?? null,
+          followersCount: followerCounts[p.id] ?? 0,
+        })),
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [debouncedQuery]);
 
   const localResults = useMemo(
