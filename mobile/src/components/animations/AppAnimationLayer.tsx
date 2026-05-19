@@ -21,7 +21,11 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { EvoAnimationWebView, ensureAnimationAssets } from './EvoAnimationWebView';
-import { isClanRevealSuppressed, setEntryAnimPlaying } from '../../../mobile/lib/animationState';
+import {
+  isClanRevealSuppressed,
+  setEntryAnimPlaying,
+  suppressClanRevealAnimations,
+} from '../../../mobile/lib/animationState';
 import { useDebugStats } from '@evoconn/debug/DebugStatsContext';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
@@ -67,6 +71,7 @@ let _requestEntry: (() => void) | null = null;
 let _entryQueued = false;
 
 export function requestEntryAnimation() {
+  suppressClanRevealAnimations(ENTRY_SOCIAL_ANIM_COOLDOWN_MS + 5_000);
   setEntryAnimPlaying(true);
   if (_requestEntry) {
     _requestEntry();
@@ -95,6 +100,8 @@ export default function AppAnimationLayer() {
   const { streakDays, statsLoaded, streakTrigger } = useDebugStats();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const clanId = (activeClan ?? 'none') as string;
+  const clanIdRef = useRef(clanId);
+  clanIdRef.current = clanId;
   const classification = useClassification();
   const { loading: authLoading, fetching: authFetching } = useAuth();
   const profileSettled = !authLoading && !authFetching;
@@ -118,30 +125,6 @@ export default function AppAnimationLayer() {
     setEntryAnimPlaying(showEntry);
   }, [showEntry]);
 
-  useEffect(() => {
-    _requestEntry = () => {
-      entryCooldownUntilRef.current = Date.now() + ENTRY_SOCIAL_ANIM_COOLDOWN_MS;
-      if (assetsReady) setShowEntry(true);
-      else pendingEntryRef.current = true;
-    };
-    return () => { _requestEntry = null; };
-  }, [assetsReady]);
-
-  useEffect(() => {
-    if (assetsReady && (pendingEntryRef.current || _entryQueued)) {
-      pendingEntryRef.current = false;
-      _entryQueued = false;
-      entryCooldownUntilRef.current = Date.now() + ENTRY_SOCIAL_ANIM_COOLDOWN_MS;
-      setShowEntry(true);
-    }
-  }, [assetsReady]);
-
-  useEffect(() => {
-    if (!showEntry) return;
-    const t = setTimeout(() => setShowEntry(false), 12000);
-    return () => clearTimeout(t);
-  }, [showEntry]);
-
   // ── Social animation queue ───────────────────────────────────────────────
   //
   // queueRef holds pending items sorted by ANIM_PRIORITY.
@@ -151,12 +134,66 @@ export default function AppAnimationLayer() {
   const queueRef = useRef<QueuedAnimation[]>([]);
   const [activeAnim, setActiveAnim] = useState<QueuedAnimation | null>(null);
   const activeAnimRef = useRef<QueuedAnimation | null>(null);
+  const prevClanRef = useRef<string | undefined>(undefined);
+  const clanSeededRef = useRef(false);
+  const noneBaselineTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const advanceQueue = useCallback(() => {
+    if (showEntryRef.current) return;
     const next = queueRef.current.shift() ?? null;
     activeAnimRef.current = next;
     setActiveAnim(next);
   }, []);
+
+  const clearClanRevealFromQueue = useCallback(() => {
+    queueRef.current = queueRef.current.filter((q) => q.kind !== 'clanReveal');
+    if (activeAnimRef.current?.kind === 'clanReveal') {
+      activeAnimRef.current = null;
+      setActiveAnim(null);
+    }
+  }, []);
+
+  const finishEntryAnimation = useCallback(() => {
+    setShowEntry(false);
+    if (Date.now() < entryCooldownUntilRef.current) {
+      queueRef.current = queueRef.current.filter((q) => q.kind !== 'clanReveal');
+    }
+    if (!activeAnimRef.current && queueRef.current.length > 0) {
+      advanceQueue();
+    }
+  }, [advanceQueue]);
+
+  useEffect(() => {
+    _requestEntry = () => {
+      suppressClanRevealAnimations(ENTRY_SOCIAL_ANIM_COOLDOWN_MS + 5_000);
+      clearClanRevealFromQueue();
+      clanSeededRef.current = true;
+      prevClanRef.current = clanIdRef.current;
+      entryCooldownUntilRef.current = Date.now() + ENTRY_SOCIAL_ANIM_COOLDOWN_MS;
+      if (assetsReady) setShowEntry(true);
+      else pendingEntryRef.current = true;
+    };
+    return () => { _requestEntry = null; };
+  }, [assetsReady, clearClanRevealFromQueue]);
+
+  useEffect(() => {
+    if (assetsReady && (pendingEntryRef.current || _entryQueued)) {
+      pendingEntryRef.current = false;
+      _entryQueued = false;
+      suppressClanRevealAnimations(ENTRY_SOCIAL_ANIM_COOLDOWN_MS + 5_000);
+      clearClanRevealFromQueue();
+      clanSeededRef.current = true;
+      prevClanRef.current = clanIdRef.current;
+      entryCooldownUntilRef.current = Date.now() + ENTRY_SOCIAL_ANIM_COOLDOWN_MS;
+      setShowEntry(true);
+    }
+  }, [assetsReady, clearClanRevealFromQueue]);
+
+  useEffect(() => {
+    if (!showEntry) return;
+    const t = setTimeout(() => finishEntryAnimation(), 12000);
+    return () => clearTimeout(t);
+  }, [showEntry, finishEntryAnimation]);
 
   const enqueue = useCallback(
     (item: QueuedAnimation) => {
@@ -175,8 +212,8 @@ export default function AppAnimationLayer() {
         queueRef.current.splice(insertAt, 0, item);
       }
 
-      // If the queue was empty and nothing is playing, start immediately.
-      if (!activeAnimRef.current) {
+      // No iniciar cola social mientras corre la animación de entrada.
+      if (!activeAnimRef.current && !showEntryRef.current) {
         advanceQueue();
       }
     },
@@ -289,27 +326,37 @@ export default function AppAnimationLayer() {
   //      reports on first arrival as the baseline, with no reveal animation.
   //   2. Only after a real clan has been seen do we start enqueueing reveals
   //      on subsequent changes.
-  const prevClanRef = useRef<string | undefined>(undefined);
-  const clanSeededRef = useRef(false);
-
   useEffect(() => {
     if (!assetsReady) return;
 
-    // Wait until the profile fetch has settled before seeding the baseline.
-    // Otherwise the natural 'none' → 'existencialista' transition as profile
-    // loads would be interpreted as a clan reveal and play the wrong
-    // animation on every cold start.
     if (!profileSettled) {
       if (!clanSeededRef.current) return;
-      // Durante refetch (p. ej. updateUser({ phone }) al pedir OTP en ajustes),
-      // no actualizar prevClanRef ni encolar reveals.
       return;
     }
 
     if (!clanSeededRef.current) {
-      clanSeededRef.current = true;
-      prevClanRef.current = clanId;
-      return;
+      if (clanId !== 'none') {
+        if (noneBaselineTimerRef.current) {
+          clearTimeout(noneBaselineTimerRef.current);
+          noneBaselineTimerRef.current = null;
+        }
+        clanSeededRef.current = true;
+        prevClanRef.current = clanId;
+        return;
+      }
+      if (noneBaselineTimerRef.current) return;
+      noneBaselineTimerRef.current = setTimeout(() => {
+        noneBaselineTimerRef.current = null;
+        if (clanSeededRef.current) return;
+        clanSeededRef.current = true;
+        prevClanRef.current = clanIdRef.current;
+      }, 700);
+      return () => {
+        if (noneBaselineTimerRef.current) {
+          clearTimeout(noneBaselineTimerRef.current);
+          noneBaselineTimerRef.current = null;
+        }
+      };
     }
 
     if (isClanRevealSuppressed()) return;
@@ -345,8 +392,8 @@ export default function AppAnimationLayer() {
         visible={showEntry}
         name="clanEntry"
         params={{ clanId }}
-        onComplete={() => setShowEntry(false)}
-        onClose={() => setShowEntry(false)}
+        onComplete={finishEntryAnimation}
+        onClose={finishEntryAnimation}
       />
 
       {/* ── Streak animation ── */}
