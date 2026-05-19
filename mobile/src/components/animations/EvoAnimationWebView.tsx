@@ -80,7 +80,7 @@ export async function ensureAnimationAssets(): Promise<void> {
 
   _copyPromise = (async () => {
     const STAMP_FILE = ANIM_DIR + '.stamp';
-    const APP_VERSION = '57';
+    const APP_VERSION = '58';
 
     try {
       const stampInfo = await FileSystem.getInfoAsync(STAMP_FILE);
@@ -415,7 +415,10 @@ export function EvoAnimationWebView({
       switch (msg.type) {
         case 'ready':
           if (name === 'clanEntry') {
-            const fadeMs = Platform.OS === 'android' ? 150 : 280;
+            // Con StarFieldBackground siempre detrás, el fade puede ser muy corto:
+            // las estrellas RN y las del HTML son idénticas (seed=42), así que un
+            // cross-fade rápido es imperceptible y elimina el "salto" visual.
+            const fadeMs = Platform.OS === 'android' ? 80 : 120;
             fadeInWebView(fadeMs, startClanEntrySequence);
           }
           break;
@@ -514,10 +517,16 @@ export function EvoAnimationWebView({
         ]}
       >
         {/*
-          clan-entry draws its own star-field in HTML; a second RN starfield behind a
-          hidden WebView caused a visible jump on Android when the WebView appeared mid-spin.
+          StarFieldBackground siempre visible detrás del WebView.
+          Antes se omitía para clanEntry porque causaba un jump en Android con la
+          implementación antigua (estrella spin). Ahora que clanEntry usa el mismo
+          pipeline de ring/rotor que el sin-clan, el jump ya no ocurre.
+          Tenerlo siempre presente elimina el flash negro que aparecía entre el
+          overlay estático de (tabs)/_layout y el momento en que el HTML cargaba:
+            estrellas RN (overlay) → estrellas RN (Modal) → estrellas HTML (fade-in)
+          Todos usan el mismo seed=42 → mismas posiciones → transición imperceptible.
         */}
-        {name !== 'clanEntry' ? <StarFieldBackground /> : null}
+        <StarFieldBackground />
 
         {/*
           Layer 2 — WebView animation. Rendered on top once htmlContent is ready,

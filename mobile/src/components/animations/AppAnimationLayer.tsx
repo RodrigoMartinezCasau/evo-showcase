@@ -21,7 +21,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { EvoAnimationWebView, ensureAnimationAssets } from './EvoAnimationWebView';
-import { setEntryAnimPlaying } from '../../../mobile/lib/animationState';
+import { isClanRevealSuppressed, setEntryAnimPlaying } from '../../../mobile/lib/animationState';
 import { useDebugStats } from '@evoconn/debug/DebugStatsContext';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
@@ -299,12 +299,20 @@ export default function AppAnimationLayer() {
     // Otherwise the natural 'none' → 'existencialista' transition as profile
     // loads would be interpreted as a clan reveal and play the wrong
     // animation on every cold start.
+    if (!profileSettled) {
+      if (!clanSeededRef.current) return;
+      // Durante refetch (p. ej. updateUser({ phone }) al pedir OTP en ajustes),
+      // no actualizar prevClanRef ni encolar reveals.
+      return;
+    }
+
     if (!clanSeededRef.current) {
-      if (!profileSettled) return;
       clanSeededRef.current = true;
       prevClanRef.current = clanId;
       return;
     }
+
+    if (isClanRevealSuppressed()) return;
 
     const prev = prevClanRef.current;
     prevClanRef.current = clanId;
@@ -332,13 +340,11 @@ export default function AppAnimationLayer() {
   return (
     <>
       {/* ── Entry animation (plays on every launch) ── */}
-      {/* Always use the no-clan (star crown) animation for all users so the
-          entry is identical regardless of clan — avoids the flash caused by
-          the with-clan HTML branch reordering DOM nodes mid-frame. */}
+      {/* ── Entry animation (plays on every launch) ── */}
       <EvoAnimationWebView
         visible={showEntry}
         name="clanEntry"
-        params={{ clanId: 'none' }}
+        params={{ clanId }}
         onComplete={() => setShowEntry(false)}
         onClose={() => setShowEntry(false)}
       />
