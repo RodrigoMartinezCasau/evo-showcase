@@ -50,6 +50,8 @@ export type ThoughtEntry = ConversationItem & {
   messages?: DebateMessage[];
   /** Notas privadas del usuario (solo flujo Nueva frase). */
   phraseNotes?: string;
+  /** Backend debate id for legacy `phrase_*` local thread ids. */
+  backendDebateId?: string;
 };
 
 type ThoughtsContextValue = {
@@ -244,7 +246,9 @@ export function ThoughtsProvider({ children }: { children: React.ReactNode }) {
   const createPhraseThought = useCallback(
     async (phraseText: string): Promise<string> => {
       const trimmed = phraseText.trim();
-      const id = `phrase_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+      // Same backend debate store as reflections so follow-up messages can call
+      // POST /debates/{id}/chat (legacy local-only `phrase_*` ids could not).
+      const { id, title } = await api.createDebate(trimmed);
       const userMsg: DebateMessage = { role: 'user', content: trimmed };
       const publishSlot: DebateMessage = {
         role: 'assistant',
@@ -255,7 +259,7 @@ export function ThoughtsProvider({ children }: { children: React.ReactNode }) {
       const entry: PersistedThought = {
         id,
         type: 'phrase',
-        title: getShortTitle(trimmed),
+        title: title || getShortTitle(trimmed),
         updatedAt: new Date().toISOString(),
         messages: [userMsg, publishSlot],
         ownerUserId: userId,
@@ -313,18 +317,20 @@ export function ThoughtsProvider({ children }: { children: React.ReactNode }) {
     (id: string) => {
       const currentDb = dbRef.current;
       let targetUserId: string | null = null;
-      let targetType: 'reflection' | 'phrase' | undefined;
+      let foundThought: PersistedThought | undefined;
       for (const [uid, list] of Object.entries(currentDb)) {
         const found = list.find((t) => t.id === id);
         if (found) {
           targetUserId = uid;
-          targetType = found.type;
+          foundThought = found;
           break;
         }
       }
       if (!targetUserId) return;
-      if (targetType !== 'phrase') {
-        api.deleteDebate(id).catch(() => {});
+      const debateApiId =
+        foundThought?.backendDebateId ?? (id.startsWith('phrase_') ? null : id);
+      if (debateApiId) {
+        api.deleteDebate(debateApiId).catch(() => {});
       }
       mutateUserSlice(targetUserId, (prev) => prev.filter((t) => t.id !== id));
       // Cancel any pending debounced push for this thought + delete remote.

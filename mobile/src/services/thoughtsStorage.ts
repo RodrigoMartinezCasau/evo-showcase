@@ -35,6 +35,11 @@ export type PersistedThought = ConversationItem & {
   phraseNotes?: string;
   /** ID of the simulated user who owns this thought. Always present. */
   ownerUserId: string;
+  /**
+   * Backend debate id for legacy phrase threads whose `id` is `phrase_*`.
+   * New phrases use the debate uuid as `id` directly.
+   */
+  backendDebateId?: string;
 };
 
 export type ThoughtsDatabase = Record<string, PersistedThought[]>;

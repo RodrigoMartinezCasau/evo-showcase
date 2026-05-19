@@ -12,7 +12,12 @@ import {
 import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AppTopBar, ChatInputBar, SidebarDrawer, useKeyboardAnim } from '@evoconn/components';
 import { getPhraseSendButtonByHouse } from '@evoconn/utils/getPhraseSendButtonByHouse';
-import { PublishBlock, PhraseNotesCard, PhraseFolderManagerCard } from '@evoconn/components/debate';
+import {
+  PublishBlock,
+  PhraseNotesCard,
+  PhraseFolderManagerCard,
+  DebateResponseDisplay,
+} from '@evoconn/components/debate';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import { useConversationFolders } from '@evoconn/hooks/ConversationFoldersContext';
@@ -35,6 +40,7 @@ import {
   computeIntroDurationMs,
 } from '@evoconn/components/aiPhase/AiPhaseAnimations';
 import { generatePhraseIntro } from '@evoconn/services/phraseApi';
+import * as debateApi from '@evoconn/services/debateApi';
 import { warmUpBackend } from '@evoconn/services/debateApi';
 import {
   getChatUserAccentColor,
@@ -50,7 +56,7 @@ import {
   getPublishTitleOutlineColor,
 } from '@evoconn/constants/debateResponseLayout';
 import { getPublishStarByClan } from '@evoconn/utils/getDebateStarByClan';
-import type { DebateMessage } from '@evoconn/types/debate';
+import type { DebateMessage, DebateResponse } from '@evoconn/types/debate';
 import { useFeedStore, createPhrasePost } from '@evoconn/hooks/useFeedStore';
 import { useDebugStreak } from '../debug/DebugStreakContext';
 import { useDebugStats } from '../debug/DebugStatsContext';
@@ -452,13 +458,137 @@ export default function PhraseCreationScreen() {
     [updateThought],
   );
 
+  const resolvePhraseDebateApiId = useCallback(
+    async (threadId: string): Promise<string> => {
+      const thought = thoughts.find((x) => x.id === threadId);
+      if (thought?.backendDebateId) return thought.backendDebateId;
+      if (!threadId.startsWith('phrase_')) return threadId;
+      const firstUser =
+        messagesRef.current.find((m) => m.role === 'user')?.content?.trim() ?? '';
+      const { id: backendId } = await debateApi.createDebate(firstUser || 'Frase');
+      updateThought(threadId, { backendDebateId: backendId });
+      return backendId;
+    },
+    [thoughts, updateThought],
+  );
+
   const handleSend = useCallback(
     async (text: string) => {
       const t = text.trim();
       if (!t || sending) return;
       if (blockIfNoUses()) return;
-      if (publishPending) return;
-      if (phraseId || messages.length > 0) return;
+
+      const threadId = phraseId;
+      const isFirstPhrase = !threadId && messages.length === 0;
+
+      // ── Follow-up messages in an existing phrase thread ─────────────────
+      if (!isFirstPhrase) {
+        if (!threadId) return;
+        setSending(true);
+        Keyboard.dismiss();
+        const userMsg: DebateMessage = { role: 'user', content: t };
+        setMessages((prev) => [...prev, userMsg]);
+        scrollToEnd();
+        try {
+          let apiDebateId = await resolvePhraseDebateApiId(threadId);
+          const placeholder: DebateMessage = {
+            role: 'assistant',
+            content: '',
+            streaming: true,
+          };
+          setMessages((prev) => [...prev, placeholder]);
+          scrollToEnd();
+
+          let resp: Awaited<ReturnType<typeof debateApi.sendMessage>>;
+          try {
+            resp = await debateApi.sendMessage(apiDebateId, t);
+          } catch (sendErr) {
+            const errMsg = sendErr instanceof Error ? sendErr.message : '';
+            if (errMsg.includes('Debate not found') || errMsg.includes('404')) {
+              const { id: freshId } = await debateApi.createDebate(t);
+              apiDebateId = freshId;
+              updateThought(threadId, { backendDebateId: freshId });
+              resp = await debateApi.sendMessage(freshId, t);
+            } else {
+              throw sendErr;
+            }
+          }
+
+          const justEmptiedDailyUses = remainingUses === 1;
+          markStreakActivated();
+          decrementUses();
+          if (justEmptiedDailyUses) requestNoUsesAnimation();
+          void recordActivity(apiUserId, 'frase').catch(console.error);
+          void recordUsesLog(apiUserId).catch(console.error);
+
+          const assistantText = resp.assistant_text;
+          const introText = resp.debate_response?.debate_layer?.conversational_intro ?? '';
+          const introLen = introText.length;
+          const introDuration = computeIntroDurationMs(introText);
+          const assistantMsg: DebateMessage = {
+            role: 'assistant',
+            content: assistantText,
+            id: resp.message_id,
+            debateResponse: resp.debate_response,
+            nextQuestion: resp.next_question,
+            topic: resp.topic,
+            lang: resp.lang,
+            streaming: false,
+            introPhase: introLen > 0 ? 'intro' : 'done',
+          };
+
+          setMessages((prev) => {
+            const copy = [...prev];
+            copy[copy.length - 1] = assistantMsg;
+            return copy;
+          });
+          scrollToEnd();
+
+          if (introLen > 0) {
+            setTimeout(() => {
+              setMessages((prev) => {
+                const copy = [...prev];
+                const last = copy[copy.length - 1];
+                if (
+                  last?.role === 'assistant' &&
+                  'introPhase' in last &&
+                  last.introPhase === 'intro'
+                ) {
+                  copy[copy.length - 1] = { ...last, introPhase: 'done' };
+                }
+                return copy;
+              });
+            }, introDuration);
+          }
+
+          const finalised: DebateMessage[] = [
+            ...messagesRef.current.slice(0, -1),
+            assistantMsg,
+          ];
+          updateThought(threadId, { messages: finalised });
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.warn('[PHRASE] follow-up send failed:', err);
+          setMessages((prev) => {
+            const copy = [...prev];
+            if (
+              copy.length > 0 &&
+              copy[copy.length - 1].role === 'assistant' &&
+              !copy[copy.length - 1].content
+            ) {
+              copy.pop();
+            }
+            if (copy.length > 0 && copy[copy.length - 1].role === 'user' && copy[copy.length - 1].content === t) {
+              copy.pop();
+            }
+            return copy;
+          });
+          Alert.alert('Error', 'No se pudo enviar el mensaje. Inténtalo de nuevo.');
+        } finally {
+          setSending(false);
+        }
+        return;
+      }
 
       setSending(true);
       Keyboard.dismiss();
@@ -520,7 +650,6 @@ export default function PhraseCreationScreen() {
     [
       sending,
       blockIfNoUses,
-      publishPending,
       phraseId,
       messages.length,
       createPhraseThought,
@@ -532,6 +661,8 @@ export default function PhraseCreationScreen() {
       remainingUses,
       requestPhraseIntro,
       recordClassificationInput,
+      resolvePhraseDebateApiId,
+      apiUserId,
     ],
   );
 
@@ -672,11 +803,63 @@ export default function PhraseCreationScreen() {
             // sanitisation) would otherwise render as a blank screen on reopen.
             // Default them to a pending publish state so intro, notes, folder
             // manager and publish button all become visible again.
-            const pubUi = getPhrasePublishUI(msg) ?? { status: 'pending' as const };
+            const pubUi = getPhrasePublishUI(msg);
+
+            // Follow-up turns: full debate reply (no publish / intro / tools stack).
+            if (!pubUi) {
+              const follow = msg as DebateMessage & {
+                streaming?: boolean;
+                debateResponse?: DebateResponse;
+                introPhase?: 'intro' | 'done';
+              };
+              if (follow.streaming && !follow.debateResponse && !follow.content) {
+                return (
+                  <View key={`a-stream-${i}`} style={{ marginTop: PHRASE_STACK.sectionGapPx }}>
+                    <ThinkingStar />
+                  </View>
+                );
+              }
+              if (follow.debateResponse) {
+                const phase = follow.introPhase ?? 'done';
+                if (phase === 'intro') {
+                  const introText =
+                    follow.debateResponse.debate_layer?.conversational_intro ?? '';
+                  return (
+                    <View
+                      key={`a-intro-${i}`}
+                      style={{
+                        marginTop: PHRASE_STACK.sectionGapPx,
+                        paddingHorizontal: PHRASE_STACK.introHorizontalPaddingPx,
+                      }}
+                    >
+                      <IntroTypewriter introText={introText} />
+                    </View>
+                  );
+                }
+                return (
+                  <View key={`a-debate-${i}`} style={{ marginTop: PHRASE_STACK.sectionGapPx }}>
+                    <DebateResponseDisplay
+                      response={follow.debateResponse}
+                      clanId={activeClan}
+                    />
+                  </View>
+                );
+              }
+              if ((follow.content ?? '').length > 0) {
+                return (
+                  <View key={`a-text-${i}`} style={{ marginTop: PHRASE_STACK.sectionGapPx }}>
+                    <Text style={styles.introStaticText}>{follow.content}</Text>
+                  </View>
+                );
+              }
+              return null;
+            }
+
             if (!effectiveThreadId) return null;
+            const pubUiResolved = pubUi ?? { status: 'pending' as const };
             const userPhrase =
               displayMessages[i - 1]?.role === 'user' ? displayMessages[i - 1].content : '';
-            const published = pubUi.status === 'published';
+            const published = pubUiResolved.status === 'published';
             const phraseTooLong = !published && userPhrase.length > PHRASE_MAX_PUBLISH_CHARS;
             const phraseHintOverride = phraseTooLong
               ? { text: PHRASE_TOO_LONG_FOR_PUBLISH_MESSAGE, blockPublish: true as const }
@@ -694,7 +877,7 @@ export default function PhraseCreationScreen() {
             // intro to show at all (e.g. backend returned null).
             const showTools = published || typewriterDone || (!introLoading && !introText);
             return (
-              <View key={`pub-stack-${effectiveThreadId}`}>
+              <View key={`pub-stack-${effectiveThreadId}-${i}`}>
                 {/* 1. AI intro slot — same animation logic as reflections.
                        While loading: pulsing white thinking star (no text).
                        When intro arrives: typewriter reveals it once.
@@ -794,8 +977,8 @@ export default function PhraseCreationScreen() {
         placeholder={
           sending
             ? 'Guardando…'
-            : publishPending
-              ? 'Publica o revisa la frase arriba…'
+            : phraseId || messages.length > 0
+              ? 'Sigue la conversación…'
               : 'Escribe tu frase...'
         }
         onSend={handleSend}
