@@ -95,6 +95,13 @@ function sanitiseMessage(m: unknown): DebateMessage | null {
         : undefined,
     phraseIntro: typeof o.phraseIntro === 'string' ? o.phraseIntro : null,
     phraseIntroLoading: false, // explicit: never resume a stale loading spinner
+    phraseNotes: typeof o.phraseNotes === 'string' ? o.phraseNotes : undefined,
+    folderId:
+      typeof o.folderId === 'string'
+        ? o.folderId
+        : o.folderId === null
+          ? null
+          : undefined,
   };
 }
 

@@ -346,20 +346,10 @@ export default function ReflectionCreationScreen() {
 
       try {
         let id = debateId;
-        const isFirstSend = !id;
         if (!id) {
           id = await createThought(text);
           setDebateId(id);
         }
-        // ── Real philosophical-clan classification ─────────────────────
-        // Every reflection sent to the AI counts as a reflection input
-        // for the clan classifier. We only record on the first send so
-        // continuing the same thread doesn't double-count, and we use
-        // `id` so each reflection has a stable inputId across reloads.
-        if (isFirstSend) {
-          void recordClassificationInput(text, 'reflection', id);
-        }
-
         const placeholder: ChatBubble = {
           role: 'assistant',
           content: '',
@@ -415,6 +405,13 @@ export default function ReflectionCreationScreen() {
           domainColor: domainMeta?.color ?? '#7C3AED',
         };
         const assistantText = resp.assistant_text;
+
+        // Cada mensaje del usuario en el hilo cuenta para el perfil de clan.
+        void recordClassificationInput(
+          text,
+          'reflection',
+          resp.message_id ?? `${id}_${Date.now()}`,
+        );
 
         const introText = resp.debate_response?.debate_layer?.conversational_intro ?? '';
         const introLen = (introText || '').length;

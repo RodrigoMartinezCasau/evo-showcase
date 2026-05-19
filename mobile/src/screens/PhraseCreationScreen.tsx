@@ -12,12 +12,7 @@ import {
 import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AppTopBar, ChatInputBar, SidebarDrawer, useKeyboardAnim } from '@evoconn/components';
 import { getPhraseSendButtonByHouse } from '@evoconn/utils/getPhraseSendButtonByHouse';
-import {
-  PublishBlock,
-  PhraseNotesCard,
-  PhraseFolderManagerCard,
-  DebateResponseDisplay,
-} from '@evoconn/components/debate';
+import { PublishBlock, PhraseNotesCard, PhraseFolderManagerCard } from '@evoconn/components/debate';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import { useConversationFolders } from '@evoconn/hooks/ConversationFoldersContext';
@@ -40,7 +35,6 @@ import {
   computeIntroDurationMs,
 } from '@evoconn/components/aiPhase/AiPhaseAnimations';
 import { generatePhraseIntro } from '@evoconn/services/phraseApi';
-import * as debateApi from '@evoconn/services/debateApi';
 import { warmUpBackend } from '@evoconn/services/debateApi';
 import {
   getChatUserAccentColor,
@@ -56,7 +50,7 @@ import {
   getPublishTitleOutlineColor,
 } from '@evoconn/constants/debateResponseLayout';
 import { getPublishStarByClan } from '@evoconn/utils/getDebateStarByClan';
-import type { DebateMessage, DebateResponse } from '@evoconn/types/debate';
+import type { DebateMessage } from '@evoconn/types/debate';
 import { useFeedStore, createPhrasePost } from '@evoconn/hooks/useFeedStore';
 import { useDebugStreak } from '../debug/DebugStreakContext';
 import { useDebugStats } from '../debug/DebugStatsContext';
@@ -121,6 +115,71 @@ function getPhrasePublishUI(
     return { status: 'published', author: x.phrasePublishAuthor };
   }
   return null;
+}
+
+/** Stable key per assistant slot so intro/typewriter state works across multi-phrase threads. */
+function phraseIntroSlotKey(threadId: string, messageIndex: number): string {
+  return `${threadId}#${messageIndex}`;
+}
+
+/** Phrase threads must never render reflection-shaped assistant payloads. */
+function normalizePhraseThreadMessage(m: DebateMessage): DebateMessage {
+  if (m.role !== 'assistant') return m;
+  const perTurnMeta = {
+    ...(m.phraseNotes !== undefined ? { phraseNotes: m.phraseNotes } : {}),
+    ...(m.folderId !== undefined ? { folderId: m.folderId } : {}),
+  };
+  if (getPhrasePublishUI(m)) {
+    const base = m.phraseIntroLoading ? { ...m, phraseIntroLoading: false } : m;
+    return { ...base, ...perTurnMeta };
+  }
+  const legacy = m as DebateMessage & {
+    debateResponse?: { debate_layer?: { conversational_intro?: string } };
+    streaming?: boolean;
+  };
+  if (legacy.debateResponse || legacy.streaming || (m.content ?? '').length > 0) {
+    const intro =
+      legacy.debateResponse?.debate_layer?.conversational_intro?.trim() ||
+      (m.content ?? '').trim() ||
+      null;
+    return {
+      role: 'assistant',
+      content: '',
+      phrasePublishUI: { status: 'pending' },
+      phraseIntro: intro,
+      phraseIntroLoading: false,
+      ...perTurnMeta,
+    };
+  }
+  return {
+    role: 'assistant',
+    content: '',
+    phrasePublishUI: { status: 'pending' },
+    phraseIntro: null,
+    phraseIntroLoading: false,
+    ...perTurnMeta,
+  };
+}
+
+/** Move legacy thread-level apuntes/carpeta onto the first assistant turn only. */
+function migratePhraseThreadMessages(
+  messages: DebateMessage[],
+  thought?: { phraseNotes?: string; folderId?: string | null },
+): DebateMessage[] {
+  const migrated = messages.map(normalizePhraseThreadMessage);
+  if (!thought?.phraseNotes && thought?.folderId == null) return migrated;
+  const firstAssistantIdx = migrated.findIndex((m) => m.role === 'assistant');
+  if (firstAssistantIdx < 0) return migrated;
+  const slot = migrated[firstAssistantIdx];
+  if (slot.role !== 'assistant') return migrated;
+  if (slot.phraseNotes || slot.folderId != null) return migrated;
+  const copy = [...migrated];
+  copy[firstAssistantIdx] = {
+    ...slot,
+    phraseNotes: thought.phraseNotes,
+    folderId: thought.folderId ?? null,
+  };
+  return copy;
 }
 
 export default function PhraseCreationScreen() {
@@ -190,7 +249,7 @@ export default function PhraseCreationScreen() {
     return () => clearTimeout(t);
   }, [publishAuthorFocused]);
   const publishedRef = useRef<Set<string>>(new Set());
-  const notesDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const notesDebounceRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   /** Tracks which threads have already had the intro fetch fired (prevents
    *  duplicate calls when the screen re-renders or remounts). */
   const introRequestedRef = useRef<Set<string>>(new Set());
@@ -203,6 +262,8 @@ export default function PhraseCreationScreen() {
    *  the lifecycle (intro fetch resolving after a remount, etc.) can read the
    *  latest values without depending on stale closures. */
   const messagesRef = useRef<DebateMessage[]>([]);
+  const thoughtsRef = useRef(thoughts);
+  thoughtsRef.current = thoughts;
 
   // Warm up the Railway backend on mount so it's awake before the user sends a phrase.
   useEffect(() => { warmUpBackend(); }, []);
@@ -210,8 +271,6 @@ export default function PhraseCreationScreen() {
   /** Per-thread flag: once the typewriter finishes for that thread, we flip
    *  this to true so the phrase tools (Apuntes, Folder) appear. */
   const [introTypewriterDone, setIntroTypewriterDone] = useState<Record<string, boolean>>({});
-
-  const [phraseNotesLocal, setPhraseNotesLocal] = useState('');
 
   const scrollToEnd = useCallback(() => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
@@ -256,11 +315,8 @@ export default function PhraseCreationScreen() {
           //     sanitisation / persistence corruption) would otherwise render
           //     as just the user bubble on a black screen, with no intro,
           //     notes card, folder manager or publish button visible.
-          const cleaned = thread.messages.map((m) =>
-            m.role === 'assistant' && m.phraseIntroLoading
-              ? { ...m, phraseIntroLoading: false }
-              : m,
-          );
+          const thoughtMeta = thoughtsRef.current.find((t) => t.id === phraseId);
+          const cleaned = migratePhraseThreadMessages(thread.messages, thoughtMeta);
           const hasAssistant = cleaned.some((m) => m.role === 'assistant');
           const hydrated: DebateMessage[] = hasAssistant
             ? cleaned
@@ -275,16 +331,22 @@ export default function PhraseCreationScreen() {
                 },
               ];
           setMessages(hydrated);
-          // Persist the recovered assistant slot back to disk so this repair
-          // is one-shot — next reopen reads it cleanly without the patch path.
-          if (!hasAssistant) {
+          const needsPersistRepair =
+            !hasAssistant ||
+            hydrated.some((m, idx) => m !== thread.messages[idx]);
+          if (needsPersistRepair) {
             updateThought(phraseId, { messages: hydrated });
           }
           // For reopened threads we never re-run the typewriter — surface the
           // intro as already-revealed static text so the user sees it instantly.
-          setIntroTypewriterDone((prev) => ({ ...prev, [phraseId]: true }));
-          // Mark as already requested to prevent any background re-fetch.
-          introRequestedRef.current.add(phraseId);
+          const doneBySlot: Record<string, boolean> = { [phraseId]: true };
+          hydrated.forEach((m, idx) => {
+            if (m.role === 'assistant') {
+              doneBySlot[phraseIntroSlotKey(phraseId, idx)] = true;
+              introRequestedRef.current.add(phraseIntroSlotKey(phraseId, idx));
+            }
+          });
+          setIntroTypewriterDone((prev) => ({ ...prev, ...doneBySlot }));
         }
       } finally {
         if (!cancelled) setLoadingThread(false);
@@ -295,29 +357,32 @@ export default function PhraseCreationScreen() {
     };
   }, [phraseId, loadThread, updateThought]);
 
-  const phraseThought = useMemo(
-    () => (phraseId ? thoughts.find((t) => t.id === phraseId) : undefined),
-    [thoughts, phraseId],
-  );
-
-  useEffect(() => {
-    setPhraseNotesLocal(phraseThought?.phraseNotes ?? '');
-  }, [phraseId, phraseThought?.phraseNotes]);
-
   useEffect(() => {
     return () => {
-      if (notesDebounceRef.current) clearTimeout(notesDebounceRef.current);
+      notesDebounceRef.current.forEach((handle) => clearTimeout(handle));
+      notesDebounceRef.current.clear();
     };
   }, []);
 
   const onPhraseNotesChange = useCallback(
-    (text: string) => {
-      setPhraseNotesLocal(text);
+    (assistantIndex: number, text: string) => {
       if (!phraseId) return;
-      if (notesDebounceRef.current) clearTimeout(notesDebounceRef.current);
-      notesDebounceRef.current = setTimeout(() => {
-        updateThought(phraseId, { phraseNotes: text });
-      }, 400);
+      setMessages((prev) => {
+        const next = prev.map((m, idx) =>
+          idx === assistantIndex && m.role === 'assistant' ? { ...m, phraseNotes: text } : m,
+        );
+        messagesRef.current = next;
+        return next;
+      });
+      const existing = notesDebounceRef.current.get(assistantIndex);
+      if (existing) clearTimeout(existing);
+      notesDebounceRef.current.set(
+        assistantIndex,
+        setTimeout(() => {
+          notesDebounceRef.current.delete(assistantIndex);
+          updateThought(phraseId, { messages: messagesRef.current });
+        }, 400),
+      );
     },
     [phraseId, updateThought],
   );
@@ -341,11 +406,11 @@ export default function PhraseCreationScreen() {
   );
 
   const handlePhrasePublish = useCallback(
-    async (threadId: string, rawPhraseFromUser: string) => {
+    async (threadId: string, rawPhraseFromUser: string, assistantMessageIndex: number) => {
       if (rawPhraseFromUser.length > PHRASE_MAX_PUBLISH_CHARS) return;
       const authorName = publishAuthorRef.current.trim();
       if (!authorName) return;
-      const sourceId = `${threadId}_phrase_pub`;
+      const sourceId = `${threadId}_phrase_pub_${assistantMessageIndex}`;
       if (publishedRef.current.has(sourceId)) return;
       publishedRef.current.add(sourceId);
 
@@ -355,24 +420,21 @@ export default function PhraseCreationScreen() {
       publishPost(post);
       router.replace({ pathname: '/latest-posts', params: { postId: sourceId } });
 
-      // Preserve the AI intro (if it was generated for this thread) so the
-      // published view doesn't lose context on reopen. Read from the live ref
-      // (not the closure-captured `messages`) so a publish that happens right
-      // after intro arrival doesn't lose the intro it just received.
       const liveMessages = messagesRef.current;
-      const prevAssistant = liveMessages.find((m) => m.role === 'assistant');
+      const assistantMsg = liveMessages[assistantMessageIndex];
       const carriedIntro =
-        prevAssistant && prevAssistant.role === 'assistant' ? prevAssistant.phraseIntro ?? null : null;
-      const nextMessages: DebateMessage[] = [
-        { role: 'user', content: rawPhraseFromUser.trim() },
-        {
-          role: 'assistant',
-          content: '',
-          phrasePublishUI: { status: 'published', author: authorName },
-          phraseIntro: carriedIntro,
-          phraseIntroLoading: false,
-        },
-      ];
+        assistantMsg?.role === 'assistant' ? assistantMsg.phraseIntro ?? null : null;
+      const nextMessages = liveMessages.map((m, idx) =>
+        idx === assistantMessageIndex && m.role === 'assistant'
+          ? {
+              ...m,
+              content: '',
+              phrasePublishUI: { status: 'published' as const, author: authorName },
+              phraseIntro: carriedIntro,
+              phraseIntroLoading: false,
+            }
+          : m,
+      );
       setMessages(nextMessages);
       updateThought(threadId, { messages: nextMessages });
       publishAuthorRef.current = '';
@@ -382,9 +444,18 @@ export default function PhraseCreationScreen() {
   );
 
   const handleAssignPhraseToFolder = useCallback(
-    (folder: SidebarFolder) => {
+    (folder: SidebarFolder, assistantIndex: number) => {
       if (!phraseId) return;
-      updateThought(phraseId, { folderId: folder.id });
+      setMessages((prev) => {
+        const next = prev.map((m, idx) =>
+          idx === assistantIndex && m.role === 'assistant'
+            ? { ...m, folderId: folder.id }
+            : m,
+        );
+        messagesRef.current = next;
+        updateThought(phraseId, { messages: next });
+        return next;
+      });
       Alert.alert('Carpeta', `La frase se ha guardado en «${folder.name}».`);
     },
     [phraseId, updateThought],
@@ -398,39 +469,52 @@ export default function PhraseCreationScreen() {
    * Safe to call multiple times: deduped via `introRequestedRef`.
    */
   const requestPhraseIntro = useCallback(
-    async (threadId: string, phraseText: string, author?: string | null) => {
-      if (introRequestedRef.current.has(threadId)) return;
-      introRequestedRef.current.add(threadId);
+    async (
+      threadId: string,
+      slotKey: string,
+      phraseText: string,
+      author?: string | null,
+    ) => {
+      if (introRequestedRef.current.has(slotKey)) return;
+      introRequestedRef.current.add(slotKey);
       let intro: string | null = null;
       try {
         intro = await generatePhraseIntro({ phrase: phraseText, author: author ?? null });
       } catch (err) {
-        // Network/backend failure — log it and continue.  We MUST still flip
-        // `phraseIntroLoading` off so the screen doesn't stay stuck on the
-        // pulsing star forever waiting for an intro that never arrives.
         // eslint-disable-next-line no-console
         console.warn('[PHRASE] generatePhraseIntro failed, skipping intro:', err);
         intro = null;
       }
-      // Apply the intro to the assistant slot. If — for any reason — the live
-      // state has no assistant slot (race with a load effect, hot reload,
-      // legacy thread shape), we INJECT one rather than silently dropping the
-      // result. This is what previously caused some phrase threads to lose
-      // their assistant message after reopening.
       let nextMessages: DebateMessage[] | null = null;
       setMessages((prev) => {
         const copy = [...prev];
-        const lastIdx = copy.length - 1;
-        const last = copy[lastIdx];
-        if (last && last.role === 'assistant') {
-          copy[lastIdx] = {
-            ...last,
-            phraseIntro: intro,
-            phraseIntroLoading: false,
-          };
+        let targetIdx = -1;
+        for (let j = copy.length - 1; j >= 0; j--) {
+          const m = copy[j];
+          if (m.role === 'assistant' && m.phraseIntroLoading) {
+            targetIdx = j;
+            break;
+          }
+        }
+        if (targetIdx < 0) {
+          for (let j = copy.length - 1; j >= 0; j--) {
+            if (copy[j].role === 'assistant') {
+              targetIdx = j;
+              break;
+            }
+          }
+        }
+        if (targetIdx >= 0) {
+          const slot = copy[targetIdx];
+          if (slot.role === 'assistant') {
+            copy[targetIdx] = {
+              ...slot,
+              phraseIntro: intro,
+              phraseIntroLoading: false,
+              phrasePublishUI: slot.phrasePublishUI ?? { status: 'pending' },
+            };
+          }
         } else {
-          // No assistant slot present — append a fresh one in pending state
-          // carrying the intro we just fetched.
           copy.push({
             role: 'assistant',
             content: '',
@@ -442,34 +526,16 @@ export default function PhraseCreationScreen() {
         nextMessages = copy;
         return copy;
       });
-      // Persist the intro on the phrase thread so reopening it later still
-      // shows the AI intro without re-hitting the backend.
       if (nextMessages) {
         updateThought(threadId, { messages: nextMessages });
       }
-      // No intro returned (either backend gave us null or the request failed)
-      // → skip the typewriter wait entirely so phrase tools appear right away.
       if (!intro) {
         setIntroTypewriterDone((prev) =>
-          prev[threadId] ? prev : { ...prev, [threadId]: true },
+          prev[slotKey] ? prev : { ...prev, [slotKey]: true },
         );
       }
     },
     [updateThought],
-  );
-
-  const resolvePhraseDebateApiId = useCallback(
-    async (threadId: string): Promise<string> => {
-      const thought = thoughts.find((x) => x.id === threadId);
-      if (thought?.backendDebateId) return thought.backendDebateId;
-      if (!threadId.startsWith('phrase_')) return threadId;
-      const firstUser =
-        messagesRef.current.find((m) => m.role === 'user')?.content?.trim() ?? '';
-      const { id: backendId } = await debateApi.createDebate(firstUser || 'Frase');
-      updateThought(threadId, { backendDebateId: backendId });
-      return backendId;
-    },
-    [thoughts, updateThought],
   );
 
   const handleSend = useCallback(
@@ -481,109 +547,53 @@ export default function PhraseCreationScreen() {
       const threadId = phraseId;
       const isFirstPhrase = !threadId && messages.length === 0;
 
-      // ── Follow-up messages in an existing phrase thread ─────────────────
+      // ── Follow-up phrases in the same thread (always phrase UI, never reflection) ──
       if (!isFirstPhrase) {
         if (!threadId) return;
         setSending(true);
         Keyboard.dismiss();
         const userMsg: DebateMessage = { role: 'user', content: t };
-        setMessages((prev) => [...prev, userMsg]);
+        const assistantPlaceholder: DebateMessage = {
+          role: 'assistant',
+          content: '',
+          phrasePublishUI: { status: 'pending' },
+          phraseIntro: null,
+          phraseIntroLoading: true,
+        };
+        const nextSnapshot = [...messagesRef.current, userMsg, assistantPlaceholder];
+        messagesRef.current = nextSnapshot;
+        setMessages(nextSnapshot);
         scrollToEnd();
         try {
-          let apiDebateId = await resolvePhraseDebateApiId(threadId);
-          const placeholder: DebateMessage = {
-            role: 'assistant',
-            content: '',
-            streaming: true,
-          };
-          setMessages((prev) => [...prev, placeholder]);
-          scrollToEnd();
-
-          let resp: Awaited<ReturnType<typeof debateApi.sendMessage>>;
-          try {
-            resp = await debateApi.sendMessage(apiDebateId, t);
-          } catch (sendErr) {
-            const errMsg = sendErr instanceof Error ? sendErr.message : '';
-            if (errMsg.includes('Debate not found') || errMsg.includes('404')) {
-              const { id: freshId } = await debateApi.createDebate(t);
-              apiDebateId = freshId;
-              updateThought(threadId, { backendDebateId: freshId });
-              resp = await debateApi.sendMessage(freshId, t);
-            } else {
-              throw sendErr;
-            }
-          }
-
           const justEmptiedDailyUses = remainingUses === 1;
           markStreakActivated();
           decrementUses();
           if (justEmptiedDailyUses) requestNoUsesAnimation();
           void recordActivity(apiUserId, 'frase').catch(console.error);
           void recordUsesLog(apiUserId).catch(console.error);
+          void recordClassificationInput(t, 'phrase', `${threadId}_${Date.now()}`);
 
-          const assistantText = resp.assistant_text;
-          const introText = resp.debate_response?.debate_layer?.conversational_intro ?? '';
-          const introLen = introText.length;
-          const introDuration = computeIntroDurationMs(introText);
-          const assistantMsg: DebateMessage = {
-            role: 'assistant',
-            content: assistantText,
-            id: resp.message_id,
-            debateResponse: resp.debate_response,
-            nextQuestion: resp.next_question,
-            topic: resp.topic,
-            lang: resp.lang,
-            streaming: false,
-            introPhase: introLen > 0 ? 'intro' : 'done',
-          };
-
-          setMessages((prev) => {
-            const copy = [...prev];
-            copy[copy.length - 1] = assistantMsg;
-            return copy;
-          });
-          scrollToEnd();
-
-          if (introLen > 0) {
-            setTimeout(() => {
-              setMessages((prev) => {
-                const copy = [...prev];
-                const last = copy[copy.length - 1];
-                if (
-                  last?.role === 'assistant' &&
-                  'introPhase' in last &&
-                  last.introPhase === 'intro'
-                ) {
-                  copy[copy.length - 1] = { ...last, introPhase: 'done' };
-                }
-                return copy;
-              });
-            }, introDuration);
-          }
-
-          const finalised: DebateMessage[] = [
-            ...messagesRef.current.slice(0, -1),
-            assistantMsg,
-          ];
-          updateThought(threadId, { messages: finalised });
+          const assistantIdx = nextSnapshot.length - 1;
+          const slotKey = phraseIntroSlotKey(threadId, assistantIdx);
+          updateThought(threadId, { messages: nextSnapshot });
+          void requestPhraseIntro(
+            threadId,
+            slotKey,
+            t,
+            publishAuthorRef.current.trim() || null,
+          );
         } catch (err) {
           // eslint-disable-next-line no-console
           console.warn('[PHRASE] follow-up send failed:', err);
           setMessages((prev) => {
             const copy = [...prev];
-            if (
-              copy.length > 0 &&
-              copy[copy.length - 1].role === 'assistant' &&
-              !copy[copy.length - 1].content
-            ) {
-              copy.pop();
-            }
+            if (copy.length > 0 && copy[copy.length - 1].role === 'assistant') copy.pop();
             if (copy.length > 0 && copy[copy.length - 1].role === 'user' && copy[copy.length - 1].content === t) {
               copy.pop();
             }
             return copy;
           });
-          Alert.alert('Error', 'No se pudo enviar el mensaje. Inténtalo de nuevo.');
+          Alert.alert('Error', 'No se pudo enviar la frase. Inténtalo de nuevo.');
         } finally {
           setSending(false);
         }
@@ -642,7 +652,7 @@ export default function PhraseCreationScreen() {
         // Kick off the AI intro in the background. Author is unknown at this
         // point (the user hasn't typed it yet), so we let the model assess the
         // phrase content alone.
-        void requestPhraseIntro(id, t, null);
+        void requestPhraseIntro(id, phraseIntroSlotKey(id, 1), t, null);
       } finally {
         setSending(false);
       }
@@ -661,7 +671,6 @@ export default function PhraseCreationScreen() {
       remainingUses,
       requestPhraseIntro,
       recordClassificationInput,
-      resolvePhraseDebateApiId,
       apiUserId,
     ],
   );
@@ -781,6 +790,12 @@ export default function PhraseCreationScreen() {
           onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
         >
           {displayMessages.map((msg, i) => {
+            const prevMsg = i > 0 ? displayMessages[i - 1] : null;
+            const turnTopGap =
+              i > 0 && prevMsg?.role === 'assistant'
+                ? PHRASE_STACK.phraseTurnTopGapPx
+                : 0;
+
             if (msg.role === 'user') {
               return (
                 <View
@@ -790,6 +805,7 @@ export default function PhraseCreationScreen() {
                     {
                       borderLeftColor: clanColor,
                       borderLeftWidth: CHAT_USER_MESSAGE_LAYOUT.accentWidth,
+                      marginTop: turnTopGap,
                       marginBottom: PHRASE_STACK.userBubbleBottomGapPx,
                     },
                   ]}
@@ -805,56 +821,6 @@ export default function PhraseCreationScreen() {
             // manager and publish button all become visible again.
             const pubUi = getPhrasePublishUI(msg);
 
-            // Follow-up turns: full debate reply (no publish / intro / tools stack).
-            if (!pubUi) {
-              const follow = msg as DebateMessage & {
-                streaming?: boolean;
-                debateResponse?: DebateResponse;
-                introPhase?: 'intro' | 'done';
-              };
-              if (follow.streaming && !follow.debateResponse && !follow.content) {
-                return (
-                  <View key={`a-stream-${i}`} style={{ marginTop: PHRASE_STACK.sectionGapPx }}>
-                    <ThinkingStar />
-                  </View>
-                );
-              }
-              if (follow.debateResponse) {
-                const phase = follow.introPhase ?? 'done';
-                if (phase === 'intro') {
-                  const introText =
-                    follow.debateResponse.debate_layer?.conversational_intro ?? '';
-                  return (
-                    <View
-                      key={`a-intro-${i}`}
-                      style={{
-                        marginTop: PHRASE_STACK.sectionGapPx,
-                        paddingHorizontal: PHRASE_STACK.introHorizontalPaddingPx,
-                      }}
-                    >
-                      <IntroTypewriter introText={introText} />
-                    </View>
-                  );
-                }
-                return (
-                  <View key={`a-debate-${i}`} style={{ marginTop: PHRASE_STACK.sectionGapPx }}>
-                    <DebateResponseDisplay
-                      response={follow.debateResponse}
-                      clanId={activeClan}
-                    />
-                  </View>
-                );
-              }
-              if ((follow.content ?? '').length > 0) {
-                return (
-                  <View key={`a-text-${i}`} style={{ marginTop: PHRASE_STACK.sectionGapPx }}>
-                    <Text style={styles.introStaticText}>{follow.content}</Text>
-                  </View>
-                );
-              }
-              return null;
-            }
-
             if (!effectiveThreadId) return null;
             const pubUiResolved = pubUi ?? { status: 'pending' as const };
             const userPhrase =
@@ -865,7 +831,9 @@ export default function PhraseCreationScreen() {
               ? { text: PHRASE_TOO_LONG_FOR_PUBLISH_MESSAGE, blockPublish: true as const }
               : null;
             const introText = (msg.phraseIntro ?? '').trim();
-            const typewriterDone = !!introTypewriterDone[effectiveThreadId];
+            const introSlotKey = phraseIntroSlotKey(effectiveThreadId, i);
+            const typewriterDone =
+              !!introTypewriterDone[introSlotKey] || !!introTypewriterDone[effectiveThreadId];
             // `introLoading` reflects an active /phrase/intro request.  On
             // reopen we ALWAYS mark `typewriterDone` to true (see the load
             // useEffect), which forces `introLoading` off — so a previously
@@ -877,7 +845,10 @@ export default function PhraseCreationScreen() {
             // intro to show at all (e.g. backend returned null).
             const showTools = published || typewriterDone || (!introLoading && !introText);
             return (
-              <View key={`pub-stack-${effectiveThreadId}-${i}`}>
+              <View
+                key={`pub-stack-${effectiveThreadId}-${i}`}
+                style={turnTopGap > 0 ? { marginTop: turnTopGap } : undefined}
+              >
                 {/* 1. AI intro slot — same animation logic as reflections.
                        While loading: pulsing white thinking star (no text).
                        When intro arrives: typewriter reveals it once.
@@ -891,11 +862,11 @@ export default function PhraseCreationScreen() {
                   <View style={{ marginTop: PHRASE_STACK.sectionGapPx, paddingHorizontal: PHRASE_STACK.introHorizontalPaddingPx }}>
                     <IntroTypewriter introText={introText} />
                     <PhraseIntroDoneTrigger
-                      threadId={effectiveThreadId}
+                      threadId={introSlotKey}
                       introText={introText}
-                      onDone={(tid) =>
+                      onDone={(slotId) =>
                         setIntroTypewriterDone((prev) =>
-                          prev[tid] ? prev : { ...prev, [tid]: true },
+                          prev[slotId] ? prev : { ...prev, [slotId]: true },
                         )
                       }
                     />
@@ -915,8 +886,8 @@ export default function PhraseCreationScreen() {
                     <View style={{ marginTop: PHRASE_STACK.sectionGapPx }}>
                       <PhraseNotesCard
                         backgroundColor={getBlockBackgroundColor('question', activeClan)}
-                        value={phraseNotesLocal}
-                        onChangeText={onPhraseNotesChange}
+                        value={msg.phraseNotes ?? ''}
+                        onChangeText={(text) => onPhraseNotesChange(i, text)}
                       />
                     </View>
                     <View style={{ marginTop: PHRASE_STACK.sectionGapPx }}>
@@ -924,8 +895,8 @@ export default function PhraseCreationScreen() {
                         backgroundColor={getBlockBackgroundColor('quote', activeClan)}
                         innerBorderColor={getBlockBorderColor('quote', activeClan)}
                         folders={folders}
-                        selectedFolderId={phraseThought?.folderId ?? null}
-                        onSelectFolder={handleAssignPhraseToFolder}
+                        selectedFolderId={msg.folderId ?? null}
+                        onSelectFolder={(folder) => handleAssignPhraseToFolder(folder, i)}
                       />
                     </View>
                   </>
@@ -950,7 +921,7 @@ export default function PhraseCreationScreen() {
                       inputPlaceholder={PUBLISH_AUTHOR_PLACEHOLDER}
                       inputMaxLength={PUBLISH_AUTHOR_MAX_LEN}
                       published={published}
-                      initialAuthorValue={published ? pubUi.author ?? '' : ''}
+                      initialAuthorValue={published ? pubUiResolved.author ?? '' : ''}
                       onTitleChange={
                         published
                           ? undefined
@@ -961,7 +932,7 @@ export default function PhraseCreationScreen() {
                       onPublish={
                         published
                           ? undefined
-                          : () => handlePhrasePublish(effectiveThreadId, userPhrase)
+                          : () => handlePhrasePublish(effectiveThreadId, userPhrase, i)
                       }
                     />
                   </View>

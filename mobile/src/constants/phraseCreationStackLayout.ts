@@ -37,6 +37,8 @@ export const PHRASE_CREATION_STACK_LAYOUT = {
   // ── Burbuja del usuario ───────────────────────────────────────────────────
   /** Margen inferior de la burbuja del usuario (separación respecto al bloque siguiente). */
   userBubbleBottomGapPx: 10,
+  /** Margen superior entre turnos (p. ej. tras bloque Publicar de la frase anterior). */
+  phraseTurnTopGapPx: 24,
 
   // ── Secciones apiladas ────────────────────────────────────────────────────
   /**
