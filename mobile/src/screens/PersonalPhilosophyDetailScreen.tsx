@@ -13,7 +13,7 @@
  * AI blocks each cost 1 use per generation/reload.
  * Results are persisted on the backend and restored on reopen.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   ScrollView,
@@ -55,8 +55,14 @@ import {
   type PhilosophyContext,
 } from '@evoconn/services/philosophyProfileApi';
 import { recordUsesLog } from '@evoconn/services/streakApi';
+import {
+  loadPhilosophyBooks,
+  savePhilosophyBooks,
+} from '@evoconn/services/philosophyBooksStorage';
 import { getBookRecommendations } from '@evoconn/logic/books/getBookRecommendations';
 import type { BookRecord } from '@evoconn/data/books/bookDatabase';
+import { useDebugStats } from '../debug/DebugStatsContext';
+import { requestNoUsesAnimation } from '@evoconn/components/animations/AppAnimationLayer';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -114,7 +120,18 @@ export default function PersonalPhilosophyDetailScreen() {
   /** Misma regla que racha/usos: Supabase cuando hay sesión, si no el perfil activo. */
   const apiUserId = authProfile?.id ?? profile.id;
   const { hasAiUses, blockIfNoUses } = useDailyUsesGate();
+  const { decrementUses, remainingUses } = useDebugStats();
+  const remainingUsesRef = useRef(remainingUses);
+  remainingUsesRef.current = remainingUses;
   const clanId = activeClan;
+
+  /** Same quota as enviar reflexión/frase: 1 uso local + log remoto por generación. */
+  const consumeAiUse = useCallback(() => {
+    const justEmptied = remainingUsesRef.current === 1;
+    decrementUses();
+    if (justEmptied) requestNoUsesAnimation();
+    void recordUsesLog(apiUserId).catch(() => {});
+  }, [apiUserId, decrementUses]);
 
   // Dominant clan (highest pct)
   const sorted = [...profile.philosophyPercentages].sort((a, b) => b.pct - a.pct);
@@ -145,13 +162,41 @@ export default function PersonalPhilosophyDetailScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const data = await fetchPhilosophyProfile(apiUserId);
-        if (data.summary) { setSummaryText(data.summary); setSummaryState('success'); }
-        if (data.philosophers) { setPhilosophers(data.philosophers); setPhilosophersState('success'); }
-        // Books are now managed locally — do not restore from backend
-        if (data.jobs) { setJobs(data.jobs); setJobsState('success'); }
+        const [data, localBooks] = await Promise.all([
+          fetchPhilosophyProfile(apiUserId),
+          loadPhilosophyBooks(apiUserId),
+        ]);
+        if (data.summary) {
+          setSummaryText(data.summary);
+          setSummaryState('success');
+        }
+        if (data.philosophers) {
+          setPhilosophers(data.philosophers);
+          setPhilosophersState('success');
+        }
+        if (data.jobs) {
+          setJobs(data.jobs);
+          setJobsState('success');
+        }
+        if (localBooks) {
+          setShownBookIds(localBooks.shownBookIds);
+          setBooksExhausted(localBooks.exhausted);
+          if (localBooks.exhausted || localBooks.books.length > 0) {
+            setBooks(localBooks.books.length > 0 ? localBooks.books : null);
+            setBooksState('success');
+          }
+        }
       } catch {
         // Backend unreachable — show empty blocks, user can still try to generate
+        const localBooks = await loadPhilosophyBooks(apiUserId).catch(() => null);
+        if (localBooks) {
+          setShownBookIds(localBooks.shownBookIds);
+          setBooksExhausted(localBooks.exhausted);
+          if (localBooks.exhausted || localBooks.books.length > 0) {
+            setBooks(localBooks.books.length > 0 ? localBooks.books : null);
+            setBooksState('success');
+          }
+        }
       }
     })();
   }, [apiUserId]);
@@ -165,13 +210,13 @@ export default function PersonalPhilosophyDetailScreen() {
       const res = await generateSummary(apiUserId, ctx);
       setSummaryText(res.summary);
       setSummaryState('success');
-      recordUsesLog(apiUserId).catch(() => {});
+      consumeAiUse();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Error';
       setSummaryState(isNoUsesError(msg) ? 'no_uses' : 'error');
       setSummaryError(msg);
     }
-  }, [apiUserId, ctx, blockIfNoUses]);
+  }, [apiUserId, ctx, blockIfNoUses, consumeAiUse]);
 
   const handlePhilosophersReload = useCallback(async () => {
     if (blockIfNoUses()) return;
@@ -181,13 +226,13 @@ export default function PersonalPhilosophyDetailScreen() {
       const res = await generatePhilosophers(apiUserId, ctx);
       setPhilosophers(res.philosophers);
       setPhilosophersState('success');
-      recordUsesLog(apiUserId).catch(() => {});
+      consumeAiUse();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Error';
       setPhilosophersState(isNoUsesError(msg) ? 'no_uses' : 'error');
       setPhilosophersError(msg);
     }
-  }, [apiUserId, ctx, blockIfNoUses]);
+  }, [apiUserId, ctx, blockIfNoUses, consumeAiUse]);
 
   const handleBooksReload = useCallback(() => {
     if (blockIfNoUses()) return;
@@ -200,18 +245,37 @@ export default function PersonalPhilosophyDetailScreen() {
 
     if (result.status === 'exhausted') {
       setBooksExhausted(true);
+      setBooks(null);
       setBooksState('success');
+      consumeAiUse();
+      void savePhilosophyBooks(apiUserId, {
+        books: [],
+        shownBookIds,
+        exhausted: true,
+      });
       return;
     }
 
     const newBooks = result.books;
+    const nextShownIds = [...shownBookIds, ...newBooks.map((b) => b.id)];
     setBooks(newBooks);
     setBooksExhausted(false);
     setBooksState('success');
-    // Add newly shown book ids to the history so they are never repeated
-    setShownBookIds((prev) => [...prev, ...newBooks.map((b) => b.id)]);
-    recordUsesLog(apiUserId).catch(() => {});
-  }, [apiUserId, profile.rank, profile.philosophyPercentages, shownBookIds, blockIfNoUses]);
+    setShownBookIds(nextShownIds);
+    consumeAiUse();
+    void savePhilosophyBooks(apiUserId, {
+      books: newBooks,
+      shownBookIds: nextShownIds,
+      exhausted: false,
+    });
+  }, [
+    apiUserId,
+    profile.rank,
+    profile.philosophyPercentages,
+    shownBookIds,
+    blockIfNoUses,
+    consumeAiUse,
+  ]);
 
   const handleJobsReload = useCallback(async () => {
     if (blockIfNoUses()) return;
@@ -221,13 +285,13 @@ export default function PersonalPhilosophyDetailScreen() {
       const res = await generateJobs(apiUserId, ctx);
       setJobs(res.jobs);
       setJobsState('success');
-      recordUsesLog(apiUserId).catch(() => {});
+      consumeAiUse();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Error';
       setJobsState(isNoUsesError(msg) ? 'no_uses' : 'error');
       setJobsError(msg);
     }
-  }, [apiUserId, ctx, blockIfNoUses]);
+  }, [apiUserId, ctx, blockIfNoUses, consumeAiUse]);
 
   // ─── Navigation ─────────────────────────────────────────────────────────
   const handleBottomTabChange = useCallback(
