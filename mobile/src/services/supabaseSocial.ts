@@ -47,18 +47,39 @@ export function isRealUserId(id: string): boolean {
 // ─── Posts ────────────────────────────────────────────────────────────────────
 
 export async function fetchAllPosts(): Promise<SimPost[]> {
-  const { data, error } = await supabase
-    .from('posts')
+  // Read from the live view so the clan we display on each card matches
+  // the author's CURRENT clan, not the one frozen at publish time.
+  // Falls back to the legacy `posts` table if the view doesn't exist yet
+  // (e.g. SQL migration hasn't been applied) — same shape, just minus
+  // the live_* columns.
+  const primary = await supabase
+    .from('posts_with_author_clan')
     .select('*')
     .in('type', ['reflection', 'phrase'])
     .order('created_at', { ascending: false })
     .limit(200);
-  if (error) { console.error('[Social] fetchAllPosts:', error.message); return []; }
-  // Filter out hidden posts client-side; is_hidden column may not exist yet.
-  return (data ?? [])
+
+  let rows: Record<string, unknown>[] = [];
+  if (primary.error) {
+    console.warn('[Social] view posts_with_author_clan unavailable, falling back to posts table:', primary.error.message);
+    const fallback = await supabase
+      .from('posts')
+      .select('*')
+      .in('type', ['reflection', 'phrase'])
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (fallback.error) {
+      console.error('[Social] fetchAllPosts:', fallback.error.message);
+      return [];
+    }
+    rows = (fallback.data ?? []) as Record<string, unknown>[];
+  } else {
+    rows = (primary.data ?? []) as Record<string, unknown>[];
+  }
+
+  return rows
     .filter(
-      (row: Record<string, unknown>) =>
-        row['is_hidden'] !== true && isPublishedSimPostType(row['type']),
+      (row) => row['is_hidden'] !== true && isPublishedSimPostType(row['type']),
     )
     .map(dbRowToSimPost);
 }
@@ -77,13 +98,32 @@ export async function removePost(postId: string): Promise<void> {
 // ─── Comments ─────────────────────────────────────────────────────────────────
 
 export async function fetchCommentsForPost(postId: string): Promise<SimComment[]> {
-  const { data, error } = await supabase
-    .from('comments')
+  // Read from the live view so commenter colours match their CURRENT
+  // clan in profiles, not the one they had when they wrote the comment.
+  // Falls back to the legacy `comments` table if the view doesn't exist.
+  const primary = await supabase
+    .from('comments_with_author_clan')
     .select('*')
     .eq('post_id', postId)
     .order('created_at', { ascending: true });
-  if (error) { console.error('[Social] fetchComments:', error.message); return []; }
-  return (data ?? []).map(dbRowToSimComment);
+
+  let rows: Record<string, unknown>[] = [];
+  if (primary.error) {
+    console.warn('[Social] view comments_with_author_clan unavailable, falling back to comments table:', primary.error.message);
+    const fallback = await supabase
+      .from('comments')
+      .select('*')
+      .eq('post_id', postId)
+      .order('created_at', { ascending: true });
+    if (fallback.error) {
+      console.error('[Social] fetchComments:', fallback.error.message);
+      return [];
+    }
+    rows = (fallback.data ?? []) as Record<string, unknown>[];
+  } else {
+    rows = (primary.data ?? []) as Record<string, unknown>[];
+  }
+  return rows.map(dbRowToSimComment);
 }
 
 export async function insertComment(comment: SimComment): Promise<void> {
@@ -316,16 +356,37 @@ export async function setProfilePrivate(userId: string, isPrivate: boolean): Pro
 
 /** Fetch all posts from a specific author (for their profile page). */
 export async function fetchPostsByUser(userId: string): Promise<SimPost[]> {
-  const { data, error } = await supabase
-    .from('posts')
+  // Use the live view (see fetchAllPosts) so the cards repaint when the
+  // author changes clan. Falls back to the legacy table if needed.
+  const primary = await supabase
+    .from('posts_with_author_clan')
     .select('*')
     .eq('author_id', userId)
     .in('type', ['reflection', 'phrase'])
     .order('created_at', { ascending: false })
     .limit(50);
-  if (error) { console.error('[Social] fetchPostsByUser:', error.message); return []; }
-  const posts = (data ?? [])
-    .filter((row: Record<string, unknown>) => isPublishedSimPostType(row['type']))
+
+  let rows: Record<string, unknown>[] = [];
+  if (primary.error) {
+    console.warn('[Social] view posts_with_author_clan unavailable, falling back to posts table:', primary.error.message);
+    const fallback = await supabase
+      .from('posts')
+      .select('*')
+      .eq('author_id', userId)
+      .in('type', ['reflection', 'phrase'])
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (fallback.error) {
+      console.error('[Social] fetchPostsByUser:', fallback.error.message);
+      return [];
+    }
+    rows = (fallback.data ?? []) as Record<string, unknown>[];
+  } else {
+    rows = (primary.data ?? []) as Record<string, unknown>[];
+  }
+
+  const posts = rows
+    .filter((row) => isPublishedSimPostType(row['type']))
     .map(dbRowToSimPost);
   if (posts.length === 0) return posts;
   // Hydrate vote counts.
@@ -594,12 +655,23 @@ export async function fetchMyReports(reporterId: string): Promise<Report[]> {
 // ─── Mapping helpers ──────────────────────────────────────────────────────────
 
 function simPostToDbRow(p: SimPost) {
+  // author_clan_id and author_rank are NOT written here. They exist on
+  // the `posts` table as legacy columns, but the live values are resolved
+  // in real time by the `posts_with_author_clan` view (JOIN profiles).
+  //
+  // Writing a frozen value would be the root cause of "post stuck with
+  // an old clan" bug — by leaving them out we guarantee the view's
+  // `live_*` columns are the only source of truth.
+  //
+  //   • author_clan_id  → stays NULL (column is nullable)
+  //   • author_rank     → falls back to schema default 'aprendiz'
+  //                       (column is NOT NULL with a default; we omit
+  //                       the key so Postgres applies the default)
   return {
     id:              p.id,
     author_id:       p.authorId,
     author_username: p.authorUsername ?? '',
-    author_clan_id:  p.authorClanId  ?? null,
-    author_rank:     p.authorRank    ?? 'aprendiz',
+    author_clan_id:  null,
     type:            p.type,
     title:           p.title         ?? null,
     body:            p.body,
@@ -609,12 +681,18 @@ function simPostToDbRow(p: SimPost) {
 }
 
 export function dbRowToSimPost(row: Record<string, unknown>): SimPost {
+  // When reading from the posts_with_author_clan view we get two extra
+  // columns: live_author_clan_id and live_author_rank, resolved from the
+  // author's CURRENT profile. Prefer those over the frozen-at-publish
+  // values so post cards always match the author's actual clan today.
+  const liveClan = row['live_author_clan_id'] as string | null | undefined;
+  const liveRank = row['live_author_rank'] as Rank | null | undefined;
   return {
     id:             row.id             as string,
     authorId:       row.author_id      as string,
     authorUsername: row.author_username as string,
-    authorClanId:   row.author_clan_id  as string | null,
-    authorRank:     row.author_rank     as Rank,
+    authorClanId:   liveClan !== undefined ? (liveClan ?? null) : ((row.author_clan_id as string | null) ?? null),
+    authorRank:     (liveRank as Rank | undefined) ?? (row.author_rank as Rank),
     type:           row.type            as 'reflection' | 'phrase',
     title:          row.title           as string | undefined,
     body:           row.body            as string,
@@ -627,26 +705,32 @@ export function dbRowToSimPost(row: Record<string, unknown>): SimPost {
 }
 
 function simCommentToDbRow(c: SimComment) {
+  // Same principle as simPostToDbRow: never freeze the author's clan or
+  // rank into the comments row. We resolve them live from profiles when
+  // we read (currently via direct mapping; can be moved behind a view
+  // if comments end up needing live clan colours too).
   return {
     id:              c.id,
     post_id:         c.postId,
     author_id:       c.authorId,
     author_username: c.authorUsername ?? '',
-    author_clan_id:  c.authorClanId  ?? null,
-    author_rank:     c.authorRank    ?? 'aprendiz',
+    author_clan_id:  null,
     body:            c.body,
     created_at:      c.createdAt,
   };
 }
 
 export function dbRowToSimComment(row: Record<string, unknown>): SimComment {
+  // Same logic as dbRowToSimPost — prefer the live_* values from the view.
+  const liveClan = row['live_author_clan_id'] as string | null | undefined;
+  const liveRank = row['live_author_rank'] as Rank | null | undefined;
   return {
     id:             row.id              as string,
     postId:         row.post_id         as string,
     authorId:       row.author_id       as string,
     authorUsername: row.author_username as string,
-    authorClanId:   row.author_clan_id  as string | null,
-    authorRank:     row.author_rank     as Rank,
+    authorClanId:   liveClan !== undefined ? (liveClan ?? null) : ((row.author_clan_id as string | null) ?? null),
+    authorRank:     (liveRank as Rank | undefined) ?? (row.author_rank as Rank),
     body:           row.body            as string,
     upCount:        0,
     createdAt:      row.created_at      as string,

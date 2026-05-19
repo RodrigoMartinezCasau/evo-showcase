@@ -13,7 +13,6 @@
 import { usePreviewMode } from '@evoconn/debug/PreviewModeContext';
 import { useAuth } from '../../mobile/lib/AuthContext';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
-import { isRealUserId } from '@evoconn/services/supabaseSocial';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 
 export function useEffectiveClanId(userId?: string): string | null {
@@ -24,11 +23,10 @@ export function useEffectiveClanId(userId?: string): string | null {
   if (isPreviewActive) return previewClanId ?? null;
 
   const targetId = userId ?? profile?.id ?? mockCurrentUser.id;
-  const visibleClan = classification.getVisibleClanId(targetId);
-
-  if (profile?.id && targetId === profile.id && isRealUserId(profile.id)) {
-    return profile.clan_id ?? visibleClan ?? null;
-  }
-
-  return visibleClan ?? null;
+  // The local ClassificationContext is the sole source of truth for the
+  // self-user's clan. It is heal-validated on disk load and on hydrate
+  // from Supabase backup, so a dangling `profiles.clan_id` (without a
+  // matching state backup) can never resurrect a ghost clan. A clean
+  // reset ("Sin clan") therefore propagates immediately to the UI.
+  return classification.getVisibleClanId(targetId) ?? null;
 }

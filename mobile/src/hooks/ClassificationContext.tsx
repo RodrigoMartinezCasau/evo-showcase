@@ -53,6 +53,7 @@ import {
 } from '@evoconn/services/clanClassifier';
 import { useSimulation } from './SimulationContext';
 import {
+  healState,
   loadClassificationDb,
   saveClassificationDb,
   makeEmptyUserState,
@@ -60,6 +61,12 @@ import {
   type ClassificationDatabase,
   type UserClassificationState,
 } from '@evoconn/services/classificationStorage';
+import {
+  fetchPublishedClassification,
+  pushClassificationSnapshot,
+} from '@evoconn/services/classificationSync';
+import { useAuth } from '../../mobile/lib/AuthContext';
+import { isRealUserId } from '@evoconn/services/supabaseSocial';
 import { getDefaultApiUrl, mergeApiHeaders } from '@evoconn/services/apiRuntimeConfig';
 import { getRankFromPct } from '@evoconn/utils/getRankFromPct';
 import type { Rank } from '@evoconn/types';
@@ -180,6 +187,16 @@ export type ClassificationContextValue = {
 
   /** Raw state for debugging / advanced screens. */
   getUserState: (userId?: string) => UserClassificationState;
+
+  /**
+   * Force-publish the given (or active) user's current local state to
+   * Supabase right now. Used by EffectiveClanSync as a retry safety net
+   * when an earlier inline push failed.
+   */
+  publishNow: (userId?: string) => Promise<void>;
+
+  /** True if a Supabase publish for this user failed and is pending retry. */
+  isDirty: (userId?: string) => boolean;
 };
 
 const ClassificationContext = createContext<ClassificationContextValue | null>(null);
@@ -368,12 +385,19 @@ function deriveVisibleClan(
 export function ClassificationProvider({ children }: { children: ReactNode }) {
   const sim = useSimulation();
   const activeUserId = sim.activeUserId;
+  const { profile } = useAuth();
 
   const [db, setDb] = useState<ClassificationDatabase>({});
   const [loading, setLoading] = useState(true);
 
   // Hydration guard — avoid clobbering disk before initial load resolves.
   const hydratedRef = useRef(false);
+  // Track which real users we've already attempted to hydrate from Supabase,
+  // so a "first launch after reinstall" only fetches once per user.
+  const hydratedFromSupabaseRef = useRef<Set<string>>(new Set());
+  // Real user IDs whose latest local state failed to publish to Supabase.
+  // EffectiveClanSync drains this set on every render as a retry safety net.
+  const dirtyUsersRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -394,6 +418,31 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
     if (!hydratedRef.current) return;
     void saveClassificationDb(db);
   }, [db]);
+
+  // ── Cross-device recovery ──────────────────────────────────────────────────
+  // After local load, if the authenticated REAL user has no local record (e.g.
+  // fresh install or AsyncStorage wiped), pull their last published snapshot
+  // from Supabase and seed the local store. Idempotent — only the first
+  // successful hydration per (userId) takes effect.
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    const uid = profile?.id;
+    if (!uid || !isRealUserId(uid)) return;
+    if (db[uid]) return;
+    if (hydratedFromSupabaseRef.current.has(uid)) return;
+    hydratedFromSupabaseRef.current.add(uid);
+
+    let cancelled = false;
+    void (async () => {
+      const snapshot = await fetchPublishedClassification(uid);
+      if (cancelled || !snapshot) return;
+      // Race guard: if a write happened in the meantime, don't clobber.
+      setDb((prev) => (prev[uid] ? prev : { ...prev, [uid]: snapshot.state }));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.id, db]);
 
   // ── Helpers that read state ───────────────────────────────────────────
   const getUserStateInternal = useCallback(
@@ -456,6 +505,16 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
   );
 
   // ── Action: record a new input ────────────────────────────────────────
+  //
+  // Sync model: AsyncStorage is a local cache; Supabase is the public
+  // source of truth. Every recordInput call publishes the new snapshot
+  // to Supabase **immediately** (no debounce). Because callers invoke
+  // this with `void` (fire-and-forget) from the reflection / phrase flow,
+  // the extra network round-trip never delays the user-visible answer.
+  //
+  // If the push fails (offline, RLS, transient error) we mark the user's
+  // local state as dirty so EffectiveClanSync picks it up later as a
+  // retry safety net.
   const recordInput = useCallback(
     async (text: string, type: InputType, inputId?: string): Promise<void> => {
       const userId = activeUserId;
@@ -481,6 +540,12 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
       const nowIso = new Date().toISOString();
       const generatedId =
         inputId ?? `cls-${type}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+      // Capture the state we wrote so we can push the *exact* same snapshot
+      // to Supabase outside the setDb callback (setDb's updater must be pure
+      // and React may invoke it more than once).
+      let publishedState: UserClassificationState | null = null;
+      let publishedRank: Rank = 'aprendiz';
 
       setDb((prev) => {
         const prevState = prev[userId] ?? makeEmptyUserState();
@@ -562,7 +627,7 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
           createdAt: nowIso,
         };
 
-        const nextState: UserClassificationState = {
+        const candidateState: UserClassificationState = {
           inputs: [...prevState.inputs, nextRecord],
           totals: newTotals,
           totalReflectionsSent,
@@ -573,10 +638,59 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
           revealedAt: reveal.revealedAt,
           lastSwitchAt: reveal.lastSwitchAt,
         };
+        // Defense-in-depth: if deriveVisibleClan ever leaves the state in
+        // an incoherent shape (impossible today, but guards against future
+        // regressions and against weird hydration edge cases), self-heal.
+        const nextState = healState(candidateState);
+        nextState.inputs = candidateState.inputs;
         trimInputs(nextState);
+
+        publishedState = nextState;
+        publishedRank = getDisplayRankForState(nextState);
 
         return { ...prev, [userId]: nextState };
       });
+
+      // ── Immediate publish to Supabase (universal source of truth) ───────
+      //
+      // We don't await this inside the reflection submission flow because
+      // callers fire-and-forget; but doing it here (instead of relying on
+      // the debounced EffectiveClanSync) guarantees that the very next
+      // time anyone fetches this user's profile they see the same clan
+      // and percentages the user just saw on their own device.
+      if (publishedState && isRealUserId(userId)) {
+        try {
+          await pushClassificationSnapshot(userId, publishedState, publishedRank);
+          dirtyUsersRef.current.delete(userId);
+        } catch {
+          // Network / RLS / transient — let EffectiveClanSync retry later.
+          dirtyUsersRef.current.add(userId);
+        }
+      }
+    },
+    [activeUserId],
+  );
+
+  const publishNow = useCallback(
+    async (userId?: string): Promise<void> => {
+      const id = userId ?? activeUserId;
+      if (!isRealUserId(id)) return;
+      const state = db[id];
+      if (!state) return;
+      try {
+        await pushClassificationSnapshot(id, state, getDisplayRankForState(state));
+        dirtyUsersRef.current.delete(id);
+      } catch {
+        dirtyUsersRef.current.add(id);
+      }
+    },
+    [db, activeUserId],
+  );
+
+  const isDirty = useCallback(
+    (userId?: string): boolean => {
+      const id = userId ?? activeUserId;
+      return dirtyUsersRef.current.has(id);
     },
     [activeUserId],
   );
@@ -592,6 +706,8 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
       getClanRankHistory,
       getDisplayRank,
       getUserState: getUserStateInternal,
+      publishNow,
+      isDirty,
     }),
     [
       loading,
@@ -603,6 +719,8 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
       getClanRankHistory,
       getDisplayRank,
       getUserStateInternal,
+      publishNow,
+      isDirty,
     ],
   );
 

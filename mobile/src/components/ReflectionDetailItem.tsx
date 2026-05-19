@@ -51,6 +51,7 @@ import type { SimComment } from '@evoconn/data/simulation/simulatedNetwork';
 import { blockUser, insertReport, isRealUserId } from '@evoconn/services/supabaseSocial';
 import { useAuth } from '../../mobile/lib/AuthContext';
 import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
+import { rankCommentsForViewer } from '@evoconn/logic/comments/commentRanking';
 import { computePhraseDetailTypography } from '@evoconn/utils/phraseDetailTypography';
 import { getAppPostOpenUrl } from '@evoconn/utils/appShareLinks';
 import {
@@ -736,10 +737,23 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     ],
   );
 
-  const visibleComments = useMemo(
-    () => contextComments.filter((c) => !blockedUsers.has(c.author.id)),
-    [contextComments, blockedUsers],
-  );
+  const viewerClanIdForRanking =
+    authProfile?.clan_id ?? mockCurrentUser.clanId ?? null;
+  const viewerIdForRanking =
+    (session?.user?.id && isRealUserId(session.user.id)
+      ? session.user.id
+      : mockCurrentUser.id) ?? null;
+
+  // Ordenación personalizada: mejor comentario primero (mezcla de votos +
+  // recencia residual) con boost para autores del mismo clan que el lector,
+  // siempre que el lector pertenezca a uno de los 8 clanes filosóficos.
+  const visibleComments = useMemo(() => {
+    const filtered = contextComments.filter((c) => !blockedUsers.has(c.author.id));
+    return rankCommentsForViewer(filtered, {
+      viewerClanId: viewerClanIdForRanking,
+      viewerId: viewerIdForRanking,
+    });
+  }, [contextComments, blockedUsers, viewerClanIdForRanking, viewerIdForRanking]);
 
   const actionColStyle = useMemo(() => {
     if (reflPanelLayout) {

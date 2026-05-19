@@ -15,8 +15,10 @@ import { mockSearchableUsers } from '../data/mockSearchUsers';
 import { searchUsers, type ScoredUser } from '../utils/searchUsers';
 import { UserResultCard } from './UserResultCard';
 import { fetchFollowersCountsBatch, searchSupabaseUsers } from '../services/supabaseSocial';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../mobile/lib/AuthContext';
 import { useEffectiveClanId } from '@evoconn/hooks/useEffectiveClanId';
+import { getClanColor } from '@evoconn/constants/clanColors';
 
 const MAX_RECENTS = 10;
 const DEBOUNCE_MS = 250;
@@ -35,6 +37,7 @@ type SearchScreenProps = {
 export function SearchScreen({ onUserPress }: SearchScreenProps) {
   const { profile } = useAuth();
   const myEffectiveClanId = useEffectiveClanId();
+  const myClanColor = getClanColor(myEffectiveClanId);
   const inputRef = useRef<TextInput>(null);
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -157,7 +160,7 @@ export function SearchScreen({ onUserPress }: SearchScreenProps) {
         activeOpacity={0.7}
         onPress={() => handleRecentPress(item)}
       >
-        <Text style={styles.recentIcon}>🕐</Text>
+        <Ionicons name="time-outline" size={16} color={myClanColor} style={styles.recentIcon} />
         <Text style={styles.recentText} numberOfLines={1}>{item}</Text>
       </TouchableOpacity>
       <TouchableOpacity
@@ -168,7 +171,7 @@ export function SearchScreen({ onUserPress }: SearchScreenProps) {
         <Text style={styles.recentDeleteText}>✕</Text>
       </TouchableOpacity>
     </View>
-  ), [handleRecentPress, removeRecent]);
+  ), [handleRecentPress, removeRecent, myClanColor]);
 
   return (
     <Pressable style={styles.container} onPress={Keyboard.dismiss}>
@@ -320,7 +323,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   recentIcon: {
-    fontSize: 14,
+    width: 16,
   },
   recentText: {
     color: evoconnColors.text,

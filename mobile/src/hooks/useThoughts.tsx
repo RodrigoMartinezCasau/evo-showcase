@@ -35,6 +35,14 @@ import {
   type PersistedThought,
   type ThoughtsDatabase,
 } from '@evoconn/services/thoughtsStorage';
+import {
+  deleteThoughtRemote,
+  fetchUserThoughts,
+  mergeThoughts,
+  pushThought,
+} from '@evoconn/services/thoughtsSync';
+import { isRealUserId } from '@evoconn/services/supabaseSocial';
+import { useAuth } from '../../mobile/lib/AuthContext';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
 
 export type ThoughtEntry = ConversationItem & {
@@ -67,9 +75,43 @@ const ThoughtsContext = createContext<ThoughtsContextValue | null>(null);
 export function ThoughtsProvider({ children }: { children: React.ReactNode }) {
   const sim = useSimulation();
   const activeUserId = sim.activeUserId;
+  const { profile: authProfile } = useAuth();
 
   // List of every known user ID — used to migrate any legacy v2 per-user keys.
   const knownUserIds = useMemo(() => Object.keys(sim.users), [sim.users]);
+
+  // ── Supabase backup wiring ─────────────────────────────────────────────────
+  //
+  // For real (Supabase-authenticated) users we mirror every thought into
+  // public.user_thoughts so a reinstall / device switch / backend wipe
+  // can never lose history. Mirroring is per-thoughtId debounced so a
+  // chat stream of N tokens collapses into one upsert.
+  const pushTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const PUSH_DEBOUNCE_MS = 800;
+
+  const schedulePush = useCallback((userId: string, thought: PersistedThought) => {
+    if (!isRealUserId(userId)) return;
+    const key = `${userId}:${thought.id}`;
+    const timers = pushTimersRef.current;
+    const existing = timers.get(key);
+    if (existing) clearTimeout(existing);
+    const t = setTimeout(() => {
+      timers.delete(key);
+      // Snapshot the latest state by re-reading dbRef inside the timer.
+      const list = dbRef.current[userId] ?? [];
+      const latest = list.find((x) => x.id === thought.id) ?? thought;
+      void pushThought(userId, latest);
+    }, PUSH_DEBOUNCE_MS);
+    timers.set(key, t);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      // Cleanup all pending timers on unmount.
+      for (const t of pushTimersRef.current.values()) clearTimeout(t);
+      pushTimersRef.current.clear();
+    };
+  }, []);
 
   /**
    * The COMPLETE multi-user thoughts database lives here.  It is the single
@@ -116,6 +158,44 @@ export function ThoughtsProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── Cross-device recovery: hydrate real user's thoughts from Supabase ─────
+  //
+  // Runs once per authenticated session (per userId). The merge is
+  // non-destructive: if local has a longer thread than remote we keep
+  // local, and vice-versa (see mergeThoughts). This protects users who:
+  //   • reinstalled the app (local empty → repopulate from remote)
+  //   • switched device (same Supabase user, different AsyncStorage)
+  //   • survived a backend SQLite wipe (messages now live here too)
+  const hydratedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const uid = authProfile?.id;
+    if (!uid || !isRealUserId(uid)) return;
+    if (loading) return; // wait for the local load to finish first
+    if (hydratedRef.current.has(uid)) return;
+    hydratedRef.current.add(uid);
+
+    let cancelled = false;
+    void (async () => {
+      const remote = await fetchUserThoughts(uid);
+      if (cancelled || remote.length === 0) return;
+      setDb((prev) => {
+        const localSlice = prev[uid] ?? [];
+        const merged = mergeThoughts(localSlice, remote);
+        if (merged.length === localSlice.length && merged.every((m, i) => m === localSlice[i])) {
+          return prev; // no-op: nothing actually changed
+        }
+        const next: ThoughtsDatabase = { ...prev, [uid]: merged };
+        saveAllThoughts(next).catch(() => {});
+        // eslint-disable-next-line no-console
+        console.log('[THOUGHTS] Hydrated from Supabase backup:', uid, 'remote=', remote.length, 'merged=', merged.length);
+        return next;
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authProfile?.id, loading]);
+
   // ── Core mutation: update one user's slice and persist the whole db ────────
 
   const mutateUserSlice = useCallback(
@@ -153,11 +233,12 @@ export function ThoughtsProvider({ children }: { children: React.ReactNode }) {
         ownerUserId: userId,
       };
       mutateUserSlice(userId, (prev) => [entry, ...prev]);
+      schedulePush(userId, entry);
       // eslint-disable-next-line no-console
       console.log(`[THOUGHTS] createThought (reflection) id=${id} ownerUserId=${userId}`);
       return id;
     },
-    [mutateUserSlice],
+    [mutateUserSlice, schedulePush],
   );
 
   const createPhraseThought = useCallback(
@@ -180,11 +261,12 @@ export function ThoughtsProvider({ children }: { children: React.ReactNode }) {
         ownerUserId: userId,
       };
       mutateUserSlice(userId, (prev) => [entry, ...prev]);
+      schedulePush(userId, entry);
       // eslint-disable-next-line no-console
       console.log(`[THOUGHTS] createPhraseThought id=${id} ownerUserId=${userId}`);
       return id;
     },
-    [mutateUserSlice],
+    [mutateUserSlice, schedulePush],
   );
 
   const updateThought = useCallback(
@@ -218,8 +300,13 @@ export function ThoughtsProvider({ children }: { children: React.ReactNode }) {
             : t,
         ),
       );
+      // Debounced push to Supabase. We look up the latest snapshot inside
+      // the timer so streaming updates collapse into a single network call.
+      const list = dbRef.current[targetUserId] ?? [];
+      const thoughtNow = list.find((t) => t.id === id);
+      if (thoughtNow) schedulePush(targetUserId, thoughtNow);
     },
-    [mutateUserSlice],
+    [mutateUserSlice, schedulePush],
   );
 
   const removeThought = useCallback(
@@ -240,6 +327,14 @@ export function ThoughtsProvider({ children }: { children: React.ReactNode }) {
         api.deleteDebate(id).catch(() => {});
       }
       mutateUserSlice(targetUserId, (prev) => prev.filter((t) => t.id !== id));
+      // Cancel any pending debounced push for this thought + delete remote.
+      const key = `${targetUserId}:${id}`;
+      const t = pushTimersRef.current.get(key);
+      if (t) {
+        clearTimeout(t);
+        pushTimersRef.current.delete(key);
+      }
+      void deleteThoughtRemote(targetUserId, id);
     },
     [mutateUserSlice],
   );

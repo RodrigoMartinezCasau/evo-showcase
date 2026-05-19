@@ -11,6 +11,7 @@ import type {
   SendMessageResponse,
 } from '@evoconn/types/debate';
 import { getDefaultApiUrl, mergeApiHeaders } from './apiRuntimeConfig';
+import { logAiUsageEvent } from './supabaseAnalytics';
 
 /**
  * Backend base URL.
@@ -156,6 +157,7 @@ export async function createDebate(
   }
   if (!res.ok) throw new Error(await getApiErrorMessage(res));
   const data = await res.json();
+  void logAiUsageEvent({ source: 'debate_create', model: 'backend' });
   return { id: data.id, title: data.title };
 }
 
@@ -207,7 +209,9 @@ export async function sendMessage(
     throw new Error(networkError(msg));
   }
   if (!res.ok) throw new Error(await getApiErrorMessage(res));
-  return (await res.json()) as SendMessageResponse;
+  const data = (await res.json()) as SendMessageResponse;
+  void logAiUsageEvent({ source: 'debate_chat', model: 'backend' });
+  return data;
 }
 
 export async function deleteDebate(id: string): Promise<void> {

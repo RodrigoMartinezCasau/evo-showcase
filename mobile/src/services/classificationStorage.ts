@@ -28,6 +28,7 @@ import {
   type InputType,
   ALL_CLAN_IDS,
   makeZeroScores,
+  totalsToPercentages,
 } from './clanClassifier';
 import type { Rank } from '@evoconn/types';
 
@@ -154,9 +155,118 @@ function sanitiseDb(raw: unknown): ClassificationDatabase {
   const out: ClassificationDatabase = {};
   for (const [userId, state] of Object.entries(raw as Record<string, unknown>)) {
     if (typeof userId !== 'string' || !userId) continue;
-    out[userId] = sanitiseUserState(state);
+    out[userId] = healState(sanitiseUserState(state));
   }
   return out;
+}
+
+// ─── Self-healing (consistency guarantees) ────────────────────────────────────
+//
+// Three corruption modes we've seen in the wild that healState eliminates:
+//
+//   A. Ghost-clan: visibleClanId is set, but totals are all zero / counters
+//      are zero. Cause: AsyncStorage wiped while Supabase still had the old
+//      `clan_id`, then the user got hydrated from a partial backup. Fix:
+//      treat counters/totals as the source of truth → drop the clan.
+//
+//   B. Mismatched-clan: visibleClanId says X, but in the percentages another
+//      clan dominates by a wide margin (e.g. "soy existencialista pero
+//      tengo 35% racionalista y 20% humanista"). This means the on-disk
+//      visibleClanId lost causality with the totals (interrupted write, bad
+//      migration, manual edit). Fix: if a different clan satisfies the
+//      reveal threshold AND leads X by at least REVEAL_LEAD_OVER_SECOND_PP,
+//      promote it; otherwise un-reveal completely. This is intentionally
+//      stricter than the in-app switch rule because we're reacting to a
+//      corruption, not to a normal score drift.
+//
+//   C. Weak-clan: visibleClanId is set but pct < a sanity floor. Inertia
+//      can legitimately keep a clan below 25%, but going below 10% means
+//      the state is no longer believable.
+//
+// Heal is idempotent — a healed state passes through unchanged on a re-run.
+
+/** A clan losing this much pct vs the current top is treated as a corruption signal. */
+const HEAL_LEAD_OVER_CLAIM_PP = 5;
+/** Top clan must reach at least this pct before we promote it on heal. */
+const HEAL_PROMOTE_TOP_PCT = 25;
+/** Floor below which a revealed clan is no longer believable. */
+const HEAL_MIN_CLAIM_PCT = 10;
+
+export function healState(state: UserClassificationState): UserClassificationState {
+  const totalInputs = state.totalReflectionsSent + state.totalPhrasesSent;
+  const totalMass = ALL_CLAN_IDS.reduce((s, c) => s + (state.totals[c] ?? 0), 0);
+
+  // ── Mode A: zero inputs / zero totals → no clan should survive ─────────────
+  if (totalInputs === 0 && totalMass === 0) {
+    if (
+      state.visibleClanId === null &&
+      state.revealedAt === null &&
+      state.lastSwitchAt === null &&
+      Object.keys(state.clanRankHistory ?? {}).length === 0
+    ) {
+      return state; // already a clean empty state
+    }
+    return makeEmptyUserState();
+  }
+
+  if (state.visibleClanId === null) {
+    // Nothing to validate further — pre-reveal state with some data is fine.
+    return state;
+  }
+
+  // ── Mode B / C: visibleClanId is set; check it against the totals ──────────
+  const pcts = totalsToPercentages(state.totals);
+  const claim = state.visibleClanId;
+  const claimPct = pcts[claim] ?? 0;
+
+  let topId: ClanScoreId = ALL_CLAN_IDS[0];
+  let topPct = pcts[topId];
+  let secondPct = 0;
+  for (const c of ALL_CLAN_IDS) {
+    const p = pcts[c];
+    if (p > topPct) {
+      secondPct = topPct;
+      topPct = p;
+      topId = c;
+    } else if (p > secondPct) {
+      secondPct = p;
+    }
+  }
+
+  // Mode B — another clan clearly dominates and the claim is far behind.
+  const claimedIsNotTop = topId !== claim;
+  const topClearlyLeadsClaim = topPct - claimPct >= HEAL_LEAD_OVER_CLAIM_PP;
+  if (claimedIsNotTop && topPct >= HEAL_PROMOTE_TOP_PCT && topClearlyLeadsClaim) {
+    return {
+      ...state,
+      visibleClanId: topId,
+      lastSwitchAt: new Date().toISOString(),
+    };
+  }
+
+  // Mode C — claimed clan is below the believability floor → un-reveal.
+  if (claimPct < HEAL_MIN_CLAIM_PCT) {
+    return {
+      ...state,
+      visibleClanId: null,
+      revealedAt: null,
+      lastSwitchAt: null,
+    };
+  }
+
+  // Mode B without a clear winner — still demote: if the claim isn't even
+  // top and the gap is significant, fall back to "Sin clan" rather than
+  // promoting an undeserving runner-up.
+  if (claimedIsNotTop && topClearlyLeadsClaim) {
+    return {
+      ...state,
+      visibleClanId: null,
+      revealedAt: null,
+      lastSwitchAt: null,
+    };
+  }
+
+  return state;
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────

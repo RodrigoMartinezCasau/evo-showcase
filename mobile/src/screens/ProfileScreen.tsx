@@ -1,7 +1,7 @@
 import React, { useCallback, useState, useRef, useMemo, useEffect, useLayoutEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet, Animated, Easing, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter, usePathname } from 'expo-router';
+import { useLocalSearchParams, useRouter, usePathname, useFocusEffect } from 'expo-router';
 import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
@@ -130,19 +130,24 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
     setTargetIsPrivate(false);
   }, [userId]);
 
-  useEffect(() => {
-    if (mockProfile || !isRealUserId(userId)) return;
+  // Fetcher refactored so we can invoke it both on userId change and on
+  // screen focus (Ventana 3 close: when you come back to a profile, you
+  // want the latest clan/percentages, not what you cached 2 minutes ago).
+  const reloadOtherProfile = useCallback(
+    async (signal?: { cancelled: boolean }) => {
+      if (mockProfile || !isRealUserId(userId)) return;
+      const [{ data }, counts, posts] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('id, username, clan_id, rank, insignia_phrase, total_reflections, total_quotes, is_private, avatar_url, clan_percentages')
+          .eq('id', userId)
+          .maybeSingle(),
+        fetchFollowCounts(userId),
+        fetchPostsByUser(userId),
+      ]);
 
-    // Fetch profile + follow counts in parallel.
-    Promise.all([
-      supabase
-        .from('profiles')
-        .select('id, username, clan_id, rank, insignia_phrase, total_reflections, total_quotes, is_private, avatar_url')
-        .eq('id', userId)
-        .maybeSingle(),
-      fetchFollowCounts(userId),
-      fetchPostsByUser(userId),
-    ]).then(([{ data }, counts, posts]) => {
+      if (signal?.cancelled) return;
+
       const vid = followGraphRef.current;
       const iFollowed =
         isRealUserId(viewerId) && isRealUserId(userId)
@@ -156,6 +161,9 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
           following: counts.followingCount,
           iFollowed,
         });
+        const remotePcts = Array.isArray((data as { clan_percentages?: unknown }).clan_percentages)
+          ? ((data as { clan_percentages: unknown[] }).clan_percentages as { clanId: string; label: string; pct: number }[])
+          : [];
         setSupabaseProfile({
           id: data.id,
           username: '@' + (data.username ?? '').toUpperCase(),
@@ -164,15 +172,13 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
           followersCount: counts.followersCount,
           followingCount: counts.followingCount,
           insigniaPhrase: data.insignia_phrase ?? '',
-          philosophyPercentages: [],
+          philosophyPercentages: remotePcts,
           totalReflections: data.total_reflections ?? 0,
           totalQuotes: data.total_quotes ?? 0,
           recentPosts: [],
           avatarUri: (data as { avatar_url?: string | null }).avatar_url ?? null,
         });
       }
-      // Convert SimPost → CommunityPost for the slider.
-      // Use the already-fetched profile username so posts always show the real name.
       const resolvedUsername = data?.username
         ? '@' + data.username.toUpperCase()
         : null;
@@ -191,8 +197,30 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
         voteStats: { up: p.upvoterIds.length, down: p.downvoterIds.length, save: p.saverIds.length },
         createdAt: p.createdAt,
       })));
-    });
-  }, [userId, mockProfile, viewerId]);
+    },
+    [userId, mockProfile, viewerId],
+  );
+
+  useEffect(() => {
+    const signal = { cancelled: false };
+    void reloadOtherProfile(signal);
+    return () => {
+      signal.cancelled = true;
+    };
+  }, [reloadOtherProfile]);
+
+  // Refresh whenever the screen regains focus (closes Ventana 3 — the
+  // "I'm seeing a stale clan because I opened the profile 2 min ago"
+  // problem). Cheap because the queries hit indexed columns.
+  useFocusEffect(
+    useCallback(() => {
+      const signal = { cancelled: false };
+      void reloadOtherProfile(signal);
+      return () => {
+        signal.cancelled = true;
+      };
+    }, [reloadOtherProfile]),
+  );
 
   // Static profile data (username, rank, insignia, etc.)
   // Falls back to supabaseProfile for real users, or first mock user as last resort.
@@ -227,18 +255,25 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
     isRealUserId(viewerId) &&
     viewerId !== userId;
 
-  // Per-user real philosophical classification — replaces seed clanId and
-  // seed philosophyPercentages so even other simulated users start as
-  // "Sin clan" and only get a clan when their own classification reveals it.
+  // Source of truth for clan + percentages:
+  //   • SIM users (u1..u9): local ClassificationContext (the device "plays"
+  //     them, so the local store is authoritative).
+  //   • REAL users (other Supabase accounts): the public copy on
+  //     `profiles.clan_id` / `clan_percentages`, which EffectiveClanSync
+  //     keeps up to date for the user that owns it. Without this we'd
+  //     overwrite the remote values with the viewer's (always-empty) local
+  //     classification for that userId — that was the root cause of "other
+  //     users always look Sin clan / lime-green".
   const classification = useClassification();
-  const realClanId = classification.getVisibleClanId(userId);
-  const realPercentages = classification.getPercentages(userId);
-  const profile = {
-    ...baseProfile,
-    clanId: realClanId,
-    rank: classification.getDisplayRank(userId),
-    philosophyPercentages: realPercentages,
-  };
+  const isSimUser = !!mockProfile;
+  const profile = isSimUser
+    ? {
+        ...baseProfile,
+        clanId: classification.getVisibleClanId(userId),
+        rank: classification.getDisplayRank(userId),
+        philosophyPercentages: classification.getPercentages(userId),
+      }
+    : baseProfile;
 
   const profileWithLiveFollowers = useMemo(() => {
     if (mockProfile || !isRealUserId(userId) || !followCountSnap) return profile;

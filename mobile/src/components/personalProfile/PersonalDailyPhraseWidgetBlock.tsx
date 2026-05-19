@@ -112,7 +112,7 @@ export const PersonalDailyPhraseWidgetBlock = React.memo(function PersonalDailyP
         ]}
       >
         <Text style={[styles.label, { color: titleColor }]} numberOfLines={2}>
-          Frase del día
+          Widgets
         </Text>
         {SvgStar ? (
           <View

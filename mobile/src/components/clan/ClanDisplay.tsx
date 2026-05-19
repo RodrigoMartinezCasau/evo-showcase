@@ -12,7 +12,7 @@
  *  5. Descripción del clan
  *  6. Top publicaciones (horizontal scrollable)
  */
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -62,6 +62,8 @@ import { ClanRankingCard } from './ClanRankingCard';
 import { useAuth } from '../../../mobile/lib/AuthContext';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import { useEffectiveClanId } from '@evoconn/hooks/useEffectiveClanId';
+import { fetchClanMembers, type ClanMemberSummary } from '@evoconn/services/classificationSync';
+import { isRealUserId } from '@evoconn/services/supabaseSocial';
 import type { CommunityPost } from '@evoconn/types';
 import type { ClanMember } from '@evoconn/data/mockClanProfiles';
 
@@ -196,17 +198,42 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
   const classification = useClassification();
   const realUserClanId = useEffectiveClanId();
 
-  // ── Miembros destacados — solo usuario real si su clan coincide ──────────
-  // Se filtra cualquier usuario simulado (u1–u9) de la lista hardcodeada.
+  // ── Miembros destacados ──────────────────────────────────────────────────
+  // Composición:
+  //   1) El propio usuario autenticado si su clan local == este clan
+  //   2) El resto de usuarios reales que tengan publicado este clan en
+  //      Supabase (universalizado — ya no depende de la clasificación local
+  //      del observador, que era la causa del bug "nadie aparece en mi clan")
+  //   3) Como fallback / contenido base, los miembros simulados del perfil
+  //      hardcodeado (filtrando u1–u9 que duplicarían las card de la sim)
   const SIM_IDS = useMemo(
     () => new Set(['u1','u2','u3','u4','u5','u6','u7','u8','u9']),
     [],
   );
 
-  const topMembers = useMemo<ClanMember[]>(() => {
-    const members: ClanMember[] = [];
+  const [remoteMembers, setRemoteMembers] = useState<ClanMemberSummary[]>([]);
+  useEffect(() => {
+    if (clanId === 'indefinido') {
+      setRemoteMembers([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const list = await fetchClanMembers(clanId, {
+        excludeUserId:
+          authProfile?.id && isRealUserId(authProfile.id) ? authProfile.id : null,
+      });
+      if (!cancelled) setRemoteMembers(list);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [clanId, authProfile?.id]);
 
-    // Añadir usuario real si pertenece a este clan
+  const topMembers = useMemo<ClanMember[]>(() => {
+    const members: (ClanMember & { _clanPct?: string })[] = [];
+    const seen = new Set<string>();
+
     if (authProfile && realUserClanId === clanId) {
       const pcts = classification.getPercentages();
       const dominantPct = pcts.find((p) => p.clanId === clanId)?.pct ?? 0;
@@ -216,17 +243,39 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
         clanId: realUserClanId,
         rank: authProfile.rank,
         followersCount: 0,
-        // Guardamos pct en un campo extra para renderizarlo
         _clanPct: dominantPct.toFixed(1),
-      } as ClanMember & { _clanPct: string });
+      });
+      seen.add(authProfile.id);
     }
 
-    // Filtrar usuarios simulados del perfil hardcodeado
-    const filteredSim = clan.topMembers.filter((m) => !SIM_IDS.has(m.id));
+    for (const m of remoteMembers) {
+      if (seen.has(m.id)) continue;
+      members.push({
+        id: m.id,
+        username: m.username,
+        clanId: m.clanId,
+        rank: m.rank,
+        followersCount: 0,
+        _clanPct: m.clanPct.toFixed(1),
+      });
+      seen.add(m.id);
+    }
+
+    const filteredSim = clan.topMembers.filter(
+      (m) => !SIM_IDS.has(m.id) && !seen.has(m.id),
+    );
     members.push(...filteredSim);
 
     return members;
-  }, [authProfile, realUserClanId, clanId, clan.topMembers, classification, SIM_IDS]);
+  }, [
+    authProfile,
+    realUserClanId,
+    clanId,
+    clan.topMembers,
+    classification,
+    remoteMembers,
+    SIM_IDS,
+  ]);
 
   // ── Top posts en vivo — publicaciones del clan con ≥1 voto en las últimas 24h ──
   // Para 'indefinido', los autores sin clan asignado tienen clanId: null.
