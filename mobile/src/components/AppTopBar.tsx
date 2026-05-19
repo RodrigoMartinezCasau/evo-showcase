@@ -135,11 +135,16 @@ function AppTopBarInner({
   const LapizIcon = useMemo(() => getTopBarLapizByHouse(effectiveClan), [effectiveClan]);
   const UsosIcon = useMemo(() => getTopBarUsosByHouse(effectiveClan), [effectiveClan]);
   const RachaIcon = useMemo(() => getTopBarRachaTopByHouse(effectiveClan), [effectiveClan]);
+  // El badge del clan se decide por `effectiveClan` (clan real del perfil
+  // combinado con la simulación o el preview), NO por `visibleClanId` (que
+  // depende del clasificador local y es null hasta acumular reflexiones).
+  // Antes, un usuario existencialista real veía el "?" de sin-clan porque la
+  // simulación local aún no había "revelado" su clan.
   const InsigniaIcon = useMemo(
-    () => (isPreviewActive || visibleClanId)
+    () => effectiveClan
       ? getTopBarInsigniaByHouse(effectiveClan)
       : getProgressionIcon(progressionInputs),
-    [effectiveClan, isPreviewActive, visibleClanId, progressionInputs],
+    [effectiveClan, progressionInputs],
   );
 
   // ─── Top-bar fire icon animation (grey → clan on first send of the day) ────
