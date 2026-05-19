@@ -80,7 +80,7 @@ export async function ensureAnimationAssets(): Promise<void> {
 
   _copyPromise = (async () => {
     const STAMP_FILE = ANIM_DIR + '.stamp';
-    const APP_VERSION = '54';
+    const APP_VERSION = '56';
 
     try {
       const stampInfo = await FileSystem.getInfoAsync(STAMP_FILE);
@@ -88,6 +88,13 @@ export async function ensureAnimationAssets(): Promise<void> {
         const stamp = await FileSystem.readAsStringAsync(STAMP_FILE);
         if (stamp === APP_VERSION) return; // already up to date
       }
+    } catch {}
+
+    // Version changed: remove stale copied HTML/assets first. Some platforms do
+    // not reliably overwrite copied bundle assets in-place, which left older
+    // clan-entry.html versions (with the glow) running even after source edits.
+    try {
+      await FileSystem.deleteAsync(ANIM_DIR, { idempotent: true });
     } catch {}
 
     // Create directories
