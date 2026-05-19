@@ -332,10 +332,13 @@ export default function AppAnimationLayer() {
   return (
     <>
       {/* ── Entry animation (plays on every launch) ── */}
+      {/* Always use the no-clan (star crown) animation for all users so the
+          entry is identical regardless of clan — avoids the flash caused by
+          the with-clan HTML branch reordering DOM nodes mid-frame. */}
       <EvoAnimationWebView
         visible={showEntry}
         name="clanEntry"
-        params={{ clanId }}
+        params={{ clanId: 'none' }}
         onComplete={() => setShowEntry(false)}
         onClose={() => setShowEntry(false)}
       />

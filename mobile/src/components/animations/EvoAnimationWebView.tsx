@@ -80,7 +80,7 @@ export async function ensureAnimationAssets(): Promise<void> {
 
   _copyPromise = (async () => {
     const STAMP_FILE = ANIM_DIR + '.stamp';
-    const APP_VERSION = '56';
+    const APP_VERSION = '57';
 
     try {
       const stampInfo = await FileSystem.getInfoAsync(STAMP_FILE);
@@ -223,7 +223,7 @@ async function buildInlinedHtml(name: EvoAnimationName): Promise<string> {
   }
 
   // 1. Replace SVG references using the in-memory SVG_DATA map.
-  html = html.replace(/(['"`])assets\/([\w.\-]+\.svg)\1/g, (match, q, filename) => {
+  html = html.replace(/(['"`])assets\/([\w.\-]+\.svg)\1/g, (_match: string, q: string, filename: string) => {
     const svg = SVG_DATA[filename];
     if (!svg) return match;
     return `${q}data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}${q}`;
@@ -249,7 +249,7 @@ async function buildInlinedHtml(name: EvoAnimationName): Promise<string> {
   }
 
   // 4. Replace PNG references with data URIs.
-  html = html.replace(/(['"`])assets\/([\w.\-]+\.png)\1/g, (match, q, filename) => {
+  html = html.replace(/(['"`])assets\/([\w.\-]+\.png)\1/g, (_match: string, q: string, filename: string) => {
     const uri = pngData[filename];
     return uri ? `${q}${uri}${q}` : match;
   });
