@@ -16,6 +16,7 @@ import Svg47 from '../assets/topbar/progresionSvg/47.svg';
 import Svg48 from '../assets/topbar/progresionSvg/48.svg';
 import Svg49 from '../assets/topbar/progresionSvg/49.svg';
 import Svg50 from '../assets/topbar/progresionSvg/50.svg';
+import { REVEAL_TOTAL_INPUTS_THRESHOLD } from '@evoconn/hooks/ClassificationContext';
 
 export type ProgressionSvgProps = {
   width?: number;
@@ -43,19 +44,18 @@ const PROGRESSION_SVGS: Record<number, FC<ProgressionSvgProps>> = {
 
 const PROGRESSION_MIN = 36;
 const PROGRESSION_MAX = 50;
-const PROGRESSION_STEP = 2; // inputs (reflexión o frase) por tramo
+const PROGRESSION_SPAN = PROGRESSION_MAX - PROGRESSION_MIN;
 
 /**
- * Devuelve el SVG de progresión según reflexiones + frases enviadas (misma escala que antes solo con refs).
- * índice = clamp(36 + floor(total / 2), 36, 50)
+ * Badge "Sin clan" en la top bar: SVG 36 (inicio) → 50 (justo antes del reveal).
+ *
+ * Antes: +1 cada 2 inputs → el 50 solo llegaba con ~28 envíos, pero el clan
+ * puede revelarse con 10 (REVEAL_TOTAL_INPUTS_THRESHOLD), así que el badge
+ * se quedaba siempre en los SVG intermedios (37–43).
  */
 export function getProgressionIcon(totalReflectionAndPhraseInputs: number): FC<ProgressionSvgProps> {
-  const idx = Math.min(
-    PROGRESSION_MAX,
-    Math.max(
-      PROGRESSION_MIN,
-      PROGRESSION_MIN + Math.floor(totalReflectionAndPhraseInputs / PROGRESSION_STEP),
-    ),
-  );
+  const total = Math.max(0, totalReflectionAndPhraseInputs);
+  const progress = Math.min(1, total / REVEAL_TOTAL_INPUTS_THRESHOLD);
+  const idx = PROGRESSION_MIN + Math.round(progress * PROGRESSION_SPAN);
   return PROGRESSION_SVGS[idx] ?? Svg36;
 }

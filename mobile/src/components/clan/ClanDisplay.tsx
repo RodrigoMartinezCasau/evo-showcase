@@ -44,6 +44,9 @@ import {
   CLAN_DISPLAY_ESTANDARTE_MARGIN_BOTTOM,
   CLAN_DISPLAY_LOGO_PADDING_TOP,
   CLAN_DISPLAY_SECTIONS_GAP,
+  CLAN_DISPLAY_PHRASE_BORDER_RADIUS,
+  CLAN_DISPLAY_PHRASE_RIM_ARM_X,
+  CLAN_DISPLAY_PHRASE_RIM_ARM_Y,
   CLAN_DISPLAY_PHRASE_PADDING_V,
   CLAN_DISPLAY_PHRASE_PADDING_H,
   CLAN_DISPLAY_PHRASE_FONT_SIZE,
@@ -52,6 +55,11 @@ import {
   CLAN_DISPLAY_POST_CARD_MIN_W,
 } from '@evoconn/constants/clanDisplayLayout';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
+import { ClanCardFeedRimOverlay } from '@evoconn/components/ClanCardFeedRimOverlay';
+import {
+  PanelStarField,
+  PANEL_STAR_SURFACE_DEFAULT,
+} from '@evoconn/components/animations/StarFieldBackground';
 import { ProfileDetailPanel } from '@evoconn/components/ProfileDetailPanel';
 import { ClanPhilosopherSlot } from './ClanPhilosopherSlot';
 import { UserResultCard } from '@evoconn/components/UserResultCard';
@@ -190,6 +198,7 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
   const clan       = getClanProfileOrFallback(clanId);
   const config     = getClanConfig(clanId);
   const clanColor  = getClanColor(clanId);
+  const [phraseBoxDims, setPhraseBoxDims] = useState<{ width: number; height: number } | null>(null);
   const ShieldSvg      = useMemo(() => getTopBarInsigniaByHouse(clanId), [clanId]);
   const EstandarteSvg  = useMemo(() => getClanEstandarte(clanId), [clanId]);
 
@@ -459,9 +468,30 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
             </View>
           </View>
 
-          {/* ── SECCIÓN 2 — Frase del clan ────────────────────────────── */}
-          <View style={styles.phraseSection}>
+          {/* ── SECCIÓN 2 — Frase del clan (fondo + rebordes como Siguiendo) ─ */}
+          <View
+            style={styles.phraseSection}
+            onLayout={(e) => {
+              const { width, height } = e.nativeEvent.layout;
+              setPhraseBoxDims((prev) =>
+                prev?.width === width && prev?.height === height ? prev : { width, height },
+              );
+            }}
+          >
+            <View style={styles.phraseStarField} pointerEvents="none">
+              <PanelStarField surfaceColor={PANEL_STAR_SURFACE_DEFAULT} />
+            </View>
             <Text style={styles.clanPhrase}>{config.phrase}</Text>
+            {phraseBoxDims ? (
+              <ClanCardFeedRimOverlay
+                width={phraseBoxDims.width}
+                height={phraseBoxDims.height}
+                borderRadius={CLAN_DISPLAY_PHRASE_BORDER_RADIUS}
+                clanColor={clanColor}
+                rimArmX={CLAN_DISPLAY_PHRASE_RIM_ARM_X}
+                rimArmY={CLAN_DISPLAY_PHRASE_RIM_ARM_Y}
+              />
+            ) : null}
           </View>
 
           {/* ── SECCIONES 2b, 3, 4 — Solo para clanes reales (no "sin clan") ── */}
@@ -585,10 +615,13 @@ const styles = StyleSheet.create({
   // ── Section 2: Phrase ────────────────────────────────────────────────────
   phraseSection: {
     marginHorizontal: 20,
-    backgroundColor: '#000000',
-    borderRadius: 14,
+    borderRadius: CLAN_DISPLAY_PHRASE_BORDER_RADIUS,
     paddingVertical: CLAN_DISPLAY_PHRASE_PADDING_V,
     paddingHorizontal: CLAN_DISPLAY_PHRASE_PADDING_H,
+    overflow: 'hidden',
+  },
+  phraseStarField: {
+    ...StyleSheet.absoluteFillObject,
   },
   clanPhrase: {
     color: '#ffffff',
@@ -597,6 +630,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: CLAN_DISPLAY_PHRASE_LINE_HEIGHT,
     textAlign: 'center',
+    zIndex: 1,
   },
 
   // ── Shared panel styles ──────────────────────────────────────────────────

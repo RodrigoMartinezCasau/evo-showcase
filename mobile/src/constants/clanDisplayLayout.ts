@@ -69,6 +69,13 @@ export const CLAN_DISPLAY_SECTIONS_GAP = 16;
 
 // ─── Tarjeta de frase del clan ────────────────────────────────────────────────
 
+/** Radio de esquina — mismo criterio que tarjetas Siguiendo (`SVG_CARD_VISUAL`). */
+export const CLAN_DISPLAY_PHRASE_BORDER_RADIUS = 16;
+
+/** Longitud del reborde en esquinas (horizontal / vertical), estilo burbuja Siguiendo. */
+export const CLAN_DISPLAY_PHRASE_RIM_ARM_X = 44;
+export const CLAN_DISPLAY_PHRASE_RIM_ARM_Y = 28;
+
 /** Padding vertical de la tarjeta de frase. */
 export const CLAN_DISPLAY_PHRASE_PADDING_V = 20;
 
