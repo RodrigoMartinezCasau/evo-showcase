@@ -30,6 +30,7 @@ import { useAuth } from '../../../mobile/lib/AuthContext';
 import type { Rank } from '@evoconn/types';
 
 const RANK_ORDER: Record<Rank, number> = { aprendiz: 0, maestro: 1, filosofo: 2 };
+const ENTRY_SOCIAL_ANIM_COOLDOWN_MS = 8_000;
 
 // ── Queue types ───────────────────────────────────────────────────────────────
 
@@ -110,6 +111,7 @@ export default function AppAnimationLayer() {
   const [showEntry, setShowEntry] = useState(false);
   const pendingEntryRef = useRef(_entryQueued);
   const showEntryRef = useRef(false);
+  const entryCooldownUntilRef = useRef(0);
 
   useEffect(() => {
     showEntryRef.current = showEntry;
@@ -118,6 +120,7 @@ export default function AppAnimationLayer() {
 
   useEffect(() => {
     _requestEntry = () => {
+      entryCooldownUntilRef.current = Date.now() + ENTRY_SOCIAL_ANIM_COOLDOWN_MS;
       if (assetsReady) setShowEntry(true);
       else pendingEntryRef.current = true;
     };
@@ -128,6 +131,7 @@ export default function AppAnimationLayer() {
     if (assetsReady && (pendingEntryRef.current || _entryQueued)) {
       pendingEntryRef.current = false;
       _entryQueued = false;
+      entryCooldownUntilRef.current = Date.now() + ENTRY_SOCIAL_ANIM_COOLDOWN_MS;
       setShowEntry(true);
     }
   }, [assetsReady]);
@@ -260,6 +264,7 @@ export default function AppAnimationLayer() {
     prevRankRef.current = displayRank;
     if (prev === null) return;
     if (RANK_ORDER[displayRank] <= RANK_ORDER[prev]) return;
+    if (Date.now() < entryCooldownUntilRef.current) return;
 
     const percentages = classification.getPercentages();
     const dominantPct = percentages.find((p) => p.clanId === clanId)?.pct ?? 0;
@@ -307,6 +312,7 @@ export default function AppAnimationLayer() {
     if (prev === clanId) return;
     if (clanId === 'none') return;
     if (showEntryRef.current) return;
+    if (Date.now() < entryCooldownUntilRef.current) return;
 
     const wasNone = prev === 'none';
     enqueue({

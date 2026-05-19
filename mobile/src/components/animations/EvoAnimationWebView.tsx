@@ -339,18 +339,17 @@ export function EvoAnimationWebView({
   }, [visible, rootOpacity, webOpacity]);
 
   // Called when the animation signals completion (or is closed).
-  // By the time this fires the community screen is already rendered behind
-  // the modal (setEntryAnimPlaying was called on the flash-start phase
-  // ~500ms earlier). We fade rootOpacity 1→0 so the white flash dissolves
-  // directly into the community — no star background visible at any point.
+  //
+  // Important: do not keep a transparent Modal mounted after complete. RN
+  // Modals keep intercepting touches even at opacity: 0; on clan entry this
+  // could leave the feed visible but untouchable until a later safety timeout.
+  // The app screen is already rendered behind the animation by the time
+  // "complete" fires, so unmount immediately.
   const closeAndCall = useCallback(
     (callback?: (extra?: unknown) => void, extra?: unknown) => {
       setEntryAnimPlaying(false); // safety net if phase handler didn't fire
-      Animated.timing(rootOpacity, {
-        toValue: 0,
-        duration: 650,
-        useNativeDriver: true,
-      }).start(() => callback?.(extra));
+      rootOpacity.setValue(0);
+      callback?.(extra);
     },
     [rootOpacity],
   );
