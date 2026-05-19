@@ -1136,7 +1136,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
           onClanPress={handleClanPressAction}
           onMorePress={handleMorePress}
           containerHeight={reflPanelLayout ? reflPanelLayout.height * 1.05 * COL.verticalFillRatio : undefined}
-          showClanBadge
+          showClanBadge={communityVerticalFeed}
           authorRank={post.author.rank}
         />
       </View>

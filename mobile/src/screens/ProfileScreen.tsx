@@ -31,6 +31,7 @@ import {
 } from '@evoconn/components/otherProfile';
 import { ProfileDetailPanel } from '@evoconn/components/ProfileDetailPanel';
 import type { CommunityPost } from '@evoconn/types';
+import { enrichPostsAuthorAvatar } from '@evoconn/utils/enrichPostsAuthorAvatar';
 
 const ANIM_DURATION = 200;
 
@@ -182,6 +183,8 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
       const resolvedUsername = data?.username
         ? '@' + data.username.toUpperCase()
         : null;
+      const authorAvatar =
+        (data as { avatar_url?: string | null } | null | undefined)?.avatar_url ?? undefined;
       setSupabasePosts(posts.map(p => ({
         id: p.id,
         type: p.type,
@@ -190,6 +193,7 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
           username: resolvedUsername ?? (p.authorUsername && p.authorUsername.length < 36 ? p.authorUsername : '?'),
           clanId: p.authorClanId ?? null,
           rank: p.authorRank ?? 'aprendiz',
+          avatarUri: authorAvatar,
         },
         title: p.title,
         body: p.body,
@@ -289,12 +293,16 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
 
   // For real Supabase users: use dedicated fetchPostsByUser result.
   // For simulated users: filter the global sim posts array.
+  const profileAvatarUri =
+    (profileWithLiveFollowers as { avatarUri?: string | null }).avatarUri?.trim() || undefined;
+
   const livePosts = useMemo<CommunityPost[]>(
     () => {
+      let list: CommunityPost[];
       if (isRealUserId(userId) && supabasePosts.length > 0) {
-        return supabasePosts;
-      }
-      return allSimPosts
+        list = supabasePosts;
+      } else {
+      list = allSimPosts
         .filter((p) => p.authorId === userId && isPublishedSimPostType(p.type))
         .sort((a, b) => (b.createdAt > a.createdAt ? 1 : b.createdAt < a.createdAt ? -1 : 0))
         .map((p): CommunityPost => {
@@ -303,8 +311,19 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
             id: p.id,
             type: p.type,
             author: author
-              ? { id: author.id, username: author.username, clanId: author.clanId, rank: author.rank }
-              : { id: p.authorId, username: p.authorUsername ?? '?', clanId: p.authorClanId ?? null, rank: p.authorRank ?? 'aprendiz' },
+              ? {
+                  id: author.id,
+                  username: author.username,
+                  clanId: author.clanId,
+                  rank: author.rank,
+                  avatarUri: author.avatarUri,
+                }
+              : {
+                  id: p.authorId,
+                  username: p.authorUsername ?? '?',
+                  clanId: p.authorClanId ?? null,
+                  rank: p.authorRank ?? 'aprendiz',
+                },
             title: p.title,
             body: p.body,
             quoteAuthor: p.quoteAuthor,
@@ -316,8 +335,10 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
             createdAt: p.createdAt,
           };
         });
+      }
+      return enrichPostsAuthorAvatar(list, userId, profileAvatarUri);
     },
-    [allSimPosts, userId, simUsers, supabasePosts],
+    [allSimPosts, userId, simUsers, supabasePosts, profileAvatarUri],
   );
 
   // Live totals that always match the publications slider count.

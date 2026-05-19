@@ -911,7 +911,7 @@ export default function PhraseCreationScreen() {
                       backgroundColor={getBlockBackgroundColor('publish', activeClan)}
                       starIcon={PublishStar}
                       titleOutlineColor={getPublishTitleOutlineColor(activeClan)}
-                      actionBarColor={getPublishTitleOutlineColor(activeClan)}
+                      actionBarColor={getClanSecondaryColor(activeClan)}
                       showPhraseFormatHint
                       phraseHintOverride={phraseHintOverride}
                       onAuthorFocusChange={published ? undefined : setPublishAuthorFocused}

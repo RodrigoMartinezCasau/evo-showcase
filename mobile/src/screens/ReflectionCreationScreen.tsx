@@ -113,6 +113,7 @@ import {
   getBlockBackgroundColor,
   getPublishTitleOutlineColor,
 } from '@evoconn/constants/debateResponseLayout';
+import { getClanSecondaryColor } from '@evoconn/constants/clanColors';
 import { getPublishStarByClan } from '@evoconn/utils/getDebateStarByClan';
 import { useDebugStreak } from '../debug/DebugStreakContext';
 import { useDebugStats } from '../debug/DebugStatsContext';
@@ -783,7 +784,7 @@ const PublishBlockConnected = React.memo(function PublishBlockConnected({
       backgroundColor={getBlockBackgroundColor('publish', clanId)}
       starIcon={PublishStar}
       titleOutlineColor={getPublishTitleOutlineColor(clanId)}
-      actionBarColor={getPublishTitleOutlineColor(clanId)}
+      actionBarColor={getClanSecondaryColor(clanId)}
       onTitleChange={handleTitleChange}
       onPublish={handlePublish}
     />

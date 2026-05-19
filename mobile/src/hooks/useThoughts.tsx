@@ -216,10 +216,12 @@ export function ThoughtsProvider({ children }: { children: React.ReactNode }) {
 
   // ── Public API: thoughts for the active user ─────────────────────────────────
 
-  const thoughts = useMemo<ThoughtEntry[]>(
-    () => (db[activeUserId] ?? []) as ThoughtEntry[],
-    [db, activeUserId],
-  );
+  const thoughts = useMemo<ThoughtEntry[]>(() => {
+    const list = (db[activeUserId] ?? []) as ThoughtEntry[];
+    return [...list].sort(
+      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+    );
+  }, [db, activeUserId]);
 
   // ── Mutations ────────────────────────────────────────────────────────────────
 

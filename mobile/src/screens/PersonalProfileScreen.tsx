@@ -233,9 +233,9 @@ export default function PersonalProfileScreen() {
 
   const handleRecentPostPress = useCallback(
     (post: CommunityPost) => {
-      openDetailFeed(posts, post.id);
+      router.push({ pathname: '/latest-posts', params: { postId: post.id } });
     },
-    [openDetailFeed, posts],
+    [router],
   );
 
   const handleSeeMoreRecentPosts = useCallback(() => {

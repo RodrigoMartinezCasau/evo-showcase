@@ -38,7 +38,9 @@ import {
   COMMUNITY_DETAIL_UPDATE_CELLS_PERIOD_ANDROID,
 } from '@evoconn/constants/communityDetailFeed';
 import { fetchPostsByUser, isRealUserId } from '@evoconn/services/supabaseSocial';
+import { enrichPostsAuthorAvatar } from '@evoconn/utils/enrichPostsAuthorAvatar';
 import { supabase } from '../../mobile/lib/supabase';
+import { useAuth } from '../../mobile/lib/AuthContext';
 
 const BG = '#0b0b0f';
 
@@ -73,9 +75,11 @@ export default function LatestPostsScreen() {
   const { height: screenH } = useWindowDimensions();
   const { posts: allPosts } = useFeedStore();
   const { thoughts } = useThoughts();
+  const { profile: authProfile } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [feedScrollEnabled, setFeedScrollEnabled] = useState(true);
   const [remotePosts, setRemotePosts] = useState<CommunityPost[] | null>(null);
+  const [remoteAuthorAvatar, setRemoteAuthorAvatar] = useState<string | undefined>();
 
   const handleReadingModeChange = useCallback((active: boolean) => {
     setFeedScrollEnabled(!active);
@@ -84,17 +88,25 @@ export default function LatestPostsScreen() {
   useEffect(() => {
     if (!needsRemoteFetch) {
       setRemotePosts(null);
+      setRemoteAuthorAvatar(undefined);
       return;
     }
     let cancelled = false;
     setRemotePosts(null);
     Promise.all([
-      supabase.from('profiles').select('username').eq('id', targetUserId).maybeSingle(),
+      supabase
+        .from('profiles')
+        .select('username, avatar_url')
+        .eq('id', targetUserId)
+        .maybeSingle(),
       fetchPostsByUser(targetUserId),
     ])
       .then(([{ data }, simPosts]) => {
         if (cancelled) return;
         const resolvedUsername = data?.username ? '@' + data.username.toUpperCase() : null;
+        const authorAvatar =
+          (data as { avatar_url?: string | null } | null)?.avatar_url?.trim() || undefined;
+        setRemoteAuthorAvatar(authorAvatar);
         const mapped: CommunityPost[] = simPosts.map((p) => ({
           id: p.id,
           type: p.type,
@@ -105,6 +117,7 @@ export default function LatestPostsScreen() {
               (p.authorUsername && p.authorUsername.length < 36 ? p.authorUsername : '?'),
             clanId: p.authorClanId ?? null,
             rank: p.authorRank ?? 'aprendiz',
+            avatarUri: authorAvatar,
           },
           title: p.title,
           body: p.body,
@@ -127,15 +140,34 @@ export default function LatestPostsScreen() {
   }, [needsRemoteFetch, targetUserId]);
 
   const data = useMemo(() => {
+    const profileAvatar = needsRemoteFetch
+      ? remoteAuthorAvatar
+      : authProfile?.avatar_url?.trim() || mockCurrentUser.avatarUri;
+
     if (needsRemoteFetch) {
       if (remotePosts === null) return null;
-      return pinPostFirst(sortMyPostsNewestFirst(remotePosts), postId);
+      const sorted = sortMyPostsNewestFirst(remotePosts);
+      return pinPostFirst(
+        enrichPostsAuthorAvatar(sorted, targetUserId, profileAvatar),
+        postId,
+      );
     }
     const fromFeed = sortMyPostsNewestFirst(
       allPosts.filter((p) => p.author.id === targetUserId),
     );
-    return pinPostFirst(fromFeed, postId);
-  }, [allPosts, postId, targetUserId, needsRemoteFetch, remotePosts]);
+    return pinPostFirst(
+      enrichPostsAuthorAvatar(fromFeed, targetUserId, profileAvatar),
+      postId,
+    );
+  }, [
+    allPosts,
+    postId,
+    targetUserId,
+    needsRemoteFetch,
+    remotePosts,
+    remoteAuthorAvatar,
+    authProfile?.avatar_url,
+  ]);
 
   const initialIndex = 0;
 
