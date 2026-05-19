@@ -51,6 +51,9 @@ import {
   CLAN_DISPLAY_PHRASE_PADDING_H,
   CLAN_DISPLAY_PHRASE_FONT_SIZE,
   CLAN_DISPLAY_PHRASE_LINE_HEIGHT,
+  CLAN_DISPLAY_PHRASE_AUTHOR_MARGIN_TOP,
+  CLAN_DISPLAY_PHRASE_AUTHOR_FONT_SIZE,
+  CLAN_DISPLAY_PHRASE_AUTHOR_LINE_HEIGHT,
   CLAN_DISPLAY_POST_CARD_RATIO,
   CLAN_DISPLAY_POST_CARD_MIN_W,
 } from '@evoconn/constants/clanDisplayLayout';
@@ -481,7 +484,25 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
             <View style={styles.phraseStarField} pointerEvents="none">
               <PanelStarField surfaceColor={PANEL_STAR_SURFACE_DEFAULT} />
             </View>
-            <Text style={styles.clanPhrase}>{config.phrase}</Text>
+            <View style={styles.phraseContent}>
+              <Text style={styles.clanPhrase}>{config.phrase}</Text>
+              {config.phraseAuthor ? (
+                <Text
+                  style={[
+                    styles.clanPhraseAuthor,
+                    {
+                      color: clanColor,
+                      marginTop: CLAN_DISPLAY_PHRASE_AUTHOR_MARGIN_TOP,
+                      fontSize: CLAN_DISPLAY_PHRASE_AUTHOR_FONT_SIZE,
+                      lineHeight: CLAN_DISPLAY_PHRASE_AUTHOR_LINE_HEIGHT,
+                    },
+                  ]}
+                >
+                  {'\u2014 '}
+                  {config.phraseAuthor}
+                </Text>
+              ) : null}
+            </View>
             {phraseBoxDims ? (
               <ClanCardFeedRimOverlay
                 width={phraseBoxDims.width}
@@ -623,6 +644,10 @@ const styles = StyleSheet.create({
   phraseStarField: {
     ...StyleSheet.absoluteFillObject,
   },
+  phraseContent: {
+    zIndex: 1,
+    alignItems: 'center',
+  },
   clanPhrase: {
     color: '#ffffff',
     fontSize: CLAN_DISPLAY_PHRASE_FONT_SIZE,
@@ -630,7 +655,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: CLAN_DISPLAY_PHRASE_LINE_HEIGHT,
     textAlign: 'center',
-    zIndex: 1,
+  },
+  clanPhraseAuthor: {
+    fontWeight: '500',
+    textAlign: 'center',
+    letterSpacing: 0.15,
+    opacity: 0.88,
   },
 
   // ── Shared panel styles ──────────────────────────────────────────────────

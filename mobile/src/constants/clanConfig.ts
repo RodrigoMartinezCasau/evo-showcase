@@ -24,6 +24,7 @@ export type Philosopher = {
 
 export type ClanConfigEntry = {
   phrase: string;
+  phraseAuthor: string;
   description: string;
   philosophers: [Philosopher, Philosopher, Philosopher, Philosopher];
 };

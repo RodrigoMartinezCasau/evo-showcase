@@ -141,7 +141,7 @@ function SettingsRow({
           <View style={[styles.iconBox, { backgroundColor: IC.amber }]}><IconInner name="star" /></View>
           <View style={styles.rowContent}>
             <Text style={styles.upgradeLabel}>Actualizar a Premium</Text>
-            <Text style={styles.rowSubtitle}>Acceso ilimitado a IA y funciones avanzadas</Text>
+            <Text style={styles.rowSubtitle}>Acceso ilimitado al asistente y funciones avanzadas</Text>
           </View>
           <View style={styles.upgradeBadge}><Text style={styles.upgradeBadgeText}>PRO</Text></View>
         </TouchableOpacity>
@@ -469,9 +469,9 @@ export default function SettingsScreen({
     },
     {
       id: 'ai',
-      title: 'INTELIGENCIA ARTIFICIAL',
+      title: 'CONVERSACIONES',
       rows: [
-        { id: 'ai-uses', label: 'Usos de IA hoy', value: `${remainingUses} / ${DAILY_USES_LIMIT}`, icon: 'flash-outline', iconBg: IC.green, type: 'info' },
+        { id: 'ai-uses', label: 'Usos disponibles hoy', value: `${remainingUses} / ${DAILY_USES_LIMIT}`, icon: 'flash-outline', iconBg: IC.green, type: 'info' },
       ],
     },
     {

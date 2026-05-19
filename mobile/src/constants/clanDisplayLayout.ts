@@ -88,6 +88,15 @@ export const CLAN_DISPLAY_PHRASE_FONT_SIZE = 17;
 /** Altura de línea de la frase del clan. */
 export const CLAN_DISPLAY_PHRASE_LINE_HEIGHT = 26;
 
+/** Espacio entre la frase y el nombre del autor. */
+export const CLAN_DISPLAY_PHRASE_AUTHOR_MARGIN_TOP = 6;
+
+/** Tamaño de fuente del autor bajo la frase (muy pequeño, secundario). */
+export const CLAN_DISPLAY_PHRASE_AUTHOR_FONT_SIZE = 9;
+
+/** Altura de línea del autor. */
+export const CLAN_DISPLAY_PHRASE_AUTHOR_LINE_HEIGHT = 11;
+
 // ─── Tarjetas de posts (sección 6) ───────────────────────────────────────────
 
 /**

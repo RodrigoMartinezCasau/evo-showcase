@@ -9,7 +9,7 @@ Desarrollada y operada por EvoConn (cuenta de desarrollador: evoconn)
 Última actualización: 18 de mayo de 2026
 
 1. Introducción
-Bienvenido/a a Evo, una aplicación móvil de carácter social y filosófico que permite compartir reflexiones, explorar frases, seguir a otros usuarios, participar en debates guiados por inteligencia artificial y descubrir contenido filosófico adaptado a tu perfil. EvoConn («nosotros», «el responsable») es el responsable del tratamiento de sus datos personales en los términos descritos en esta Política de Privacidad.
+Bienvenido/a a Evo, una aplicación móvil de carácter social y filosófico que permite compartir reflexiones, explorar frases, seguir a otros usuarios, participar en debates guiados por el asistente conversacional de la aplicación y descubrir contenido filosófico adaptado a tu perfil. EvoConn («nosotros», «el responsable») es el responsable del tratamiento de sus datos personales en los términos descritos en esta Política de Privacidad.
 Esta política se redacta conforme al Reglamento (UE) 2016/679 General de Protección de Datos (RGPD), la Ley Orgánica 3/2018 de Protección de Datos Personales y garantía de los derechos digitales (LOPDGDD) y la legislación complementaria aplicable en España. Le rogamos que la lea detenidamente antes de utilizar la aplicación.
 
 2. Datos personales que recogemos
@@ -41,9 +41,9 @@ Número de teléfono (SMS/OTP): registro y autenticación mediante un código de
 Los tokens de sesión y credenciales de autenticación se almacenan de forma local en el dispositivo mediante AsyncStorage, el mecanismo de almacenamiento local de la plataforma React Native/Expo. Esto permite mantener la sesión activa sin necesidad de volver a autenticarse en cada uso.
 
 2.3 Contenido generado por el usuario
-La aplicación permite crear y compartir reflexiones, participar en debates con asistente de inteligencia artificial, publicar frases filosóficas y dejar comentarios en publicaciones de otros usuarios. El texto que usted redacta o dicta y decide enviar o publicar puede almacenarse en nuestro backend (Supabase) para su funcionamiento. El contenido que permanezca únicamente en el dispositivo y no se envíe al servidor no es accesible por nosotros.
-Las funciones sociales de la aplicación incluyen: publicación en el feed «Para ti» y «Siguiendo», sistema de seguir/dejar de seguir a otros usuarios, solicitudes de seguimiento en cuentas privadas, comentarios en publicaciones y debates con asistente de IA. Los datos asociados a estas interacciones (relaciones de seguimiento, comentarios, solicitudes) se almacenan en Supabase.
-Los textos de los debates con IA que usted decide enviar se procesan a través de nuestra API propia para generar las respuestas del asistente. Estos eventos de uso de IA se registran en la tabla ai_usage_events de Supabase con fines de control de límites y mejora del servicio.
+La aplicación permite crear y compartir reflexiones, participar en debates con el asistente conversacional, publicar frases filosóficas y dejar comentarios en publicaciones de otros usuarios. El texto que usted redacta o dicta y decide enviar o publicar puede almacenarse en nuestro backend (Supabase) para su funcionamiento. El contenido que permanezca únicamente en el dispositivo y no se envíe al servidor no es accesible por nosotros.
+Las funciones sociales de la aplicación incluyen: publicación en el feed «Para ti» y «Siguiendo», sistema de seguir/dejar de seguir a otros usuarios, solicitudes de seguimiento en cuentas privadas, comentarios en publicaciones y debates con el asistente. Los datos asociados a estas interacciones (relaciones de seguimiento, comentarios, solicitudes) se almacenan en Supabase.
+Los textos de los debates con el asistente que usted decide enviar se procesan a través de nuestra API propia para generar las respuestas. Estos eventos de uso del asistente se registran en la tabla ai_usage_events de Supabase con fines de control de límites y mejora del servicio.
 
 2.4 Fotos y avatar de perfil
 La aplicación permite seleccionar una imagen desde la galería o la cámara del dispositivo para establecerla como foto de perfil. Para ello:
@@ -53,7 +53,7 @@ El acceso solo se produce si usted otorga el permiso correspondiente y realiza l
 
 2.5 Datos de uso y estadísticas
 La aplicación registra datos relacionados con su actividad para proporcionar las funcionalidades descritas. Distinguimos dos flujos:
-Supabase: registra datos de presencia de la aplicación (tabla user_app_presence) y eventos de uso de la IA (tabla ai_usage_events).
+Supabase: registra datos de presencia de la aplicación (tabla user_app_presence) y eventos de uso del asistente (tabla ai_usage_events).
 API FastAPI (Railway): gestiona el registro de usos diarios (/uses-log), datos de racha (/streak) y otros flujos de backend relacionados con el control de límites y estadísticas de actividad.
 
 2.6 Datos de voz y transcripción (micrófono)
@@ -71,13 +71,13 @@ Notificaciones locales de racha: la aplicación puede programar recordatorios lo
 Puede gestionar sus preferencias de notificaciones desde los ajustes del dispositivo y/o desde la propia aplicación.
 
 2.8 Datos procesados localmente en el dispositivo
-Parte del análisis del contenido textual para la asignación de clan filosófico se realiza mediante algoritmos locales en el propio dispositivo, sin enviar cada reflexión a servicios externos exclusivamente para ese propósito. Algunos textos pueden enviarse a nuestra API para clasificación asistida por IA cuando usted utiliza esas funciones. Algunos datos de estado y preferencias pueden almacenarse temporalmente en el dispositivo mediante AsyncStorage o SecureStore.
+Parte del análisis del contenido textual para la asignación de clan filosófico se realiza mediante algoritmos locales en el propio dispositivo, sin enviar cada reflexión a servicios externos exclusivamente para ese propósito. Algunos textos pueden enviarse a nuestra API para clasificación asistida por el sistema cuando usted utiliza esas funciones. Algunos datos de estado y preferencias pueden almacenarse temporalmente en el dispositivo mediante AsyncStorage o SecureStore.
 
 3. Finalidades del tratamiento
 Tratamos sus datos para las siguientes finalidades:
 Prestación del servicio: crear y gestionar su cuenta, permitir la autenticación, mostrar su perfil, asignar clan filosófico, calcular rachas y gestionar límites de uso.
 Funciones sociales: publicar reflexiones en el feed, permitir el sistema de seguimiento entre usuarios, gestionar cuentas privadas y solicitudes de seguimiento, y mostrar comentarios.
-Debates con asistencia de inteligencia artificial: procesar los textos que envía para generar respuestas del asistente y registrar eventos de uso de IA con fines de control de límites.
+Debates con el asistente conversacional: procesar los textos que envía para generar respuestas y registrar eventos de uso del asistente con fines de control de límites.
 Transcripción de voz: convertir su voz en texto para facilitar la creación de contenido mediante dictado.
 Personalización: adaptar su experiencia según su clan asignado y perfil filosófico.
 Notificaciones: enviarle comunicaciones sobre actividad relevante en su cuenta y recordatorios de racha, sin fines publicitarios de terceros.
@@ -87,7 +87,7 @@ Mejora del producto: analizar datos de uso agregados o anonimizados para mejorar
 
 4. Base legal del tratamiento (art. 6 RGPD)
 El tratamiento de sus datos se sustenta en las siguientes bases jurídicas previstas en el artículo 6 del RGPD:
-Ejecución de un contrato (art. 6.1.b RGPD): el tratamiento es necesario para la prestación del servicio que usted solicita al crear una cuenta y utilizar la aplicación Evo. Abarca la gestión de cuenta, autenticación, funciones sociales, debates con IA, racha y límites de uso.
+Ejecución de un contrato (art. 6.1.b RGPD): el tratamiento es necesario para la prestación del servicio que usted solicita al crear una cuenta y utilizar la aplicación Evo. Abarca la gestión de cuenta, autenticación, funciones sociales, debates con el asistente, racha y límites de uso.
 Interés legítimo (art. 6.1.f RGPD): para el mantenimiento de la seguridad del servicio, la prevención del abuso, el diagnóstico de errores técnicos (Sentry) y la mejora técnica del producto, siempre que no prevalezcan sus derechos y libertades fundamentales.
 Consentimiento (art. 6.1.a RGPD): para el acceso al micrófono, a la biblioteca de fotos, a la cámara y el envío de notificaciones push, cuyos permisos se solicitan expresamente al usuario en el momento en que se requieren. Puede retirar este consentimiento en cualquier momento desde los ajustes del dispositivo, sin que ello afecte a la licitud del tratamiento anterior.
 
@@ -105,7 +105,7 @@ Registros de errores (Sentry): conforme a los plazos establecidos en la polític
 Para prestar el servicio utilizamos los siguientes proveedores externos, que pueden actuar como encargados del tratamiento o como responsables independientes según el caso:
 
 6.1 Supabase
-Supabase (Supabase Inc.) proporciona la infraestructura de autenticación, base de datos relacional y almacenamiento en la nube donde se almacenan los datos de perfil, cuenta, contenido publicado, relaciones sociales (follows), notificaciones, presencia, eventos de IA y avatares de usuario. Los datos se almacenan en los servidores de Supabase, que puede alojarlos en distintas regiones.
+Supabase (Supabase Inc.) proporciona la infraestructura de autenticación, base de datos relacional y almacenamiento en la nube donde se almacenan los datos de perfil, cuenta, contenido publicado, relaciones sociales (follows), notificaciones, presencia, eventos de uso del asistente y avatares de usuario. Los datos se almacenan en los servidores de Supabase, que puede alojarlos en distintas regiones.
 Más información: https://supabase.com/privacy
 
 6.2 Apple
@@ -121,7 +121,7 @@ Si inicia sesión con Facebook, el proceso de autenticación OAuth involucra a M
 Política de privacidad de Meta: https://www.facebook.com/privacy/policy/
 
 6.5 Railway (API propia / backend FastAPI)
-Nuestro backend propio (API FastAPI) está alojado en Railway (Railway Corp.), proveedor de infraestructura en la nube. Railway puede tener acceso técnico a los datos procesados en nuestros servidores en su calidad de encargado del tratamiento. A través de esta API se gestionan, entre otros flujos, la racha de uso, el registro de usos diarios y los debates con el asistente de inteligencia artificial.
+Nuestro backend propio (API FastAPI) está alojado en Railway (Railway Corp.), proveedor de infraestructura en la nube. Railway puede tener acceso técnico a los datos procesados en nuestros servidores en su calidad de encargado del tratamiento. A través de esta API se gestionan, entre otros flujos, la racha de uso, el registro de usos diarios y los debates con el asistente conversacional.
 Política de privacidad de Railway: https://railway.app/legal/privacy
 
 6.6 Expo (plataforma de desarrollo)

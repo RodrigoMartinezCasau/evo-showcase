@@ -3,11 +3,14 @@
  * ==================
  * Edita AQUÍ las frases y descripciones del display de clan (ClanDisplay).
  *
- * - `phrase`       → frase bajo el estandarte (tarjeta “frase del clan”).
- * - `description`  → texto del bloque «¿Cómo piensa este clan?».
+ * - `phrase`        → frase bajo el estandarte (tarjeta “frase del clan”).
+ * - `phraseAuthor`  → autor visible bajo la frase.
+ * - `description`   → texto del bloque «¿Cómo piensa este clan?».
  *
  * Usa `\n` para saltos de línea en `phrase`.
  * Los referentes filosóficos están en `clanConfig.ts` (no en este archivo).
+ *
+ * Frases insignia curadas desde `Desktop/EVOCONN/EVOCONN_FRASES_REFLEXIONES.md`.
  *
  * Claves: nihilista | cientista | estoico | existencialista | racionalista |
  *         humanista | realista | trascendentalista | indefinido (sin clan)
@@ -16,56 +19,76 @@
 export type ClanDisplayCopy = {
   /** Frase insignia del clan en la pantalla de display */
   phrase: string;
+  /** Autor de la frase (nombre para mostrar bajo la cita) */
+  phraseAuthor: string;
   /** Descripción larga del clan */
   description: string;
 };
 
 export const CLAN_DISPLAY_COPY: Record<string, ClanDisplayCopy> = {
   nihilista: {
-    phrase: 'Nada tiene significado inherente.\nY eso lo cambia todo.',
+    // Nietzsche — Reflexión «Hay más ídolos que realidades» (EVOCONN_FRASES_REFLEXIONES)
+    phrase: 'Hay más ídolos\nque realidades.',
+    phraseAuthor: 'Friedrich Nietzsche',
     description:
-      'El nihilista no colapsa ante el vacío — lo habita. Sus miembros cuestionan cada certeza heredada y encuentran en la deconstrucción una forma radical de honestidad. No buscan consuelo en sistemas de valores absolutos. Prefieren la incomodidad de la verdad desnuda a la comodidad de una ilusión bien construida. Su potencial: ver con claridad donde otros prefieren no mirar.',
+      'El nihilista no acepta una verdad solo porque otros la repitan. Cuestiona lo heredado, desmonta las certezas fáciles y prefiere una verdad incómoda antes que una ilusión cómoda. No busca consuelo en valores absolutos: busca mirar de frente lo que otros evitan.',
   },
   cientista: {
-    phrase: 'La evidencia no miente.\nLas personas sí.',
+    // Einstein — guion EVOCONN / NUEVOS GUIONES (biblioteca Evoconn)
+    phrase: 'Lo más incomprensible del universo\nes que sea comprensible.',
+    phraseAuthor: 'Albert Einstein',
     description:
-      'El cientista confía en el método por encima de la intuición. Sus miembros miden, contrastan y actualizan sus creencias cuando los datos cambian. No les incomoda la incertidumbre — la abrazan como motor del conocimiento. Rechazan el dogma en todas sus formas, incluyendo el científico mal aplicado. Su potencial: tomar decisiones sin dejarse engañar por sesgos ni narrativas.',
+      'El cientista no se queda con lo que parece cierto: lo comprueba. Observa, mide, compara y cambia de opinión cuando los datos cambian. No teme decir “no lo sé”, porque para este clan la duda no es debilidad, es el inicio de entender mejor.',
   },
   estoico: {
-    phrase: 'Controla lo que puedes.\nSuelta lo que no.',
+    // Epicteto — Día 5 (RD1M)
+    phrase: 'Podrán matarme,\npero no hacerme daño.',
+    phraseAuthor: 'Epicteto',
     description:
-      'El estoico no evita el sufrimiento — lo entrena. Sus miembros distinguen con precisión lo que depende de ellos y lo que no, y actúan solo sobre lo primero. La disciplina no es un sacrificio para el estoico: es la expresión más alta de la libertad. Ante la adversidad, no preguntan "¿por qué a mí?" sino "¿qué puedo hacer con esto?". Su potencial: mantener la calma y la dirección cuando todo colapsa a su alrededor.',
+      'El estoico sabe que no controla todo, pero sí controla cómo responde. No pierde energía peleando contra lo inevitable: se centra en sus actos, su carácter y su disciplina. Cuando algo sale mal, no pregunta “por qué a mí”, sino “qué puedo hacer ahora”.',
   },
   existencialista: {
-    phrase: 'No te encuentras.\nTe construyes.',
+    // Camus — Día 74 (RD1M; Top 5 Camus)
+    phrase: 'El ser humano llama destino\na todo lo que no puede soportar.',
+    phraseAuthor: 'Albert Camus',
     description:
-      'El existencialista rechaza la idea de una esencia predefinida. Naces sin manual y eso, lejos de ser una condena, es la mayor libertad posible. Sus miembros cargan con esa libertad de forma consciente: cada decisión es una declaración de identidad. La angustia no los paraliza — los define. Su potencial: crear significado propio allí donde otros buscan que alguien se lo dé.',
+      'El existencialista entiende que nadie nace con un sentido escrito de antemano. Cada persona se construye con sus decisiones, incluso cuando eso pesa. La libertad puede dar miedo, pero también permite crear una vida propia en vez de esperar que alguien la defina por ti.',
   },
   racionalista: {
-    phrase: 'La razón es el único camino\nque no te traiciona.',
+    // Kant — Día 36 (RD1M)
+    phrase: 'Si la verdad los mata,\ndéjalos que mueran.',
+    phraseAuthor: 'Immanuel Kant',
     description:
-      'El racionalista construye su visión del mundo desde los primeros principios. No acepta nada por tradición ni por autoridad — solo por demostración lógica. Sus miembros tienen una relación casi íntima con la coherencia: la inconsistencia les duele como una piedra en el zapato. Son lentos para creer pero sólidos una vez convencidos. Su potencial: construir sistemas de pensamiento que resisten el tiempo y la crítica.',
+      'El racionalista necesita que las ideas encajen. No cree algo solo por costumbre, emoción o autoridad: busca razones claras y coherentes. Puede tardar en convencerse, pero cuando lo hace, su pensamiento suele estar bien construido y preparado para resistir críticas.',
   },
   humanista: {
-    phrase: 'Al final,\nsolo quedan las personas.',
+    // Rousseau — Día 47 (RD1M)
+    phrase: 'El hombre es bueno por naturaleza,\nes la sociedad quien lo corrompe.',
+    phraseAuthor: 'Jean-Jacques Rousseau',
     description:
-      'El humanista pone al ser humano en el centro de todo análisis. Sus miembros no separan la filosofía de la empatía: para ellos, un sistema de ideas que ignore el sufrimiento real es un sistema fallido. Creen en la dignidad como principio no negociable y en la conexión entre personas como fuente de sentido. Su potencial: construir puentes donde otros levantan muros, y encontrar lo humano en lo más oscuro.',
+      'El humanista pone a las personas en el centro. Para este clan, una idea no vale mucho si ignora el sufrimiento real de la gente. Cree en la dignidad, la empatía y la conexión entre personas como base para pensar mejor y vivir de forma más humana.',
   },
   realista: {
-    phrase: 'El mundo es como es,\nno como quisieras que fuera.',
+    // Maquiavelo — Día 28 (RD1M)
+    phrase: 'Si juegas limpio en un mundo de tramposos,\nestás condenado a perder.',
+    phraseAuthor: 'Nicolás Maquiavelo',
     description:
-      'El realista no se consuela con ideales que no existen. Sus miembros ven las estructuras de poder, los incentivos reales y las limitaciones humanas con una claridad que a veces incomoda. No son cínicos — son precisos. Prefieren una verdad difícil a una esperanza vacía. Cuando toman decisiones, lo hacen sobre el terreno que hay, no el que desearían. Su potencial: actuar con efectividad en un mundo imperfecto sin perder la brújula moral.',
+      'El realista mira el mundo como es, no como le gustaría que fuera. Entiende el poder, los intereses y las limitaciones humanas sin adornarlas. No necesariamente es cínico: simplemente prefiere una verdad difícil antes que una esperanza bonita pero falsa.',
   },
   trascendentalista: {
-    phrase: 'Hay algo más allá\nde lo que puedes ver.',
+    // Wilde — Reflexión EVOCONN (no es referente de ningún clan)
+    phrase: 'Todos miramos las estrellas.',
+    phraseAuthor: 'Oscar Wilde',
     description:
-      'El trascendentalista siente que la realidad visible es solo la superficie. Sus miembros buscan capas más profundas de sentido — en la naturaleza, en la conciencia, en lo que la ciencia aún no puede medir. No son irracionales: son sensibles a dimensiones de la experiencia que otros pasan por alto. La intuición, la belleza y el asombro son datos válidos para ellos. Su potencial: conectar lo cotidiano con algo mayor y encontrar sentido donde otros solo ven azar.',
+      'El trascendentalista siente que la realidad no se agota en lo que se ve. Busca sentido en la naturaleza, la conciencia, la belleza y las experiencias difíciles de explicar. No rechaza la razón, pero también escucha la intuición, el asombro y lo que conecta la vida con algo más grande.',
   },
   /** Pantalla «Sin clan» (`clanId` indefinido / sin casa asignada). */
   indefinido: {
-    phrase: 'Ser o no ser \nesa es la cuestión',
+    // Shakespeare — Día 15 (RD1M)
+    phrase: 'Ser o no ser,\nesa es la cuestión.',
+    phraseAuthor: 'William Shakespeare',
     description:
-      'Los Sin Clan aún no juraron lealtad a ningún estandarte: van probando ideas como quien prueba el menú entero. Si les preguntas qué piensan, suelen responder “depende del día” no es evasión, es beta filosófica. Su ventaja: mezclar sin drama hasta elegir con criterio.',
+      'Los Sin Clan todavía están descubriendo cómo piensan. Prueban ideas distintas, cambian de enfoque y aún no pertenecen a ningún estandarte. No es indecisión: es una etapa de búsqueda antes de encontrar el clan que mejor encaja con su forma de ver el mundo.',
   },
 };
 

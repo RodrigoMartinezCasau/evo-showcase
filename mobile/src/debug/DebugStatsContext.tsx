@@ -26,6 +26,8 @@ import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { useQuotes } from '@evoconn/hooks/QuotesContext';
 import { useAuth } from '../../mobile/lib/AuthContext';
 import { scheduleStreakReminder, cancelStreakReminder } from '@evoconn/services/pushNotifications';
+import { syncProfileStats } from '@evoconn/services/profileStatsSync';
+import { logAiUsageEvent } from '@evoconn/services/supabaseAnalytics';
 import {
   loadStatsDB,
   saveStatsDB,
@@ -203,6 +205,17 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
     mutateActiveSlice((s) => s); // Forces rollover via mutateActiveSlice.
   }, [currentDay, activeUserId, statsLoaded, db, mutateActiveSlice]);
 
+  // Sube racha/usos locales a Supabase al cargar (the same figure as the bar).
+  useEffect(() => {
+    if (!statsLoaded || !authProfile?.id) return;
+    const slice = db[authProfile.id] ?? defaultUserStats();
+    void syncProfileStats(
+      authProfile.id,
+      slice.currentStreak,
+      slice.dailyUsesRemaining,
+    );
+  }, [statsLoaded, authProfile?.id, db]);
+
   // ── Derived values for the ACTIVE user ────────────────────────────────────
   const activeSlice: UserStats = useMemo(
     () => db[activeUserId] ?? defaultUserStats(),
@@ -224,18 +237,38 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
   const markStreakActivated = useCallback(() => {
     console.log('[USERSTATS] markStreakActivated() for user', activeUserId);
     const isFirstSendToday = activeSlice.hasSentTodayDate !== getLocalDayKey();
-    mutateActiveSlice((s) => applyStreakActivation(s));
+    mutateActiveSlice((s) => {
+      const next = applyStreakActivation(s);
+      if (authProfile?.id) {
+        void syncProfileStats(
+          authProfile.id,
+          next.currentStreak,
+          next.dailyUsesRemaining,
+        );
+      }
+      return next;
+    });
     if (isFirstSendToday) {
       setStreakTrigger((n) => n + 1);
-      // Cancel the streak reminder — user has already reflected today.
       cancelStreakReminder().catch(console.error);
     }
-  }, [mutateActiveSlice, activeUserId, activeSlice]);
+  }, [mutateActiveSlice, activeUserId, activeSlice, authProfile?.id]);
 
   const decrementUses = useCallback(() => {
     console.log('[USERSTATS] decrementUses() for user', activeUserId);
-    mutateActiveSlice((s) => applyDecrementUses(s));
-  }, [mutateActiveSlice, activeUserId]);
+    mutateActiveSlice((s) => {
+      const next = applyDecrementUses(s);
+      if (authProfile?.id) {
+        void syncProfileStats(
+          authProfile.id,
+          next.currentStreak,
+          next.dailyUsesRemaining,
+        );
+        void logAiUsageEvent({ source: 'app_daily_use' });
+      }
+      return next;
+    });
+  }, [mutateActiveSlice, activeUserId, authProfile?.id]);
 
   // ── Production compat ─────────────────────────────────────────────────────
   const [realStreakDays, setRealStreakRaw] = useState(0);
