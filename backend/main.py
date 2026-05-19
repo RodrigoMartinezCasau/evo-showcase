@@ -1739,6 +1739,55 @@ def classify_reflection(payload: ClassifyReflectionRequest):
 # ══════════════════════════════════════════════════════════════════════════════
 
 import json as _json
+import threading
+import urllib.request
+
+
+# ── Supabase streak sync ─────────────────────────────────────────────────────
+# Lee del mismo .env que el resto del backend (cargado arriba con load_dotenv).
+_SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+_SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+
+
+def _sync_streak_to_supabase(user_id: str, streak_current: int) -> None:
+    """Fire-and-forget: actualiza profiles.streak_days en Supabase.
+    Se ejecuta en hilo background; nunca lanza excepción al caller.
+    """
+    if not _SUPABASE_URL or not _SUPABASE_SERVICE_KEY:
+        return
+    try:
+        url = f"{_SUPABASE_URL}/rest/v1/profiles?id=eq.{user_id}"
+        body = _json.dumps({"streak_days": streak_current}).encode()
+        req = urllib.request.Request(
+            url,
+            data=body,
+            method="PATCH",
+            headers={
+                "apikey": _SUPABASE_SERVICE_KEY,
+                "Authorization": f"Bearer {_SUPABASE_SERVICE_KEY}",
+                "Content-Type": "application/json",
+                "Prefer": "return=minimal",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            if resp.status not in (200, 204):
+                logger.warning(
+                    "[streak_sync] Supabase PATCH profiles status=%d user=%s",
+                    resp.status,
+                    user_id,
+                )
+    except Exception as exc:
+        logger.warning("[streak_sync] error syncing streak to Supabase: %s", exc)
+
+
+def _sync_streak_async(user_id: str, streak_current: int) -> None:
+    """Lanza _sync_streak_to_supabase en un hilo daemon (no bloquea la respuesta)."""
+    t = threading.Thread(
+        target=_sync_streak_to_supabase,
+        args=(user_id, streak_current),
+        daemon=True,
+    )
+    t.start()
 
 
 def _get_or_init_streak(s, user_id: str) -> UserStreak:
@@ -1984,6 +2033,10 @@ def record_streak_activity(user_id: str, payload: StreakActivityPayload):
         s.commit()
 
         logger.info("[streak] user=%s date=%s type=%s streak=%d", user_id, date, payload.type, streak)
+
+        # Sincroniza streak_days en Supabase profiles (fire-and-forget).
+        _sync_streak_async(user_id, streak)
+
         return {
             "streak_current": streak,
             "streak_best": best,
