@@ -1,24 +1,29 @@
 /**
  * Clan visible para UI: perfil Supabase + clasificación local.
- * El top bar usa clasificación; posts/search usaban solo `profiles.clan_id`
- * (a menudo null hasta persistir) → colores sin clan (verde lima).
+ *
+ * Importante para performance:
+ *   NO se suscribe a `useSimulation()` (que incluye posts, votes, follows,
+ *   saves, etc.). Una suscripción ahí re-renderizaba AppTopBar, SidebarDrawer
+ *   y AppAnimationLayer cada vez que cualquiera votaba/guardaba/comentaba,
+ *   causando lag generalizado. En su lugar leemos `mockCurrentUser.id` como
+ *   fallback no-reactivo (SimulationContext lo mantiene sincronizado vía
+ *   setActiveSimUser), y dejamos que la reactividad venga de `useAuth` y
+ *   `useClassification`.
  */
 import { usePreviewMode } from '@evoconn/debug/PreviewModeContext';
 import { useAuth } from '../../mobile/lib/AuthContext';
-import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import { isRealUserId } from '@evoconn/services/supabaseSocial';
-import { SIM_USERS_BY_ID } from '@evoconn/data/simulation/simulatedNetwork';
+import { mockCurrentUser } from '@evoconn/data/mockUser';
 
 export function useEffectiveClanId(userId?: string): string | null {
   const { profile } = useAuth();
-  const sim = useSimulation();
   const classification = useClassification();
   const { isPreviewActive, previewClanId } = usePreviewMode();
 
   if (isPreviewActive) return previewClanId ?? null;
 
-  const targetId = userId ?? profile?.id ?? sim.activeUserId;
+  const targetId = userId ?? profile?.id ?? mockCurrentUser.id;
   const visibleClan = classification.getVisibleClanId(targetId);
 
   if (profile?.id && targetId === profile.id && isRealUserId(profile.id)) {

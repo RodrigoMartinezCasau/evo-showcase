@@ -54,6 +54,13 @@ function iconFrame(size: number, scale: number) {
   return { width: s, height: s };
 }
 
+/**
+ * Persists the last computed shrink factor across remounts so that navigating
+ * between screens does not flash the bar at full size before measuring &
+ * re-shrinking (the "lag pop" the user was seeing).
+ */
+let _lastOverflowShrink = 1;
+
 function HamburgerIcon({
   size,
 }: {
@@ -74,7 +81,7 @@ function HamburgerIcon({
   );
 }
 
-export function AppTopBar({
+function AppTopBarInner({
   onMenuPress,
   onClanPress,
   showClanIcon = true,
@@ -181,8 +188,8 @@ export function AppTopBar({
     TOP_BAR_LAYOUT.RIGHT_CLUSTER_UNIVERSAL_SCALE * tabletStatsBoost;
 
   /** Encoge el bloque entero si la fila supera el carril (más cifras en contadores). */
-  const overflowShrinkRef = useRef(1);
-  const [overflowShrink, setOverflowShrink] = useState(1);
+  const overflowShrinkRef = useRef(_lastOverflowShrink);
+  const [overflowShrink, setOverflowShrink] = useState(_lastOverflowShrink);
   const [statsRailWidth, setStatsRailWidth] = useState(0);
   const [unifiedRowWidth, setUnifiedRowWidth] = useState(0);
 
@@ -221,6 +228,7 @@ export function AppTopBar({
 
     if (Math.abs(L - overflowShrinkRef.current) > 0.005) {
       overflowShrinkRef.current = L;
+      _lastOverflowShrink = L;
       setOverflowShrink(L);
     }
   }, [
@@ -373,6 +381,14 @@ export function AppTopBar({
     </>
   );
 }
+
+/**
+ * Memoised export. Stable parents (with useCallback'd `onMenuPress` /
+ * `onClanPress`) won't re-render the top bar on unrelated context updates.
+ * This also fixes the "top bar pops large + lags" feel when switching
+ * screens, because the bar only reflows when its own data actually changes.
+ */
+export const AppTopBar = React.memo(AppTopBarInner);
 
 const styles = StyleSheet.create({
   bar: {

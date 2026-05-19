@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import {
   View,
   ScrollView,
@@ -61,20 +61,56 @@ export default function PersonalProfileScreen() {
   const classification = useClassification();
   const { isPreviewActive } = usePreviewMode();
 
-  const profile = getPersonalProfile();
+  // Mock profile is a pure derivation from mockCurrentUser; memoise once per
+  // user/clan so children that read profileWithClan don't re-render on every
+  // unrelated context update.
+  const profile = useMemo(() => getPersonalProfile(), [
+    // mockCurrentUser is mutable; depend on the bits that actually flow into
+    // getPersonalProfile so we recompute when the active user identity changes.
+    mockCurrentUser.id,
+    mockCurrentUser.username,
+    mockCurrentUser.clanId,
+    mockCurrentUser.rank,
+    mockCurrentUser.avatarUri,
+  ]);
+
   // Real per-user philosophical percentages from the classification engine.
-  const realPercentages = classification.getPercentages(profile.id);
+  const realPercentages = useMemo(
+    () => classification.getPercentages(profile.id),
+    [classification, profile.id],
+  );
+  const displayRank = useMemo(
+    () => classification.getDisplayRank(profile.id),
+    [classification, profile.id],
+  );
+  const reflectionCount = useMemo(
+    () => classification.getReflectionCount(profile.id),
+    [classification, profile.id],
+  );
+  const phraseCount = useMemo(
+    () => classification.getPhraseCount(profile.id),
+    [classification, profile.id],
+  );
+
   // Overlay Supabase identity fields so real users see their own data,
   // not the rodrigomartinez simulation fallback.
-  const profileWithClan = {
+  const profileWithClan = useMemo(() => ({
     ...profile,
     clanId: activeClan,
     philosophyPercentages: realPercentages,
-    rank: classification.getDisplayRank(profile.id),
+    rank: displayRank,
     insigniaPhrase: authProfile?.insignia_phrase ?? profile.insigniaPhrase,
     totalReflections: authProfile?.total_reflections ?? profile.totalReflections,
     totalQuotes: authProfile?.total_quotes ?? profile.totalQuotes,
-  };
+  }), [
+    profile,
+    activeClan,
+    realPercentages,
+    displayRank,
+    authProfile?.insignia_phrase,
+    authProfile?.total_reflections,
+    authProfile?.total_quotes,
+  ]);
 
   // ─── Personal profile shared state ────────────────────────────────
   const { posts, isHidden, toggleHidePost, deletePost, friends, savedPosts } = usePersonalProfile();
@@ -246,10 +282,22 @@ export default function PersonalProfileScreen() {
     router.navigate({ pathname: '/(tabs)', params: { tab } });
   }, [router]);
 
+  // Stable callbacks so SidebarDrawer (React.memo'd) doesn't re-render on every
+  // parent render.
+  const handleOpenSidebar = useCallback(() => setSidebarOpen(true), []);
+  const handleCloseSidebar = useCallback(() => setSidebarOpen(false), []);
+  const handleSidebarConversationPress = useCallback(
+    (id: string) => {
+      setSidebarOpen(false);
+      router.push({ pathname: '/reflection', params: { thoughtId: id } });
+    },
+    [router],
+  );
+
   return (
     <View style={styles.container}>
       <AppTopBar
-        onMenuPress={() => setSidebarOpen(true)}
+        onMenuPress={handleOpenSidebar}
       />
 
       <View style={[styles.profileWrap, { height: contentHeight }]} onLayout={onProfileWrapLayout}>
@@ -292,8 +340,8 @@ export default function PersonalProfileScreen() {
             <PersonalRankProgression
               rank={profileWithClan.rank}
               clanId={profileWithClan.clanId}
-              totalReflections={classification.getReflectionCount(profile.id)}
-              totalPhrases={classification.getPhraseCount(profile.id)}
+              totalReflections={reflectionCount}
+              totalPhrases={phraseCount}
               onPress={profileWithClan.clanId ? () => router.push('/philosophy-profile') : undefined}
             />
             <View style={styles.contentGap} />
@@ -343,12 +391,9 @@ export default function PersonalProfileScreen() {
 
       <SidebarDrawer
         visible={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
+        onClose={handleCloseSidebar}
         conversations={thoughts}
-        onConversationPress={(id) => {
-          setSidebarOpen(false);
-          router.push({ pathname: '/reflection', params: { thoughtId: id } });
-        }}
+        onConversationPress={handleSidebarConversationPress}
       />
 
       {/* ── Insignia phrase editor modal ── */}

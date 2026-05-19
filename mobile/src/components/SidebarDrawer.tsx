@@ -83,7 +83,7 @@ type SidebarDrawerProps = {
   openProgress?: Animated.Value;
 };
 
-export function SidebarDrawer({
+function SidebarDrawerInner({
   visible,
   onClose,
   conversations,
@@ -94,7 +94,15 @@ export function SidebarDrawer({
   const router = useRouter();
   const pathname = usePathname();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
-  const user = { ...mockCurrentUser, clanId: activeClan };
+  // user object is read by many useMemo selectors below.
+  // Stabilise its identity so getXxxByHouse calls aren't constantly invalidated.
+  const user = useMemo(
+    () => ({ ...mockCurrentUser, clanId: activeClan }),
+    // mockCurrentUser is a mutable singleton; we depend on activeClan + id +
+    // username explicitly to recompute when they actually change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeClan, mockCurrentUser.id, mockCurrentUser.username, mockCurrentUser.rank, mockCurrentUser.avatarUri],
+  );
   const closeSidebar = onClose;
   const searchInputRef = useRef<TextInput>(null);
   const [drawerSearch, setDrawerSearch] = useState('');
@@ -115,7 +123,13 @@ export function SidebarDrawer({
   const internalAnim = useRef(new Animated.Value(0)).current;
   const drive = openProgressProp ?? internalAnim;
 
-  const [interactable, setInteractable] = useState(false);
+  // Only used to disable touch handlers while the drawer sits offscreen.
+  // We intentionally do NOT lazy-mount the drawer body: doing so dropped
+  // the first frame of the open animation (parent's `drawerOpenProgress`
+  // had already started animating before our subtree existed, so the
+  // drawer "appeared" mid-flight instead of sliding in). Keeping it
+  // mounted preserves the smooth slide-in/out feel.
+  const [interactable, setInteractable] = useState(visible);
 
   useEffect(() => {
     const id = drive.addListener(({ value }) => {
@@ -141,7 +155,7 @@ export function SidebarDrawer({
         useNativeDriver: true,
       }).start();
     }
-  }, [visible, openProgressProp]);
+  }, [visible, openProgressProp, internalAnim]);
 
   const insets = useSafeAreaInsets();
 
@@ -438,6 +452,14 @@ export function SidebarDrawer({
     </View>
   );
 }
+
+/**
+ * Memoised export — same render is reused unless one of the props actually
+ * changed. Conversations is a reference from a context, so it can flip
+ * identity often; we accept that, but at least context-only updates to other
+ * sims/feed state won't force the drawer to re-render its body.
+ */
+export const SidebarDrawer = React.memo(SidebarDrawerInner);
 
 const FOOTER_LH_USER = Math.round(
   SIDEBAR_DRAWER_FOOTER_USERNAME_FONT_SIZE * SIDEBAR_DRAWER_FOOTER_LINE_HEIGHT_FACTOR_USERNAME,

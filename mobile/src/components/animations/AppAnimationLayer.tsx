@@ -26,6 +26,7 @@ import { useDebugStats } from '@evoconn/debug/DebugStatsContext';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
+import { useAuth } from '../../../mobile/lib/AuthContext';
 import type { Rank } from '@evoconn/types';
 
 const RANK_ORDER: Record<Rank, number> = { aprendiz: 0, maestro: 1, filosofo: 2 };
@@ -94,6 +95,8 @@ export default function AppAnimationLayer() {
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const clanId = (activeClan ?? 'none') as string;
   const classification = useClassification();
+  const { loading: authLoading, fetching: authFetching } = useAuth();
+  const profileSettled = !authLoading && !authFetching;
 
   const [assetsReady, setAssetsReady] = useState(false);
 
@@ -269,10 +272,35 @@ export default function AppAnimationLayer() {
   }, [displayRank, clanId, assetsReady, classification, enqueue]);
 
   // ── Clan reveal detection → enqueue ─────────────────────────────────────
+  //
+  // IMPORTANT: at app launch with a clan already assigned, `clanId` typically
+  // transitions: undefined → 'none' (while profile loads) → 'existencialista'.
+  // The naive prev/next comparison would treat that as a brand-new reveal and
+  // play the clan-reveal animation every time the user opens the app.
+  //
+  // Strategy:
+  //   1. Wait until both `assetsReady` and the FIRST non-'none' clanId before
+  //      seeding `prevClanRef`. This means we accept whatever clan the profile
+  //      reports on first arrival as the baseline, with no reveal animation.
+  //   2. Only after a real clan has been seen do we start enqueueing reveals
+  //      on subsequent changes.
   const prevClanRef = useRef<string | undefined>(undefined);
+  const clanSeededRef = useRef(false);
 
   useEffect(() => {
     if (!assetsReady) return;
+
+    // Wait until the profile fetch has settled before seeding the baseline.
+    // Otherwise the natural 'none' → 'existencialista' transition as profile
+    // loads would be interpreted as a clan reveal and play the wrong
+    // animation on every cold start.
+    if (!clanSeededRef.current) {
+      if (!profileSettled) return;
+      clanSeededRef.current = true;
+      prevClanRef.current = clanId;
+      return;
+    }
+
     const prev = prevClanRef.current;
     prevClanRef.current = clanId;
     if (prev === undefined) return;
@@ -287,7 +315,7 @@ export default function AppAnimationLayer() {
       previousClanId: wasNone ? null : prev,
       isChange: !wasNone,
     });
-  }, [clanId, assetsReady, enqueue]);
+  }, [clanId, assetsReady, enqueue, profileSettled]);
 
   // ── Render ───────────────────────────────────────────────────────────────
 
