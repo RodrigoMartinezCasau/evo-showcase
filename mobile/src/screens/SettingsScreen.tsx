@@ -77,7 +77,7 @@ interface SettingRow {
   type:         RowType;
   value?:       string;
   checked?:     boolean;
-  onToggleKey?: 'notifications' | 'haptics' | 'sounds' | 'privateAccount';
+  onToggleKey?: 'notifications' | 'haptics' | 'privateAccount';
   onPress?:     () => void;
 }
 
@@ -104,8 +104,6 @@ interface RowProps {
   onNotifToggle:     (val: boolean) => void;
   hapticsEnabled:    boolean;
   onHapticsToggle:   (val: boolean) => void;
-  soundsEnabled:     boolean;
-  onSoundsToggle:    (val: boolean) => void;
   privateAccountEnabled: boolean;
   onPrivateAccountToggle: (val: boolean) => void;
 }
@@ -117,8 +115,6 @@ function SettingsRow({
   onNotifToggle,
   hapticsEnabled,
   onHapticsToggle,
-  soundsEnabled,
-  onSoundsToggle,
   privateAccountEnabled,
   onPrivateAccountToggle,
 }: RowProps) {
@@ -166,13 +162,11 @@ function SettingsRow({
 
   const toggleValue = row.onToggleKey === 'notifications' ? notifEnabled
     : row.onToggleKey === 'haptics' ? hapticsEnabled
-    : row.onToggleKey === 'sounds'  ? soundsEnabled
     : row.onToggleKey === 'privateAccount' ? privateAccountEnabled
     : false;
 
   const handleToggleChange = row.onToggleKey === 'notifications' ? onNotifToggle
     : row.onToggleKey === 'haptics' ? onHapticsToggle
-    : row.onToggleKey === 'sounds'  ? onSoundsToggle
     : row.onToggleKey === 'privateAccount' ? onPrivateAccountToggle
     : undefined;
 
@@ -219,8 +213,6 @@ function SettingsSection({
   onNotifToggle,
   hapticsEnabled,
   onHapticsToggle,
-  soundsEnabled,
-  onSoundsToggle,
   privateAccountEnabled,
   onPrivateAccountToggle,
 }: {
@@ -229,8 +221,6 @@ function SettingsSection({
   onNotifToggle: (val: boolean) => void;
   hapticsEnabled: boolean;
   onHapticsToggle: (val: boolean) => void;
-  soundsEnabled: boolean;
-  onSoundsToggle: (val: boolean) => void;
   privateAccountEnabled: boolean;
   onPrivateAccountToggle: (val: boolean) => void;
 }) {
@@ -247,8 +237,6 @@ function SettingsSection({
             onNotifToggle={onNotifToggle}
             hapticsEnabled={hapticsEnabled}
             onHapticsToggle={onHapticsToggle}
-            soundsEnabled={soundsEnabled}
-            onSoundsToggle={onSoundsToggle}
             privateAccountEnabled={privateAccountEnabled}
             onPrivateAccountToggle={onPrivateAccountToggle}
           />
@@ -364,13 +352,8 @@ export default function SettingsScreen({
     AsyncStorage.setItem(NOTIFS_KEY, String(val)).catch(console.error);
   }, []);
 
-  // ── Haptics + Sounds toggles (persisted via EvoPreferencesContext) ────────
-  const {
-    hapticsEnabled,
-    soundsEnabled,
-    setHapticsEnabled,
-    setSoundsEnabled,
-  } = useEvoPreferences();
+  // ── Haptics toggle (persisted via EvoPreferencesContext) ──────────────────
+  const { hapticsEnabled, setHapticsEnabled } = useEvoPreferences();
 
   const handleBottomTabChange = useCallback(
     (tab: TabId) => { router.navigate({ pathname: '/(tabs)', params: { tab } }); },
@@ -456,15 +439,6 @@ export default function SettingsScreen({
           type: 'toggle',
           onToggleKey: 'haptics',
         },
-        {
-          id: 'sounds',
-          label: 'Sonidos',
-          subtitle: 'Efectos de sonido en estrellas y animaciones',
-          icon: 'musical-notes-outline',
-          iconBg: IC.teal,
-          type: 'toggle',
-          onToggleKey: 'sounds',
-        },
       ],
     },
     {
@@ -530,7 +504,6 @@ export default function SettingsScreen({
   ], [remainingUses, userEmail, userPhone, deletingAccount, confirmDeleteAccount, showSubscriptionAlert, router, profile?.id]);
 
   const handleHapticsToggle = useCallback((val: boolean) => setHapticsEnabled(val), [setHapticsEnabled]);
-  const handleSoundsToggle  = useCallback((val: boolean) => setSoundsEnabled(val),  [setSoundsEnabled]);
 
   return (
     <>
@@ -552,8 +525,6 @@ export default function SettingsScreen({
               onNotifToggle={handleNotifToggle}
               hapticsEnabled={hapticsEnabled}
               onHapticsToggle={handleHapticsToggle}
-              soundsEnabled={soundsEnabled}
-              onSoundsToggle={handleSoundsToggle}
               privateAccountEnabled={privateAccountLocal}
               onPrivateAccountToggle={handlePrivateAccountToggle}
             />

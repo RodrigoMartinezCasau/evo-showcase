@@ -270,7 +270,7 @@ export function EvoAnimationWebView({
   const [htmlContent, setHtmlContent] = useState<string | null>(null);
 
   // Preferences: combine prop flag with user preference
-  const { hapticsEnabled: prefHaptics, soundsEnabled: prefSounds } = useEvoPreferences();
+  const { hapticsEnabled: prefHaptics } = useEvoPreferences();
   const effectiveHaptics = enableHaptics && prefHaptics;
 
   // ── Prolonged-haptic loop ─────────────────────────────────────────────────
@@ -395,14 +395,13 @@ export function EvoAnimationWebView({
   const { width: winW, height: winH } = useWindowDimensions();
 
   // Inject props + real screen dimensions before the page loads.
-  // Merge soundsEnabled so HTML animations can gate their Web Audio synthesis.
   const injectedBeforeLoad = useMemo(() => {
-    const base: Record<string, unknown> = { ...params, soundsEnabled: prefSounds };
+    const base: Record<string, unknown> = { ...params, soundsEnabled: false };
     if (Platform.OS === 'android' && (name === 'streak' || name === 'clanEntry')) {
       base.animationLowGpu = true;
     }
     return `window.EVO_PROPS = ${JSON.stringify(base)}; window.EVO_SCREEN_WIDTH = ${winW}; window.EVO_SCREEN_HEIGHT = ${winH}; true;`;
-  }, [params, winW, winH, prefSounds, name]);
+  }, [params, winW, winH, name]);
 
   const onMessage = useCallback(
     (e: WebViewMessageEvent) => {
