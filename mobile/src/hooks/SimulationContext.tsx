@@ -28,6 +28,7 @@ import {
   type FollowGraph,
 } from '@evoconn/data/simulation/simulatedNetwork';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppState, type AppStateStatus } from 'react-native';
 import { setActiveSimUser, mockCurrentUser } from '@evoconn/data/mockUser';
 import { useAuth } from '../../mobile/lib/AuthContext';
 import { supabase } from '../../mobile/lib/supabase';
@@ -207,6 +208,26 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   const activeUserIdRef = useRef(activeUserId);
   activeUserIdRef.current = activeUserId;
 
+  /**
+   * `realtimeEpoch` aumenta cada vez que la app vuelve a foreground tras estar
+   * en background. Los useEffects que crean canales de Supabase Realtime usan
+   * este valor en sus dependencias para destruirlos en background y volver a
+   * crearlos al volver — evita mantener WebSockets abiertos consumiendo CPU
+   * y batería mientras la app está minimizada (Android se nota mucho).
+   */
+  const [realtimeEpoch, setRealtimeEpoch] = useState(0);
+  useEffect(() => {
+    let lastState: AppStateStatus = AppState.currentState;
+    const sub = AppState.addEventListener('change', (next) => {
+      const wasBackground = lastState === 'background' || lastState === 'inactive';
+      lastState = next;
+      if (next === 'active' && wasBackground) {
+        setRealtimeEpoch((e) => e + 1);
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
   // When a real Supabase user is authenticated (UUID not in the 9-user sim),
   // make activeUserId equal to their UUID. This ensures ALL sim-backed features
   // (saves, follow graph, posts filter, notifications) use the correct key.
@@ -295,6 +316,9 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   const realtimeSubRef = useRef<any>(null);
   useEffect(() => {
     if (!isRealUserId(activeUserId)) return;
+    // No suscribir mientras la app está en background — evita mantener un
+    // WebSocket abierto consumiendo CPU/batería en Android.
+    if (AppState.currentState !== 'active') return;
     // Subscribe after hydration settles (tiny delay avoids double-processing seed data).
     const timer = setTimeout(() => {
       const ch = supabase
@@ -322,13 +346,14 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
         realtimeSubRef.current = null;
       }
     };
-  }, [activeUserId]);
+  }, [activeUserId, realtimeEpoch]);
 
   // ── Realtime: follows involving the active user (keeps graph + counts fresh) ──
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const followsRealtimeRef = useRef<any>(null);
   useEffect(() => {
     if (!isRealUserId(activeUserId)) return;
+    if (AppState.currentState !== 'active') return;
     const timer = setTimeout(() => {
       const ch = supabase
         .channel(`public:follows:${activeUserId}`)
@@ -413,7 +438,25 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
         followsRealtimeRef.current = null;
       }
     };
-  }, [activeUserId]);
+  }, [activeUserId, realtimeEpoch]);
+
+  // Cerrar canales activamente cuando la app va a background; al volver,
+  // `realtimeEpoch` re-dispara los useEffects de arriba.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'background' || next === 'inactive') {
+        if (realtimeSubRef.current) {
+          supabase.removeChannel(realtimeSubRef.current);
+          realtimeSubRef.current = null;
+        }
+        if (followsRealtimeRef.current) {
+          supabase.removeChannel(followsRealtimeRef.current);
+          followsRealtimeRef.current = null;
+        }
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   // Load persisted posts on mount for sim users (AsyncStorage fallback)
   useEffect(() => {

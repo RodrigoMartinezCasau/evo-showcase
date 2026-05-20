@@ -18,7 +18,8 @@ import {
   Easing,
   useWindowDimensions,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, usePathname } from 'expo-router';
+import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
@@ -43,6 +44,7 @@ const ANIM_DURATION = 200;
 
 export default function PersonalSavedPostsScreen() {
   const router = useRouter();
+  const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const safeFrame = useSafeAreaFrame();
   const { width: screenW, height: screenH } = useWindowDimensions();
@@ -174,7 +176,7 @@ export default function PersonalSavedPostsScreen() {
             onClose={closeDetailFeed}
             onAuthorPress={() => closeDetailFeed()}
             onClanPress={(clanId) =>
-              router.push({ pathname: '/clan/[id]', params: { id: clanId } })
+              navigateUnlessCurrent(pathname, `/clan/${clanId}`)
             }
           />
         )}

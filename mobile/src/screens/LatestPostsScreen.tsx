@@ -19,6 +19,8 @@ import { useRouter, useLocalSearchParams, usePathname } from 'expo-router';
 import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AppTopBar, AppShellBottomTabsWrap, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
+import { useDeferredRender } from '@evoconn/hooks/useDeferredRender';
+import { ClanLoadingDot } from '@evoconn/components/shared/ClanLoadingDot';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
 import { getMainColumnHeightForFloatingBottomBar } from '@evoconn/constants/appShellLayout';
@@ -28,7 +30,7 @@ import { mockCurrentUser } from '@evoconn/data/mockUser';
 import type { CommunityPost } from '@evoconn/types';
 import { ReflectionDetailItem } from '@evoconn/components/ReflectionDetailItem';
 import { evoconnColors } from '@evoconn/theme/colors';
-import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
+import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import {
   COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE,
   COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE_ANDROID,
@@ -77,6 +79,7 @@ export default function LatestPostsScreen() {
   const { thoughts } = useThoughts();
   const { profile: authProfile } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const ready = useDeferredRender();
   const [feedScrollEnabled, setFeedScrollEnabled] = useState(true);
   const [remotePosts, setRemotePosts] = useState<CommunityPost[] | null>(null);
   const [remoteAuthorAvatar, setRemoteAuthorAvatar] = useState<string | undefined>();
@@ -181,9 +184,9 @@ export default function LatestPostsScreen() {
   const handleAuthorPress = useCallback(
     (userId: string) => {
       if (userId === mockCurrentUser.id) {
-        pushUnlessCurrent(pathname, '/my-profile');
+        navigateUnlessCurrent(pathname, '/my-profile');
       } else {
-        router.push({ pathname: '/profile/[id]', params: { id: userId } });
+        navigateUnlessCurrent(pathname, `/profile/${userId}`);
       }
     },
     [router, pathname],
@@ -192,7 +195,7 @@ export default function LatestPostsScreen() {
   const handleClanPress = useCallback(
     (clanId: string) => {
       const href = `/clan/${String(clanId).trim().toLowerCase()}`;
-      pushUnlessCurrent(pathname, href);
+      navigateUnlessCurrent(pathname, href);
     },
     [pathname],
   );
@@ -258,7 +261,9 @@ export default function LatestPostsScreen() {
       </View>
 
       <View style={{ height: listPanelHeight, overflow: 'hidden' }}>
-        {data === null ? (
+        {!ready ? (
+          <ClanLoadingDot />
+        ) : data === null ? (
           <View style={styles.loadingWrap}>
             <ActivityIndicator color="rgba(255,255,255,0.35)" />
           </View>

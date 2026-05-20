@@ -9,11 +9,12 @@ import {
   useWindowDimensions,
   ActivityIndicator,
   Keyboard,
+  InteractionManager,
 } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { useRouter, useLocalSearchParams, usePathname } from 'expo-router';
-import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
+import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import {
   AppTopBar,
@@ -68,6 +69,7 @@ import {
 } from '@evoconn/constants/followingFeedSort';
 import { getParatiAuthorClanMembershipMultiplier } from '@evoconn/logic/feed/paratiFeedRanking';
 import { normalizeRouteParam } from '@evoconn/utils/widgetDeepLink';
+import { consumeForcedCommunityPostOpen } from '@evoconn/utils/notificationNavigation';
 import { activateWidgetDeepLinkBypass } from '../../mobile/lib/animationState';
 
 type TabId = 'siguiendo' | 'para-ti' | 'search';
@@ -243,8 +245,10 @@ export default function CommunityScreen() {
   const gestureCommittingRef = useRef(false);
   const [activeTab, setActiveTab] = useState<TabId>('siguiendo');
   const [followingSort, setFollowingSort] = useState<FollowingSortOption>('recientes');
-  /** While "Para ti" fullscreen is open, freeze seen-ids used for ordering so the list does not jump as posts are marked seen. */
-  const [foryouSeenFrozen, setForyouSeenFrozen] = useState<Set<string> | null>(null);
+  // While "Para ti" was a transient overlay we needed to freeze seen-ids so
+  // the list did not jump as posts were marked seen. Now that the panel is
+  // persistent and snapshot-based (see `paratiPanelData`), no freezing is
+  // required — the panel simply does not re-rank mid-view.
 
   // Track which deep-link (tab + postId) we already handled.
   const consumedDeepLinkRef = useRef<string | undefined>(undefined);
@@ -254,9 +258,6 @@ export default function CommunityScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [feedScrollEnabled, setFeedScrollEnabled] = useState(true);
 
-  const tabSlideAnim = useRef(new Animated.Value(1)).current;
-  const [transitionTab, setTransitionTab] = useState<TabId | null>(null);
-  const slideDirectionRef = useRef(1);
 
   const handleReadingModeChange = useCallback((active: boolean) => {
     setFeedScrollEnabled(!active);
@@ -273,39 +274,30 @@ export default function CommunityScreen() {
   const detailFeedListRef = useRef<FlatList<CommunityPost>>(null);
   const detailFeedModeRef = useRef<FeedMode | null>(null);
   detailFeedModeRef.current = detailFeed?.mode ?? null;
+
+  // ── Persistent "Para ti" panel ─────────────────────────────────────
+  // Para Ti vertical viewer is mounted ONCE (deferred via InteractionManager)
+  // and stays mounted while we're inside CommunityScreen. Switching tabs only
+  // toggles its visibility (display:'none') — no re-mount, no flash.
+  // Snapshot semantics: data is only refreshed on first mount, on pull-to-
+  // refresh, or on a deep-link that needs a specific postId — never on the
+  // live `foryouFeedOrdered` re-rank, which would cause visible jumps.
+  const [paratiPanelMounted, setParatiPanelMounted] = useState(false);
+  const [paratiPanelData, setParatiPanelData] = useState<CommunityPost[]>([]);
+  const [paratiPanelInitialIndex, setParatiPanelInitialIndex] = useState(0);
+  const [paratiPanelKey, setParatiPanelKey] = useState(0);
+  const paratiPanelListRef = useRef<FlatList<CommunityPost>>(null);
+  const paratiPanelHydratedRef = useRef(false);
   const markParatiSeenRef = useRef(markParatiPostSeen);
   markParatiSeenRef.current = markParatiPostSeen;
   const triggerHapticRef = useRef(triggerHaptic);
   triggerHapticRef.current = triggerHaptic;
 
-  const seenForParatiOrder = foryouSeenFrozen ?? paratiSeenIds;
-
-  /** Orden global Para ti — memoizado para no re-ordenar en cada frame y al abrir el detalle. */
-  const foryouFeedOrdered = useMemo(
-    () =>
-      getDataForMode(
-        'foryou',
-        allPosts,
-        followingSet,
-        viewerClanId,
-        mockCurrentUser.id,
-        followingSort,
-        getBoost,
-        seenForParatiOrder,
-      ),
-    // Only `seenForParatiOrder` for seen-state — do not also depend on `paratiSeenIds` while
-    // frozen: that Set changes every mark and would thrash this memo + FlatList (initialScrollIndex bugs).
-    [
-      allPosts,
-      followingSet,
-      viewerClanId,
-      mockCurrentUser.id,
-      followingSort,
-      getBoost,
-      tasteRevision,
-      seenForParatiOrder,
-    ],
-  );
+  // Para Ti ordering is computed on-demand in `hydrateParatiPanel` /
+  // pull-to-refresh so it never re-renders the panel mid-scroll. The
+  // `foryouSeenFrozen` flag is kept as a flag (active = we're in Para Ti)
+  // and is still used by the spinner reset effect.
+  void tasteRevision;
 
   const followingFeedOrdered = useMemo(
     () =>
@@ -320,75 +312,126 @@ export default function CommunityScreen() {
     [allPosts, followingSet, viewerClanId, mockCurrentUser.id, followingSort],
   );
 
-  const openDetailFeed = useCallback(
-    (mode: FeedMode, postId?: string, skipAnimation?: boolean) => {
-      if (mode === 'foryou') {
-        const snap = new Set(paratiSeenIds);
-        setForyouSeenFrozen(snap);
-        const baseData = getDataForMode(
-          'foryou',
-          allPosts,
-          followingSet,
-          viewerClanId,
-          mockCurrentUser.id,
-          followingSort,
-          getBoost,
-          snap,
-        );
-        const { data, initialIndex, resolved } = foryouDetailWithTargetPost(
-          baseData,
-          postId,
-          getPostById,
-        );
-        if (postId && !resolved) {
-          pendingWidgetPostIdRef.current = postId;
-          return;
-        }
-        if (postId) pendingWidgetPostIdRef.current = null;
-        if (data.length === 0) return;
-        const clampedIndex = clampDetailInitialIndex(data.length, initialIndex);
-        setDetailFeed({ mode, data, initialIndex: clampedIndex });
-        if (skipAnimation) {
-          slideAnim.setValue(1);
-          detailFeedListRef.current?.scrollToOffset({ offset: 0, animated: false });
-          return;
-        }
-      } else {
-        setForyouSeenFrozen(null);
-        const data = followingFeedOrdered;
-        let initialIndex = 0;
-        if (postId) {
-          const idx = data.findIndex((p) => p.id === postId);
-          initialIndex = idx >= 0 ? idx : 0;
-        }
-        if (data.length === 0) return;
-        initialIndex = clampDetailInitialIndex(data.length, initialIndex);
-        setDetailFeed({ mode, data, initialIndex });
-        if (skipAnimation) {
-          slideAnim.setValue(1);
-          return;
-        }
-      }
-      slideAnim.stopAnimation();
-      slideAnim.setValue(0);
-      requestAnimationFrame(() => {
-        Animated.timing(slideAnim, {
-          toValue: 1,
-          duration: ANIM_DURATION,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }).start();
-      });
+  /**
+   * Defer first mount of Para Ti panel until after Community paints, so the
+   * very first open of CommunityScreen is not penalised by mounting two feeds.
+   * Hydration runs only ONCE; subsequent reorders of `foryouFeedOrdered` do
+   * not propagate (snapshot semantics — see header comment on the state).
+   */
+  useEffect(() => {
+    if (paratiPanelHydratedRef.current) return;
+    const handle = InteractionManager.runAfterInteractions(() => {
+      if (paratiPanelHydratedRef.current) return;
+      const snap = new Set(paratiSeenIds);
+      const data = getDataForMode(
+        'foryou',
+        allPosts,
+        followingSet,
+        viewerClanId,
+        mockCurrentUser.id,
+        followingSort,
+        getBoost,
+        snap,
+      );
+      paratiPanelHydratedRef.current = true;
+      setParatiPanelData(data);
+      setParatiPanelInitialIndex(0);
+      setParatiPanelMounted(true);
+    });
+    return () => handle.cancel();
+    // Hydrate on first available data; we deliberately do NOT depend on
+    // `paratiSeenIds` / `getBoost` to avoid re-running once hydrated.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allPosts, followingSet, viewerClanId, followingSort]);
+
+  /**
+   * Hydrate / re-target the persistent Para Ti panel.
+   * Used by deep-links that need to land on a specific postId, and by the
+   * widget cold-start retry. Always runs synchronously — no defer.
+   */
+  const hydrateParatiPanel = useCallback(
+    (postId?: string): { resolved: boolean; data: CommunityPost[] } => {
+      const snap = new Set(paratiSeenIds);
+      const baseData = getDataForMode(
+        'foryou',
+        allPosts,
+        followingSet,
+        viewerClanId,
+        mockCurrentUser.id,
+        followingSort,
+        getBoost,
+        snap,
+      );
+      const { data, initialIndex, resolved } = foryouDetailWithTargetPost(
+        baseData,
+        postId,
+        getPostById,
+      );
+      if (postId && !resolved) return { resolved: false, data: [] };
+      if (data.length === 0) return { resolved: true, data };
+      const clampedIndex = clampDetailInitialIndex(data.length, initialIndex);
+      paratiPanelHydratedRef.current = true;
+      setParatiPanelData(data);
+      setParatiPanelInitialIndex(clampedIndex);
+      setParatiPanelKey((k) => k + 1);
+      setParatiPanelMounted(true);
+      return { resolved: true, data };
     },
     [
-      slideAnim,
-      followingFeedOrdered,
       allPosts,
       followingSet,
+      viewerClanId,
       followingSort,
       getBoost,
       paratiSeenIds,
       getPostById,
+    ],
+  );
+
+  const openDetailFeed = useCallback(
+    (mode: FeedMode, postId?: string, skipAnimation?: boolean) => {
+      // Para Ti uses the persistent panel — switching to it is a visibility
+      // toggle, not a remount. We only re-hydrate when a specific postId is
+      // requested (deep-link / widget) so that post is centered.
+      if (mode === 'foryou') {
+        if (postId) {
+          const { resolved, data } = hydrateParatiPanel(postId);
+          if (!resolved) {
+            pendingWidgetPostIdRef.current = postId;
+            return;
+          }
+          pendingWidgetPostIdRef.current = null;
+          // Si ya estaba montado, hay que hacer scroll explícito al post solicitado
+          // (initialScrollIndex sólo aplica al primer mount).
+          if (skipAnimation && data.length > 0) {
+            const idx = clampDetailInitialIndex(
+              data.length,
+              data.findIndex((p) => p.id === postId),
+            );
+            requestAnimationFrame(() => {
+              paratiPanelListRef.current?.scrollToIndex({ index: idx, animated: false });
+            });
+          }
+        }
+        setActiveTab('para-ti');
+        return;
+      }
+      const data = followingFeedOrdered;
+      let initialIndex = 0;
+      if (postId) {
+        const idx = data.findIndex((p) => p.id === postId);
+        initialIndex = idx >= 0 ? idx : 0;
+      }
+      if (data.length === 0) return;
+      initialIndex = clampDetailInitialIndex(data.length, initialIndex);
+      setDetailFeed({ mode, data, initialIndex });
+      slideAnim.setValue(1);
+    },
+    [
+      slideAnim,
+      followingFeedOrdered,
+      paratiSeenIds,
+      hydrateParatiPanel,
     ],
   );
 
@@ -410,15 +453,18 @@ export default function CommunityScreen() {
       tabParam === 'mas-votadas' ? 'para-ti' : (tabParam as TabId);
     if (!VALID_TAB_IDS.includes(normalized)) return;
     const pid = normalizeRouteParam(postIdParam);
-    const deepLinkKey = `${tabParam}|${pid ?? ''}`;
+    const forcedPid = consumeForcedCommunityPostOpen();
+    if (forcedPid) consumedDeepLinkRef.current = undefined;
+    const deepLinkKey = `${tabParam}|${pid ?? forcedPid ?? ''}`;
     if (consumedDeepLinkRef.current === deepLinkKey) return;
     consumedDeepLinkRef.current = deepLinkKey;
 
     const tab = normalized;
     if (tab === 'para-ti') {
-      if (pid) activateWidgetDeepLinkBypass();
+      const openPostId = pid ?? forcedPid;
+      if (openPostId) activateWidgetDeepLinkBypass();
       // skipAnimation=true: detail visible in the same frame (widget / deep link).
-      openDetailFeed('foryou', pid, true);
+      openDetailFeed('foryou', openPostId, true);
     } else {
       setActiveTab(tab);
     }
@@ -429,30 +475,33 @@ export default function CommunityScreen() {
     const pid = pendingWidgetPostIdRef.current;
     if (!pid || !getPostById(pid)) return;
     pendingWidgetPostIdRef.current = null;
-    openDetailFeed('foryou', pid, true);
-  }, [allPosts, getPostById, openDetailFeed]);
+    const { resolved, data } = hydrateParatiPanel(pid);
+    if (resolved) {
+      setActiveTab('para-ti');
+      if (data.length > 0) {
+        const idx = clampDetailInitialIndex(
+          data.length,
+          data.findIndex((p) => p.id === pid),
+        );
+        requestAnimationFrame(() => {
+          paratiPanelListRef.current?.scrollToIndex({ index: idx, animated: false });
+        });
+      }
+    }
+  }, [allPosts, getPostById, hydrateParatiPanel]);
 
   useEffect(() => {
-    if (!detailFeed || detailFeed.mode !== 'foryou') {
+    if (!paratiPanelVisible) {
       paratiRefreshShiftAnim.setValue(0);
     }
-  }, [detailFeed, paratiRefreshShiftAnim]);
+  }, [paratiPanelVisible, paratiRefreshShiftAnim]);
 
   const closeDetailFeed = useCallback(() => {
-    Animated.timing(slideAnim, {
-      toValue: 0,
-      duration: ANIM_DURATION,
-      easing: Easing.inOut(Easing.cubic),
-      useNativeDriver: true,
-    }).start(({ finished }) => {
-      if (finished) {
-        setForyouSeenFrozen(null);
-        setDetailFeed(null);
-        // Reset so widget / deep links can open Para ti again after closing.
-        consumedDeepLinkRef.current = undefined;
-        pendingWidgetPostIdRef.current = null;
-      }
-    });
+    slideAnim.setValue(0);
+    setDetailFeed(null);
+    // Reset so widget / deep links can open Para ti again after closing.
+    consumedDeepLinkRef.current = undefined;
+    pendingWidgetPostIdRef.current = null;
   }, [slideAnim]);
 
   const listTranslateX = slideAnim.interpolate({
@@ -462,16 +511,6 @@ export default function CommunityScreen() {
   const detailTranslateX = slideAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [screenW, 0],
-  });
-
-  const dir = slideDirectionRef.current;
-  const incomingTabTranslateX = tabSlideAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [dir * screenW, 0],
-  });
-  const outgoingTabTranslateX = tabSlideAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -dir * screenW],
   });
 
   const handlePostPress = useCallback(
@@ -484,12 +523,12 @@ export default function CommunityScreen() {
   const handleAuthorPress = useCallback(
     (userId: string, username?: string) => {
       if (userId === mockCurrentUser.id) {
-        pushUnlessCurrent(pathname, '/my-profile');
+        navigateUnlessCurrent(pathname, '/my-profile');
       } else {
-        router.push({
-          pathname: '/profile/[id]',
-          params: { id: userId, ...(username ? { username } : {}) },
-        });
+        const href = username
+          ? `/profile/${userId}?username=${encodeURIComponent(username)}`
+          : `/profile/${userId}`;
+        navigateUnlessCurrent(pathname, href);
       }
     },
     [router, pathname],
@@ -497,7 +536,7 @@ export default function CommunityScreen() {
   const handleClanPress = useCallback(
     (clanId: string) => {
       const href = `/clan/${String(clanId).trim().toLowerCase()}`;
-      pushUnlessCurrent(pathname, href);
+      navigateUnlessCurrent(pathname, href);
     },
     [pathname],
   );
@@ -507,8 +546,9 @@ export default function CommunityScreen() {
       const tabId = tab as TabId;
 
       if (tabId === 'para-ti') {
-        const alreadyOpen = detailFeed?.mode === 'foryou';
-        if (alreadyOpen) {
+        const alreadyActive = activeTab === 'para-ti' && !detailFeed;
+        if (alreadyActive) {
+          // Re-pulsar Para Ti = pull-to-refresh sobre el panel persistente.
           void (async () => {
             const shift = PARATI_REFRESH_SHIFT;
             paratiRefreshShiftAnim.setValue(0);
@@ -526,7 +566,6 @@ export default function CommunityScreen() {
               ]);
               const freshAll = simPosts.map(simPostToCommunityPost);
               const emptySeen = new Set<string>();
-              setForyouSeenFrozen(emptySeen);
               const data = getDataForMode(
                 'foryou',
                 freshAll,
@@ -537,12 +576,11 @@ export default function CommunityScreen() {
                 getBoost,
                 emptySeen,
               );
+              paratiPanelHydratedRef.current = true;
+              setParatiPanelData(data);
+              setParatiPanelInitialIndex(0);
+              setParatiPanelKey((k) => k + 1);
               setParatiDetailFeedKey((k) => k + 1);
-              setDetailFeed({
-                mode: 'foryou',
-                data,
-                initialIndex: clampDetailInitialIndex(data.length, 0),
-              });
             } finally {
               await new Promise<void>((resolve) => {
                 Animated.spring(paratiRefreshShiftAnim, {
@@ -556,7 +594,13 @@ export default function CommunityScreen() {
           })();
           return;
         }
-        openDetailFeed('foryou', undefined, false);
+        // Cambio a Para Ti — solo toggle de visibilidad sobre panel ya montado.
+        // Si todavía no se ha hidratado (caso muy temprano), lo hidrato síncrono.
+        if (!paratiPanelHydratedRef.current) {
+          hydrateParatiPanel();
+        }
+        if (detailFeed) closeDetailFeed();
+        setActiveTab('para-ti');
         return;
       }
 
@@ -567,52 +611,21 @@ export default function CommunityScreen() {
       }
 
       if (activeTab === tabId) return;
-
-      if (transitionTab !== null) {
-        tabSlideAnim.stopAnimation();
-      }
-
-      const fromIdx = TAB_INDEX[activeTab] ?? 0;
-      const toIdx = TAB_INDEX[tabId] ?? 0;
-      slideDirectionRef.current = toIdx > fromIdx ? 1 : -1;
-
-      const oldTab = activeTab;
       setActiveTab(tabId);
-      setTransitionTab(oldTab);
     },
     [
       activeTab,
       detailFeed,
-      transitionTab,
-      openDetailFeed,
       closeDetailFeed,
-      tabSlideAnim,
       refreshSocialFromSupabase,
       followingSet,
       followingSort,
+      viewerClanId,
       getBoost,
+      paratiRefreshShiftAnim,
+      hydrateParatiPanel,
     ],
   );
-
-  useLayoutEffect(() => {
-    if (transitionTab === null) return;
-
-    tabSlideAnim.setValue(0);
-    Animated.timing(tabSlideAnim, {
-      toValue: 1,
-      duration: ANIM_DURATION,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start(({ finished }) => {
-      if (finished) {
-        setTransitionTab(null);
-      }
-    });
-
-    return () => {
-      tabSlideAnim.stopAnimation();
-    };
-  }, [transitionTab, tabSlideAnim]);
 
   const topBarHeight = getAppTopBarLayoutHeight(insets.top);
   const feedItemHeight = getMainColumnHeightForFloatingBottomBar(
@@ -622,24 +635,12 @@ export default function CommunityScreen() {
     safeFrame.height,
   );
 
-  const listData = useMemo(() => {
-    switch (activeTab) {
-      case 'siguiendo':
-        return followingFeedOrdered;
-      case 'para-ti':
-        return foryouFeedOrdered;
-      default:
-        return [];
-    }
-  }, [activeTab, followingFeedOrdered, foryouFeedOrdered]);
-
-  const transitionData = useMemo(
-    () =>
-      transitionTab && transitionTab !== 'search' && transitionTab !== 'para-ti'
-        ? followingFeedOrdered
-        : [],
-    [transitionTab, followingFeedOrdered],
-  );
+  /**
+   * Main panel list = Siguiendo. Para Ti vive en su propio panel persistente
+   * (más abajo). Mantenemos la data aunque la pestaña activa sea Para Ti / Search:
+   * así no se re-renderiza al volver a Siguiendo (sólo se oculta con display:none).
+   */
+  const listData = followingFeedOrdered;
 
   const communityFeedUsableWidth =
     screenW - SVG_CARD_VISUAL.CARD_HORIZONTAL_MARGIN * 2;
@@ -668,24 +669,6 @@ export default function CommunityScreen() {
       />
     ),
     [activeTab, feedCardSlotOuterHeight, handlePostPress, handleAuthorPress, handleClanPress],
-  );
-
-  const renderTransitionListItem = useCallback(
-    ({ item }: { item: CommunityPost }): React.ReactElement => (
-      <CommunityPostCard
-        post={item}
-        showPhraseAuthor={false}
-        slotOuterHeight={feedCardSlotOuterHeight}
-        followingFeedStyle
-        onPress={() => handlePostPress(item)}
-        onAuthorPress={() => handleAuthorPress(item.author.id)}
-        onClanPress={() => {
-          const cid = item.author.clanId;
-          if (cid) handleClanPress(cid);
-        }}
-      />
-    ),
-    [feedCardSlotOuterHeight, handlePostPress, handleAuthorPress, handleClanPress],
   );
 
   const renderFeedItem = useCallback(
@@ -720,9 +703,11 @@ export default function CommunityScreen() {
     [feedItemHeight],
   );
 
-  const displayTab = detailFeed
-    ? ((detailFeed.mode === 'foryou' ? 'para-ti' : 'siguiendo') as TabId)
+  const displayTab: TabId = detailFeed
+    ? (detailFeed.mode === 'foryou' ? 'para-ti' : 'siguiendo')
     : activeTab;
+  /** Para Ti está visible cuando el panel persistente es la pestaña activa Y no hay detail overlay encima. */
+  const paratiPanelVisible = activeTab === 'para-ti' && !detailFeed;
 
   // ── Sidebar open/close animation ──────────────────────────────────
   useEffect(() => {
@@ -806,13 +791,29 @@ export default function CommunityScreen() {
       const id = detailFeed.data[detailFeed.initialIndex]?.author?.id ?? null;
       visibleAuthorIdRef.current = id;
       setVisibleAuthorId(id);
-    } else {
-      visibleAuthorIdRef.current = null;
-      setVisibleAuthorId(null);
+      return;
     }
-  }, [detailFeed]);
+    if (paratiPanelVisible && paratiPanelData.length > 0) {
+      const idx = clampDetailInitialIndex(paratiPanelData.length, paratiPanelInitialIndex);
+      const id = paratiPanelData[idx]?.author?.id ?? null;
+      visibleAuthorIdRef.current = id;
+      setVisibleAuthorId(id);
+      return;
+    }
+    visibleAuthorIdRef.current = null;
+    setVisibleAuthorId(null);
+  }, [detailFeed, paratiPanelVisible, paratiPanelData, paratiPanelInitialIndex]);
 
-  /** Marcar vistos en "Para ti" al abrir el visor vertical (prioridad: no vistos arriba). */
+  /** Marcar vistos en "Para ti" al volver a entrar al panel persistente. */
+  useEffect(() => {
+    if (!paratiPanelVisible) return;
+    if (paratiPanelData.length === 0) return;
+    const idx = clampDetailInitialIndex(paratiPanelData.length, paratiPanelInitialIndex);
+    const pid = paratiPanelData[idx]?.id;
+    if (pid) markParatiPostSeen(pid);
+  }, [paratiPanelVisible, paratiPanelData, paratiPanelInitialIndex, markParatiPostSeen]);
+
+  /** Marcar vistos en detailFeed mode='foryou' (deep-link / widget abrir post concreto). */
   useEffect(() => {
     if (!detailFeed || detailFeed.mode !== 'foryou') return;
     const len = detailFeed.data.length;
@@ -828,10 +829,20 @@ export default function CommunityScreen() {
   tasteDwellRefs.current = { getPostById, recordDwell };
 
   useEffect(() => {
-    if (!detailFeed) return;
-    const len = detailFeed.data.length;
-    const idx = clampDetailInitialIndex(len, detailFeed.initialIndex);
-    const startId = len > 0 ? detailFeed.data[idx]?.id ?? null : null;
+    let len = 0;
+    let idx = 0;
+    let startId: string | null = null;
+    if (detailFeed) {
+      len = detailFeed.data.length;
+      idx = clampDetailInitialIndex(len, detailFeed.initialIndex);
+      startId = len > 0 ? detailFeed.data[idx]?.id ?? null : null;
+    } else if (paratiPanelVisible && paratiPanelData.length > 0) {
+      len = paratiPanelData.length;
+      idx = clampDetailInitialIndex(len, paratiPanelInitialIndex);
+      startId = paratiPanelData[idx]?.id ?? null;
+    } else {
+      return;
+    }
     dwellRef.current = { postId: startId, since: Date.now() };
     return () => {
       const { postId, since } = dwellRef.current;
@@ -840,11 +851,11 @@ export default function CommunityScreen() {
       const p = tasteDwellRefs.current.getPostById(postId);
       if (p && ms >= 450) tasteDwellRefs.current.recordDwell(p, ms);
     };
-  }, [detailFeed]);
+  }, [detailFeed, paratiPanelVisible, paratiPanelData, paratiPanelInitialIndex]);
 
   const detailViewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
-  const onDetailViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: Array<{ item: CommunityPost }> }) => {
+  const handleViewableItemsChangedForMode = useCallback(
+    (mode: FeedMode, viewableItems: Array<{ item: CommunityPost }>) => {
       if (viewableItems.length > 0 && viewableItems[0].item?.author?.id) {
         const post = viewableItems[0].item;
         const now = Date.now();
@@ -858,7 +869,7 @@ export default function CommunityScreen() {
         }
         dwellRef.current = { postId: post.id, since: now };
 
-        if (detailFeedModeRef.current === 'foryou') {
+        if (mode === 'foryou') {
           markParatiSeenRef.current(post.id);
         }
 
@@ -867,7 +878,21 @@ export default function CommunityScreen() {
         setVisibleAuthorId(id);
       }
     },
-  ).current;
+    [],
+  );
+  const onDetailViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: Array<{ item: CommunityPost }> }) => {
+      const mode = detailFeedModeRef.current ?? 'foryou';
+      handleViewableItemsChangedForMode(mode, viewableItems);
+    },
+    [handleViewableItemsChangedForMode],
+  );
+  const onParatiPanelViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: Array<{ item: CommunityPost }> }) => {
+      handleViewableItemsChangedForMode('foryou', viewableItems);
+    },
+    [handleViewableItemsChangedForMode],
+  );
 
   const profileRevealOverlayTranslateX = profileRevealAnim.interpolate({
     inputRange: [0, 1],
@@ -906,10 +931,12 @@ export default function CommunityScreen() {
     }).start();
   }, [profileRevealAnim]);
 
+  /** Revealing the profile overlay works in both: detailFeed AND persistent Para Ti panel. */
+  const verticalViewerVisible = detailMounted || paratiPanelVisible;
   const profileRevealGesture = useMemo(
     () =>
       Gesture.Pan()
-        .enabled(detailMounted && !sidebarOpen && !profileOverlayActive)
+        .enabled(verticalViewerVisible && !sidebarOpen && !profileOverlayActive)
         .activeOffsetX(-12)
         .failOffsetY([-32, 32])
         .onUpdate((e: { translationX: number }) => {
@@ -925,7 +952,7 @@ export default function CommunityScreen() {
             runOnJS(cancelProfileRevealJS)();
           }
         }),
-    [detailMounted, sidebarOpen, profileOverlayActive, setProfileProgressJS, commitProfileRevealJS, cancelProfileRevealJS],
+    [verticalViewerVisible, sidebarOpen, profileOverlayActive, setProfileProgressJS, commitProfileRevealJS, cancelProfileRevealJS],
   );
 
   // ── Profile CLOSE gesture callbacks (right swipe from left edge) ──
@@ -983,47 +1010,15 @@ export default function CommunityScreen() {
       />
 
       <View style={[styles.contentArea, { height: feedItemHeight }]}>
-        {transitionTab !== null ? (
-          <Animated.View
-            style={[
-              styles.panel,
-              styles.panelOverlay,
-              { transform: [{ translateX: outgoingTabTranslateX }] },
-            ]}
-          >
-            {transitionTab === 'search' ? (
-              <SearchScreen onUserPress={handleAuthorPress} />
-            ) : (
-              <FlatList
-                data={transitionData}
-                renderItem={renderTransitionListItem}
-                keyExtractor={(item) => item.id}
-                contentContainerStyle={[
-                  styles.list,
-                  {
-                    paddingBottom: getBottomBarScrollContentPaddingBottom(
-                      insets.bottom,
-                      screenH,
-                      safeFrame.height,
-                    ),
-                  },
-                ]}
-                style={styles.panelInner}
-              />
-            )}
-          </Animated.View>
-        ) : null}
-
+        {/* Panel principal: lista de Siguiendo / Search.
+            Oculto con display:'none' cuando estamos en Para Ti — así Yoga no
+            mide su layout cada frame y el cambio de pestaña es instantáneo. */}
         <Animated.View
           style={[
             styles.panel,
             styles.panelOverlay,
-            {
-              transform: [
-                { translateX: listTranslateX },
-                { translateX: incomingTabTranslateX },
-              ],
-            },
+            { transform: [{ translateX: listTranslateX }] },
+            paratiPanelVisible && styles.panelHidden,
           ]}
         >
           {activeTab === 'search' ? (
@@ -1047,6 +1042,67 @@ export default function CommunityScreen() {
             />
           )}
         </Animated.View>
+
+        {/* Panel persistente de Para Ti — siempre montado tras el primer
+            InteractionManager. Cambiar entre Siguiendo ↔ Para Ti es solo un
+            toggle de visibilidad, sin re-mount ni "carga a trozos". */}
+        {paratiPanelMounted ? (
+          <View
+            style={[
+              styles.panel,
+              styles.panelOverlay,
+              !paratiPanelVisible && styles.panelHidden,
+            ]}
+            pointerEvents={paratiPanelVisible ? 'auto' : 'none'}
+          >
+            <View style={styles.paratiDetailWithRefreshWrap}>
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.paratiRefreshHeader,
+                  { height: PARATI_REFRESH_SHIFT, opacity: paratiRefreshSpinnerOpacity },
+                ]}
+              >
+                <ActivityIndicator size="large" color={paratiUserClanColor} />
+              </Animated.View>
+              <Animated.View
+                style={[
+                  styles.panelInner,
+                  { transform: [{ translateY: paratiRefreshShiftAnim }] },
+                ]}
+              >
+                <FlatList
+                  key={`parati-panel-${paratiPanelKey}`}
+                  ref={paratiPanelListRef}
+                  data={paratiPanelData}
+                  renderItem={renderFeedItem}
+                  keyExtractor={(item) => item.id}
+                  pagingEnabled
+                  nestedScrollEnabled
+                  scrollEnabled={feedScrollEnabled && !profileOverlayActive && paratiPanelVisible}
+                  decelerationRate={
+                    Platform.OS === 'ios' ? COMMUNITY_DETAIL_DECELERATION_RATE_IOS : 'fast'
+                  }
+                  showsVerticalScrollIndicator={false}
+                  getItemLayout={getFeedItemLayout}
+                  initialScrollIndex={
+                    paratiPanelData.length > 0
+                      ? clampDetailInitialIndex(paratiPanelData.length, paratiPanelInitialIndex)
+                      : 0
+                  }
+                  initialNumToRender={FEED_PREFETCH}
+                  maxToRenderPerBatch={FEED_MAX_BATCH}
+                  updateCellsBatchingPeriod={FEED_BATCH_PERIOD}
+                  windowSize={FEED_WINDOW_SIZE}
+                  removeClippedSubviews={FEED_CLIP_SUBVIEWS}
+                  style={styles.panelInner}
+                  viewabilityConfig={detailViewabilityConfig}
+                  onViewableItemsChanged={onParatiPanelViewableItemsChanged}
+                />
+              </Animated.View>
+            </View>
+          </View>
+        ) : null}
 
         {detailMounted ? (
           <Animated.View
@@ -1136,8 +1192,8 @@ export default function CommunityScreen() {
           </Animated.View>
         ) : null}
 
-        {/* Dim overlay between detail feed and profile panel */}
-        {detailMounted ? (
+        {/* Dim overlay between vertical viewer and profile panel */}
+        {verticalViewerVisible ? (
           <Animated.View
             pointerEvents={profileOverlayActive ? 'auto' : 'none'}
             style={[
@@ -1148,7 +1204,7 @@ export default function CommunityScreen() {
         ) : null}
 
         {/* Profile overlay panel (slides in from right) */}
-        {detailMounted && visibleAuthorId ? (
+        {verticalViewerVisible && visibleAuthorId ? (
           <Animated.View
             pointerEvents={profileOverlayActive ? 'auto' : 'none'}
             style={[
@@ -1198,8 +1254,8 @@ export default function CommunityScreen() {
         </GestureDetector>
       ) : null}
 
-      {/* Right-edge: profile OPEN gesture — only when detail feed visible and profile NOT active */}
-      {detailMounted && !sidebarOpen && !profileOverlayActive ? (
+      {/* Right-edge: profile OPEN gesture — only when vertical viewer visible and profile NOT active */}
+      {verticalViewerVisible && !sidebarOpen && !profileOverlayActive ? (
         <GestureDetector gesture={profileRevealGesture}>
           <View
             style={[
@@ -1250,6 +1306,10 @@ const styles = StyleSheet.create({
   },
   panelOverlay: {
     backgroundColor: evoconnColors.background,
+  },
+  /** Para Ti panel oculto: display:none evita que Yoga mida layout cada frame. */
+  panelHidden: {
+    display: 'none',
   },
   panelInner: { flex: 1 },
   paratiDetailWithRefreshWrap: {

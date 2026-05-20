@@ -9,7 +9,7 @@ import {
   type LayoutChangeEvent,
 } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
-import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
+import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -114,7 +114,7 @@ function AppTopBarInner({
       effectiveClan != null && String(effectiveClan).trim() !== ''
         ? String(effectiveClan).trim().toLowerCase()
         : 'indefinido';
-    pushUnlessCurrent(pathname, `/clan/${clanRouteSlug}`);
+    navigateUnlessCurrent(pathname, `/clan/${clanRouteSlug}`);
   };
 
   const clanLabel =
@@ -329,7 +329,7 @@ function AppTopBarInner({
             )}
 
             <TouchableOpacity
-              onPress={() => pushUnlessCurrent(pathname, '/phrases-domains')}
+              onPress={() => navigateUnlessCurrent(pathname, '/phrases-domains')}
               style={[styles.counterBtn, { gap: counterPairGap }]}
               hitSlop={14}
             >
@@ -344,7 +344,7 @@ function AppTopBarInner({
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => pushUnlessCurrent(pathname, '/streak')}
+              onPress={() => navigateUnlessCurrent(pathname, '/streak')}
               style={[styles.counterBtn, { gap: counterPairGap }]}
               hitSlop={14}
             >
@@ -366,7 +366,7 @@ function AppTopBarInner({
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => pushUnlessCurrent(pathname, '/daily-uses')}
+              onPress={() => navigateUnlessCurrent(pathname, '/daily-uses')}
               style={[styles.counterBtn, { gap: counterPairGap }]}
               hitSlop={14}
             >

@@ -1,16 +1,10 @@
 /**
- * NotificationsScreen — displays the active user's real notification feed.
+ * NotificationsScreen — feed de notificaciones + bandeja de solicitudes de seguimiento.
  *
- * Design matches PersonalFollowersScreen / PersonalFollowingScreen:
- *   - background #0b0b0f
- *   - row-based FlatList with clan icon, username, action text, timestamp
- *   - same typography hierarchy (white username bold, muted meta)
- *
- * On focus: refresh, then mark all read (evita carrera con el fetch). Al perder el
- * foco se vuelve a marcar leídas para que el numerito de la campana se reinicie.
- * Tapping a notification navigates to the relevant content.
+ * Las solicitudes pendientes vienen de `follow_requests` (una fila por usuario).
+ * El bloque plegable bajo el título muestra el contador y, al pulsar, todas las solicitudes.
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -18,6 +12,7 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
+  Alert,
   type ListRenderItemInfo,
   useWindowDimensions,
 } from 'react-native';
@@ -25,26 +20,29 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AppTopBar, AppShellBottomTabsWrap, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
+import { useDeferredRender } from '@evoconn/hooks/useDeferredRender';
+import { ClanLoadingDot } from '@evoconn/components/shared/ClanLoadingDot';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { BOTTOM_BAR_LAYOUT, getBottomBarScrollContentPaddingBottom } from '@evoconn/constants/bottomBarLayout';
 import { getMainColumnHeightForFloatingBottomBar } from '@evoconn/constants/appShellLayout';
 import { useNotifications } from '@evoconn/hooks/NotificationsContext';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
+import { useIncomingFollowRequests } from '@evoconn/hooks/useIncomingFollowRequests';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { UserAvatarFrame } from '@evoconn/components/shared/UserAvatarFrame';
+import { FollowRequestsInbox } from '@evoconn/components/notifications/FollowRequestsInbox';
 import type { AppNotification } from '@evoconn/services/notificationsStorage';
 import {
   acceptFollowRequestRpc,
   rejectFollowRequestRpc,
 } from '@evoconn/services/supabaseSocial';
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
+import {
+  navigateToCommunityPost,
+  navigateToUserProfile,
+} from '@evoconn/utils/notificationNavigation';
 const BG = '#0b0b0f';
 const AVATAR_SIZE = 42;
 const PROFILE_ICON_SCALE = 1.05;
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -63,8 +61,6 @@ function actionLabel(n: AppNotification): string {
       return 'ha dado upvote a tu publicación';
     case 'follow':
       return 'ha empezado a seguirte';
-    case 'follow_request':
-      return 'quiere seguirte';
     case 'comment':
       return n.textPreview
         ? `ha comentado: "${n.textPreview.length > 60 ? n.textPreview.slice(0, 60) + '…' : n.textPreview}"`
@@ -75,8 +71,6 @@ function actionLabel(n: AppNotification): string {
       return 'ha interactuado contigo';
   }
 }
-
-// ─── Row component ────────────────────────────────────────────────────────────
 
 type RowProps = {
   notification: AppNotification;
@@ -94,23 +88,12 @@ const NotificationRow = React.memo(function NotificationRow({
   onPressContent,
 }: RowProps) {
   const username = n.fromUsername.replace(/^@+/, '');
-
-  // Follow / solicitud: destino perfil.
-  const handleContent = n.type === 'follow' || n.type === 'follow_request'
-    ? () => onPressProfile(n)
-    : () => onPressContent(n);
+  const handleContent = n.type === 'follow' ? () => onPressProfile(n) : () => onPressContent(n);
 
   return (
     <View style={[styles.row, !n.read && styles.rowUnread]}>
-      {/* Unread indicator dot */}
       {!n.read && <View style={styles.unreadDot} />}
-
-      {/* Avatar → always navigates to sender's profile */}
-      <TouchableOpacity
-        onPress={() => onPressProfile(n)}
-        activeOpacity={0.6}
-        hitSlop={4}
-      >
+      <TouchableOpacity onPress={() => onPressProfile(n)} activeOpacity={0.6} hitSlop={4}>
         <View style={styles.avatarWrap}>
           <UserAvatarFrame
             clanId={clanId}
@@ -120,19 +103,9 @@ const NotificationRow = React.memo(function NotificationRow({
           />
         </View>
       </TouchableOpacity>
-
-      {/* Text block → content destination */}
-      <TouchableOpacity
-        style={styles.textBlock}
-        onPress={handleContent}
-        activeOpacity={0.6}
-      >
+      <TouchableOpacity style={styles.textBlock} onPress={handleContent} activeOpacity={0.6}>
         <Text style={styles.actionText} numberOfLines={2}>
-          {/* Username within the text taps to profile */}
-          <Text
-            style={styles.username}
-            onPress={() => onPressProfile(n)}
-          >
+          <Text style={styles.username} onPress={() => onPressProfile(n)}>
             @{username}
           </Text>
           {' '}
@@ -140,8 +113,6 @@ const NotificationRow = React.memo(function NotificationRow({
         </Text>
         <Text style={styles.timestamp}>{relativeTime(n.createdAt)}</Text>
       </TouchableOpacity>
-
-      {/* Chevron → content destination */}
       <TouchableOpacity onPress={handleContent} activeOpacity={0.6} hitSlop={8}>
         <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.25)" />
       </TouchableOpacity>
@@ -149,94 +120,18 @@ const NotificationRow = React.memo(function NotificationRow({
   );
 });
 
-type FollowRequestRowProps = {
-  notification: AppNotification;
-  clanId: string | null | undefined;
-  avatarUri?: string | null;
-  onPressProfile: (n: AppNotification) => void;
-  busy: boolean;
-  onAccept: (n: AppNotification) => void;
-  onReject: (n: AppNotification) => void;
-};
-
-const FollowRequestRow = React.memo(function FollowRequestRow({
-  notification: n,
-  clanId,
-  avatarUri,
-  onPressProfile,
-  busy,
-  onAccept,
-  onReject,
-}: FollowRequestRowProps) {
-  const username = n.fromUsername.replace(/^@+/, '');
-
-  return (
-    <View style={[styles.row, !n.read && styles.rowUnread]}>
-      {!n.read && <View style={styles.unreadDot} />}
-      <TouchableOpacity
-        onPress={() => onPressProfile(n)}
-        activeOpacity={0.6}
-        hitSlop={4}
-      >
-        <View style={styles.avatarWrap}>
-          <UserAvatarFrame
-            clanId={clanId}
-            avatarUri={avatarUri}
-            size={AVATAR_SIZE}
-            iconScale={PROFILE_ICON_SCALE}
-          />
-        </View>
-      </TouchableOpacity>
-      <View style={styles.followRequestMid}>
-        <TouchableOpacity
-          style={styles.textBlock}
-          onPress={() => onPressProfile(n)}
-          activeOpacity={0.6}
-        >
-          <Text style={styles.actionText} numberOfLines={2}>
-            <Text style={styles.username} onPress={() => onPressProfile(n)}>
-              @{username}
-            </Text>
-            {' '}
-            <Text>quiere seguirte</Text>
-          </Text>
-          <Text style={styles.timestamp}>{relativeTime(n.createdAt)}</Text>
-        </TouchableOpacity>
-        <View style={styles.followRequestActions}>
-          <TouchableOpacity
-            style={[styles.acceptBtn, busy && styles.btnDisabled]}
-            disabled={busy}
-            onPress={() => onAccept(n)}
-            activeOpacity={0.75}
-          >
-            <Text style={styles.acceptBtnText}>{busy ? '…' : 'Aceptar'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.rejectBtn, busy && styles.btnDisabled]}
-            disabled={busy}
-            onPress={() => onReject(n)}
-            activeOpacity={0.75}
-          >
-            <Text style={styles.rejectBtnText}>Rechazar</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
-  );
-});
-
-// ─── Empty state ──────────────────────────────────────────────────────────────
-
-function EmptyState() {
+function EmptyState({ hasFollowRequests }: { hasFollowRequests: boolean }) {
   return (
     <View style={styles.emptyWrap}>
       <Ionicons name="notifications-off-outline" size={44} color="rgba(255,255,255,0.18)" />
-      <Text style={styles.emptyText}>No tienes notificaciones todavía</Text>
+      <Text style={styles.emptyText}>
+        {hasFollowRequests
+          ? 'No tienes más notificaciones'
+          : 'No tienes notificaciones todavía'}
+      </Text>
     </View>
   );
 }
-
-// ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function NotificationsScreen() {
   const router = useRouter();
@@ -244,83 +139,113 @@ export default function NotificationsScreen() {
   const safeFrame = useSafeAreaFrame();
   const { height: screenH } = useWindowDimensions();
   const { notifications, markAllRead, refreshNotifications } = useNotifications();
-  const { users } = useSimulation();
+  const { users, refreshSocialFromSupabase } = useSimulation();
   const { thoughts } = useThoughts();
+  const { requests: incomingRequests, refresh: refreshIncomingRequests, removeRequester } =
+    useIncomingFollowRequests();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [requestActionBusy, setRequestActionBusy] = useState(false);
+  const ready = useDeferredRender();
+  const [busyRequesterId, setBusyRequesterId] = useState<string | null>(null);
+
+  const feedNotifications = useMemo(
+    () => notifications.filter((n) => n.type !== 'follow_request'),
+    [notifications],
+  );
 
   const handleTabChange = useCallback(
     (tab: TabId) => {
-      router.navigate({ pathname: '/(tabs)', params: { tab } });
+      router.replace({ pathname: '/(tabs)', params: { tab } });
     },
     [router],
   );
 
-  // Evita carrera refresh vs mark: si el fetch termina después de markAllRead, antes
-  // volvía a poner read:false y el badge no bajaba. Orden: fetch → marcar leídas.
-  // Al salir, markAllRead otra vez por si el usuario sale antes de que acabe el fetch.
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
-      void refreshNotifications().then(() => {
+      void (async () => {
+        await Promise.all([refreshNotifications(), refreshIncomingRequests()]);
         if (!cancelled) markAllRead();
-      });
+      })();
       return () => {
         cancelled = true;
         markAllRead();
       };
-    }, [refreshNotifications, markAllRead]),
+    }, [refreshNotifications, refreshIncomingRequests, markAllRead]),
   );
 
   const handlePressProfile = useCallback(
     (n: AppNotification) => {
-      router.push({ pathname: '/profile/[id]', params: { id: n.fromUserId } });
+      navigateToUserProfile(router, n.fromUserId, n.fromUsername);
+    },
+    [router],
+  );
+
+  const handlePressProfileRequest = useCallback(
+    (requesterId: string, username: string) => {
+      navigateToUserProfile(router, requesterId, username);
     },
     [router],
   );
 
   const handleAcceptFollowRequest = useCallback(
-    async (n: AppNotification) => {
-      if (requestActionBusy || !n.fromUserId) return;
-      setRequestActionBusy(true);
+    async (requesterId: string) => {
+      if (busyRequesterId) return;
+      setBusyRequesterId(requesterId);
+      removeRequester(requesterId);
       try {
-        const ok = await acceptFollowRequestRpc(n.fromUserId);
-        if (ok) await refreshNotifications();
+        const ok = await acceptFollowRequestRpc(requesterId);
+        if (ok) {
+          await Promise.all([
+            refreshIncomingRequests(),
+            refreshNotifications(),
+            refreshSocialFromSupabase(),
+          ]);
+        } else {
+          Alert.alert(
+            'Solicitud no disponible',
+            'Esta solicitud ya no está pendiente (puede que se haya cancelado). Hemos actualizado la lista.',
+          );
+          await refreshIncomingRequests();
+        }
       } finally {
-        setRequestActionBusy(false);
+        setBusyRequesterId(null);
       }
     },
-    [requestActionBusy, refreshNotifications],
+    [
+      busyRequesterId,
+      removeRequester,
+      refreshIncomingRequests,
+      refreshNotifications,
+      refreshSocialFromSupabase,
+    ],
   );
 
   const handleRejectFollowRequest = useCallback(
-    async (n: AppNotification) => {
-      if (requestActionBusy || !n.fromUserId) return;
-      setRequestActionBusy(true);
+    async (requesterId: string) => {
+      if (busyRequesterId) return;
+      setBusyRequesterId(requesterId);
+      removeRequester(requesterId);
       try {
-        const ok = await rejectFollowRequestRpc(n.fromUserId);
-        if (ok) await refreshNotifications();
+        const ok = await rejectFollowRequestRpc(requesterId);
+        if (!ok) {
+          await refreshIncomingRequests();
+        } else {
+          await Promise.all([refreshIncomingRequests(), refreshNotifications()]);
+        }
       } finally {
-        setRequestActionBusy(false);
+        setBusyRequesterId(null);
       }
     },
-    [requestActionBusy, refreshNotifications],
+    [busyRequesterId, removeRequester, refreshIncomingRequests, refreshNotifications],
   );
 
   const handlePressContent = useCallback(
     (n: AppNotification) => {
       if (n.targetPostId) {
-        // Navigate to the community "Para Ti" tab — CommunityScreen opens
-        // its own detail-feed overlay at the requested post, same UX as tapping
-        // a post in the feed.
-        router.push({
-          pathname: '/(tabs)',
-          params: { tab: 'para-ti', postId: n.targetPostId },
-        });
+        navigateToCommunityPost(router, n.targetPostId);
         return;
       }
-      // Fallback: go to sender's profile.
-      router.push({ pathname: '/profile/[id]', params: { id: n.fromUserId } });
+      navigateToUserProfile(router, n.fromUserId, n.fromUsername);
     },
     [router],
   );
@@ -328,18 +253,6 @@ export default function NotificationsScreen() {
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<AppNotification>) => {
       const user = users[item.fromUserId];
-      if (item.type === 'follow_request') {
-        return (
-          <FollowRequestRow
-            notification={item}
-            clanId={user?.clanId ?? null}
-            onPressProfile={handlePressProfile}
-            busy={requestActionBusy}
-            onAccept={handleAcceptFollowRequest}
-            onReject={handleRejectFollowRequest}
-          />
-        );
-      }
       return (
         <NotificationRow
           notification={item}
@@ -349,22 +262,12 @@ export default function NotificationsScreen() {
         />
       );
     },
-    [
-      users,
-      handlePressProfile,
-      handlePressContent,
-      requestActionBusy,
-      handleAcceptFollowRequest,
-      handleRejectFollowRequest,
-    ],
+    [users, handlePressProfile, handlePressContent],
   );
 
   const keyExtractor = useCallback((item: AppNotification) => item.id, []);
 
-  const Separator = useCallback(
-    () => <View style={styles.separator} />,
-    [],
-  );
+  const Separator = useCallback(() => <View style={styles.separator} />, []);
 
   const listPanelHeight =
     getMainColumnHeightForFloatingBottomBar(
@@ -374,11 +277,32 @@ export default function NotificationsScreen() {
       safeFrame.height,
     ) - BOTTOM_BAR_LAYOUT.FLOATING_BAR_STACK_SUBHEADER_HEIGHT;
 
+  const listHeader = useMemo(
+    () => (
+      <FollowRequestsInbox
+        requests={incomingRequests}
+        busyRequesterId={busyRequesterId}
+        onPressProfile={handlePressProfileRequest}
+        onAccept={handleAcceptFollowRequest}
+        onReject={handleRejectFollowRequest}
+      />
+    ),
+    [
+      incomingRequests,
+      busyRequesterId,
+      handlePressProfileRequest,
+      handleAcceptFollowRequest,
+      handleRejectFollowRequest,
+    ],
+  );
+
+  const showEmpty =
+    feedNotifications.length === 0 && incomingRequests.length === 0;
+
   return (
     <View style={styles.container}>
       <AppTopBar onMenuPress={() => setSidebarOpen(true)} />
 
-      {/* Back arrow + title — same pattern as PersonalFollowersScreen */}
       <View style={styles.headerRow}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={22} color="rgba(255,255,255,0.7)" />
@@ -386,16 +310,27 @@ export default function NotificationsScreen() {
         <Text style={styles.screenTitle}>NOTIFICACIONES</Text>
       </View>
 
+      {incomingRequests.length > 0 ? listHeader : null}
+
       <View style={{ height: listPanelHeight, overflow: 'hidden' }}>
+        {!ready ? (
+          <ClanLoadingDot />
+        ) : (
         <FlatList
           style={{ flex: 1 }}
-          data={notifications}
+          data={feedNotifications}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
           ItemSeparatorComponent={Separator}
-          ListEmptyComponent={EmptyState}
+          ListEmptyComponent={
+            showEmpty ? (
+              <EmptyState hasFollowRequests={false} />
+            ) : (
+              <EmptyState hasFollowRequests={incomingRequests.length > 0} />
+            )
+          }
           contentContainerStyle={
-            notifications.length === 0
+            showEmpty
               ? styles.emptyContainer
               : {
                   paddingBottom: getBottomBarScrollContentPaddingBottom(
@@ -407,6 +342,7 @@ export default function NotificationsScreen() {
           }
           showsVerticalScrollIndicator={false}
         />
+        )}
       </View>
 
       <AppShellBottomTabsWrap
@@ -434,8 +370,6 @@ export default function NotificationsScreen() {
     </View>
   );
 }
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: {
@@ -528,41 +462,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     textAlign: 'center',
     maxWidth: 220,
-  },
-  followRequestMid: {
-    flex: 1,
-    gap: 10,
-  },
-  followRequestActions: {
-    flexDirection: 'row',
-    gap: 10,
-    alignItems: 'center',
-  },
-  acceptBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
-    backgroundColor: 'rgba(199,255,2,0.18)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(199,255,2,0.45)',
-  },
-  acceptBtnText: {
-    color: '#c7ff02',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  rejectBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-  },
-  rejectBtnText: {
-    color: 'rgba(255,255,255,0.55)',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  btnDisabled: {
-    opacity: 0.45,
   },
 });

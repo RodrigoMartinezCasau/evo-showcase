@@ -24,7 +24,6 @@ import {
 } from 'react-native';
 import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useLocalSearchParams, useRouter, usePathname } from 'expo-router';
-import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppTopBar, ChatInputBar, SidebarDrawer } from '@evoconn/components';
 import { getChatSendButtonByHouse } from '@evoconn/utils/getChatSendButtonByHouse';

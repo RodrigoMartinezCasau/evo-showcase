@@ -24,7 +24,8 @@ import {
   Animated,
   Easing,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, usePathname } from 'expo-router';
+import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { getClanColor } from '@evoconn/constants/clanColors';
 import { getClanConfig } from '@evoconn/constants/clanConfig';
 import { getClanProfileOrFallback } from '@evoconn/data/mockClanProfiles';
@@ -196,6 +197,7 @@ const WINDOW_24H = 24 * 60 * 60 * 1000;
 
 export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
   const router     = useRouter();
+  const pathname   = usePathname();
   const { width: screenW } = useWindowDimensions();
   const cardW      = Math.max(CLAN_DISPLAY_POST_CARD_MIN_W, screenW * CLAN_DISPLAY_POST_CARD_RATIO);
   const clan       = getClanProfileOrFallback(clanId);
@@ -362,24 +364,24 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
 
   const handleDetailAuthorPress = useCallback(
     (authorId: string) => {
-      router.push({ pathname: '/profile/[id]', params: { id: authorId } });
+      navigateUnlessCurrent(pathname, `/profile/${authorId}`);
     },
-    [router],
+    [pathname],
   );
 
   const handleDetailClanPress = useCallback(
     (targetClanId: string) => {
       if (targetClanId === clanId) { closeDetailFeed(); }
-      else { router.push({ pathname: '/clan/[id]', params: { id: targetClanId } }); }
+      else { navigateUnlessCurrent(pathname, `/clan/${targetClanId}`); }
     },
-    [closeDetailFeed, clanId, router],
+    [closeDetailFeed, clanId, pathname],
   );
 
   const handleMemberPress = useCallback(
     (member: ClanMember) => {
-      router.push({ pathname: '/profile/[id]', params: { id: member.id } });
+      navigateUnlessCurrent(pathname, `/profile/${member.id}`);
     },
-    [router],
+    [pathname],
   );
 
   // ── Render: post card (Section 6) ─────────────────────────────────────────

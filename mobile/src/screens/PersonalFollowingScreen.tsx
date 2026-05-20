@@ -14,7 +14,8 @@ import {
   StyleSheet,
   useWindowDimensions,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, usePathname } from 'expo-router';
+import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { evoconnColors } from '@evoconn/theme/colors';
@@ -84,6 +85,7 @@ function FollowingRow({
 
 export default function PersonalFollowingScreen() {
   const router = useRouter();
+  const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const safeFrame = useSafeAreaFrame();
   const { height: screenH } = useWindowDimensions();
@@ -94,9 +96,9 @@ export default function PersonalFollowingScreen() {
 
   const handleUserPress = useCallback(
     (id: string) => {
-      router.push({ pathname: '/profile/[id]', params: { id } });
+      navigateUnlessCurrent(pathname, `/profile/${id}`);
     },
-    [router],
+    [pathname],
   );
 
   const handleTabChange = useCallback(

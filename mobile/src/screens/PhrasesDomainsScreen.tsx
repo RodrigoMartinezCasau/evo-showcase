@@ -44,6 +44,8 @@ import { IS_DEBUG_STATS_MODE, useDebugStats } from '@evoconn/debug/DebugStatsCon
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import type { DomainStats } from '@evoconn/logic/quotes/getDomainStats';
 import type { Quote } from '@evoconn/types/quotes';
+import { useDeferredRender } from '@evoconn/hooks/useDeferredRender';
+import { ClanLoadingDot } from '@evoconn/components/shared/ClanLoadingDot';
 
 // ─── Layout editors ───────────────────────────────────────────────────────────
 
@@ -277,6 +279,7 @@ export default function PhrasesDomainsScreen() {
   const computedUnlocked = IS_DEBUG_STATS_MODE ? simulatedUnlocked : totalUnlocked;
 
   const [sidebarOpen,  setSidebarOpen]  = useState(false);
+  const ready = useDeferredRender();
   const [detailDomain, setDetailDomain] = useState<DomainStats | null>(null);
 
   // ─── Navigation ─────────────────────────────────────────────────────────────
@@ -318,6 +321,9 @@ export default function PhrasesDomainsScreen() {
 
       {/* Misma franja bajo el top bar que Para Ti (no flex hasta el borde con la barra encima). */}
       <View style={{ height: bodyHeight, overflow: 'hidden', flexGrow: 0 }}>
+        {!ready ? (
+          <ClanLoadingDot clanId={activeClan} />
+        ) : (
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={[
@@ -393,6 +399,7 @@ export default function PhrasesDomainsScreen() {
           </Text>
         </View>
         </ScrollView>
+        )}
       </View>
 
       {/* Bottom bar */}

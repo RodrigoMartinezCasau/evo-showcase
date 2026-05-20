@@ -12,7 +12,7 @@ import {
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { useLocalSearchParams, useRouter, usePathname } from 'expo-router';
-import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
+import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
 import type { CommunityPost } from '@evoconn/types';
@@ -136,9 +136,9 @@ export default function DetailFeedScreen() {
   const handleAuthorPress = useCallback(
     (userId: string) => {
       if (userId === mockCurrentUser.id) {
-        pushUnlessCurrent(pathname, '/my-profile');
+        navigateUnlessCurrent(pathname, '/my-profile');
       } else {
-        router.push({ pathname: '/profile/[id]', params: { id: userId } });
+        navigateUnlessCurrent(pathname, `/profile/${userId}`);
       }
     },
     [router, pathname],
@@ -146,7 +146,7 @@ export default function DetailFeedScreen() {
   const handleClanPress = useCallback(
     (clanId: string) => {
       const href = `/clan/${String(clanId).trim().toLowerCase()}`;
-      pushUnlessCurrent(pathname, href);
+      navigateUnlessCurrent(pathname, href);
     },
     [pathname],
   );

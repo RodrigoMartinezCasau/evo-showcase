@@ -33,6 +33,8 @@ import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { usePreviewMode } from '@evoconn/debug/PreviewModeContext';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
+import { useDeferredRender } from '@evoconn/hooks/useDeferredRender';
+import { ClanLoadingDot } from '@evoconn/components/shared/ClanLoadingDot';
 import { getAppShellScrollableBodyHeight } from '@evoconn/constants/appShellLayout';
 
 import { AiSummaryCard } from '@evoconn/components/philosophyProfile/AiSummaryCard';
@@ -103,6 +105,7 @@ export default function PersonalPhilosophyDetailScreen() {
   const { isPreviewActive, previewBadgeHistory, cyclePreviewBadgeRank } = usePreviewMode();
   const { thoughts } = useThoughts();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const ready = useDeferredRender();
   const { profile: authProfile } = useAuth();
 
   const baseProfile = getPersonalProfile();
@@ -318,6 +321,9 @@ export default function PersonalPhilosophyDetailScreen() {
 
       <View style={[styles.contentWrap, { height: contentHeight }]}>
         <ReflectionBackground clan={clanId}>
+        {!ready ? (
+          <ClanLoadingDot clanId={clanId} />
+        ) : (
           <ScrollView
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
@@ -391,6 +397,7 @@ export default function PersonalPhilosophyDetailScreen() {
 
             <View style={styles.bottomSpacer} />
           </ScrollView>
+        )}
         </ReflectionBackground>
       </View>
 

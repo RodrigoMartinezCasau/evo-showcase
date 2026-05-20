@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, usePathname } from 'expo-router';
+import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { getClanCardColor } from '@evoconn/theme/theme';
 import { evoconnColors } from '@evoconn/theme/colors';
 import {
@@ -15,6 +16,7 @@ import { useFeedStore } from '@evoconn/hooks/useFeedStore';
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const pathname = usePathname();
   const { getPostById, updatePostVote, updatePostSaveToggle } = useFeedStore();
   const post = id ? getPostById(id) : undefined;
 
@@ -83,14 +85,14 @@ export default function PostDetailScreen() {
         </TouchableOpacity>
         <FeedbackWidget />
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.push({ pathname: '/profile/[id]', params: { id: post.author.id } })}>
+          <TouchableOpacity onPress={() => navigateUnlessCurrent(pathname, `/profile/${post.author.id}`)}>
             <Text style={styles.username}>{post.author.username}</Text>
           </TouchableOpacity>
           <View style={styles.badges}>
             <TouchableOpacity
               onPress={() => {
                 if (post.author.clanId) {
-                  router.push({ pathname: '/clan/[id]', params: { id: post.author.clanId } });
+                  navigateUnlessCurrent(pathname, `/clan/${post.author.clanId}`);
                 }
               }}
               disabled={!post.author.clanId}

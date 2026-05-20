@@ -15,7 +15,8 @@ import {
   StyleSheet,
   useWindowDimensions,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, usePathname } from 'expo-router';
+import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AppTopBar, AppShellBottomTabsWrap, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
@@ -82,6 +83,7 @@ function FriendRow({
 
 export default function PersonalFriendsScreen() {
   const router = useRouter();
+  const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const safeFrame = useSafeAreaFrame();
   const { height: screenH } = useWindowDimensions();
@@ -92,9 +94,9 @@ export default function PersonalFriendsScreen() {
 
   const handleUserPress = useCallback(
     (id: string) => {
-      router.push({ pathname: '/profile/[id]', params: { id } });
+      navigateUnlessCurrent(pathname, `/profile/${id}`);
     },
-    [router],
+    [pathname],
   );
 
   const handleTabChange = useCallback(

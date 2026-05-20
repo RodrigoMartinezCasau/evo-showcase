@@ -307,6 +307,63 @@ export async function insertFollowRequest(requesterId: string, targetId: string)
   return true;
 }
 
+export type IncomingFollowRequest = {
+  requesterId: string;
+  username: string;
+  clanId: string | null;
+  avatarUri?: string | null;
+  createdAt: string;
+};
+
+/** Solicitudes pendientes recibidas (fuente de verdad: tabla follow_requests). */
+export async function fetchIncomingFollowRequests(
+  targetId: string,
+): Promise<IncomingFollowRequest[]> {
+  if (!isRealUserId(targetId)) return [];
+  const { data, error } = await supabase
+    .from('follow_requests')
+    .select('requester_id, created_at')
+    .eq('target_id', targetId)
+    .order('created_at', { ascending: false });
+  if (error) {
+    if (isFollowRequestsTableMissing(error.message)) return [];
+    console.error('[Social] fetchIncomingFollowRequests:', error.message);
+    return [];
+  }
+  const rows = (data ?? []) as { requester_id: string; created_at: string }[];
+  if (rows.length === 0) return [];
+
+  const ids = rows.map((r) => r.requester_id);
+  const { data: profiles, error: profileErr } = await supabase
+    .from('profiles')
+    .select('id, username, clan_id, avatar_url')
+    .in('id', ids);
+  if (profileErr) {
+    console.error('[Social] fetchIncomingFollowRequests profiles:', profileErr.message);
+  }
+  const profileMap = new Map<string, { username: string | null; clan_id: string | null; avatar_url: string | null }>();
+  for (const p of (profiles ?? []) as Record<string, unknown>[]) {
+    profileMap.set(p.id as string, {
+      username: (p.username as string | null) ?? null,
+      clan_id: (p.clan_id as string | null) ?? null,
+      avatar_url: (p.avatar_url as string | null) ?? null,
+    });
+  }
+
+  return rows.map((r) => {
+    const prof = profileMap.get(r.requester_id);
+    const raw = prof?.username?.trim();
+    const username = raw ? `@${raw.toUpperCase()}` : '@?';
+    return {
+      requesterId: r.requester_id,
+      username,
+      clanId: prof?.clan_id ?? null,
+      avatarUri: prof?.avatar_url ?? null,
+      createdAt: r.created_at,
+    };
+  });
+}
+
 export async function deleteFollowRequest(requesterId: string, targetId: string): Promise<void> {
   if (!isRealUserId(requesterId) || !isRealUserId(targetId)) return;
   const { error } = await supabase
@@ -319,24 +376,30 @@ export async function deleteFollowRequest(requesterId: string, targetId: string)
   }
 }
 
+/** `true` solo si había una solicitud pendiente y se aceptó. */
 export async function acceptFollowRequestRpc(requesterId: string): Promise<boolean> {
   if (!isRealUserId(requesterId)) return false;
-  const { error } = await supabase.rpc('accept_follow_request', { p_requester: requesterId });
+  const { data, error } = await supabase.rpc('accept_follow_request', {
+    p_requester: requesterId,
+  });
   if (error) {
     console.error('[Social] acceptFollowRequestRpc:', error.message);
     return false;
   }
-  return true;
+  return data === true;
 }
 
+/** `true` si se eliminó una solicitud pendiente. */
 export async function rejectFollowRequestRpc(requesterId: string): Promise<boolean> {
   if (!isRealUserId(requesterId)) return false;
-  const { error } = await supabase.rpc('reject_follow_request', { p_requester: requesterId });
+  const { data, error } = await supabase.rpc('reject_follow_request', {
+    p_requester: requesterId,
+  });
   if (error) {
     console.error('[Social] rejectFollowRequestRpc:', error.message);
     return false;
   }
-  return true;
+  return data === true;
 }
 
 export async function setProfilePrivate(userId: string, isPrivate: boolean): Promise<boolean> {

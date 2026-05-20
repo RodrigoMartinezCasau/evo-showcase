@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { usePathname } from 'expo-router';
-import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
+import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { NotificationsBellButton } from './NotificationsBellButton';
 import { SIDEBAR_HEADER_LAYOUT as SH } from '@evoconn/constants/sidebarHeaderLayout';
 
@@ -36,7 +36,7 @@ export const SidebarHeaderNotificationsButton = React.memo(function SidebarHeade
       <NotificationsBellButton
         onPress={() => {
           onBeforeNavigate?.();
-          pushUnlessCurrent(pathname, '/notifications');
+          navigateUnlessCurrent(pathname, '/notifications');
         }}
         hitSlop={10}
         activeOpacity={0.65}

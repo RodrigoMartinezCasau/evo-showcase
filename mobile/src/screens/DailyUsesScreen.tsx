@@ -56,6 +56,8 @@ import {
   heroIconSlotSize,
   heroIconVisualScale,
 } from '@evoconn/constants/heroSummaryCardLayout';
+import { useDeferredRender } from '@evoconn/hooks/useDeferredRender';
+import { ClanLoadingDot } from '@evoconn/components/shared/ClanLoadingDot';
 
 const DAILY_LIMIT     = DAILY_USES_LIMIT;
 const MAX_MONTHS_BACK = 12;
@@ -323,6 +325,7 @@ export default function DailyUsesScreen() {
   const { remainingUses, setRealRemainingUses } = useDebugStats();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const ready = useDeferredRender();
   const [log, setLog] = useState<UsesLogData>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -391,6 +394,9 @@ export default function DailyUsesScreen() {
       />
 
       <View style={[styles.contentWrap, { height: contentHeight }]}>
+        {!ready ? (
+          <ClanLoadingDot clanId={activeClan} />
+        ) : (
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
@@ -467,6 +473,7 @@ export default function DailyUsesScreen() {
             </>
           )}
         </ScrollView>
+        )}
       </View>
 
       <AppShellBottomTabsWrap>

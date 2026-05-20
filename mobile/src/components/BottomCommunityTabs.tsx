@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { useRouter, usePathname } from 'expo-router';
-import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
+import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { Ionicons } from '@expo/vector-icons';
 import { evoconnColors } from '@evoconn/theme/colors';
 import {
@@ -191,7 +191,7 @@ export function BottomCommunityTabs({
             return (
               <TouchableOpacity
                 key="profile"
-                onPress={() => pushUnlessCurrent(pathname, '/my-profile')}
+                onPress={() => navigateUnlessCurrent(pathname, '/my-profile')}
                 style={styles.tab}
                 activeOpacity={0.75}
                 accessibilityRole="button"

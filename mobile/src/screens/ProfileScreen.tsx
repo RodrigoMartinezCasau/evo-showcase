@@ -2,7 +2,7 @@ import React, { useCallback, useState, useRef, useMemo, useEffect, useLayoutEffe
 import { View, Text, ScrollView, StyleSheet, Animated, Easing, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, usePathname, useFocusEffect } from 'expo-router';
-import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
+import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { mockCurrentUser, mockUserStats } from '@evoconn/data/mockUser';
@@ -20,6 +20,8 @@ import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import { getClanCardColor } from '@evoconn/theme/theme';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
+import { useDeferredRender } from '@evoconn/hooks/useDeferredRender';
+import { ClanLoadingDot } from '@evoconn/components/shared/ClanLoadingDot';
 import { getAppShellScrollableBodyHeight } from '@evoconn/constants/appShellLayout';
 import {
   OtherProfileFollowRow,
@@ -371,6 +373,7 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
   const safeFrame = useSafeAreaFrame();
   const { width: screenW, height: screenH } = useWindowDimensions();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const ready = useDeferredRender();
   const { thoughts } = useThoughts();
 
   const contentHeight = getAppShellScrollableBodyHeight(
@@ -429,12 +432,12 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
   const handleDetailAuthorPress = useCallback(
     (authorId: string) => {
       if (authorId === mockCurrentUser.id) {
-        pushUnlessCurrent(pathname, '/my-profile');
+        navigateUnlessCurrent(pathname, '/my-profile');
       } else if (authorId === profile.id) {
         // Already viewing this user's profile — close the panel
         closeDetailFeed();
       } else {
-        router.push({ pathname: '/profile/[id]', params: { id: authorId } });
+        navigateUnlessCurrent(pathname, `/profile/${authorId}`);
       }
     },
     [closeDetailFeed, pathname, profile.id, router],
@@ -443,7 +446,7 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
   const handleDetailClanPress = useCallback(
     (clanId: string) => {
       const href = `/clan/${String(clanId).trim().toLowerCase()}`;
-      pushUnlessCurrent(pathname, href);
+      navigateUnlessCurrent(pathname, href);
     },
     [pathname],
   );
@@ -464,6 +467,9 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
 
       <View style={[styles.otherProfileWrap, { height: contentHeight }]}>
         <ReflectionBackground clan={profile.clanId}>
+        {!ready ? (
+          <ClanLoadingDot clanId={profile.clanId} />
+        ) : (
           <ScrollView
             style={styles.scroll}
             contentContainerStyle={styles.otherContent}
@@ -486,7 +492,7 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
               onShieldPress={
                 profile.clanId
                   ? () =>
-                      pushUnlessCurrent(
+                      navigateUnlessCurrent(
                         pathname,
                         `/clan/${String(profile.clanId).trim().toLowerCase()}`,
                       )
@@ -518,6 +524,7 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
             )}
             <View style={styles.bottomSpacer} />
           </ScrollView>
+        )}
         </ReflectionBackground>
 
         {/* Expanded post viewer — slides in over profile content */}

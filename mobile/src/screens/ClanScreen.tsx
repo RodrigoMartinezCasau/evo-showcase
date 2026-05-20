@@ -11,6 +11,8 @@ import {
 } from '@evoconn/constants/appShellLayout';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { ClanDisplay } from '@evoconn/components/clan/ClanDisplay';
+import { useDeferredRender } from '@evoconn/hooks/useDeferredRender';
+import { ClanLoadingDot } from '@evoconn/components/shared/ClanLoadingDot';
 
 export default function ClanScreen() {
   const { id }    = useLocalSearchParams<{ id: string }>();
@@ -22,6 +24,7 @@ export default function ClanScreen() {
 
   const clanId = id ?? 'estoico';
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const ready = useDeferredRender();
 
   const handleBottomTabChange = useCallback((tab: TabId) => {
     router.navigate({ pathname: '/(tabs)', params: { tab } });
@@ -41,14 +44,18 @@ export default function ClanScreen() {
       />
 
       <View style={[styles.content, { height: bodyHeight }]}>
-        <ClanDisplay
-          clanId={clanId}
-          bottomPadding={getClanPhrasesScrollPaddingBottom(
-            insets.bottom,
-            screenH,
-            safeFrame.height,
-          )}
-        />
+        {ready ? (
+          <ClanDisplay
+            clanId={clanId}
+            bottomPadding={getClanPhrasesScrollPaddingBottom(
+              insets.bottom,
+              screenH,
+              safeFrame.height,
+            )}
+          />
+        ) : (
+          <ClanLoadingDot clanId={clanId} />
+        )}
       </View>
 
       <AppShellBottomTabsWrap>

@@ -65,6 +65,10 @@ type Props = {
   clanId: string | null;
   rank: Rank;
   onShieldPress?: () => void;
+  /** Captura PNG: oculta la flecha de compartir. */
+  hideShareButton?: boolean;
+  /** Si se define, sustituye el Share nativo (p. ej. exportar PNG del perfil). */
+  onSharePress?: () => void;
 };
 
 export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader({
@@ -73,6 +77,8 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
   clanId,
   rank,
   onShieldPress,
+  hideShareButton = false,
+  onSharePress,
 }: Props) {
   const { width: screenW } = useWindowDimensions();
   const ShieldSvg = useMemo(() => getTopBarInsigniaByHouse(clanId), [clanId]);
@@ -112,12 +118,16 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
     : 'Sin clan';
 
   const handleShare = useCallback(() => {
+    if (onSharePress) {
+      onSharePress();
+      return;
+    }
     const url = getAppProfileOpenUrl(userId);
     Share.share({
       message: `Mira el perfil de ${username} en EVO\n\n${url}`,
       url,
     }).catch(() => {});
-  }, [username, userId]);
+  }, [username, userId, onSharePress]);
 
 
   return (
@@ -125,37 +135,65 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
       {/* Text column — username + clan+rank row */}
       <View style={styles.textBlock}>
         {/* Username row */}
-        <TouchableOpacity
-          onPress={handleShare}
-          hitSlop={8}
-          activeOpacity={0.6}
-          style={[
-            styles.usernameRow,
-            {
-              height: USERNAME_ROW_HEIGHT,
-              marginBottom: USERNAME_ROW_MARGIN_BOTTOM,
-              transform: [{ translateX: USERNAME_OFFSET_X }, { translateY: USERNAME_OFFSET_Y }],
-            },
-          ]}
-        >
-          <Text
+        {hideShareButton ? (
+          <View
             style={[
-              styles.username,
+              styles.usernameRow,
               {
-                fontSize: USERNAME_FONT_SIZE,
-                lineHeight: USERNAME_LINE_HEIGHT,
-                maxWidth: usernameMaxWidth,
+                height: USERNAME_ROW_HEIGHT,
+                marginBottom: USERNAME_ROW_MARGIN_BOTTOM,
+                transform: [{ translateX: USERNAME_OFFSET_X }, { translateY: USERNAME_OFFSET_Y }],
               },
             ]}
-            numberOfLines={1}
-            ellipsizeMode="tail"
           >
-            {username}
-          </Text>
-          <Text style={styles.shareInline} accessibilityLabel="Compartir perfil">
-            ↗
-          </Text>
-        </TouchableOpacity>
+            <Text
+              style={[
+                styles.username,
+                {
+                  fontSize: USERNAME_FONT_SIZE,
+                  lineHeight: USERNAME_LINE_HEIGHT,
+                  maxWidth: usernameMaxWidth,
+                },
+              ]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {username}
+            </Text>
+          </View>
+        ) : (
+          <TouchableOpacity
+            onPress={handleShare}
+            hitSlop={8}
+            activeOpacity={0.6}
+            style={[
+              styles.usernameRow,
+              {
+                height: USERNAME_ROW_HEIGHT,
+                marginBottom: USERNAME_ROW_MARGIN_BOTTOM,
+                transform: [{ translateX: USERNAME_OFFSET_X }, { translateY: USERNAME_OFFSET_Y }],
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.username,
+                {
+                  fontSize: USERNAME_FONT_SIZE,
+                  lineHeight: USERNAME_LINE_HEIGHT,
+                  maxWidth: usernameMaxWidth,
+                },
+              ]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {username}
+            </Text>
+            <Text style={styles.shareInline} accessibilityLabel="Compartir perfil">
+              ↗
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {/* Clan + rank row — inline, same baseline */}
         <View

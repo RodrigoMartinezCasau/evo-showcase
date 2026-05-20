@@ -1,7 +1,7 @@
 import React from 'react';
 import { TouchableOpacity, StyleSheet } from 'react-native';
 import { usePathname } from 'expo-router';
-import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
+import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import BotonAjustesBlancoSvg from '../../assets/personalProfile/boton ajustes blanco.svg';
 import {
   SETTINGS_ICON_OFFSET_X,
@@ -19,7 +19,7 @@ export const PersonalSettingsButton = React.memo(function PersonalSettingsButton
 
   return (
     <TouchableOpacity
-      onPress={() => pushUnlessCurrent(pathname, '/settings')}
+      onPress={() => navigateUnlessCurrent(pathname, '/settings')}
       hitSlop={12}
       activeOpacity={0.6}
       accessibilityRole="button"

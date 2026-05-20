@@ -31,6 +31,8 @@ import { CalendarGrid } from '@evoconn/components/shared/CalendarGrid';
 import { getTopBarRachaTopByHouse } from '@evoconn/utils/getTopBarRachaTopByHouse';
 import { getClanStreakColors } from '@evoconn/constants/clanStreakColors';
 import FuegoApagadoIcon from '../assets/topbar/fueguitoSvg/fuego-apagado.svg';
+import { useDeferredRender } from '@evoconn/hooks/useDeferredRender';
+import { ClanLoadingDot } from '@evoconn/components/shared/ClanLoadingDot';
 import {
   IS_DEBUG_STREAK_MODE,
   useDebugStreak,
@@ -99,6 +101,7 @@ export default function StreakScreen() {
   const realUserId = authProfile?.id ?? profile.id;
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const ready = useDeferredRender();
   const [data, setData] = useState<StreakData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -265,6 +268,9 @@ export default function StreakScreen() {
       />
 
       <View style={[styles.contentWrap, { height: contentHeight }]}>
+        {!ready ? (
+          <ClanLoadingDot clanId={activeClan} />
+        ) : (
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
@@ -417,6 +423,7 @@ export default function StreakScreen() {
             </>
           ) : null}
         </ScrollView>
+        )}
       </View>
 
       <AppShellBottomTabsWrap>

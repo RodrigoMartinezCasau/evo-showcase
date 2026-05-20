@@ -16,7 +16,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
-import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
+import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
@@ -38,8 +38,14 @@ import {
   PersonalRecentPostsSlider,
   PersonalBottomBlocks,
 } from '@evoconn/components/personalProfile';
+import {
+  ProfileShareCaptureHost,
+  type ProfileShareCaptureHandle,
+} from '@evoconn/components/personalProfile/ProfileShareCaptureHost';
 import { ProfileDetailPanel } from '@evoconn/components/ProfileDetailPanel';
 import { usePersonalProfile } from '@evoconn/hooks/PersonalProfileContext';
+import { useDeferredRender } from '@evoconn/hooks/useDeferredRender';
+import { ClanLoadingDot } from '@evoconn/components/shared/ClanLoadingDot';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { useAuth } from '../../mobile/lib/AuthContext';
 import { supabase } from '../../mobile/lib/supabase';
@@ -57,6 +63,7 @@ export default function PersonalProfileScreen() {
   const { activeFollowersCount, activeFollowingCount } = useSimulation();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const ready = useDeferredRender();
   const { thoughts } = useThoughts();
   const classification = useClassification();
   const { isPreviewActive } = usePreviewMode();
@@ -120,6 +127,8 @@ export default function PersonalProfileScreen() {
   const [phraseEditorOpen, setPhraseEditorOpen] = useState(false);
   const [phraseEditDraft, setPhraseEditDraft] = useState('');
   const [phraseSaving, setPhraseSaving] = useState(false);
+  const [sharePreparing, setSharePreparing] = useState(false);
+  const profileShareCaptureRef = useRef<ProfileShareCaptureHandle>(null);
 
   useEffect(() => {
     if (phraseEditorOpen) return;
@@ -263,7 +272,7 @@ export default function PersonalProfileScreen() {
         // Already on personal profile — just close the panel
         closeDetailFeed();
       } else {
-        router.push({ pathname: '/profile/[id]', params: { id: userId } });
+        navigateUnlessCurrent(pathname, `/profile/${userId}`);
       }
     },
     [closeDetailFeed, router],
@@ -271,10 +280,49 @@ export default function PersonalProfileScreen() {
 
   const handleDetailClanPress = useCallback(
     (clanId: string) => {
-      pushUnlessCurrent(pathname, `/clan/${String(clanId).trim().toLowerCase()}`);
+      navigateUnlessCurrent(pathname, `/clan/${String(clanId).trim().toLowerCase()}`);
     },
     [pathname],
   );
+
+  const handleShareProfile = useCallback(async () => {
+    if (sharePreparing) return;
+    setSharePreparing(true);
+    try {
+      await profileShareCaptureRef.current?.share({
+        width: screenW,
+        userId: profileWithClan.id,
+        username: profileWithClan.username,
+        clanId: profileWithClan.clanId,
+        rank: profileWithClan.rank,
+        insigniaPhrase,
+        followersCount: activeFollowersCount,
+        followingCount: activeFollowingCount,
+        totalPosts: posts.length,
+        totalReflections: profileWithClan.totalReflections,
+        totalQuotes: profileWithClan.totalQuotes,
+        rankReflectionCount: reflectionCount,
+        rankPhraseCount: phraseCount,
+        philosophyPercentages: profileWithClan.philosophyPercentages,
+        posts,
+      });
+    } catch (e) {
+      if (__DEV__) console.warn('[PersonalProfile] share:', e);
+      Alert.alert('Error', 'No se pudo compartir el perfil. Inténtalo de nuevo.');
+    } finally {
+      setSharePreparing(false);
+    }
+  }, [
+    sharePreparing,
+    screenW,
+    profileWithClan,
+    insigniaPhrase,
+    activeFollowersCount,
+    activeFollowingCount,
+    posts,
+    reflectionCount,
+    phraseCount,
+  ]);
 
   const handleBottomTabChange = useCallback((tab: TabId) => {
     // Always navigate immediately — replacing the route unmounts this screen
@@ -302,6 +350,9 @@ export default function PersonalProfileScreen() {
 
       <View style={[styles.profileWrap, { height: contentHeight }]} onLayout={onProfileWrapLayout}>
         <ReflectionBackground clan={profileWithClan.clanId}>
+        {!ready ? (
+          <ClanLoadingDot clanId={profileWithClan.clanId} />
+        ) : (
           <ScrollView
             style={styles.scroll}
             contentContainerStyle={styles.content}
@@ -324,10 +375,11 @@ export default function PersonalProfileScreen() {
               username={profileWithClan.username}
               clanId={profileWithClan.clanId}
               rank={profileWithClan.rank}
+              onSharePress={() => void handleShareProfile()}
               onShieldPress={
                 profileWithClan.clanId
                   ? () =>
-                      pushUnlessCurrent(
+                      navigateUnlessCurrent(
                         pathname,
                         `/clan/${String(profileWithClan.clanId).trim().toLowerCase()}`,
                       )
@@ -342,13 +394,13 @@ export default function PersonalProfileScreen() {
               clanId={profileWithClan.clanId}
               totalReflections={reflectionCount}
               totalPhrases={phraseCount}
-              onPress={profileWithClan.clanId ? () => router.push('/philosophy-profile') : undefined}
+              onPress={profileWithClan.clanId ? () => navigateUnlessCurrent(pathname, '/philosophy-profile') : undefined}
             />
             <View style={styles.contentGap} />
             <PersonalPhilosophyPanel
               percentages={profileWithClan.philosophyPercentages}
               clanId={profileWithClan.clanId}
-              onPress={() => router.push('/philosophy-profile')}
+              onPress={() => navigateUnlessCurrent(pathname, '/philosophy-profile')}
               allowLockedAccess={isPreviewActive}
             />
             <View style={styles.contentGap} />
@@ -368,6 +420,7 @@ export default function PersonalProfileScreen() {
             />
             <View style={styles.bottomSpacer} />
           </ScrollView>
+        )}
         </ReflectionBackground>
 
         {/* Expanded post viewer — slides in over profile content */}
@@ -395,6 +448,8 @@ export default function PersonalProfileScreen() {
         conversations={thoughts}
         onConversationPress={handleSidebarConversationPress}
       />
+
+      <ProfileShareCaptureHost ref={profileShareCaptureRef} />
 
       {/* ── Insignia phrase editor modal ── */}
       <Modal

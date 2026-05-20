@@ -1,6 +1,6 @@
 import React from 'react';
 import { usePathname } from 'expo-router';
-import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
+import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { NotificationsBellButton } from '../NotificationsBellButton';
 import {
   NOTIFICATIONS_ICON_OFFSET_X,
@@ -12,7 +12,7 @@ export const PersonalNotificationsButton = React.memo(function PersonalNotificat
 
   return (
     <NotificationsBellButton
-      onPress={() => pushUnlessCurrent(pathname, '/notifications')}
+      onPress={() => navigateUnlessCurrent(pathname, '/notifications')}
       hitSlop={12}
       activeOpacity={0.6}
       touchableStyle={{

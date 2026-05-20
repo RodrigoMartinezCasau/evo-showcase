@@ -8,7 +8,7 @@ import {
   useWindowDimensions,
   Platform,
 } from 'react-native';
-import { getAppProfileOpenUrl } from '@evoconn/utils/appShareLinks';
+import { buildProfileShareMessage } from '@evoconn/utils/appShareLinks';
 import { getTopBarInsigniaByHouse } from '@evoconn/utils/getTopBarInsigniaByHouse';
 import type { Rank } from '@evoconn/types';
 import {
@@ -95,10 +95,8 @@ export const UserIdentityHeader = React.memo(function UserIdentityHeader({
     : 'Sin clan';
 
   const handleShare = useCallback(() => {
-    const url = getAppProfileOpenUrl(userId);
     Share.share({
-      message: `Mira el perfil de ${username} en EVO\n\n${url}`,
-      url,
+      message: buildProfileShareMessage(username, userId),
     }).catch(() => {});
   }, [username, userId]);
 

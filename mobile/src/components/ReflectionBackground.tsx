@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { View, StyleSheet, LayoutChangeEvent } from 'react-native';
+import { View, StyleSheet, LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Path } from 'react-native-svg';
 import { REFLECTION_BACKGROUND_LAYOUT as L } from '@evoconn/constants/reflectionBackgroundLayout';
 import { getReflectionBackgroundByHouse } from '@evoconn/utils/getReflectionBackgroundByHouse';
@@ -70,13 +70,19 @@ function ClanRimOverlay({ width, height, clanColor }: { width: number; height: n
 type ReflectionBackgroundProps = {
   clan: string | null | undefined;
   children: React.ReactNode;
+  /** Override root layout (p. ej. altura fija al exportar PNG del perfil). */
+  containerStyle?: StyleProp<ViewStyle>;
 };
 
 /**
  * Wrapper that renders the clan-specific SVG background behind its children.
  * Use as:  <ReflectionBackground clan={clanId}>{content}</ReflectionBackground>
  */
-export const ReflectionBackground = React.memo(function ReflectionBackground({ clan, children }: ReflectionBackgroundProps) {
+export const ReflectionBackground = React.memo(function ReflectionBackground({
+  clan,
+  children,
+  containerStyle,
+}: ReflectionBackgroundProps) {
   const BgIcon    = useMemo(() => getReflectionBackgroundByHouse(clan), [clan]);
   const clanColor = useMemo(() => getClanColor(clan), [clan]);
 
@@ -90,7 +96,7 @@ export const ReflectionBackground = React.memo(function ReflectionBackground({ c
   }, []);
 
   return (
-    <View style={styles.root} onLayout={handleLayout}>
+    <View style={[styles.root, containerStyle]} onLayout={handleLayout}>
       <View
         pointerEvents="none"
         style={[styles.bgClip, { borderRadius: L.borderRadius }]}

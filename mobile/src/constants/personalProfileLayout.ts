@@ -104,6 +104,11 @@ export const SHARE_BUTTON_SIZE = 28;
  */
 export const PROFILE_SHARE_ARROW_FONT_SIZE = 20;
 
+/** Margen interior al exportar PNG: contenido dentro del borde de clan. */
+export const PROFILE_SHARE_CAPTURE_PADDING_TOP = 18;
+export const PROFILE_SHARE_CAPTURE_PADDING_BOTTOM = 28;
+export const PROFILE_SHARE_CAPTURE_PADDING_HORIZONTAL = 8;
+
 // ── Rank progression block ──────────────────────────────────────────
 // A. Full block (outer wrapper)
 export const RANK_BLOCK_OFFSET_X = 0;

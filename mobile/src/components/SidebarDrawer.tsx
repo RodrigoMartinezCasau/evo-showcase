@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePathname, useRouter } from 'expo-router';
-import { pushUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
+import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { SIDEBAR_HEADER_LAYOUT as SH } from '@evoconn/constants/sidebarHeaderLayout';
 import { getSidebarStarSvgByHouse, SIDEBAR_DEFAULT_STAR_SVG } from '@evoconn/utils/getSidebarStarSvgByHouse';
 import { getCommunityButtonByHouse } from '@evoconn/utils/getSidebarCommunityButton';
@@ -276,7 +276,7 @@ function SidebarDrawerInner({
           }}
           onPress={() => {
             onClose();
-            pushUnlessCurrent(pathname, '/(tabs)');
+            navigateUnlessCurrent(pathname, '/(tabs)');
           }}
         />
         <SidebarPngMenuButton
@@ -347,7 +347,7 @@ function SidebarDrawerInner({
           <TouchableOpacity
             onPress={() => {
               onClose();
-              pushUnlessCurrent(pathname, '/my-profile');
+              navigateUnlessCurrent(pathname, '/my-profile');
             }}
             activeOpacity={0.88}
             accessibilityRole="button"
@@ -376,7 +376,7 @@ function SidebarDrawerInner({
               <TouchableOpacity
                 onPress={() => {
                   onClose();
-                  pushUnlessCurrent(pathname, '/my-profile');
+                  navigateUnlessCurrent(pathname, '/my-profile');
                 }}
                 hitSlop={6}
                 activeOpacity={0.85}
@@ -398,7 +398,7 @@ function SidebarDrawerInner({
               <TouchableOpacity
                 onPress={() => {
                   onClose();
-                  pushUnlessCurrent(pathname, `/clan/${clanRouteSlug}`);
+                  navigateUnlessCurrent(pathname, `/clan/${clanRouteSlug}`);
                 }}
                 hitSlop={6}
                 activeOpacity={0.85}
@@ -417,7 +417,7 @@ function SidebarDrawerInner({
               <TouchableOpacity
                 onPress={() => {
                   onClose();
-                  pushUnlessCurrent(pathname, '/my-profile');
+                  navigateUnlessCurrent(pathname, '/my-profile');
                 }}
                 hitSlop={6}
                 activeOpacity={0.85}
@@ -435,7 +435,7 @@ function SidebarDrawerInner({
             style={styles.footerSettingsHit}
             onPress={() => {
               onClose();
-              pushUnlessCurrent(pathname, '/settings');
+              navigateUnlessCurrent(pathname, '/settings');
             }}
             activeOpacity={0.88}
             accessibilityRole="button"
