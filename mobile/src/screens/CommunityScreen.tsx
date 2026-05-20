@@ -67,6 +67,8 @@ import {
   type FollowingSortOption,
 } from '@evoconn/constants/followingFeedSort';
 import { getParatiAuthorClanMembershipMultiplier } from '@evoconn/logic/feed/paratiFeedRanking';
+import { normalizeRouteParam } from '@evoconn/utils/widgetDeepLink';
+import { activateWidgetDeepLinkBypass } from '../../mobile/lib/animationState';
 
 type TabId = 'siguiendo' | 'para-ti' | 'search';
 type FeedMode = 'following' | 'foryou';
@@ -147,6 +149,35 @@ function clampDetailInitialIndex(dataLength: number, initialIndex: number): numb
   return Math.min(Math.max(0, initialIndex), dataLength - 1);
 }
 
+/** Ensures the widget target post is in the detail list and selected. */
+function foryouDetailWithTargetPost(
+  baseData: CommunityPost[],
+  postId: string | undefined,
+  getPostById: (id: string) => CommunityPost | undefined,
+): { data: CommunityPost[]; initialIndex: number; resolved: boolean } {
+  if (!postId) {
+    return {
+      data: baseData,
+      initialIndex: clampDetailInitialIndex(baseData.length, 0),
+      resolved: true,
+    };
+  }
+  const idx = baseData.findIndex((p) => p.id === postId);
+  if (idx >= 0) {
+    return { data: baseData, initialIndex: idx, resolved: true };
+  }
+  const target = getPostById(postId);
+  if (target) {
+    const data = [target, ...baseData.filter((p) => p.id !== postId)];
+    return { data, initialIndex: 0, resolved: true };
+  }
+  return {
+    data: baseData,
+    initialIndex: clampDetailInitialIndex(baseData.length, 0),
+    resolved: false,
+  };
+}
+
 const ANIM_DURATION = 200;
 const RIGHT_EDGE_ZONE_WIDTH = 28;
 
@@ -215,9 +246,10 @@ export default function CommunityScreen() {
   /** While "Para ti" fullscreen is open, freeze seen-ids used for ordering so the list does not jump as posts are marked seen. */
   const [foryouSeenFrozen, setForyouSeenFrozen] = useState<Set<string> | null>(null);
 
-  // Track which tabParam value we have already reacted to so we never
-  // re-trigger the same navigation when openDetailFeed's reference changes.
-  const consumedTabParamRef = useRef<string | undefined>(undefined);
+  // Track which deep-link (tab + postId) we already handled.
+  const consumedDeepLinkRef = useRef<string | undefined>(undefined);
+  /** Widget postId when feed is not hydrated yet — open once the post exists. */
+  const pendingWidgetPostIdRef = useRef<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [feedScrollEnabled, setFeedScrollEnabled] = useState(true);
@@ -293,7 +325,7 @@ export default function CommunityScreen() {
       if (mode === 'foryou') {
         const snap = new Set(paratiSeenIds);
         setForyouSeenFrozen(snap);
-        const data = getDataForMode(
+        const baseData = getDataForMode(
           'foryou',
           allPosts,
           followingSet,
@@ -303,13 +335,19 @@ export default function CommunityScreen() {
           getBoost,
           snap,
         );
-        let initialIndex = 0;
-        if (postId) {
-          const idx = data.findIndex((p) => p.id === postId);
-          initialIndex = idx >= 0 ? idx : 0;
+        const { data, initialIndex, resolved } = foryouDetailWithTargetPost(
+          baseData,
+          postId,
+          getPostById,
+        );
+        if (postId && !resolved) {
+          pendingWidgetPostIdRef.current = postId;
+          return;
         }
-        initialIndex = clampDetailInitialIndex(data.length, initialIndex);
-        setDetailFeed({ mode, data, initialIndex });
+        if (postId) pendingWidgetPostIdRef.current = null;
+        if (data.length === 0) return;
+        const clampedIndex = clampDetailInitialIndex(data.length, initialIndex);
+        setDetailFeed({ mode, data, initialIndex: clampedIndex });
         if (skipAnimation) {
           slideAnim.setValue(1);
           detailFeedListRef.current?.scrollToOffset({ offset: 0, animated: false });
@@ -323,6 +361,7 @@ export default function CommunityScreen() {
           const idx = data.findIndex((p) => p.id === postId);
           initialIndex = idx >= 0 ? idx : 0;
         }
+        if (data.length === 0) return;
         initialIndex = clampDetailInitialIndex(data.length, initialIndex);
         setDetailFeed({ mode, data, initialIndex });
         if (skipAnimation) {
@@ -349,6 +388,7 @@ export default function CommunityScreen() {
       followingSort,
       getBoost,
       paratiSeenIds,
+      getPostById,
     ],
   );
 
@@ -369,19 +409,28 @@ export default function CommunityScreen() {
     const normalized =
       tabParam === 'mas-votadas' ? 'para-ti' : (tabParam as TabId);
     if (!VALID_TAB_IDS.includes(normalized)) return;
-    if (consumedTabParamRef.current === tabParam) return;
-    consumedTabParamRef.current = tabParam;
+    const pid = normalizeRouteParam(postIdParam);
+    const deepLinkKey = `${tabParam}|${pid ?? ''}`;
+    if (consumedDeepLinkRef.current === deepLinkKey) return;
+    consumedDeepLinkRef.current = deepLinkKey;
 
     const tab = normalized;
     if (tab === 'para-ti') {
-      const pid = typeof postIdParam === 'string' ? postIdParam : undefined;
-      // skipAnimation=true: sets slideAnim=1 immediately so the detail panel
-      // is fully visible in the same native frame — no slide-in required.
+      if (pid) activateWidgetDeepLinkBypass();
+      // skipAnimation=true: detail visible in the same frame (widget / deep link).
       openDetailFeed('foryou', pid, true);
     } else {
       setActiveTab(tab);
     }
   }, [tabParam, postIdParam, openDetailFeed]);
+
+  // Cold start from widget: Supabase hydration may arrive after the first open attempt.
+  useEffect(() => {
+    const pid = pendingWidgetPostIdRef.current;
+    if (!pid || !getPostById(pid)) return;
+    pendingWidgetPostIdRef.current = null;
+    openDetailFeed('foryou', pid, true);
+  }, [allPosts, getPostById, openDetailFeed]);
 
   useEffect(() => {
     if (!detailFeed || detailFeed.mode !== 'foryou') {
@@ -399,9 +448,9 @@ export default function CommunityScreen() {
       if (finished) {
         setForyouSeenFrozen(null);
         setDetailFeed(null);
-        // Reset so that navigating back to Para Ti from another screen correctly
-        // re-opens the detail feed (consumedTabParamRef would otherwise block it).
-        consumedTabParamRef.current = undefined;
+        // Reset so widget / deep links can open Para ti again after closing.
+        consumedDeepLinkRef.current = undefined;
+        pendingWidgetPostIdRef.current = null;
       }
     });
   }, [slideAnim]);
