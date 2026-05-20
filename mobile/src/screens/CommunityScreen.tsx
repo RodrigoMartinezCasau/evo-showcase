@@ -315,13 +315,18 @@ export default function CommunityScreen() {
   /**
    * Defer first mount of Para Ti panel until after Community paints, so the
    * very first open of CommunityScreen is not penalised by mounting two feeds.
-   * Hydration runs only ONCE; subsequent reorders of `foryouFeedOrdered` do
-   * not propagate (snapshot semantics — see header comment on the state).
+   *
+   * IMPORTANT: We only mark the panel as hydrated once we've actually got
+   * data. If `allPosts` is still empty (Supabase hydrating), the effect
+   * re-runs as soon as `allPosts` changes, and tries again. Without this
+   * guard, the panel would mount empty and stay empty (black screen).
    */
   useEffect(() => {
     if (paratiPanelHydratedRef.current) return;
+    if (allPosts.length === 0) return;
     const handle = InteractionManager.runAfterInteractions(() => {
       if (paratiPanelHydratedRef.current) return;
+      if (allPosts.length === 0) return;
       const snap = new Set(paratiSeenIds);
       const data = getDataForMode(
         'foryou',
@@ -333,6 +338,7 @@ export default function CommunityScreen() {
         getBoost,
         snap,
       );
+      if (data.length === 0) return;
       paratiPanelHydratedRef.current = true;
       setParatiPanelData(data);
       setParatiPanelInitialIndex(0);
@@ -368,7 +374,8 @@ export default function CommunityScreen() {
         getPostById,
       );
       if (postId && !resolved) return { resolved: false, data: [] };
-      if (data.length === 0) return { resolved: true, data };
+      // Sin datos no hidratamos: el effect inicial reintentará cuando lleguen.
+      if (data.length === 0) return { resolved: false, data };
       const clampedIndex = clampDetailInitialIndex(data.length, initialIndex);
       paratiPanelHydratedRef.current = true;
       setParatiPanelData(data);
@@ -706,8 +713,14 @@ export default function CommunityScreen() {
   const displayTab: TabId = detailFeed
     ? (detailFeed.mode === 'foryou' ? 'para-ti' : 'siguiendo')
     : activeTab;
-  /** Para Ti está visible cuando el panel persistente es la pestaña activa Y no hay detail overlay encima. */
-  const paratiPanelVisible = activeTab === 'para-ti' && !detailFeed;
+  /**
+   * Para Ti está visible cuando: (a) la pestaña activa es Para Ti, (b) no hay
+   * detail overlay encima, y (c) el panel ya está hidratado. La condición (c)
+   * evita que ocultemos el panel principal antes de tener algo que mostrar
+   * (lo que daría pantalla negra durante la hidratación inicial).
+   */
+  const paratiPanelVisible =
+    activeTab === 'para-ti' && !detailFeed && paratiPanelMounted;
 
   // ── Sidebar open/close animation ──────────────────────────────────
   useEffect(() => {
@@ -1104,6 +1117,17 @@ export default function CommunityScreen() {
           </View>
         ) : null}
 
+        {/* Loading clan-coloured spinner mientras se hidrata Para Ti
+            (caso: usuario pulsa la pestaña antes de que `allPosts` llegue). */}
+        {activeTab === 'para-ti' && !paratiPanelMounted && !detailFeed ? (
+          <View
+            style={[styles.panel, styles.panelOverlay, styles.paratiLoadingCenter]}
+            pointerEvents="none"
+          >
+            <ActivityIndicator size="large" color={paratiUserClanColor} />
+          </View>
+        ) : null}
+
         {detailMounted ? (
           <Animated.View
             style={[
@@ -1322,6 +1346,10 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
     zIndex: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  paratiLoadingCenter: {
     justifyContent: 'center',
     alignItems: 'center',
   },

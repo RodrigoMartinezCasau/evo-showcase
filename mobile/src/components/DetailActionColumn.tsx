@@ -10,7 +10,9 @@ import {
 } from '@evoconn/constants/detailActionColumnLayout';
 import { UserAvatarFrame } from './shared/UserAvatarFrame';
 import { getPhilosophyClanBadgeIcon } from '@evoconn/utils/getPhilosophyClanBadgeIcon';
+import { CLAN_PROFILE_SIN_CLAN } from '@evoconn/utils/getClanProfileByHouse';
 import type { ClanId } from '@evoconn/constants/clanColors';
+import { CLAN_TO_COLOR } from '@evoconn/constants/clanColors';
 import type { Rank } from '@evoconn/types';
 
 import UpvoteInactive from '../assets/detailActions/31.svg';
@@ -44,6 +46,29 @@ function formatCount(n: number): string {
 /** Same vertical gap: up (count→icon) and down (icon→count). */
 const VOTE_STAT_ICON_GAP = 2;
 
+const VALID_CLAN_IDS = new Set<string>(Object.keys(CLAN_TO_COLOR));
+
+function isValidClanId(id: string | null | undefined): id is ClanId {
+  return !!id && VALID_CLAN_IDS.has(id);
+}
+
+/** True solo si hay URL de foto asignada (no usar el fallback con silueta del marco). */
+function hasProfilePhoto(avatarUri?: string | null): boolean {
+  const u = avatarUri?.trim();
+  if (!u) return false;
+  return /^https?:\/\//i.test(u) || u.startsWith('file://');
+}
+
+function philosophyBadgeForAuthor(
+  clanId: string | null | undefined,
+  authorRank?: Rank,
+) {
+  if (isValidClanId(clanId)) {
+    return getPhilosophyClanBadgeIcon(clanId, authorRank ?? 'aprendiz');
+  }
+  return CLAN_PROFILE_SIN_CLAN;
+}
+
 type DetailActionColumnProps = {
   clanId: string | null | undefined;
   avatarUri?: string | null;
@@ -63,8 +88,7 @@ type DetailActionColumnProps = {
    */
   containerHeight?: number;
   /**
-   * When true (Para Ti feed) and the user has a clan but no photo,
-   * shows the clan philosophy badge (with animal) instead of the flat profile icon.
+   * Para Ti: con foto → marco + foto; sin foto → badge de clan (animal o sin clan).
    */
   showClanBadge?: boolean;
   /** Author rank — required when showClanBadge is true to pick the correct badge tier. */
@@ -138,13 +162,19 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
     saveSz = sz * SAVE_L.scale * SCALE;
     dotsFontSz = Math.max(10, 22 * MORE_L.scale * SCALE);
   }
-  // ── Top icon: clan badge (animal) or profile icon ─────────────────────────
-  // Para Ti (showClanBadge=true), no photo, has clan → philosophy badge (animal, rank-aware).
-  // Any other case (no clan, has photo, showClanBadge=false) → UserAvatarFrame.
+  // ── Top icon (Para ti) ─────────────────────────────────────────────────────
+  // Con foto → UserAvatarFrame (marco de clan + imagen).
+  // Sin foto → badge de filosofía (animal del clan, o medalla sin clan si no tiene clan).
   let TopIcon: React.ReactNode;
-  if (showClanBadge && clanId && !avatarUri) {
-    const BadgeSvg = getPhilosophyClanBadgeIcon(clanId as ClanId, authorRank ?? null);
-    TopIcon = <BadgeSvg width={clanSz} height={clanSz} />;
+  if (showClanBadge) {
+    if (hasProfilePhoto(avatarUri)) {
+      TopIcon = (
+        <UserAvatarFrame clanId={clanId} avatarUri={avatarUri!.trim()} size={clanSz} />
+      );
+    } else {
+      const BadgeSvg = philosophyBadgeForAuthor(clanId, authorRank);
+      TopIcon = <BadgeSvg width={clanSz} height={clanSz} />;
+    }
   } else {
     TopIcon = <UserAvatarFrame clanId={clanId} avatarUri={avatarUri} size={clanSz} />;
   }
@@ -159,7 +189,7 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
       {/* ── 6-item column: clan / up block / approval% / down block / save / dots (same count↔icon gap up & down) ── */}
       <View style={columnStyle}>
 
-        {/* 1. Profile / clan badge — Para Ti uses philosophy badge (animal) when no photo */}
+        {/* 1. Perfil (tap → onClanPress / autor); Para ti sin foto = badge animal del clan */}
         <TouchableOpacity onPress={onClanPress} activeOpacity={0.7}>
           {TopIcon}
         </TouchableOpacity>

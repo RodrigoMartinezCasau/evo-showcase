@@ -13,8 +13,8 @@ import Svg73 from '../assets/profiles/nuevosPerfiles4Svg/73.svg';
 import Svg74 from '../assets/profiles/nuevosPerfiles4Svg/74.svg';
 import Svg75 from '../assets/profiles/nuevosPerfiles4Svg/75.svg';
 import Svg76 from '../assets/profiles/nuevosPerfiles4Svg/76.svg';
-// ── Sin clan profile icon ─────────────────────────────────────────────────────
-import SvgSinClan from '../assets/profiles/nuevosPerfiles4Svg/sin-clan.svg';
+// ── Sin clan — "ICONO SIN CLAN.svg" ─────────────────────────────────────────
+import SvgSinClan from '../assets/profiles/nuevosPerfiles4Svg/icono-sin-clan.svg';
 
 export type ClanProfileSvgProps = {
   width?: number;
@@ -33,7 +33,7 @@ const PROFILE_BY_CLAN: Record<ClanId, FC<ClanProfileSvgProps>> = {
   estoico:           Svg76,
 };
 
-/** Icon shown for users with no clan assigned — "Icono perfil sin clan.svg". */
+/** Icon shown for users with no clan assigned — "ICONO SIN CLAN.svg". */
 export const CLAN_PROFILE_SIN_CLAN: FC<ClanProfileSvgProps> = SvgSinClan;
 
 /** Fallback for an unknown clan key (should not normally occur). */
