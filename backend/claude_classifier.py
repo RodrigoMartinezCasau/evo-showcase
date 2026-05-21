@@ -23,7 +23,8 @@ CLANS: list[str] = [
     "racionalista", "humanista", "realista", "trascendentalista",
 ]
 
-MODEL = "claude-sonnet-4-6"
+# Haiku: much cheaper at launch scale; quality vs Sonnet evaluated in scripts/compare_haiku_vs_sonnet.py
+MODEL = "claude-haiku-4-5-20251001"
 
 _SYSTEM = (
     "Eres un clasificador filosófico experto. Solo devuelves JSON válido con claves entre comillas. "
@@ -105,7 +106,7 @@ def _parse_scores(raw: str) -> dict[str, float] | None:
 
 def classify_with_claude(texto: str) -> dict[str, float]:
     """
-    Clasifica una reflexión filosófica usando claude-sonnet-4-6.
+    Clasifica una reflexión filosófica usando Claude Haiku.
 
     Retorna un dict {clan: score} en escala [0, 10].
     Retorna zeros en cualquier error (API, red, parseo) para no romper el flujo.

@@ -47,20 +47,22 @@ app.add_middleware(
     allow_origins=_cors_list,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "x-api-key", "x-request-id", "Accept"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "x-api-key",
+        "x-request-id",
+        "x-user-id",
+        "x-client-date",
+        "Accept",
+    ],
 )
 
-# --- Minimal private beta protection: API key + rate limiting ---
-TESTER_API_KEY = os.environ.get("TESTER_API_KEY") or ""
-RATE_LIMIT_PER_MINUTE = 30
-_RATE_WINDOW_SECONDS = 60
-_rate_counters: dict[tuple[str, str], dict[str, float | int]] = {}
+# --- Minimal private beta protection: API key + rate limiting + per-user quota ---
+from user_quota import DAILY_LIMIT, check_can_consume, consume_use, get_usage_payload
+from rate_limit import check_rate_limit, startup_note as rate_limit_startup_note
 
-# --- Daily quota (per API key, per day) ---
-DAILY_LIMIT = 60  # <-- edit this to change daily quota
-_daily_usage: dict[tuple[str, str], int] = {}
-# Idempotency: only count once per (api_key, date, request_id)
-_counted_request_ids: set[tuple[str, str, str]] = set()
+TESTER_API_KEY = os.environ.get("TESTER_API_KEY") or ""
 
 
 def _get_client_ip(request: Request) -> str:
@@ -106,35 +108,28 @@ async def beta_protection_middleware(request: Request, call_next):
         # For local dev without TESTER_API_KEY, group all usage under empty key
         api_key = request.headers.get("x-api-key") or ""
 
-    # Rate limiting: per IP + path
+    # Rate limiting: per user (x-user-id) or IP + path
     ip = _get_client_ip(request)
-    key = (ip, path)
-    now = time.time()
-    bucket = _rate_counters.get(key)
-    if not bucket or now >= bucket["reset"]:  # type: ignore[index]
-        bucket = {"count": 1, "reset": now + _RATE_WINDOW_SECONDS}
-        _rate_counters[key] = bucket
-    else:
-        bucket["count"] = int(bucket["count"]) + 1  # type: ignore[index]
-        if bucket["count"] > RATE_LIMIT_PER_MINUTE:  # type: ignore[comparison-overlap]
-            return JSONResponse(
-                status_code=429,
-                content={"detail": "Rate limit exceeded. Please wait a minute before retrying."},
-            )
+    user_id_header = (request.headers.get("x-user-id") or "").strip()
+    rate_key = user_id_header if user_id_header else ip
+    if not check_rate_limit(rate_key, path):
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Rate limit exceeded. Please wait a minute before retrying."},
+        )
+
+    client_date = request.headers.get("x-client-date") or ""
 
     def _is_generation_endpoint(p: str, method: str) -> bool:
         if method != "POST":
             return False
         # Core LLM pipelines
-        if p in {"/debate", "/debate/chat", "/creator"}:
+        if p in {"/debate", "/debate/chat", "/creator", "/phrase/intro"}:
             return True
         # POST /debates only generates a short title (cheap LLM call) — does NOT
         # count toward daily quota. The real generation cost is in /debates/{id}/chat.
-        # Persisted debate chat — main reply per user message; use X-Request-Id for idempotency
         if p.startswith("/debates/") and p.endswith("/chat"):
             return True
-        # Lazy-loaded blocks (facts, quotes, creator): do NOT count toward daily quota (1 use = main reply only)
-        # if p.startswith("/messages/") and any(...): return True  # disabled
         # Philosophical profile AI generation (each block costs 1 use)
         if p.startswith("/philosophy-profile/") and any(
             p.endswith(s) for s in ("/summary", "/philosophers", "/books", "/jobs")
@@ -144,63 +139,51 @@ async def beta_protection_middleware(request: Request, call_next):
 
     is_generation = _is_generation_endpoint(path, request.method)
 
-    # Daily quota check BEFORE executing the endpoint (only for generation routes)
+    # Per-user daily quota (Supabase profiles.remaining_uses), 10/day
     if is_generation:
-        today = time.strftime("%Y-%m-%d", time.gmtime())
-        usage_key = (api_key, today)
-        used = _daily_usage.get(usage_key, 0)
-        if used >= DAILY_LIMIT:
+        if not user_id_header:
+            return JSONResponse(
+                status_code=400,
+                content={"detail": "Missing x-user-id header (required for AI generation)."},
+            )
+        ok, remaining = check_can_consume(user_id_header, client_date)
+        if not ok:
             return JSONResponse(
                 status_code=429,
-                content={"error": "Daily quota exceeded", "remaining": 0},
+                content={
+                    "error": "Daily quota exceeded",
+                    "remaining": remaining,
+                    "dailyLimit": DAILY_LIMIT,
+                },
             )
 
-    # Call downstream handler
     response = await call_next(request)
 
-    # Increment quota ONLY after successful generation calls (and not for /usage, /health)
-    if is_generation and response.status_code < 400:
-        today = time.strftime("%Y-%m-%d", time.gmtime())
-        usage_key = (api_key, today)
-        request_id_raw = request.headers.get("x-request-id")
-        request_id = (request_id_raw or "").strip()
-        should_count = True
-        if request_id:
-            id_key = (api_key, today, request_id)
-            if id_key in _counted_request_ids:
-                should_count = False
-            else:
-                _counted_request_ids.add(id_key)
-                # Prune old days to avoid unbounded growth (mutate in place, no rebinding)
-                to_remove = {k for k in _counted_request_ids if k[1] != today}
-                _counted_request_ids.difference_update(to_remove)
-        if should_count:
-            _daily_usage[usage_key] = _daily_usage.get(usage_key, 0) + 1
+    if is_generation and response.status_code < 400 and user_id_header:
+        request_id = (request.headers.get("x-request-id") or "").strip()
+        consume_use(user_id_header, client_date, request_id or None)
 
     return response
 
 
 @app.get("/usage")
 def get_usage(request: Request):
-    """Return current daily usage for the calling API key."""
-    # API key has already been validated by middleware (if TESTER_API_KEY is set)
-    api_key = request.headers.get("x-api-key") or (TESTER_API_KEY or "")
-    today = time.strftime("%Y-%m-%d", time.gmtime())
-    usage_key = (api_key, today)
-    used = _daily_usage.get(usage_key, 0)
-    remaining = max(DAILY_LIMIT - used, 0)
-    return {
-        "dailyLimit": DAILY_LIMIT,
-        "used": used,
-        "remaining": remaining,
-        "date": today,
-    }
+    """Return current daily usage for the authenticated user (x-user-id)."""
+    user_id = (request.headers.get("x-user-id") or "").strip()
+    if not user_id:
+        return JSONResponse(
+            status_code=400,
+            content={"detail": "Missing x-user-id header."},
+        )
+    client_date = request.headers.get("x-client-date") or ""
+    return get_usage_payload(user_id, client_date)
 
 
 @app.on_event("startup")
 def on_startup():
     import logging
     logging.basicConfig(level=logging.INFO)
+    rate_limit_startup_note()
     # Ensure debate tables exist and are migrated (e.g., add mode column if missing)
     import debate_db  # noqa: F401 - register Debate, DebateMessage, DebateMemory
     try:

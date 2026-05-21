@@ -8,6 +8,18 @@
  * Embed API keys cautiously (extractable from the bundle); rotate often for betas.
  */
 import { Platform } from 'react-native';
+import { getLocalDayKey } from '@evoconn/services/userStatsStorage';
+
+/** Active Supabase user id — set from AuthContext when profile loads. */
+let _apiUserId: string | undefined;
+
+export function setApiUserId(userId: string | undefined): void {
+  _apiUserId = userId?.trim() || undefined;
+}
+
+export function getApiUserId(): string | undefined {
+  return _apiUserId;
+}
 
 export function stripTrailingSlash(url: string): string {
   return url.replace(/\/$/, '');
@@ -39,5 +51,7 @@ export function mergeApiHeaders(extra?: Record<string, string>): Record<string, 
   const out = { ...(extra ?? {}) };
   const k = getPublicApiKey();
   if (k) out['x-api-key'] = k;
+  if (_apiUserId) out['x-user-id'] = _apiUserId;
+  out['x-client-date'] = getLocalDayKey();
   return out;
 }

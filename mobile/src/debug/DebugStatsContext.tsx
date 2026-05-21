@@ -205,7 +205,49 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
     mutateActiveSlice((s) => s); // Forces rollover via mutateActiveSlice.
   }, [currentDay, activeUserId, statsLoaded, db, mutateActiveSlice]);
 
-  // Sube racha/usos locales a Supabase al cargar (the same figure as the bar).
+  // Alinear usos locales con Supabase (fuente de verdad en backend para IA).
+  useEffect(() => {
+    if (!statsLoaded || !authProfile?.id) return;
+    const today = getLocalDayKey();
+    const serverDay = authProfile.last_uses_reset_date
+      ? String(authProfile.last_uses_reset_date).slice(0, 10)
+      : null;
+    let serverRemaining = Math.min(
+      DAILY_USES_LIMIT,
+      Math.max(0, Number(authProfile.remaining_uses ?? DAILY_USES_LIMIT)),
+    );
+    if (serverDay !== today) {
+      serverRemaining = DAILY_USES_LIMIT;
+    }
+    setDB((prev) => {
+      const cur = prev[authProfile.id] ?? defaultUserStats();
+      const rolled = applyDailyRollover(cur, today);
+      const mergedRemaining = Math.min(rolled.dailyUsesRemaining, serverRemaining);
+      if (
+        mergedRemaining === rolled.dailyUsesRemaining &&
+        rolled.lastUsesResetDate === today
+      ) {
+        return prev;
+      }
+      const nextDB: StatsDatabase = {
+        ...prev,
+        [authProfile.id]: {
+          ...rolled,
+          dailyUsesRemaining: mergedRemaining,
+          lastUsesResetDate: today,
+        },
+      };
+      saveStatsDB(nextDB);
+      return nextDB;
+    });
+  }, [
+    statsLoaded,
+    authProfile?.id,
+    authProfile?.remaining_uses,
+    authProfile?.last_uses_reset_date,
+  ]);
+
+  // Sube racha/usos locales a Supabase tras mutaciones (the same figure as the bar).
   useEffect(() => {
     if (!statsLoaded || !authProfile?.id) return;
     const slice = db[authProfile.id] ?? defaultUserStats();
@@ -213,6 +255,7 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
       authProfile.id,
       slice.currentStreak,
       slice.dailyUsesRemaining,
+      slice.lastUsesResetDate ?? getLocalDayKey(),
     );
   }, [statsLoaded, authProfile?.id, db]);
 
@@ -244,6 +287,7 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
           authProfile.id,
           next.currentStreak,
           next.dailyUsesRemaining,
+          getLocalDayKey(),
         );
       }
       return next;
@@ -263,6 +307,7 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
           authProfile.id,
           next.currentStreak,
           next.dailyUsesRemaining,
+          getLocalDayKey(),
         );
         void logAiUsageEvent({ source: 'app_daily_use' });
       }

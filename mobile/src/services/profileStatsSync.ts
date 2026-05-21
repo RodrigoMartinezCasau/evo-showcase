@@ -8,15 +8,21 @@ export async function syncProfileStats(
   userId: string,
   streakDays: number,
   remainingUses: number,
+  lastUsesResetDate?: string,
 ): Promise<void> {
   if (!isRealUserId(userId)) return;
 
+  const payload: Record<string, number | string> = {
+    streak_days: Math.max(0, Math.floor(streakDays)),
+    remaining_uses: Math.max(0, Math.floor(remainingUses)),
+  };
+  if (lastUsesResetDate) {
+    payload.last_uses_reset_date = lastUsesResetDate;
+  }
+
   const { error } = await supabase
     .from('profiles')
-    .update({
-      streak_days: Math.max(0, Math.floor(streakDays)),
-      remaining_uses: Math.max(0, Math.floor(remainingUses)),
-    })
+    .update(payload)
     .eq('id', userId);
 
   if (error && __DEV__) {
