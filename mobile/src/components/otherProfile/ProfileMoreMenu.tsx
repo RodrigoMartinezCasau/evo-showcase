@@ -10,7 +10,8 @@ import { useRouter } from 'expo-router';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
 import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
 import { useAuth } from '../../../mobile/lib/AuthContext';
-import { blockUser, insertReport, isRealUserId } from '@evoconn/services/supabaseSocial';
+import { insertReport, isRealUserId } from '@evoconn/services/supabaseSocial';
+import { useBlockedUsers } from '@evoconn/hooks/BlockedUsersContext';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import {
   EvoActionSheetModal,
@@ -40,6 +41,7 @@ export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({
   const { session } = useAuth();
   const { isFollowing, toggleFollow } = useFollowState();
   const { recordBlockUser } = useRecommendationTaste();
+  const { block } = useBlockedUsers();
   const following = isFollowing(userId);
 
   const [mainOpen, setMainOpen] = useState(false);
@@ -71,9 +73,7 @@ export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({
       return;
     }
     if (following) toggleFollow(userId);
-    if (isRealUserId(session.user.id) && isRealUserId(userId)) {
-      await blockUser(session.user.id, userId).catch(console.error);
-    }
+    await block(userId).catch(console.error);
     recordBlockUser(userId, clanId ?? null);
     openInfo('Usuario bloqueado', 'Ya no verás su contenido. Puedes desbloquear desde Ajustes.');
     if (router.canGoBack()) router.back();
@@ -84,6 +84,7 @@ export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({
     userId,
     clanId,
     toggleFollow,
+    block,
     recordBlockUser,
     router,
     openInfo,

@@ -21,6 +21,7 @@ import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { useNotifications } from '@evoconn/hooks/NotificationsContext';
 import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
 import { isRealUserId, fetchProfilesBatch } from '@evoconn/services/supabaseSocial';
+import { useBlockedUsers } from '@evoconn/hooks/BlockedUsersContext';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -92,6 +93,7 @@ const FeedContext = createContext<FeedContextValue | null>(null);
 
 export function FeedProvider({ children }: { children: React.ReactNode }) {
   const sim = useSimulation();
+  const { blockedIds } = useBlockedUsers();
   const { addNotification } = useNotifications();
   const taste = useRecommendationTaste();
   const [publishedIds, setPublishedIds] = useState<Set<string>>(new Set());
@@ -132,8 +134,9 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
     () =>
       sim.posts
         .filter(p => isPublishedSimPostType(p.type))
+        .filter(p => !blockedIds.has(p.authorId))
         .map(p => simPostToCommunityPost(p, authorAvatarCache)),
-    [sim.posts, authorAvatarCache],
+    [sim.posts, authorAvatarCache, blockedIds],
   );
 
   const publishPost = useCallback(

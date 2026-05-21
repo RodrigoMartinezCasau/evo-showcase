@@ -13,8 +13,10 @@ import Svg73 from '../assets/profiles/nuevosPerfiles4Svg/73.svg';
 import Svg74 from '../assets/profiles/nuevosPerfiles4Svg/74.svg';
 import Svg75 from '../assets/profiles/nuevosPerfiles4Svg/75.svg';
 import Svg76 from '../assets/profiles/nuevosPerfiles4Svg/76.svg';
-// ── Sin clan — "ICONO SIN CLAN.svg" ─────────────────────────────────────────
-import SvgSinClan from '../assets/profiles/nuevosPerfiles4Svg/icono-sin-clan.svg';
+// Medalla sin clan (Para ti / columna de acciones) — "ICONO SIN CLAN.svg"
+import SvgSinClanBadge from '../assets/profiles/nuevosPerfiles4Svg/icono-sin-clan.svg';
+// Silueta de persona en escudo (perfil / búsqueda sin foto) — "Icono perfil sin clan.svg"
+import SvgSinClanProfile from '../assets/profiles/nuevosPerfiles4Svg/sin-clan.svg';
 
 export type ClanProfileSvgProps = {
   width?: number;
@@ -33,8 +35,11 @@ const PROFILE_BY_CLAN: Record<ClanId, FC<ClanProfileSvgProps>> = {
   estoico:           Svg76,
 };
 
-/** Icon shown for users with no clan assigned — "ICONO SIN CLAN.svg". */
-export const CLAN_PROFILE_SIN_CLAN: FC<ClanProfileSvgProps> = SvgSinClan;
+/** Medalla sin clan (no usar como avatar de perfil). */
+export const CLAN_PROFILE_SIN_CLAN: FC<ClanProfileSvgProps> = SvgSinClanBadge;
+
+/** Avatar genérico: escudo + silueta de persona (búsqueda, listas, sin foto). */
+export const PROFILE_PERSON_SILHOUETTE: FC<ClanProfileSvgProps> = SvgSinClanProfile;
 
 /** Fallback for an unknown clan key (should not normally occur). */
 export const CLAN_PROFILE_DEFAULT: FC<ClanProfileSvgProps> = Svg69;
@@ -42,8 +47,7 @@ export const CLAN_PROFILE_DEFAULT: FC<ClanProfileSvgProps> = Svg69;
 export function getClanProfileByHouse(
   house?: string | null,
 ): FC<ClanProfileSvgProps> {
-  // No clan → use the dedicated sin-clan icon.
-  if (house == null || house === '') return CLAN_PROFILE_SIN_CLAN;
+  if (house == null || house === '') return PROFILE_PERSON_SILHOUETTE;
   const key = house.trim().toLowerCase() as ClanId;
   return (
     (PROFILE_BY_CLAN as Record<string, FC<ClanProfileSvgProps> | undefined>)[key] ??

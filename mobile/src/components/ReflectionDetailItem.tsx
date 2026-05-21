@@ -48,7 +48,8 @@ import { usePersonalProfile } from '@evoconn/hooks/PersonalProfileContext';
 import { useNotifications } from '@evoconn/hooks/NotificationsContext';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import type { SimComment } from '@evoconn/data/simulation/simulatedNetwork';
-import { blockUser, insertReport, isRealUserId } from '@evoconn/services/supabaseSocial';
+import { insertReport, isRealUserId } from '@evoconn/services/supabaseSocial';
+import { useBlockedUsers } from '@evoconn/hooks/BlockedUsersContext';
 import { useAuth } from '../../mobile/lib/AuthContext';
 import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
 import { rankCommentsForViewer } from '@evoconn/logic/comments/commentRanking';
@@ -237,7 +238,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     });
   }, [commentsMap, post.id, simUsers]);
 
-  const [blockedUsers, setBlockedUsers] = useState<Set<string>>(new Set());
+  const { block, isBlocked } = useBlockedUsers();
   const { session, profile: authProfile } = useAuth();
 
   const [postMoreSheetOpen, setPostMoreSheetOpen] = useState(false);
@@ -248,14 +249,11 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   const [infoModalMessage, setInfoModalMessage] = useState('');
 
   const handleBlockUser = useCallback(async (userId: string) => {
-    setBlockedUsers((prev) => new Set(prev).add(userId));
-    if (session?.user && isRealUserId(session.user.id) && isRealUserId(userId)) {
-      await blockUser(session.user.id, userId).catch(console.error);
-    }
-  }, [session]);
+    await block(userId).catch(console.error);
+  }, [block]);
 
   const { addNotification } = useNotifications();
-  const { recordComment } = useRecommendationTaste();
+  const { recordComment, recordBlockUser } = useRecommendationTaste();
 
   const handleAddComment = useCallback(
     async (text: string) => {
@@ -395,9 +393,10 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   }, []);
 
   const confirmBlockUser = useCallback(() => {
-    handleBlockUser(post.author.id);
+    void handleBlockUser(post.author.id);
+    recordBlockUser(post.author.id, post.author.clanId ?? null);
     showInfo('Usuario bloqueado', `@${post.author.username} ha sido bloqueado.`);
-  }, [handleBlockUser, post.author.id, post.author.username, showInfo]);
+  }, [handleBlockUser, post.author.id, post.author.username, post.author.clanId, recordBlockUser, showInfo]);
 
   const TAP_MOVE_THRESHOLD = 10;
   const panelLastTap = useRef(0);
@@ -748,12 +747,12 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   // recencia residual) con boost para autores del mismo clan que el lector,
   // siempre que el lector pertenezca a uno de los 8 clanes filosóficos.
   const visibleComments = useMemo(() => {
-    const filtered = contextComments.filter((c) => !blockedUsers.has(c.author.id));
+    const filtered = contextComments.filter((c) => !isBlocked(c.author.id));
     return rankCommentsForViewer(filtered, {
       viewerClanId: viewerClanIdForRanking,
       viewerId: viewerIdForRanking,
     });
-  }, [contextComments, blockedUsers, viewerClanIdForRanking, viewerIdForRanking]);
+  }, [contextComments, isBlocked, viewerClanIdForRanking, viewerIdForRanking]);
 
   const actionColStyle = useMemo(() => {
     if (reflPanelLayout) {

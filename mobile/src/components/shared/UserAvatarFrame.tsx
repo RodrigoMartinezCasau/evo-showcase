@@ -3,7 +3,7 @@
  *
  * Renders a profile photo clipped to the exact inner shape of the clan badge SVG,
  * keeping the black border ring and top star decorations visible on top.
- * Falls back to the original clan SVG icon when no photo is set.
+ * Sin foto: silueta de persona (`person-silhouette`) o icono de clan del usuario (`by-clan`).
  *
  * Usage:
  *   <UserAvatarFrame clanId={user.clanId} avatarUri={user.avatarUri} size={60} />
@@ -11,7 +11,10 @@
 import React, { useId, useMemo } from 'react';
 import { View, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import Svg, { ClipPath, Path, Defs, Image as SvgImage } from 'react-native-svg';
-import { getClanProfileByHouse } from '@evoconn/utils/getClanProfileByHouse';
+import {
+  getClanProfileByHouse,
+  PROFILE_PERSON_SILHOUETTE,
+} from '@evoconn/utils/getClanProfileByHouse';
 import { getClanProfileFrameByHouse } from '@evoconn/utils/getClanProfileFrameByHouse';
 
 // ─── Badge shape paths ────────────────────────────────────────────────────────
@@ -44,6 +47,11 @@ type Props = {
   iconScale?: number;
   iconOffsetX?: number;
   iconOffsetY?: number;
+  /**
+   * Sin foto de perfil: `person-silhouette` = escudo + personita (búsqueda, listas).
+   * `by-clan` = icono de perfil del clan del usuario.
+   */
+  noPhotoFallback?: 'person-silhouette' | 'by-clan';
 };
 
 const DEFAULT_SIZE = 60;
@@ -56,11 +64,19 @@ export function UserAvatarFrame({
   iconScale = 1,
   iconOffsetX = 0,
   iconOffsetY = 0,
+  noPhotoFallback = 'by-clan',
 }: Props) {
-  const ClanSvg   = useMemo(() => getClanProfileByHouse(clanId), [clanId]);
+  const ClanSvg = useMemo(() => {
+    if (noPhotoFallback === 'person-silhouette') return PROFILE_PERSON_SILHOUETTE;
+    return getClanProfileByHouse(clanId);
+  }, [clanId, noPhotoFallback]);
   const FrameSvg  = useMemo(() => getClanProfileFrameByHouse(clanId), [clanId]);
   const photoClipId = useId().replace(/:/g, '_');
-  const resolvedAvatar = avatarUri?.trim() || null;
+  const trimmed = avatarUri?.trim() ?? '';
+  const resolvedAvatar =
+    trimmed && (/^https?:\/\//i.test(trimmed) || trimmed.startsWith('file://'))
+      ? trimmed
+      : null;
 
   if (!resolvedAvatar) {
     return (

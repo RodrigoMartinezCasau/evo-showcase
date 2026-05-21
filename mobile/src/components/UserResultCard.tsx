@@ -15,6 +15,12 @@ const ICON_SCALE   = 1.2;
 const ICON_OFFSET_X = 0;
 const ICON_OFFSET_Y = 0;
 
+function hasProfilePhoto(avatarUri?: string | null): boolean {
+  const u = avatarUri?.trim();
+  if (!u) return false;
+  return /^https?:\/\//i.test(u) || u.startsWith('file://');
+}
+
 const RANK_LABELS: Record<string, string> = {
   aprendiz: 'Aprendiz',
   maestro:  'Maestro',
@@ -30,6 +36,11 @@ export type UserResultCardProps = {
   avatarUri?: string | null;
   /** Porcentaje de afinidad con el clan (opcional, mostrado en display de clan) */
   clanPct?: string;
+  /**
+   * `search` — foto o silueta de persona (barra de buscar).
+   * `clan` — foto o icono de perfil del clan (p. ej. miembros en pantalla de clan).
+   */
+  avatarVariant?: 'search' | 'clan';
   onPress?: () => void;
 };
 
@@ -40,9 +51,11 @@ export function UserResultCard({
   followersCount,
   avatarUri,
   clanPct,
+  avatarVariant = 'search',
   onPress,
 }: UserResultCardProps) {
   const clanColor  = getClanColor(clanId);
+  const showPhoto = hasProfilePhoto(avatarUri);
 
   return (
     <TouchableOpacity
@@ -51,15 +64,17 @@ export function UserResultCard({
       onPress={onPress}
       disabled={!onPress}
     >
-      {/* Avatar con foto de perfil o icono de clan */}
       <View style={styles.avatarWrap}>
         <UserAvatarFrame
           clanId={clanId}
-          avatarUri={avatarUri}
+          avatarUri={showPhoto ? avatarUri : null}
           size={ICON_SIZE}
           iconScale={ICON_SCALE}
           iconOffsetX={ICON_OFFSET_X}
           iconOffsetY={ICON_OFFSET_Y}
+          noPhotoFallback={
+            avatarVariant === 'search' ? 'person-silhouette' : 'by-clan'
+          }
         />
       </View>
 

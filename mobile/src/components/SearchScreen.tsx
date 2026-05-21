@@ -18,6 +18,7 @@ import { fetchFollowersCountsBatch, searchSupabaseUsers } from '../services/supa
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../mobile/lib/AuthContext';
 import { useEffectiveClanId } from '@evoconn/hooks/useEffectiveClanId';
+import { useBlockedUsers } from '@evoconn/hooks/BlockedUsersContext';
 import { getClanColor } from '@evoconn/constants/clanColors';
 
 const MAX_RECENTS = 10;
@@ -36,6 +37,7 @@ type SearchScreenProps = {
 
 export function SearchScreen({ onUserPress }: SearchScreenProps) {
   const { profile } = useAuth();
+  const { isBlocked } = useBlockedUsers();
   const myEffectiveClanId = useEffectiveClanId();
   const myClanColor = getClanColor(myEffectiveClanId);
   const inputRef = useRef<TextInput>(null);
@@ -101,12 +103,12 @@ export function SearchScreen({ onUserPress }: SearchScreenProps) {
   const results: ScoredUser[] = useMemo(() => {
     const sbIds = new Set(supabaseResults.map(r => r.id));
     const localOnly = localResults.filter(r => !sbIds.has(r.id));
-    const merged = [...supabaseResults, ...localOnly];
+    const merged = [...supabaseResults, ...localOnly].filter((r) => !isBlocked(r.id));
     if (!profile?.id || !myEffectiveClanId) return merged;
     return merged.map((r) =>
       r.id === profile.id ? { ...r, clanId: myEffectiveClanId } : r,
     );
-  }, [supabaseResults, localResults, profile?.id, myEffectiveClanId]);
+  }, [supabaseResults, localResults, profile?.id, myEffectiveClanId, isBlocked]);
 
   const addRecent = useCallback((term: string) => {
     const trimmed = term.trim();

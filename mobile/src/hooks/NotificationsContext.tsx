@@ -40,6 +40,7 @@ import {
 } from '@evoconn/services/supabaseSocial';
 import { supabase } from '../../mobile/lib/supabase';
 import { registerPushToken } from '@evoconn/services/pushNotifications';
+import { useBlockedUsers } from '@evoconn/hooks/BlockedUsersContext';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -88,6 +89,7 @@ const NotificationsCtx = createContext<NotificationsContextValue | null>(null);
 
 export function NotificationsProvider({ children }: { children: ReactNode }) {
   const { activeUserId } = useSimulation();
+  const { isBlocked } = useBlockedUsers();
 
   const [db, setDb] = useState<NotificationsDatabase>({});
   const dbRef = useRef<NotificationsDatabase>({});
@@ -236,7 +238,10 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
   // ── Derived values for active user ───────────────────────────────────────
 
-  const notifications = useMemo(() => db[activeUserId] ?? [], [db, activeUserId]);
+  const notifications = useMemo(
+    () => (db[activeUserId] ?? []).filter((n) => !isBlocked(n.fromUserId)),
+    [db, activeUserId, isBlocked],
+  );
   const unreadCount = useMemo(
     () => notifications.filter((n) => !n.read).length,
     [notifications],

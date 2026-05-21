@@ -52,7 +52,6 @@ const PROFILE_ICON_BASE_SIZE = 54;
 
 const IC = {
   blue:   '#3B82F6',
-  amber:  '#D97706',
   purple: '#7C3AED',
   green:  '#10B981',
   neon:   '#8BAD00',
@@ -66,7 +65,7 @@ const IC = {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type RowType = 'navigate' | 'toggle' | 'info' | 'action' | 'danger' | 'upgrade';
+type RowType = 'navigate' | 'toggle' | 'info' | 'action' | 'danger';
 
 interface SettingRow {
   id:           string;
@@ -121,29 +120,12 @@ function SettingsRow({
   const isToggle  = row.type === 'toggle';
   const isInfo    = row.type === 'info';
   const isDanger  = row.type === 'danger';
-  const isUpgrade = row.type === 'upgrade';
 
   const handlePress = useCallback(() => {
     if (row.onPress) { row.onPress(); return; }
-    if (isDanger || isUpgrade || isInfo || isToggle) return;
+    if (isDanger || isInfo || isToggle) return;
     Alert.alert('Próximamente', 'Esta sección está en desarrollo.');
-  }, [row, isDanger, isInfo, isToggle, isUpgrade]);
-
-  if (isUpgrade) {
-    return (
-      <>
-        {!isFirst && <View style={styles.divider} />}
-        <TouchableOpacity style={[styles.row, styles.upgradeRow]} onPress={row.onPress ?? handlePress} activeOpacity={0.75}>
-          <View style={[styles.iconBox, { backgroundColor: IC.amber }]}><IconInner name="star" /></View>
-          <View style={styles.rowContent}>
-            <Text style={styles.upgradeLabel}>Actualizar a Premium</Text>
-            <Text style={styles.rowSubtitle}>Acceso ilimitado al asistente y funciones avanzadas</Text>
-          </View>
-          <View style={styles.upgradeBadge}><Text style={styles.upgradeBadgeText}>PRO</Text></View>
-        </TouchableOpacity>
-      </>
-    );
-  }
+  }, [row, isDanger, isInfo, isToggle]);
 
   if (isDanger) {
     return (
@@ -317,7 +299,6 @@ export default function SettingsScreen({
   const { remainingUses }         = useDebugStats();
   const { profile, refreshProfile } = useAuth();
   const [privateAccountLocal, setPrivateAccountLocal] = useState(false);
-  const [premiumInfoOpen, setPremiumInfoOpen] = useState(false);
   const [privateSaveErrorOpen, setPrivateSaveErrorOpen] = useState(false);
   const [deleteUnavailableOpen, setDeleteUnavailableOpen] = useState(false);
   const [fallbackLogoutInfoOpen, setFallbackLogoutInfoOpen] = useState(false);
@@ -377,10 +358,6 @@ export default function SettingsScreen({
   }, []);
   const confirmLogout = onLogout ?? defaultLogout;
 
-  const showSubscriptionAlert = useCallback(() => {
-    setPremiumInfoOpen(true);
-  }, []);
-
   const SECTIONS: SettingSection[] = useMemo(() => [
     {
       id: 'account',
@@ -407,15 +384,6 @@ export default function SettingsScreen({
         },
         { id: 'pass',   label: 'Contraseña y seguridad',                      icon: 'lock-closed-outline', iconBg: IC.slate, type: 'navigate', onPress: () => router.push('/account-password') },
         { id: 'linked', label: 'Cuentas vinculadas',  subtitle: 'Google, Apple…', icon: 'link-outline',   iconBg: IC.gray,  type: 'navigate', onPress: () => router.push('/account-linked') },
-      ],
-    },
-    {
-      id: 'subscription',
-      title: 'SUSCRIPCIÓN',
-      rows: [
-        { id: 'plan',    label: 'Plan actual', value: 'Gratis', icon: 'card-outline',    iconBg: IC.gray,  type: 'navigate', onPress: showSubscriptionAlert },
-        { id: 'upgrade', label: '',            icon: 'star',    iconBg: IC.amber,         type: 'upgrade',  onPress: showSubscriptionAlert },
-        { id: 'restore', label: 'Restaurar compras',            icon: 'refresh-outline', iconBg: IC.gray,  type: 'action',   onPress: showSubscriptionAlert },
       ],
     },
     {
@@ -498,10 +466,9 @@ export default function SettingsScreen({
       title: 'INFORMACIÓN',
       rows: [
         { id: 'version', label: 'Versión', value: '1.0.0', icon: 'information-circle-outline', iconBg: IC.gray, type: 'info' },
-        { id: 'build',   label: 'Build',   value: '(16)',   icon: 'cube-outline',               iconBg: IC.gray, type: 'info' },
       ],
     },
-  ], [remainingUses, userEmail, userPhone, deletingAccount, confirmDeleteAccount, showSubscriptionAlert, router, profile?.id]);
+  ], [remainingUses, userEmail, userPhone, deletingAccount, confirmDeleteAccount, router, profile?.id]);
 
   const handleHapticsToggle = useCallback((val: boolean) => setHapticsEnabled(val), [setHapticsEnabled]);
 
@@ -549,12 +516,6 @@ export default function SettingsScreen({
         onConversationPress={(id) => router.push({ pathname: '/reflection', params: { thoughtId: id } })}
       />
     </View>
-    <EvoInfoModal
-      visible={premiumInfoOpen}
-      onClose={() => setPremiumInfoOpen(false)}
-      title="Suscripción"
-      message="La app no cuenta con versiones premium todavía, gracias por la intención de apoyo igualmente ;)"
-    />
     <EvoInfoModal
       visible={privateSaveErrorOpen}
       onClose={() => setPrivateSaveErrorOpen(false)}
@@ -611,10 +572,6 @@ const styles = StyleSheet.create({
   chevron:        { color: 'rgba(255,255,255,0.25)', fontSize: 22, fontWeight: '300', lineHeight: 26, marginRight: -2 },
   divider:        { height: 1, backgroundColor: DIVIDER, marginLeft: 14 + ICON_SIZE + 12 },
   dangerLabel:    { flex: 1, color: evoconnColors.danger, fontSize: 15, fontWeight: '500' },
-  upgradeRow:     { backgroundColor: 'rgba(217,175,51,0.07)', borderRadius: 0, paddingVertical: 14 },
-  upgradeLabel:   { color: '#F5C842', fontSize: 15, fontWeight: '700' },
-  upgradeBadge:   { paddingHorizontal: 8, paddingVertical: 3, backgroundColor: '#D97706', borderRadius: 6, flexShrink: 0 },
-  upgradeBadgeText:{ color: '#ffffff', fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
 
   logoutWrap:     { marginBottom: 12 },
   logoutBtn:      { backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: 18, borderWidth: 1, borderColor: 'rgba(239,68,68,0.25)', paddingVertical: 16, alignItems: 'center' },

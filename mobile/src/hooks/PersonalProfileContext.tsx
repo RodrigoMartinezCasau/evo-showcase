@@ -34,6 +34,7 @@ import {
 import { fetchProfilesBatch, setPostHidden, isRealUserId, type BasicProfile } from '@evoconn/services/supabaseSocial';
 import { registerFollowProfilePrimer } from '@evoconn/hooks/followProfilePrime';
 import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
+import { useBlockedUsers } from '@evoconn/hooks/BlockedUsersContext';
 import { useAuth } from '../../mobile/lib/AuthContext';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -127,6 +128,7 @@ const PersonalProfileCtx = createContext<PersonalProfileContextValue | null>(nul
 export function PersonalProfileProvider({ children }: { children: React.ReactNode }) {
   const sim = useSimulation();
   const taste = useRecommendationTaste();
+  const { isBlocked } = useBlockedUsers();
   const { activeUserId, users, posts: simPosts, followGraph, savedMap, hiddenMap } = sim;
 
   // Cache of Supabase profiles for real UUID users not in SIM_USERS_BY_ID.
@@ -234,6 +236,7 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
   const followers = useMemo<FollowerEntry[]>(() => {
     return Object.entries(followGraph)
       .filter(([, followingSet]) => followingSet.has(activeUserId))
+      .filter(([uid]) => !isBlocked(uid))
       .map(([uid]) => {
         const u = users[uid];
         if (u) return { id: u.id, username: u.username, clanId: u.clanId, rank: u.rank };
@@ -241,12 +244,13 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
         if (cached) return { id: cached.id, username: cached.username, clanId: cached.clanId, rank: cached.rank as FollowerEntry['rank'] };
         return { id: uid, username: `@${uid.slice(0, 8)}`, clanId: null, rank: 'aprendiz' as const };
       });
-  }, [followGraph, activeUserId, users, profileCache]);
+  }, [followGraph, activeUserId, users, profileCache, isBlocked]);
 
   // ── Following ──────────────────────────────────────────────────────────────
   const following = useMemo<FollowingEntry[]>(() => {
     const myFollowing = followGraph[activeUserId] ?? new Set<string>();
     return [...myFollowing]
+      .filter(uid => !isBlocked(uid))
       .map(uid => {
         const u = users[uid];
         if (u) return { id: u.id, username: u.username, clanId: u.clanId, rank: u.rank };
@@ -254,7 +258,7 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
         if (cached) return { id: cached.id, username: cached.username, clanId: cached.clanId, rank: cached.rank as FollowingEntry['rank'] };
         return { id: uid, username: `@${uid.slice(0, 8)}`, clanId: null, rank: 'aprendiz' as const };
       });
-  }, [followGraph, activeUserId, users, profileCache]);
+  }, [followGraph, activeUserId, users, profileCache, isBlocked]);
 
   // followingBackIds = users I already follow back (who are in my followers list)
   const followingBackIds = useMemo<Set<string>>(() => {
@@ -285,8 +289,8 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
   // ── Mutual friends ─────────────────────────────────────────────────────────
   const friends = useMemo<FollowingEntry[]>(() => {
     const followerIdSet = new Set(followers.map(f => f.id));
-    return following.filter(u => followerIdSet.has(u.id));
-  }, [followers, following]);
+    return following.filter(u => followerIdSet.has(u.id) && !isBlocked(u.id));
+  }, [followers, following, isBlocked]);
 
   // ── Saved posts ────────────────────────────────────────────────────────────
   const savedPostIds = useMemo<Set<string>>(
@@ -299,8 +303,9 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
       [...savedPostIds]
         .map((postId) => simPosts.find((p) => p.id === postId))
         .filter((p): p is SimPost => p !== undefined && isPublishedSimPostType(p.type))
+        .filter((p) => !isBlocked(p.authorId))
         .map((p) => simPostToCommunityPost(p, users, profileCache)),
-    [savedPostIds, simPosts, users, profileCache],
+    [savedPostIds, simPosts, users, profileCache, isBlocked],
   );
 
   const savePost = useCallback(

@@ -409,6 +409,7 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
           rank={item.rank}
           followersCount={item.followersCount ?? 0}
           clanPct={pct}
+          avatarVariant="clan"
           onPress={() => handleMemberPress(item)}
         />
       );

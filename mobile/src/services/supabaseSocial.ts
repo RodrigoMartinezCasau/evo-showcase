@@ -639,16 +639,21 @@ export interface BlockedProfile {
   clanId: string | null;
 }
 
-export async function fetchBlockedUsers(blockerId: string): Promise<BlockedProfile[]> {
-  // Step 1: get blocked user IDs
+export async function fetchBlockedUserIds(blockerId: string): Promise<string[]> {
   const { data: blockRows, error: blockErr } = await supabase
     .from('blocks')
     .select('blocked_id')
     .eq('blocker_id', blockerId);
-  if (blockErr) { console.error('[Social] fetchBlockedUsers:', blockErr.message); return []; }
-  if (!blockRows || blockRows.length === 0) return [];
+  if (blockErr) {
+    console.error('[Social] fetchBlockedUserIds:', blockErr.message);
+    return [];
+  }
+  return (blockRows ?? []).map((r: Record<string, unknown>) => r.blocked_id as string);
+}
 
-  const ids = blockRows.map((r: Record<string, unknown>) => r.blocked_id as string);
+export async function fetchBlockedUsers(blockerId: string): Promise<BlockedProfile[]> {
+  const ids = await fetchBlockedUserIds(blockerId);
+  if (ids.length === 0) return [];
 
   // Step 2: fetch profiles for those IDs
   const { data: profileRows, error: profileErr } = await supabase

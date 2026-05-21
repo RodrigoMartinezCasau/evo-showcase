@@ -25,6 +25,9 @@ import {
 } from '@evoconn/components';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useFeedStore, simPostToCommunityPost } from '@evoconn/hooks/useFeedStore';
+import { mergePanelPostsAuthorAvatars } from '@evoconn/utils/enrichPostsAuthorAvatar';
+import { fetchProfilesBatch, isRealUserId } from '@evoconn/services/supabaseSocial';
+import { isPublishedSimPostType, type SimPost } from '@evoconn/data/simulation/simulatedNetwork';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
 import { useParatiSeenPosts } from '@evoconn/hooks/ParatiSeenPostsContext';
@@ -60,6 +63,7 @@ import { PANEL_STAR_SURFACE_DEFAULT } from '@evoconn/components/animations/StarF
 import { SearchScreen } from '@evoconn/components/SearchScreen';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { useEffectiveClanId } from '@evoconn/hooks/useEffectiveClanId';
+import { useBlockedUsers } from '@evoconn/hooks/BlockedUsersContext';
 import { getClanColor } from '@evoconn/constants/clanColors';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
 import { ProfileRevealPanel } from '@evoconn/components/otherProfile';
@@ -82,6 +86,30 @@ function tabToFeedMode(tab: TabId): FeedMode {
     default:
       return 'foryou';
   }
+}
+
+/** Avatares de autores reales para hidratar Para ti tras refresh o antes del cache del feed. */
+async function buildAuthorAvatarCacheFromSimPosts(
+  simPosts: SimPost[],
+): Promise<Record<string, string | null>> {
+  const ids = [
+    ...new Set(
+      simPosts
+        .filter((p) => isPublishedSimPostType(p.type))
+        .map((p) => p.authorId)
+        .filter((id) => isRealUserId(id) && id !== mockCurrentUser.id),
+    ),
+  ];
+  const cache: Record<string, string | null> = {};
+  if (ids.length > 0) {
+    const profiles = await fetchProfilesBatch(ids);
+    profiles.forEach((p) => {
+      cache[p.id] = p.avatarUri ?? null;
+    });
+  }
+  const mine = mockCurrentUser.avatarUri?.trim();
+  if (mine) cache[mockCurrentUser.id] = mine;
+  return cache;
 }
 
 /**
@@ -222,6 +250,7 @@ export default function CommunityScreen() {
   const { followingSet } = useFollowState();
   const { thoughts } = useThoughts();
   const { posts: allPosts, getPostById } = useFeedStore();
+  const { blockedIds } = useBlockedUsers();
   const { refreshSocialFromSupabase } = useSimulation();
   const { getBoost, revision: tasteRevision, recordDwell } = useRecommendationTaste();
   const { seenIds: paratiSeenIds, markParatiPostSeen } = useParatiSeenPosts();
@@ -284,6 +313,11 @@ export default function CommunityScreen() {
   // live `foryouFeedOrdered` re-rank, which would cause visible jumps.
   const [paratiPanelMounted, setParatiPanelMounted] = useState(false);
   const [paratiPanelData, setParatiPanelData] = useState<CommunityPost[]>([]);
+  /** Snapshot + avatares en vivo de `allPosts` (el panel no reordena al llegar fotos). */
+  const paratiPanelDisplayData = useMemo(
+    () => mergePanelPostsAuthorAvatars(paratiPanelData, allPosts),
+    [paratiPanelData, allPosts],
+  );
   const [paratiPanelInitialIndex, setParatiPanelInitialIndex] = useState(0);
   const [paratiPanelKey, setParatiPanelKey] = useState(0);
   const paratiPanelListRef = useRef<FlatList<CommunityPost>>(null);
@@ -292,6 +326,25 @@ export default function CommunityScreen() {
   markParatiSeenRef.current = markParatiPostSeen;
   const triggerHapticRef = useRef(triggerHaptic);
   triggerHapticRef.current = triggerHaptic;
+
+  // Quitar al instante posts de autores bloqueados del panel Para Ti ya montado.
+  useEffect(() => {
+    const dropBlocked = (posts: CommunityPost[]) =>
+      posts.filter((p) => !blockedIds.has(p.author.id));
+    setParatiPanelData((prev) => (prev.length === 0 ? prev : dropBlocked(prev)));
+    setDetailFeed((prev) =>
+      prev
+        ? {
+            ...prev,
+            data: dropBlocked(prev.data),
+            initialIndex: clampDetailInitialIndex(
+              dropBlocked(prev.data).length,
+              prev.initialIndex,
+            ),
+          }
+        : null,
+    );
+  }, [blockedIds]);
 
   // Para Ti ordering is computed on-demand in `hydrateParatiPanel` /
   // pull-to-refresh so it never re-renders the panel mid-scroll. The
@@ -571,7 +624,11 @@ export default function CommunityScreen() {
                 }),
                 refreshSocialFromSupabase(),
               ]);
-              const freshAll = simPosts.map(simPostToCommunityPost);
+              const avatarCache = await buildAuthorAvatarCacheFromSimPosts(simPosts);
+              const freshAll = simPosts
+                .filter((p) => isPublishedSimPostType(p.type))
+                .filter((p) => !blockedIds.has(p.authorId))
+                .map((p) => simPostToCommunityPost(p, avatarCache));
               const emptySeen = new Set<string>();
               const data = getDataForMode(
                 'foryou',
@@ -688,11 +745,14 @@ export default function CommunityScreen() {
         onReadingModeChange={handleReadingModeChange}
         communityVerticalFeed
         reflectionStarSurfaceColor={
-          detailFeed?.mode === 'foryou' ? evoconnColors.background : PANEL_STAR_SURFACE_DEFAULT
+          activeTab === 'para-ti' || detailFeed?.mode === 'foryou'
+            ? evoconnColors.background
+            : PANEL_STAR_SURFACE_DEFAULT
         }
       />
     ),
     [
+      activeTab,
       feedItemHeight,
       handleAuthorPress,
       handleClanPress,
@@ -1087,7 +1147,7 @@ export default function CommunityScreen() {
                 <FlatList
                   key={`parati-panel-${paratiPanelKey}`}
                   ref={paratiPanelListRef}
-                  data={paratiPanelData}
+                  data={paratiPanelDisplayData}
                   renderItem={renderFeedItem}
                   keyExtractor={(item) => item.id}
                   pagingEnabled
