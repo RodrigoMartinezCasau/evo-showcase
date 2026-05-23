@@ -48,7 +48,7 @@ export const SIDEBAR_COMMUNITY_LAYOUT = {
 } as const;
 
 /**
- * Botón COMUNIDAD cuando el usuario no tiene clan (fondo app + destellos + reborde verde lima).
+ * Botón COMUNIDAD (fondo app + destellos + reborde por clan).
  * Edita estos valores y recarga la app; no hace falta tocar SidebarPngMenuButton.tsx.
  */
 export const SIDEBAR_COMMUNITY_SIN_CLAN = {

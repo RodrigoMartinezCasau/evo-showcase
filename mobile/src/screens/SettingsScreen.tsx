@@ -45,10 +45,12 @@ const SETTINGS_ICON_INNER_SCALE   = 1;
 const SETTINGS_ICON_INNER_OFFSET_X = 0;
 const SETTINGS_ICON_INNER_OFFSET_Y = 0;
 
-const PROFILE_ICON_SCALE   = 1.3;
+/** Solo tarjeta de perfil en Ajustes (más grande que otros usos de UserAvatarFrame). */
+const PROFILE_ICON_SCALE   = 1;
 const PROFILE_ICON_OFFSET_X = 0;
 const PROFILE_ICON_OFFSET_Y = -3;
-const PROFILE_ICON_BASE_SIZE = 54;
+const PROFILE_ICON_BASE_SIZE = 80;
+const PROFILE_AVATAR_SLOT_SIZE = 68;
 
 const IC = {
   blue:   '#3B82F6',
@@ -231,20 +233,28 @@ function SettingsSection({
 // ─── Profile header ───────────────────────────────────────────────────────────
 
 function ProfileHeader({ username, rank: rawRank, onPress }: { username: string; rank: string; onPress: () => void }) {
-  const activeClan  = useActiveClan(mockCurrentUser.clanId);
+  const { profile } = useAuth();
+  const activeClan = useActiveClan(mockCurrentUser.clanId);
   const { visibleClanId } = useClassification();
   const effectiveClan = visibleClanId ?? activeClan;
-  const clanColor     = effectiveClan ? CLAN_TO_COLOR[effectiveClan as keyof typeof CLAN_TO_COLOR] ?? null : null;
+  const clanColor = effectiveClan
+    ? (CLAN_TO_COLOR[effectiveClan as keyof typeof CLAN_TO_COLOR] ?? null)
+    : null;
   const displayName = username || mockCurrentUser.username;
   const rank = rawRank ? rawRank.charAt(0).toUpperCase() + rawRank.slice(1) : 'Aprendiz';
+
+  const rankBadgeStyle = clanColor
+    ? { backgroundColor: `${clanColor}1F`, borderColor: `${clanColor}40` }
+    : styles.rankBadgeFallback;
+  const rankTextStyle = clanColor ? { color: clanColor } : styles.rankTextFallback;
 
   return (
     <TouchableOpacity style={styles.profileHeader} activeOpacity={0.8} onPress={onPress}>
       <View style={styles.avatarWrap}>
-        <View style={[styles.avatar, clanColor ? { backgroundColor: `${clanColor}1F`, borderRadius: 30 } : undefined]}>
+        <View style={styles.avatar}>
           <UserAvatarFrame
             clanId={effectiveClan}
-            avatarUri={mockCurrentUser.avatarUri}
+            avatarUri={profile?.avatar_url ?? mockCurrentUser.avatarUri}
             size={PROFILE_ICON_BASE_SIZE}
             iconScale={PROFILE_ICON_SCALE}
             iconOffsetX={PROFILE_ICON_OFFSET_X}
@@ -256,7 +266,9 @@ function ProfileHeader({ username, rank: rawRank, onPress }: { username: string;
       <View style={styles.profileInfo}>
         <Text style={styles.profileName}>{displayName}</Text>
         <Text style={styles.profileHandle}>{displayName.startsWith('@') ? displayName.toLowerCase() : `@${displayName.toLowerCase()}`}</Text>
-        <View style={styles.rankBadge}><Text style={styles.rankText}>{rank}</Text></View>
+        <View style={[styles.rankBadge, rankBadgeStyle]}>
+          <Text style={[styles.rankText, rankTextStyle]}>{rank}</Text>
+        </View>
       </View>
       <Text style={styles.chevron}>›</Text>
     </TouchableOpacity>
@@ -549,14 +561,16 @@ const styles = StyleSheet.create({
 
   profileHeader:  { backgroundColor: CARD_BG, borderRadius: 18, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 28 },
   avatarWrap:     { position: 'relative' },
-  avatar:         { width: 60, height: 60, alignItems: 'center', justifyContent: 'center' },
+  avatar:         { width: PROFILE_AVATAR_SLOT_SIZE, height: PROFILE_AVATAR_SLOT_SIZE, alignItems: 'center', justifyContent: 'center' },
   avatarEditBadge:{ position: 'absolute', bottom: -2, right: -2, width: 22, height: 22, borderRadius: 11, backgroundColor: '#2a2a38', borderWidth: 1.5, borderColor: '#000', alignItems: 'center', justifyContent: 'center' },
   avatarEditChar: { color: 'rgba(255,255,255,0.6)', fontSize: 11 },
   profileInfo:    { flex: 1, gap: 2 },
   profileName:    { color: '#ffffff', fontSize: 17, fontWeight: '700', letterSpacing: -0.3 },
   profileHandle:  { color: 'rgba(255,255,255,0.4)', fontSize: 13 },
-  rankBadge:      { alignSelf: 'flex-start', marginTop: 5, paddingHorizontal: 8, paddingVertical: 2, backgroundColor: 'rgba(199,255,2,0.12)', borderRadius: 6, borderWidth: 1, borderColor: 'rgba(199,255,2,0.25)' },
-  rankText:       { color: evoconnColors.neonGreen, fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.6 },
+  rankBadge:      { alignSelf: 'flex-start', marginTop: 5, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1 },
+  rankBadgeFallback: { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.15)' },
+  rankText:       { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.6 },
+  rankTextFallback: { color: 'rgba(255,255,255,0.55)' },
 
   sectionWrap:    { marginBottom: 28 },
   sectionTitle:   { color: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: '600', letterSpacing: 0.9, textTransform: 'uppercase', marginBottom: 8, marginLeft: 4 },

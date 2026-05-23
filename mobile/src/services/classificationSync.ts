@@ -197,7 +197,34 @@ export type ClanMemberSummary = {
   clanId: string;
   rank: Rank;
   clanPct: number;
+  avatarUri: string | null;
 };
+
+/** Miembros publicados por clan (para ranking: posts / miembros). */
+export async function fetchClanMemberCountsByClan(): Promise<Record<string, number>> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('clan_id')
+    .not('clan_id', 'is', null)
+    .in('clan_id', [...ALL_CLAN_IDS]);
+
+  if (error) {
+    console.warn('[ClassificationSync] fetchClanMemberCountsByClan failed', error.message);
+    return {};
+  }
+
+  const counts: Record<string, number> = {};
+  for (const clan of ALL_CLAN_IDS) {
+    counts[clan] = 0;
+  }
+  for (const row of data ?? []) {
+    const cid = row.clan_id as string | null;
+    if (cid && cid in counts) {
+      counts[cid]++;
+    }
+  }
+  return counts;
+}
 
 export async function fetchClanMembers(
   clanId: string,
@@ -207,7 +234,9 @@ export async function fetchClanMembers(
 
   let query = supabase
     .from('profiles')
-    .select('id, username, clan_id, rank, clan_percentages, total_reflections, total_quotes')
+    .select(
+      'id, username, clan_id, rank, avatar_url, clan_percentages, total_reflections, total_quotes',
+    )
     .eq('clan_id', clanId);
   if (excludeUserId) query = query.neq('id', excludeUserId);
   query = query
@@ -225,6 +254,7 @@ export async function fetchClanMembers(
     const raw = (row as { clan_percentages?: unknown }).clan_percentages;
     const pcts = Array.isArray(raw) ? (raw as PublishedClanPct[]) : [];
     const dominant = pcts.find((e) => e.clanId === clanId)?.pct ?? 0;
+    const avatarRaw = (row as { avatar_url?: string | null }).avatar_url;
     return {
       id: row.id as string,
       username:
@@ -234,6 +264,7 @@ export async function fetchClanMembers(
       clanId,
       rank: (row.rank as Rank) ?? 'aprendiz',
       clanPct: dominant,
+      avatarUri: typeof avatarRaw === 'string' ? avatarRaw.trim() || null : null,
     };
   });
 }

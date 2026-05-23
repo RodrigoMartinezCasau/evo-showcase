@@ -49,12 +49,11 @@ import { useEvoPreferences } from '@evoconn/hooks/EvoPreferencesContext';
 import { getClanColor } from '@evoconn/constants/clanColors';
 import {
   CHAT_SEND_BUTTON_LAYOUT,
-  CHAT_BOTTOM_AREA_LAYOUT as CHAT_BOTTOM_AREA,
-  CHAT_INPUT_LAYOUT as CHAT_INPUT,
   PUBLISH_JUMP_ISLAND_LAYOUT as ISLAND,
   REFLECTION_PUBLISH_MIN_CHARS,
-  CHAT_INPUT_ISLAND_LAYOUT,
 } from '@evoconn/constants/chatInputBarLayout';
+import { useScrollInputAboveKeyboard } from '@evoconn/hooks/useScrollInputAboveKeyboard';
+import { chatCreationScrollBottomInset } from '@evoconn/constants/chatKeyboardScrollLayout';
 import Svg, { Polyline } from 'react-native-svg';
 import {
   ThinkingStar,
@@ -177,6 +176,20 @@ export default function ReflectionCreationScreen() {
 
   const insets = useSafeAreaInsets();
   const topBarHeight = getAppTopBarLayoutHeight(insets.top);
+  const lastPublishUserIndexRef = useRef(-1);
+
+  const {
+    scrollRef,
+    scrollOffsetYRef,
+    registerInputAnchor,
+    handleInputFocusChange,
+    onScroll: onKeyboardScroll,
+    getScrollPaddingBottom,
+    onScrollContentSizeChange,
+  } = useScrollInputAboveKeyboard({
+    topBarHeight,
+    isLastFocusedInput: (key) => key === lastPublishUserIndexRef.current,
+  });
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { drawerOpenProgress, edgeOpenGesture } = useSidebarGesture(sidebarOpen, setSidebarOpen);
@@ -193,8 +206,6 @@ export default function ReflectionCreationScreen() {
   const [sending, setSending] = useState(false);
   const [loadingThread, setLoadingThread] = useState(!!thoughtId);
   const [error, setError] = useState<string | null>(null);
-
-  const scrollRef = useRef<ScrollView>(null);
 
   /**
    * Always-current ref of the local `messages` state.
@@ -237,7 +248,6 @@ export default function ReflectionCreationScreen() {
   // `messageYOffsets` stores the measured Y offset (from scroll top) for each
   // message index so we can scroll directly to the latest user reflection.
   const messageYOffsets = useRef<Record<number, number>>({});
-  const scrollOffsetY = useRef(0);
   const scrollViewHeight = useRef(0);
   const islandOpacity = useRef(new Animated.Value(0)).current;
   const [islandVisible, setIslandVisible] = useState(false);
@@ -263,6 +273,18 @@ export default function ReflectionCreationScreen() {
     return indices;
   }, [messages]);
 
+  const lastPublishUserIndex = useMemo(
+    () =>
+      publishableReflectionIndices.length > 0
+        ? publishableReflectionIndices[publishableReflectionIndices.length - 1]
+        : -1,
+    [publishableReflectionIndices],
+  );
+
+  useEffect(() => {
+    lastPublishUserIndexRef.current = lastPublishUserIndex;
+  }, [lastPublishUserIndex]);
+
   // The "active" target for the jump island: the last publishable reflection
   // whose top Y is above the current viewport (i.e. user has scrolled past it).
   // We store the resolved index in a ref so checkIslandVisibility can read it
@@ -278,7 +300,7 @@ export default function ReflectionCreationScreen() {
       }
       return;
     }
-    const viewTop = scrollOffsetY.current;
+    const viewTop = scrollOffsetYRef.current;
     // Find the last publishable reflection that has been scrolled above the viewport.
     let targetIdx = -1;
     for (let k = publishableReflectionIndices.length - 1; k >= 0; k--) {
@@ -330,7 +352,15 @@ export default function ReflectionCreationScreen() {
 
   const scrollToEnd = useCallback(() => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
-  }, []);
+  }, [scrollRef]);
+
+  const handleScroll = useCallback(
+    (e: Parameters<typeof onKeyboardScroll>[0]) => {
+      onKeyboardScroll(e);
+      checkIslandVisibility();
+    },
+    [onKeyboardScroll, checkIslandVisibility],
+  );
 
   const handleSend = useCallback(
     async (text: string) => {
@@ -565,15 +595,16 @@ export default function ReflectionCreationScreen() {
         <ScrollView
           ref={scrollRef}
           style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: getScrollPaddingBottom(chatCreationScrollBottomInset()) },
+          ]}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
-          onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+          automaticallyAdjustKeyboardInsets
+          onContentSizeChange={() => onScrollContentSizeChange(scrollToEnd)}
           scrollEventThrottle={16}
-          onScroll={(e) => {
-            scrollOffsetY.current = e.nativeEvent.contentOffset.y;
-            checkIslandVisibility();
-          }}
+          onScroll={handleScroll}
           onLayout={(e) => {
             scrollViewHeight.current = e.nativeEvent.layout.height;
           }}
@@ -606,6 +637,16 @@ export default function ReflectionCreationScreen() {
                     clanColor={clanColor}
                     clanId={activeClan}
                     publishHandlerBelow={publishHandlerBelow}
+                    onPublishAuthorFocusChange={
+                      publishHandlerBelow
+                        ? (focused) => handleInputFocusChange(i, focused)
+                        : undefined
+                    }
+                    registerPublishAuthorAnchor={
+                      publishHandlerBelow
+                        ? (node) => registerInputAnchor(i, node)
+                        : undefined
+                    }
                   />
                 </View>
               );
@@ -762,10 +803,14 @@ const PublishBlockConnected = React.memo(function PublishBlockConnected({
   clanId,
   userReflectionText,
   onPublish,
+  onPublishAuthorFocusChange,
+  registerPublishAuthorAnchor,
 }: {
   clanId: string | null | undefined;
   userReflectionText: string;
   onPublish: (title: string, body: string) => Promise<void> | void;
+  onPublishAuthorFocusChange?: (focused: boolean) => void;
+  registerPublishAuthorAnchor?: (node: View | null) => void;
 }) {
   const PublishStar = useMemo(() => getPublishStarByClan(clanId), [clanId]);
   const publishTitleRef = useRef('');
@@ -784,6 +829,8 @@ const PublishBlockConnected = React.memo(function PublishBlockConnected({
       actionBarColor={getClanSecondaryColor(clanId)}
       onTitleChange={handleTitleChange}
       onPublish={handlePublish}
+      onAuthorFocusChange={onPublishAuthorFocusChange}
+      authorInputAnchorRef={registerPublishAuthorAnchor}
     />
   );
 });
@@ -794,12 +841,16 @@ const MessageBubble = React.memo(function MessageBubble({
   clanColor,
   clanId,
   publishHandlerBelow,
+  onPublishAuthorFocusChange,
+  registerPublishAuthorAnchor,
 }: {
   message: ChatBubble;
   clanColor: string;
   clanId: string | null | undefined;
   /** When set, a PublishBlock is rendered below the user bubble in the same container. */
   publishHandlerBelow?: (title: string, body: string) => Promise<void> | void;
+  onPublishAuthorFocusChange?: (focused: boolean) => void;
+  registerPublishAuthorAnchor?: (node: View | null) => void;
 }) {
   const isUser = message.role === 'user';
   const displayText = message.revealed ?? message.content;
@@ -818,6 +869,8 @@ const MessageBubble = React.memo(function MessageBubble({
               clanId={clanId}
               userReflectionText={displayText}
               onPublish={publishHandlerBelow}
+              onPublishAuthorFocusChange={onPublishAuthorFocusChange}
+              registerPublishAuthorAnchor={registerPublishAuthorAnchor}
             />
           </View>
         ) : null}
@@ -891,12 +944,6 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: {
     padding: 16,
-    paddingBottom:
-      CHAT_INPUT_ISLAND_LAYOUT.gradientHeight +
-      CHAT_BOTTOM_AREA.paddingTop +
-      CHAT_INPUT.minHeight +
-      CHAT_BOTTOM_AREA.paddingBottom +
-      24,
   },
 
   reflectionWelcomeAboveInput: {

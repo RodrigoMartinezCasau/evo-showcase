@@ -7,10 +7,9 @@ import {
   ActivityIndicator,
   Keyboard,
   Alert,
-  Animated,
 } from 'react-native';
 import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
-import { AppTopBar, ChatInputBar, SidebarDrawer, useKeyboardAnim } from '@evoconn/components';
+import { AppTopBar, ChatInputBar, SidebarDrawer } from '@evoconn/components';
 import { getPhraseSendButtonByHouse } from '@evoconn/utils/getPhraseSendButtonByHouse';
 import { PublishBlock, PhraseNotesCard, PhraseFolderManagerCard } from '@evoconn/components/debate';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
@@ -63,6 +62,7 @@ import {
   PHRASE_CREATION_STACK_LAYOUT as PHRASE_STACK,
   phraseCreationScrollBottomInset,
 } from '@evoconn/constants/phraseCreationStackLayout';
+import { useScrollInputAboveKeyboard } from '@evoconn/hooks/useScrollInputAboveKeyboard';
 import { PHRASE_PUBLISH_HINT_LAYOUT as PHRASE_PUBLISH_LAYOUT } from '@evoconn/constants/phrasePublishHintLayout';
 import {
   PHRASE_MAX_PUBLISH_CHARS,
@@ -224,31 +224,40 @@ export default function PhraseCreationScreen() {
   const [loadingThread, setLoadingThread] = useState(!!phraseId);
   const [sending, setSending] = useState(false);
 
-  const scrollRef = useRef<ScrollView>(null);
-  const publishAuthorRef = useRef('');
-  const keyboardAnim = useKeyboardAnim();
-  const authorLift = useRef(new Animated.Value(0)).current;
-  const [publishAuthorFocused, setPublishAuthorFocused] = useState(false);
+  const scrollContentRef = useRef<View>(null);
+  const authorDraftByIndexRef = useRef<Record<number, string>>({});
+  const [authorDraftByIndex, setAuthorDraftByIndex] = useState<Record<number, string>>({});
+  const lastPublishAssistantIndexRef = useRef(-1);
 
-  const scrollKeyboardLift = useMemo(
-    () => Animated.multiply(keyboardAnim, Animated.multiply(authorLift, -1)),
-    [keyboardAnim, authorLift],
-  );
+  const {
+    scrollRef,
+    registerInputAnchor,
+    handleInputFocusChange,
+    onScroll,
+    getScrollPaddingBottom,
+    onScrollContentSizeChange,
+  } = useScrollInputAboveKeyboard({
+    topBarHeight,
+    isLastFocusedInput: (key) => {
+      const last = lastPublishAssistantIndexRef.current;
+      if (last < 0) return false;
+      return key === `author-${last}` || key === `notes-${last}`;
+    },
+  });
 
-  useEffect(() => {
-    Animated.timing(authorLift, {
-      toValue: publishAuthorFocused ? 1 : 0,
-      duration: 140,
-      useNativeDriver: true,
-    }).start();
-  }, [publishAuthorFocused, authorLift]);
-
-  useEffect(() => {
-    if (!publishAuthorFocused) return;
-    const t = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 160);
-    return () => clearTimeout(t);
-  }, [publishAuthorFocused]);
+  const publishAnchorRefs = useRef<Map<number, View>>(new Map());
   const publishedRef = useRef<Set<string>>(new Set());
+
+  const onAuthorDraftChange = useCallback((assistantIndex: number, text: string) => {
+    authorDraftByIndexRef.current = {
+      ...authorDraftByIndexRef.current,
+      [assistantIndex]: text,
+    };
+    setAuthorDraftByIndex((prev) =>
+      prev[assistantIndex] === text ? prev : { ...prev, [assistantIndex]: text },
+    );
+  }, []);
+
   const notesDebounceRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   /** Tracks which threads have already had the intro fetch fired (prevents
    *  duplicate calls when the screen re-renders or remounts). */
@@ -274,7 +283,7 @@ export default function PhraseCreationScreen() {
 
   const scrollToEnd = useCallback(() => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
-  }, []);
+  }, [scrollRef]);
 
   // Keep messagesRef in sync with the live state on every render so async
   // callbacks (intro fetch, publish handler) can read the latest snapshot.
@@ -408,7 +417,7 @@ export default function PhraseCreationScreen() {
   const handlePhrasePublish = useCallback(
     async (threadId: string, rawPhraseFromUser: string, assistantMessageIndex: number) => {
       if (rawPhraseFromUser.length > PHRASE_MAX_PUBLISH_CHARS) return;
-      const authorName = publishAuthorRef.current.trim();
+      const authorName = (authorDraftByIndexRef.current[assistantMessageIndex] ?? '').trim();
       if (!authorName) return;
       const sourceId = `${threadId}_phrase_pub_${assistantMessageIndex}`;
       if (publishedRef.current.has(sourceId)) return;
@@ -437,10 +446,18 @@ export default function PhraseCreationScreen() {
       );
       setMessages(nextMessages);
       updateThought(threadId, { messages: nextMessages });
-      publishAuthorRef.current = '';
+      authorDraftByIndexRef.current = { ...authorDraftByIndexRef.current };
+      delete authorDraftByIndexRef.current[assistantMessageIndex];
+      setAuthorDraftByIndex((prev) => {
+        if (!(assistantMessageIndex in prev)) return prev;
+        const next = { ...prev };
+        delete next[assistantMessageIndex];
+        return next;
+      });
+      handleInputFocusChange(assistantMessageIndex, false);
       Keyboard.dismiss();
     },
-    [publishPost, updateThought, router],
+    [publishPost, updateThought, router, handleInputFocusChange],
   );
 
   const handleAssignPhraseToFolder = useCallback(
@@ -580,7 +597,7 @@ export default function PhraseCreationScreen() {
             threadId,
             slotKey,
             t,
-            publishAuthorRef.current.trim() || null,
+            null,
           );
         } catch (err) {
           // eslint-disable-next-line no-console
@@ -765,6 +782,19 @@ export default function PhraseCreationScreen() {
     ];
   }, [messages, effectiveThreadId]);
 
+  const lastPublishAssistantIndex = useMemo(() => {
+    for (let i = displayMessages.length - 1; i >= 0; i--) {
+      if (displayMessages[i].role !== 'assistant') continue;
+      const pubUi = getPhrasePublishUI(displayMessages[i]) ?? { status: 'pending' as const };
+      if (pubUi.status !== 'published') return i;
+    }
+    return -1;
+  }, [displayMessages]);
+
+  useEffect(() => {
+    lastPublishAssistantIndexRef.current = lastPublishAssistantIndex;
+  }, [lastPublishAssistantIndex]);
+
   return (
     <GestureHandlerRootView style={styles.gestureRoot}>
     <View style={styles.container}>
@@ -776,19 +806,23 @@ export default function PhraseCreationScreen() {
           <Text style={styles.loadingText}>Cargando frase…</Text>
         </View>
       ) : (
-        <Animated.View style={[styles.scrollLiftWrap, { transform: [{ translateY: scrollKeyboardLift }] }]}>
+        <View style={styles.scrollLiftWrap}>
         <ScrollView
           ref={scrollRef}
           style={styles.scroll}
+          automaticallyAdjustKeyboardInsets
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          onScroll={onScroll}
+          scrollEventThrottle={16}
           contentContainerStyle={{
             paddingHorizontal: PHRASE_STACK.scrollPaddingHorizontal,
             paddingTop: PHRASE_STACK.scrollPaddingTop,
-            paddingBottom: phraseCreationScrollBottomInset(),
+            paddingBottom: getScrollPaddingBottom(phraseCreationScrollBottomInset()),
           }}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+          onContentSizeChange={() => onScrollContentSizeChange(scrollToEnd)}
         >
+          <View ref={scrollContentRef} collapsable={false}>
           {displayMessages.map((msg, i) => {
             const prevMsg = i > 0 ? displayMessages[i - 1] : null;
             const turnTopGap =
@@ -888,6 +922,10 @@ export default function PhraseCreationScreen() {
                         backgroundColor={getBlockBackgroundColor('question', activeClan)}
                         value={msg.phraseNotes ?? ''}
                         onChangeText={(text) => onPhraseNotesChange(i, text)}
+                        onFocusChange={(focused) =>
+                          handleInputFocusChange(`notes-${i}`, focused)
+                        }
+                        inputAnchorRef={(node) => registerInputAnchor(`notes-${i}`, node)}
                       />
                     </View>
                     <View style={{ marginTop: PHRASE_STACK.sectionGapPx }}>
@@ -904,8 +942,16 @@ export default function PhraseCreationScreen() {
 
                 {/* 4. Publicar — at the very bottom, below all phrase tools. */}
                 {showTools && (
-                  <View style={{ marginTop: PHRASE_STACK.sectionGapPx, marginBottom: PHRASE_STACK.publishBottomGapPx }}>
+                  <View
+                    ref={(node) => {
+                      if (node) publishAnchorRefs.current.set(i, node);
+                      else publishAnchorRefs.current.delete(i);
+                    }}
+                    collapsable={false}
+                    style={{ marginTop: PHRASE_STACK.sectionGapPx, marginBottom: PHRASE_STACK.publishBottomGapPx }}
+                  >
                     <PublishBlock
+                      key={`publish-${effectiveThreadId}-${i}`}
                       borderColor={getBlockBorderColor('publish', activeClan)}
                       borderWidth={BW.publish}
                       backgroundColor={getBlockBackgroundColor('publish', activeClan)}
@@ -914,7 +960,12 @@ export default function PhraseCreationScreen() {
                       actionBarColor={getClanSecondaryColor(activeClan)}
                       showPhraseFormatHint
                       phraseHintOverride={phraseHintOverride}
-                      onAuthorFocusChange={published ? undefined : setPublishAuthorFocused}
+                      onAuthorFocusChange={
+                        published
+                          ? undefined
+                          : (focused) => handleInputFocusChange(`author-${i}`, focused)
+                      }
+                      authorInputAnchorRef={(node) => registerInputAnchor(`author-${i}`, node)}
                       actionBarInnerPaddingHorizontal={
                         PHRASE_PUBLISH_LAYOUT.publishActionBarInnerPaddingH
                       }
@@ -922,12 +973,9 @@ export default function PhraseCreationScreen() {
                       inputMaxLength={PUBLISH_AUTHOR_MAX_LEN}
                       published={published}
                       initialAuthorValue={published ? pubUiResolved.author ?? '' : ''}
+                      authorValue={published ? undefined : authorDraftByIndex[i] ?? ''}
                       onTitleChange={
-                        published
-                          ? undefined
-                          : (a) => {
-                              publishAuthorRef.current = a;
-                            }
+                        published ? undefined : (a) => onAuthorDraftChange(i, a)
                       }
                       onPublish={
                         published
@@ -940,8 +988,9 @@ export default function PhraseCreationScreen() {
               </View>
             );
           })}
+          </View>
         </ScrollView>
-        </Animated.View>
+        </View>
       )}
 
       <ChatInputBar

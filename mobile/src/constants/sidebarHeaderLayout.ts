@@ -15,7 +15,7 @@ export const SIDEBAR_HEADER_LAYOUT = {
    * Texto completo que ves al lado de "Evo" (gris). Reescribe la cadena cuando subas versión:
    * p. ej. `'0.2 Beta'`, `'1.0'`, etc.
    */
-  SIDEBAR_VERSION_TEXT: '0.1 Beta',
+  SIDEBAR_VERSION_TEXT: '1.0',
 
   SIDEBAR_HEADER_PADDING_TOP: 0,
   SIDEBAR_HEADER_PADDING_LEFT: 16,

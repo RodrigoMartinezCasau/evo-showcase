@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
 import {
   AI_SPECIAL_BLOCK_LAYOUT as SB,
@@ -29,13 +29,24 @@ type Props = {
   backgroundColor: string;
   value: string;
   onChangeText: (text: string) => void;
+  /** Cambio de foco del TextInput interno (notas). */
+  onFocusChange?: (focused: boolean) => void;
+  /**
+   * Ref al contenedor que envuelve el TextInput, para que el hook de scroll
+   * (`useScrollInputAboveKeyboard`) pueda medirlo y subirlo sobre el teclado.
+   */
+  inputAnchorRef?: (node: View | null) => void;
 };
 
 export const PhraseNotesCard = React.memo(function PhraseNotesCard({
   backgroundColor,
   value,
   onChangeText,
+  onFocusChange,
+  inputAnchorRef,
 }: Props) {
+  const handleFocus = useCallback(() => onFocusChange?.(true), [onFocusChange]);
+  const handleBlur = useCallback(() => onFocusChange?.(false), [onFocusChange]);
   return (
     <View
       style={[
@@ -78,6 +89,8 @@ export const PhraseNotesCard = React.memo(function PhraseNotesCard({
       </View>
 
       <View
+        ref={inputAnchorRef}
+        collapsable={false}
         style={[
           styles.innerCard,
           {
@@ -102,6 +115,8 @@ export const PhraseNotesCard = React.memo(function PhraseNotesCard({
         <TextInput
           value={value}
           onChangeText={onChangeText}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
           placeholder="Tus notas privadas sobre esta frase…"
           placeholderTextColor={evoconnColors.muted}
           multiline

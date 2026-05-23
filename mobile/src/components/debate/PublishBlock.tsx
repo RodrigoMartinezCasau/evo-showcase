@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, LayoutChangeEvent } from 'react-native';
+import { View, Text, TextInput, StyleSheet, LayoutChangeEvent, type View as RNView } from 'react-native';
 import type { FC } from 'react';
 import type { SvgProps } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
@@ -34,6 +34,8 @@ type Props = {
   published?: boolean;
   /** Valor inicial del autor cuando `published` (reapertura de hilo). */
   initialAuthorValue?: string;
+  /** Modo controlado (frases multi-turno): el padre posee el borrador del autor. */
+  authorValue?: string;
   /**
    * Solo modo frase: muestra aviso gris + icono de información encima del campo.
    * El texto sale de `phrasePublishHintLayout` (no duplicar aquí).
@@ -45,6 +47,8 @@ type Props = {
   phraseHintOverride?: { text: string; blockPublish: boolean } | null;
   /** Llamado cuando el campo autor recibe/pierde foco (para subir el scroll con el teclado). */
   onAuthorFocusChange?: (focused: boolean) => void;
+  /** Ref al contenedor del campo autor (para scroll preciso con teclado). */
+  authorInputAnchorRef?: React.Ref<RNView>;
   /**
    * Padding horizontal dentro del botón PUBLICAR. Solo frases suelen pasar un valor > 0;
    * reflexiones omiten y queda 0.
@@ -67,19 +71,23 @@ export const PublishBlock = React.memo(function PublishBlock({
   inputMaxLength = PUBLISH_TITLE_MAX_LEN,
   published = false,
   initialAuthorValue = '',
+  authorValue,
   showPhraseFormatHint = false,
   phraseHintOverride = null,
   onAuthorFocusChange,
+  authorInputAnchorRef,
   actionBarInnerPaddingHorizontal = 0,
 }: Props) {
-  const [title, setTitle] = useState(() =>
+  const isAuthorControlled = authorValue !== undefined;
+  const [internalTitle, setInternalTitle] = useState(() =>
     published && initialAuthorValue ? initialAuthorValue : '',
   );
+  const title = isAuthorControlled ? authorValue : internalTitle;
 
   const handleChange = (t: string) => {
     if (published) return;
     const next = t.slice(0, inputMaxLength);
-    setTitle(next);
+    if (!isAuthorControlled) setInternalTitle(next);
     onTitleChange?.(next);
   };
 
@@ -131,6 +139,7 @@ export const PublishBlock = React.memo(function PublishBlock({
         </View>
       ) : null}
 
+      <View ref={authorInputAnchorRef} collapsable={false} style={styles.inputAnchor}>
       <TextInput
         style={[
           styles.input,
@@ -155,6 +164,7 @@ export const PublishBlock = React.memo(function PublishBlock({
         onFocus={() => onAuthorFocusChange?.(true)}
         onBlur={() => onAuthorFocusChange?.(false)}
       />
+      </View>
 
       <PublishActionBar
         barColor={actionBarColor ?? borderColor}
@@ -179,6 +189,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   input: {
+    width: '100%',
+  },
+  inputAnchor: {
     width: '100%',
   },
   phraseHintRow: {

@@ -15,7 +15,7 @@ import { getClanColor } from '@evoconn/constants/clanColors';
 import CientistaStarSvg from '../../assets/topbar/estrellasNuevasSvg/11.svg';
 import TrascendentalistaStarSvg from '../../assets/topbar/estrellasNuevasSvg/12.svg';
 import { useFeedStore } from '@evoconn/hooks/useFeedStore';
-import { computeTopPhraseWidgetPayload } from '@evoconn/widget/topPhraseWidgetPayload';
+import { resolveTopPhraseWidgetPayload } from '@evoconn/widget/widgetPhraseLock';
 import { pushTopPhraseWidgetSnapshot } from '@evoconn/widget/iosWidgetBridge';
 import {
   BOTTOM_BLOCK_SIZE,
@@ -68,8 +68,10 @@ export const PersonalDailyPhraseWidgetBlock = React.memo(function PersonalDailyP
 
   useEffect(() => {
     if (!modalOpen) return;
-    const payload = computeTopPhraseWidgetPayload(posts);
-    void pushTopPhraseWidgetSnapshot(payload);
+    void (async () => {
+      const payload = await resolveTopPhraseWidgetPayload(posts);
+      void pushTopPhraseWidgetSnapshot(payload);
+    })();
   }, [modalOpen, posts]);
 
   const openModal = useCallback(() => setModalOpen(true), []);
@@ -79,7 +81,7 @@ export const PersonalDailyPhraseWidgetBlock = React.memo(function PersonalDailyP
     'Mantén pulsada una zona vacía de la pantalla de inicio hasta que los iconos tiemblen.',
     'Pulsa el botón «+» de la galería de widgets (suele estar arriba o en la barra de edición).',
     'Busca «Evo» en la galería de widgets.',
-    'Elige el widget de la frase más votada (24 h), el tamaño que prefieras y pulsa «Añadir widget».',
+    'Elige el widget de la frase más votada del día anterior (fija todo el día) y pulsa «Añadir widget».',
   ];
 
   const stepsAndroid = [
@@ -162,8 +164,8 @@ export const PersonalDailyPhraseWidgetBlock = React.memo(function PersonalDailyP
             <Text style={styles.sheetTitle}>Añadir widget en la pantalla de inicio</Text>
             <Text style={styles.sheetSubtitle}>
               No se puede abrir la galería de widgets desde la app; añádelo manualmente con los pasos de
-              abajo. El contenido será la frase más votada en las últimas 24 h cuando el widget nativo esté
-              instalado en tu build.
+              abajo. El contenido será la frase más votada del día anterior; permanece igual hasta medianoche
+              cuando el widget nativo esté instalado en tu build.
             </Text>
             <ScrollView style={styles.stepsScroll} showsVerticalScrollIndicator={false}>
               {steps.map((line, i) => (
@@ -259,13 +261,13 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   primaryBtn: {
-    backgroundColor: '#89D957',
+    backgroundColor: '#6B7280',
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
   },
   primaryBtnText: {
-    color: '#000000',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '800',
   },

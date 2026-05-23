@@ -25,7 +25,8 @@ export type Philosopher = {
 export type ClanConfigEntry = {
   phrase: string;
   phraseAuthor: string;
-  description: string;
+  descriptionPoints: string[];
+  mythology?: import('./clanDisplayCopy').ClanMythologyCopy;
   philosophers: [Philosopher, Philosopher, Philosopher, Philosopher];
 };
 

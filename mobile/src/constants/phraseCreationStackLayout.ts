@@ -1,8 +1,4 @@
-import {
-  CHAT_BOTTOM_AREA_LAYOUT as AREA,
-  CHAT_INPUT_LAYOUT as INP,
-  CHAT_INPUT_ISLAND_LAYOUT as ISLAND,
-} from './chatInputBarLayout';
+import { chatCreationScrollBottomInset } from './chatKeyboardScrollLayout';
 
 /**
  * Espaciado vertical en la pantalla de creación de frases (`PhraseCreationScreen`).
@@ -21,16 +17,9 @@ import {
  */
 export const PHRASE_GAP_ABOVE_CHAT_INPUT_PX = 6;
 
-/**
- * `paddingBottom` del ScrollView de nueva frase: una sola medida derivada de la
- * barra de chat (`chatInputBarLayout`) + un trozo del degradé (overlay), para
- * que Publicar quede siempre justo encima de la burbuja con separación mínima.
- */
+/** @deprecated Usa `chatCreationScrollBottomInset()` en `chatKeyboardScrollLayout.ts`. */
 export function phraseCreationScrollBottomInset(): number {
-  const inputIslandRow =
-    AREA.paddingTop + INP.minHeight + AREA.paddingBottom + ISLAND.extraHeight;
-  const gradientClearZone = Math.round(ISLAND.gradientHeight * 0.22);
-  return PHRASE_GAP_ABOVE_CHAT_INPUT_PX + inputIslandRow + gradientClearZone;
+  return chatCreationScrollBottomInset();
 }
 
 export const PHRASE_CREATION_STACK_LAYOUT = {

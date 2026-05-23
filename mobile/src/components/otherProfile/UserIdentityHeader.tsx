@@ -6,7 +6,6 @@ import {
   Share,
   StyleSheet,
   useWindowDimensions,
-  Platform,
 } from 'react-native';
 import { buildProfileShareMessage } from '@evoconn/utils/appShareLinks';
 import { getTopBarInsigniaByHouse } from '@evoconn/utils/getTopBarInsigniaByHouse';
@@ -30,7 +29,9 @@ import {
   CLAN_ROW_MARGIN_BOTTOM,
   SHARE_BUTTON_SIZE,
   PROFILE_SHARE_ARROW_FONT_SIZE,
+  PROFILE_TESTER_BADGE_RESERVE,
 } from '@evoconn/constants/personalProfileLayout';
+import { ProfileUsernameRow } from '@evoconn/components/shared/ProfileUsernameRow';
 
 const RANK_LABELS: Record<Rank, string> = {
   aprendiz: 'Aprendiz',
@@ -87,7 +88,10 @@ export const UserIdentityHeader = React.memo(function UserIdentityHeader({
     MIN_RESERVED_RIGHT_SPACE,
     shieldDisplaySize + TEXT_BADGE_SAFE_GAP + Math.max(0, -clampedShieldOffsetX),
   );
-  const shareReserve = Math.max(SHARE_BUTTON_SIZE, PROFILE_SHARE_ARROW_FONT_SIZE) + 14;
+  const shareReserve =
+    Math.max(SHARE_BUTTON_SIZE, PROFILE_SHARE_ARROW_FONT_SIZE) +
+    PROFILE_TESTER_BADGE_RESERVE +
+    14;
   const usernameMaxWidth = Math.max(120, screenW - 20 * 2 - shareReserve);
   const containerHeight = CONTAINER_HEIGHT;
   const clanLabel = clanId
@@ -103,37 +107,17 @@ export const UserIdentityHeader = React.memo(function UserIdentityHeader({
   return (
     <View style={[styles.container, { height: containerHeight }]}>
       <View style={styles.textBlock}>
-        <TouchableOpacity
-          onPress={handleShare}
-          hitSlop={8}
-          activeOpacity={0.6}
-          style={[
-            styles.usernameRow,
-            {
-              height: USERNAME_ROW_HEIGHT,
-              marginBottom: USERNAME_ROW_MARGIN_BOTTOM,
-              transform: [{ translateX: USERNAME_OFFSET_X }, { translateY: USERNAME_OFFSET_Y }],
-            },
-          ]}
-        >
-          <Text
-            style={[
-              styles.username,
-              {
-                fontSize: USERNAME_FONT_SIZE,
-                lineHeight: USERNAME_LINE_HEIGHT,
-                maxWidth: usernameMaxWidth,
-              },
-            ]}
-            numberOfLines={1}
-            ellipsizeMode="tail"
-          >
-            {username}
-          </Text>
-          <Text style={styles.shareInline} accessibilityLabel="Compartir perfil">
-            ↗
-          </Text>
-        </TouchableOpacity>
+        <ProfileUsernameRow
+          username={username}
+          userId={userId}
+          usernameMaxWidth={usernameMaxWidth}
+          onSharePress={handleShare}
+          rowStyle={{
+            height: USERNAME_ROW_HEIGHT,
+            marginBottom: USERNAME_ROW_MARGIN_BOTTOM,
+            transform: [{ translateX: USERNAME_OFFSET_X }, { translateY: USERNAME_OFFSET_Y }],
+          }}
+        />
 
         <View
           style={[
@@ -196,30 +180,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   textBlock: {},
-  usernameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    overflow: 'visible',
-    zIndex: 3,
-  },
-  username: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    letterSpacing: 0.6,
-    flexShrink: 1,
-    ...Platform.select({ android: { includeFontPadding: false } }),
-  },
-  shareInline: {
-    fontSize: PROFILE_SHARE_ARROW_FONT_SIZE,
-    lineHeight: Math.ceil(PROFILE_SHARE_ARROW_FONT_SIZE * 1.25),
-    color: 'rgba(255,255,255,0.85)',
-    fontWeight: '500',
-    marginLeft: 5,
-    flexShrink: 0,
-    zIndex: 10,
-    elevation: 10,
-    ...Platform.select({ android: { includeFontPadding: false } }),
-  },
   clanRankRow: {
     flexDirection: 'row',
     alignItems: 'center',

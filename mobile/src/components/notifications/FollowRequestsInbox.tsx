@@ -3,6 +3,10 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { UserAvatarFrame } from '@evoconn/components/shared/UserAvatarFrame';
 import type { IncomingFollowRequest } from '@evoconn/services/supabaseSocial';
+import { mockCurrentUser } from '@evoconn/data/mockUser';
+import { useActiveClan } from '@evoconn/debug/DebugClanContext';
+import { useClassification } from '@evoconn/hooks/ClassificationContext';
+import { getClanColor } from '@evoconn/constants/clanColors';
 
 const AVATAR_SIZE = 42;
 const PROFILE_ICON_SCALE = 1.05;
@@ -34,6 +38,10 @@ export function FollowRequestsInbox({
   onReject,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const activeClan = useActiveClan(mockCurrentUser.clanId);
+  const { visibleClanId } = useClassification();
+  const effectiveClan = visibleClanId ?? activeClan;
+  const accentColor = getClanColor(effectiveClan);
   const count = requests.length;
 
   const toggleExpanded = useCallback(() => {
@@ -53,11 +61,11 @@ export function FollowRequestsInbox({
         onPress={toggleExpanded}
         activeOpacity={0.75}
       >
-        <View style={styles.previewIcon}>
-          <Ionicons name="person-add-outline" size={20} color="#c7ff02" />
+        <View style={[styles.previewIcon, { backgroundColor: `${accentColor}1F` }]}>
+          <Ionicons name="person-add-outline" size={20} color={accentColor} />
         </View>
         <Text style={styles.previewText}>{previewLabel}</Text>
-        <View style={styles.countBadge}>
+        <View style={[styles.countBadge, { backgroundColor: accentColor }]}>
           <Text style={styles.countBadgeText}>{count}</Text>
         </View>
         <Ionicons
@@ -148,7 +156,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: 'rgba(199,255,2,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -163,7 +170,6 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     paddingHorizontal: 6,
-    backgroundColor: '#c7ff02',
     alignItems: 'center',
     justifyContent: 'center',
   },

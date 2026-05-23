@@ -16,8 +16,9 @@ import { usePathname, useRouter } from 'expo-router';
 import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { SIDEBAR_HEADER_LAYOUT as SH } from '@evoconn/constants/sidebarHeaderLayout';
 import { getSidebarStarSvgByHouse, SIDEBAR_DEFAULT_STAR_SVG } from '@evoconn/utils/getSidebarStarSvgByHouse';
-import { getCommunityButtonByHouse } from '@evoconn/utils/getSidebarCommunityButton';
+import { getSidebarFooterClanLineColor, getClanColor } from '@evoconn/constants/clanColors';
 import { SIDEBAR_COMMUNITY_LAYOUT as SCL } from '@evoconn/constants/sidebarCommunityLayout';
+import { SIDEBAR_DEFAULT_COMMUNITY_BUTTON } from '@evoconn/utils/getSidebarCommunityButton';
 import { getNewReflectionButtonByHouse } from '@evoconn/utils/getSidebarNewReflectionButton';
 import {
   getNewReflectionPlusIconByHouse,
@@ -40,7 +41,6 @@ import { SidebarConversationsPanel } from './SidebarConversationsPanel';
 import { SidebarHeaderNotificationsButton } from './SidebarHeaderNotificationsButton';
 import { UserAvatarFrame } from './shared/UserAvatarFrame';
 import SettingsSvg from '../assets/sidebar/settingsIconSvg/settings.svg';
-import { getSidebarFooterClanLineColor, getClanColor } from '@evoconn/constants/clanColors';
 import { INRIA_SERIF_FONT_FAMILY } from '@evoconn/constants/inriaSerifFontFamily';
 import type { Rank } from '@evoconn/types';
 import type { ConversationItem as ConvItem } from '@evoconn/types';
@@ -169,9 +169,7 @@ function SidebarDrawerInner({
   const footerRankLine = RANK_LABELS[user.rank as Rank] ?? user.rank.toUpperCase();
 
   const StarSvg = getSidebarStarSvgByHouse(user.clanId);
-  const communityButtonSource = getCommunityButtonByHouse(user.clanId);
-  const isSinClan =
-    user.clanId == null || String(user.clanId).trim() === '';
+  const communityRimColor = getClanColor(user.clanId);
   const newReflectionButtonSource = getNewReflectionButtonByHouse(user.clanId);
   const newReflectionPlusSource = getNewReflectionPlusIconByHouse(user.clanId);
   const newReflectionPlusLayout = getNewReflectionPlusLayoutByHouse(user.clanId);
@@ -256,11 +254,11 @@ function SidebarDrawerInner({
         </View>
         <SidebarPngMenuButton
           config={getCommunityPngMenuConfig()}
-          source={communityButtonSource}
+          source={SIDEBAR_DEFAULT_COMMUNITY_BUTTON}
           label="COMUNIDAD"
           accessibilityLabel="Comunidad"
           menuRowStyle={styles.communityMenuRow}
-          sinClanCommunityStyle={isSinClan}
+          communityRimColor={communityRimColor}
           leftOverlay={{
             element: (
               <EstrellaComunidadSvg

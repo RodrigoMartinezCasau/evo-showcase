@@ -28,6 +28,7 @@ import { useRouter, usePathname } from 'expo-router';
 import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { getClanColor } from '@evoconn/constants/clanColors';
 import { getClanConfig } from '@evoconn/constants/clanConfig';
+import { formatMythologyOriginPrefix } from '@evoconn/constants/clanDisplayCopy';
 import { getClanProfileOrFallback } from '@evoconn/data/mockClanProfiles';
 import { getTopBarInsigniaByHouse } from '@evoconn/utils/getTopBarInsigniaByHouse';
 import { getClanEstandarte } from '@evoconn/utils/getClanEstandarte';
@@ -74,7 +75,14 @@ import { ClanRankingCard } from './ClanRankingCard';
 import { useAuth } from '../../../mobile/lib/AuthContext';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import { useEffectiveClanId } from '@evoconn/hooks/useEffectiveClanId';
-import { fetchClanMembers, type ClanMemberSummary } from '@evoconn/services/classificationSync';
+import {
+  fetchClanMembers,
+  fetchClanMemberCountsByClan,
+  type ClanMemberSummary,
+} from '@evoconn/services/classificationSync';
+import { computeAllClanRankings } from '@evoconn/utils/clanRanking';
+import { getClanCompetitionPeriod } from '@evoconn/utils/clanCompetitionPeriod';
+import { ALL_CLAN_IDS } from '@evoconn/services/clanClassifier';
 import { isRealUserId } from '@evoconn/services/supabaseSocial';
 import type { CommunityPost } from '@evoconn/types';
 import type { ClanMember } from '@evoconn/data/mockClanProfiles';
@@ -83,92 +91,20 @@ import type { ClanMember } from '@evoconn/data/mockClanProfiles';
 
 const ANIM_DURATION = 200;
 
-/** Los 8 clanes reales (sin contar 'indefinido'). */
-const REAL_CLANS = [
-  'nihilista', 'cientista', 'estoico', 'existencialista',
-  'trascendentalista', 'humanista', 'realista', 'racionalista',
-] as const;
-
-/** Duración del período de ranking: 30 días en ms. */
-const RANKING_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
-
-/** Fecha ancla para alinear los períodos de 30 días (1 enero 2025). */
-const RANKING_EPOCH = new Date('2025-01-01T00:00:00Z').getTime();
-
-/** Calcula el inicio del período de 30 días activo. */
-function getPeriodStart(): number {
-  const elapsed = Date.now() - RANKING_EPOCH;
-  const periods = Math.floor(elapsed / RANKING_PERIOD_MS);
-  return RANKING_EPOCH + periods * RANKING_PERIOD_MS;
-}
-
-/** Días restantes en el período activo. */
-function getDaysLeft(): number {
-  const periodStart = getPeriodStart();
-  const msLeft = RANKING_PERIOD_MS - (Date.now() - periodStart);
-  return Math.ceil(msLeft / (24 * 60 * 60 * 1000));
-}
-
-type ClanRankInfo = { rank: number; points: number; daysLeft: number };
-
-/** Calcula puntos y ranking para todos los clanes dado un array de posts.
- *  `realUserClanId` es el clan del usuario autenticado (si tiene uno), para
- *  sumarlo al conteo de miembros y no subestimar su clan. */
-function computeAllClanRankings(
-  posts: CommunityPost[],
-  realUserClanId?: string | null,
-): Record<string, ClanRankInfo> {
-  const periodStart = getPeriodStart();
-  const daysLeft = getDaysLeft();
-
-  // Filtrar posts del período actual
-  const periodPosts = posts.filter(
-    (p) => new Date(p.createdAt).getTime() >= periodStart,
-  );
-
-  // Acumular posts por clan
-  const clanPostCounts: Record<string, number> = {};
-  for (const clan of REAL_CLANS) { clanPostCounts[clan] = 0; }
-
-  for (const post of periodPosts) {
-    const authorClanId = post.author.clanId;
-    if (authorClanId && authorClanId in clanPostCounts) {
-      clanPostCounts[authorClanId]++;
-    }
+/** Combina miembros reales (Supabase) con usuarios simulados del grafo demo. */
+function mergeClanMemberCounts(
+  dbCounts: Record<string, number>,
+): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const clan of ALL_CLAN_IDS) {
+    counts[clan] = dbCounts[clan] ?? 0;
   }
-
-  // Contar miembros: sim users + usuario real (sin duplicar si ya es u1-u9)
-  const clanMemberCounts: Record<string, number> = {};
-  for (const clan of REAL_CLANS) { clanMemberCounts[clan] = 0; }
   for (const user of SIM_USERS) {
-    if (user.clanId && user.clanId in clanMemberCounts) {
-      clanMemberCounts[user.clanId]++;
+    if (user.clanId && user.clanId in counts) {
+      counts[user.clanId]++;
     }
   }
-  // Añadir el usuario real al conteo si tiene clan asignado
-  if (realUserClanId && realUserClanId in clanMemberCounts) {
-    clanMemberCounts[realUserClanId]++;
-  }
-
-  // Calcular puntos = posts del período / max(miembros, 1)
-  const clanPoints = REAL_CLANS.map((clan) => ({
-    clanId: clan,
-    points: clanPostCounts[clan] / Math.max(clanMemberCounts[clan], 1),
-  })).sort((a, b) => b.points - a.points || REAL_CLANS.indexOf(a.clanId as typeof REAL_CLANS[number]) - REAL_CLANS.indexOf(b.clanId as typeof REAL_CLANS[number]));
-
-  // Asignar rangos (empates comparten rango)
-  const result: Record<string, ClanRankInfo> = {};
-  let currentRank = 1;
-  for (let i = 0; i < clanPoints.length; i++) {
-    if (i > 0 && clanPoints[i].points === clanPoints[i - 1].points) {
-      result[clanPoints[i].clanId] = { rank: result[clanPoints[i - 1].clanId].rank, points: clanPoints[i].points, daysLeft };
-    } else {
-      result[clanPoints[i].clanId] = { rank: currentRank, points: clanPoints[i].points, daysLeft };
-    }
-    currentRank++;
-  }
-
-  return result;
+  return counts;
 }
 
 /** Genera un % de clan simulado a partir del rank para el display de miembros */
@@ -226,6 +162,19 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
   );
 
   const [remoteMembers, setRemoteMembers] = useState<ClanMemberSummary[]>([]);
+  const [dbMemberCounts, setDbMemberCounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const counts = await fetchClanMemberCountsByClan();
+      if (!cancelled) setDbMemberCounts(counts);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     if (clanId === 'indefinido') {
       setRemoteMembers([]);
@@ -244,8 +193,8 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
     };
   }, [clanId, authProfile?.id]);
 
-  const topMembers = useMemo<ClanMember[]>(() => {
-    const members: (ClanMember & { _clanPct?: string })[] = [];
+  const topMembers = useMemo<(ClanMember & { _clanPct?: string; _avatarUri?: string | null })[]>(() => {
+    const members: (ClanMember & { _clanPct?: string; _avatarUri?: string | null })[] = [];
     const seen = new Set<string>();
 
     if (authProfile && realUserClanId === clanId) {
@@ -258,6 +207,7 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
         rank: authProfile.rank,
         followersCount: 0,
         _clanPct: dominantPct.toFixed(1),
+        _avatarUri: authProfile.avatar_url?.trim() || null,
       });
       seen.add(authProfile.id);
     }
@@ -271,6 +221,7 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
         rank: m.rank,
         followersCount: 0,
         _clanPct: m.clanPct.toFixed(1),
+        _avatarUri: m.avatarUri,
       });
       seen.add(m.id);
     }
@@ -317,11 +268,20 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
   }, [allPosts, clanId]);
 
   // ── Ranking del clan ──────────────────────────────────────────────────────
-  const allRankings = useMemo(
-    () => computeAllClanRankings(allPosts, realUserClanId),
-    [allPosts, realUserClanId],
+  const memberCounts = useMemo(
+    () => mergeClanMemberCounts(dbMemberCounts),
+    [dbMemberCounts],
   );
-  const clanRanking: ClanRankInfo = allRankings[clanId] ?? { rank: 1, points: 0, daysLeft: getDaysLeft() };
+  const competitionPeriod = useMemo(() => getClanCompetitionPeriod(), []);
+  const allRankings = useMemo(
+    () => computeAllClanRankings(allPosts, memberCounts),
+    [allPosts, memberCounts],
+  );
+  const clanRanking = allRankings[clanId] ?? {
+    rank: 1,
+    points: 0,
+    daysLeft: competitionPeriod.daysLeft,
+  };
 
   // ── Detail panel state ────────────────────────────────────────────────────
   const slideAnim        = useRef(new Animated.Value(0)).current;
@@ -399,7 +359,7 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
   // ── Render: member row (Section 3) ────────────────────────────────────────
   const renderMember = useCallback(
     ({ item, index }: { item: ClanMember; index: number }) => {
-      const extItem = item as ClanMember & { _clanPct?: string };
+      const extItem = item as ClanMember & { _clanPct?: string; _avatarUri?: string | null };
       const pct = extItem._clanPct ?? mockClanPct(item.rank, index);
       return (
         <UserResultCard
@@ -409,6 +369,7 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
           rank={item.rank}
           followersCount={item.followersCount ?? 0}
           clanPct={pct}
+          avatarUri={extItem._avatarUri}
           avatarVariant="clan"
           onPress={() => handleMemberPress(item)}
         />
@@ -527,6 +488,8 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
                 rank={clanRanking.rank}
                 points={clanRanking.points}
                 daysLeft={clanRanking.daysLeft}
+                competitionActive={competitionPeriod.isCompetitionActive}
+                membersCount={memberCounts[clanId] ?? 0}
               />
 
               {/* Miembros destacados */}
@@ -568,8 +531,27 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
           {/* ── SECCIÓN 5 — Descripción del clan ─────────────────────── */}
           <View style={[styles.panel, { borderWidth: 1, borderColor: `${clanColor}22` }]}>
             <Text style={[styles.panelTitle, { color: clanColor }]}>¿Cómo piensa este clan?</Text>
-            <Text style={styles.descText}>{config.description}</Text>
+            <View style={styles.bulletList}>
+              {config.descriptionPoints.map((point, idx) => (
+                <View key={`desc-${idx}`} style={styles.bulletRow}>
+                  <Text style={[styles.bulletDot, { color: clanColor }]}>•</Text>
+                  <Text style={styles.descText}>{point}</Text>
+                </View>
+              ))}
+            </View>
           </View>
+
+          {config.mythology != null && (
+            <View style={[styles.panel, { borderWidth: 1, borderColor: `${clanColor}22` }]}>
+              <Text style={[styles.panelTitle, { color: clanColor }]}>
+                Símbolo mitológico del clan
+              </Text>
+              <Text style={styles.descText}>
+                {formatMythologyOriginPrefix(config.mythology.mythologyOrigin)}{' '}
+                {config.mythology.description}
+              </Text>
+            </View>
+          )}
 
           {/* ── SECCIÓN 6 — Top publicaciones ────────────────────────── */}
           <View style={styles.postsSection}>
@@ -703,7 +685,21 @@ const styles = StyleSheet.create({
   },
 
   // ── Section 5: Description ───────────────────────────────────────────────
+  bulletList: {
+    gap: 12,
+  },
+  bulletRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  bulletDot: {
+    fontSize: 16,
+    lineHeight: 22,
+    marginTop: 0,
+  },
   descText: {
+    flex: 1,
     color: 'rgba(255,255,255,0.82)',
     fontSize: 14,
     lineHeight: 22,

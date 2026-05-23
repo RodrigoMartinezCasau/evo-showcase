@@ -16,7 +16,6 @@ import { SIDEBAR_NEW_REFLECTION_LAYOUT as SR } from '@evoconn/constants/sidebarN
 import { SIDEBAR_NEW_PHRASE_LAYOUT as SP } from '@evoconn/constants/sidebarNewPhraseLayout';
 import { PanelStarField } from '@evoconn/components/animations/StarFieldBackground';
 import { ClanCardFeedRimOverlay } from '@evoconn/components/ClanCardFeedRimOverlay';
-import { NO_CLAN_ACCENT_COLOR } from '@evoconn/constants/clanColors';
 import { evoconnColors } from '@evoconn/theme/colors';
 
 /** Config normalizada: misma forma para COMUNIDAD, NUEVA REFLEXIÓN y NUEVA FRASE. */
@@ -140,6 +139,7 @@ export function getNewPhrasePngMenuConfig(): SidebarPngMenuButtonConfig {
 
 type SidebarPngMenuButtonProps = {
   config: SidebarPngMenuButtonConfig;
+  /** Ignorado cuando `communityRimColor` está definido. */
   source: ImageSourcePropType;
   label: string;
   accessibilityLabel: string;
@@ -152,10 +152,10 @@ type SidebarPngMenuButtonProps = {
   textAdjustsFontSizeToFit?: boolean;
   leftOverlay?: SidebarPngMenuButtonLeftOverlay | null;
   /**
-   * Sin clan: sustituye el PNG verde lima por fondo de app + destellos + reborde Apple (verde lima).
-   * El color define el reborde; el interior (estrella, texto) no se modifica.
+   * Botón COMUNIDAD: sustituye el PNG por fondo de app + destellos + reborde en este color.
+   * Sin clan → verde lima; cada clan → su color principal.
    */
-  sinClanCommunityStyle?: boolean;
+  communityRimColor?: string | null;
 };
 
 export function SidebarPngMenuButton({
@@ -167,7 +167,7 @@ export function SidebarPngMenuButton({
   onPress,
   textAdjustsFontSizeToFit = true,
   leftOverlay = null,
-  sinClanCommunityStyle = false,
+  communityRimColor = null,
 }: SidebarPngMenuButtonProps) {
   const imgW = config.imageWidth;
   const imgH = config.imageHeight;
@@ -184,9 +184,11 @@ export function SidebarPngMenuButton({
   const textTop =
     (visibleH - config.textBoxHeight) / 2 + config.textContainerOffsetY;
 
-  const sinClanRim = sinClanCommunityStyle
-    ? resolveSidebarSinClanRim(layoutW, visibleH)
-    : null;
+  const communityRim =
+    communityRimColor != null && communityRimColor.trim() !== ''
+      ? resolveSidebarSinClanRim(layoutW, visibleH)
+      : null;
+  const rimColor = communityRimColor?.trim() ?? '';
 
   return (
     <TouchableOpacity
@@ -214,15 +216,15 @@ export function SidebarPngMenuButton({
           }}
         >
           <View style={{ position: 'relative', width: layoutW, height: visibleH, alignSelf: 'center' }}>
-            {sinClanRim != null ? (
+            {communityRim != null ? (
               <View
                 style={{
                   position: 'absolute',
                   left: 0,
-                  top: sinClanRim.insetTop,
+                  top: communityRim.insetTop,
                   width: layoutW,
-                  height: sinClanRim.bodyHeight,
-                  borderRadius: sinClanRim.borderRadius,
+                  height: communityRim.bodyHeight,
+                  borderRadius: communityRim.borderRadius,
                   overflow: 'hidden',
                   backgroundColor: evoconnColors.background,
                 }}
@@ -230,11 +232,11 @@ export function SidebarPngMenuButton({
                 <PanelStarField surfaceColor={evoconnColors.background} />
                 <ClanCardFeedRimOverlay
                   width={layoutW}
-                  height={sinClanRim.bodyHeight}
-                  borderRadius={sinClanRim.borderRadius}
-                  clanColor={NO_CLAN_ACCENT_COLOR}
-                  rimArmX={sinClanRim.rimArmX}
-                  rimArmY={sinClanRim.rimArmY}
+                  height={communityRim.bodyHeight}
+                  borderRadius={communityRim.borderRadius}
+                  clanColor={rimColor}
+                  rimArmX={communityRim.rimArmX}
+                  rimArmY={communityRim.rimArmY}
                 />
               </View>
             ) : (

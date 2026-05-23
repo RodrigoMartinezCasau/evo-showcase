@@ -103,6 +103,10 @@ export const SHARE_BUTTON_SIZE = 28;
  * Valor fijo para que Android e iOS se vean alineados (evita flecha “enana” en Android).
  */
 export const PROFILE_SHARE_ARROW_FONT_SIZE = 20;
+/** Insignia 100 primeros: 80 % más pequeña que la flecha ↗ (20 % del tamaño). */
+export const PROFILE_TESTER_BADGE_SIZE = Math.round(PROFILE_SHARE_ARROW_FONT_SIZE * 0.5);
+/** Reserva horizontal para la insignia (a la derecha de ↗). */
+export const PROFILE_TESTER_BADGE_RESERVE = PROFILE_TESTER_BADGE_SIZE + 10;
 
 /** Margen interior al exportar PNG: contenido dentro del borde de clan. */
 export const PROFILE_SHARE_CAPTURE_PADDING_TOP = 18;
