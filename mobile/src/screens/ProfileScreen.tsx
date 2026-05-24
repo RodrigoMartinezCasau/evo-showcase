@@ -1,5 +1,5 @@
 import React, { useCallback, useState, useRef, useMemo, useEffect, useLayoutEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, Animated, Easing, useWindowDimensions } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Animated, Easing, useWindowDimensions, Alert, Share } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, usePathname, useFocusEffect } from 'expo-router';
 import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
@@ -34,6 +34,11 @@ import {
 import { ProfileDetailPanel } from '@evoconn/components/ProfileDetailPanel';
 import type { CommunityPost } from '@evoconn/types';
 import { enrichPostsAuthorAvatar } from '@evoconn/utils/enrichPostsAuthorAvatar';
+import { buildProfileShareMessage } from '@evoconn/utils/appShareLinks';
+import {
+  ProfileShareCaptureHost,
+  type ProfileShareCaptureHandle,
+} from '@evoconn/components/personalProfile/ProfileShareCaptureHost';
 
 const ANIM_DURATION = 200;
 
@@ -373,6 +378,8 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
   const safeFrame = useSafeAreaFrame();
   const { width: screenW, height: screenH } = useWindowDimensions();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sharePreparing, setSharePreparing] = useState(false);
+  const profileShareCaptureRef = useRef<ProfileShareCaptureHandle>(null);
   const ready = useDeferredRender();
   const { thoughts } = useThoughts();
 
@@ -459,6 +466,64 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
     router.navigate({ pathname: '/(tabs)', params: { tab } });
   }, [detailFeed, closeDetailFeed, router]);
 
+  const handleShareProfile = useCallback(async () => {
+    if (sharePreparing) return;
+
+    if (isProfileLocked) {
+      try {
+        await Share.share({
+          message: buildProfileShareMessage(profile.username, profileWithLiveFollowers.id),
+        });
+      } catch {
+        /* cancel */
+      }
+      return;
+    }
+
+    setSharePreparing(true);
+    try {
+      await profileShareCaptureRef.current?.share({
+        width: screenW,
+        userId: profileWithLiveFollowers.id,
+        username: profile.username,
+        clanId: profile.clanId,
+        rank: profile.rank,
+        insigniaPhrase: profile.insigniaPhrase,
+        followersCount: profileWithLiveFollowers.followersCount,
+        followingCount: profileWithLiveFollowers.followingCount,
+        totalPosts: postsCountForRow,
+        totalReflections: profile.totalReflections ?? liveReflectionCount,
+        totalQuotes: profile.totalQuotes ?? liveQuoteCount,
+        rankReflectionCount: isSimUser
+          ? classification.getReflectionCount(userId)
+          : liveReflectionCount,
+        rankPhraseCount: isSimUser
+          ? classification.getPhraseCount(userId)
+          : liveQuoteCount,
+        philosophyPercentages: profile.philosophyPercentages,
+        posts: livePosts,
+      });
+    } catch (e) {
+      if (__DEV__) console.warn('[ProfileScreen] share:', e);
+      Alert.alert('Error', 'No se pudo compartir el perfil. Inténtalo de nuevo.');
+    } finally {
+      setSharePreparing(false);
+    }
+  }, [
+    sharePreparing,
+    isProfileLocked,
+    profile,
+    profileWithLiveFollowers,
+    screenW,
+    postsCountForRow,
+    liveReflectionCount,
+    liveQuoteCount,
+    isSimUser,
+    classification,
+    userId,
+    livePosts,
+  ]);
+
   return (
     <View style={styles.container}>
       <AppTopBar
@@ -489,6 +554,7 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
               username={profile.username}
               clanId={profile.clanId}
               rank={profile.rank}
+              onSharePress={() => void handleShareProfile()}
               onShieldPress={
                 profile.clanId
                   ? () =>
@@ -555,6 +621,7 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
           router.push({ pathname: '/reflection', params: { thoughtId: id } });
         }}
       />
+      <ProfileShareCaptureHost ref={profileShareCaptureRef} />
     </View>
   );
 }

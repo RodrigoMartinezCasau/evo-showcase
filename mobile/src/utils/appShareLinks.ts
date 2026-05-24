@@ -28,15 +28,34 @@ export function getAppProfileOpenUrl(userId: string): string {
   return Linking.createURL(`profile/${id}`, { scheme: APP_SCHEME });
 }
 
-/** Mensaje + enlaces recomendados al compartir un perfil. */
+/** Mensaje + enlaces recomendados al compartir un perfil. HTTPS primero (clicable en chats). */
 export function buildProfileShareMessage(username: string, userId: string): string {
-  return `Mira el perfil de ${username} en EVO\n\n${getPublicProfileWebUrl(userId)}\n\nAbrir en la app:\n${getAppProfileOpenUrl(userId)}`;
+  const web = getPublicProfileWebUrl(userId);
+  const cleanName = username.startsWith('@') ? username : `@${username}`;
+  return `${web}\n\nMira el perfil de ${cleanName} en EVO`;
+}
+
+/** URL web de una publicación (clicable en WhatsApp / iMessage). */
+export function getPublicPostWebUrl(postId: string): string {
+  const id = encodeURIComponent(postId);
+  return `${PUBLIC_WEB_ORIGIN}/post/${id}`;
 }
 
 /**
- * Abre la publicación `/post/[id]`.
+ * Deep link nativo: abre `/post/[id]`.
  */
 export function getAppPostOpenUrl(postId: string): string {
   const id = encodeURIComponent(postId);
   return Linking.createURL(`post/${id}`, { scheme: APP_SCHEME });
+}
+
+/** Mensaje al compartir una publicación — el enlace HTTPS va primero (más clicable). */
+export function buildPostShareMessage(
+  authorUsername: string,
+  preview: string,
+  postId: string,
+): string {
+  const web = getPublicPostWebUrl(postId);
+  const author = authorUsername.startsWith('@') ? authorUsername : `@${authorUsername}`;
+  return `${web}\n\n${author}: «${preview}»`;
 }

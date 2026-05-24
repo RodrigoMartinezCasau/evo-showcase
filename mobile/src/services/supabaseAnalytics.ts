@@ -2,6 +2,7 @@
  * Analytics: presencia en app y eventos IA (Supabase).
  * Métricas agregadas: ver scripts/evo-analytics.mjs + supabase_analytics_cli.sql
  */
+import { countSentryMetric } from '../../mobile/lib/sentry';
 import { supabase } from '../../mobile/lib/supabase';
 import { isRealUserId } from './supabaseSocial';
 
@@ -49,4 +50,9 @@ export async function logAiUsageEvent(
     metadata: params.metadata ?? null,
   });
   if (error && __DEV__) console.warn('[Analytics] logAiUsageEvent:', error.message);
+
+  countSentryMetric('evo.ai_usage', 1, {
+    source: params.source,
+    ...(params.model ? { model: params.model } : {}),
+  });
 }

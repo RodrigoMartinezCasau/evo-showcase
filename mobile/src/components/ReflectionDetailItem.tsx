@@ -54,7 +54,7 @@ import { useAuth } from '../../mobile/lib/AuthContext';
 import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
 import { rankCommentsForViewer } from '@evoconn/logic/comments/commentRanking';
 import { computePhraseDetailTypography } from '@evoconn/utils/phraseDetailTypography';
-import { getAppPostOpenUrl } from '@evoconn/utils/appShareLinks';
+import { buildPostShareMessage } from '@evoconn/utils/appShareLinks';
 import {
   EvoActionSheetModal,
   EvoConfirmModal,
@@ -358,10 +358,12 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
             try {
               const text = (livePost.body || livePost.title || '').trim();
               const preview = text.length > 240 ? `${text.slice(0, 237)}…` : text;
-              const url = getAppPostOpenUrl(livePost.id);
               await Share.share({
-                message: `${livePost.author.username}: «${preview}»\n\n${url}`,
-                url,
+                message: buildPostShareMessage(
+                  livePost.author.username,
+                  preview,
+                  livePost.id,
+                ),
               });
             } catch {
               /* user cancelled */

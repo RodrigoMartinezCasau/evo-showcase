@@ -63,6 +63,8 @@ type Props = {
   clanId: string | null;
   rank: Rank;
   onShieldPress?: () => void;
+  /** Captura PNG del perfil; si no se define, comparte solo texto + enlace. */
+  onSharePress?: () => void;
 };
 
 export const UserIdentityHeader = React.memo(function UserIdentityHeader({
@@ -71,6 +73,7 @@ export const UserIdentityHeader = React.memo(function UserIdentityHeader({
   clanId,
   rank,
   onShieldPress,
+  onSharePress,
 }: Props) {
   const { width: screenW } = useWindowDimensions();
   const ShieldSvg = useMemo(() => getTopBarInsigniaByHouse(clanId), [clanId]);
@@ -99,10 +102,14 @@ export const UserIdentityHeader = React.memo(function UserIdentityHeader({
     : 'Sin clan';
 
   const handleShare = useCallback(() => {
+    if (onSharePress) {
+      onSharePress();
+      return;
+    }
     Share.share({
       message: buildProfileShareMessage(username, userId),
     }).catch(() => {});
-  }, [username, userId]);
+  }, [username, userId, onSharePress]);
 
   return (
     <View style={[styles.container, { height: containerHeight }]}>

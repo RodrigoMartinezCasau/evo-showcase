@@ -1,18 +1,12 @@
 import { Alert, Platform, Share } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
-import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
 import type { RefObject } from 'react';
 import type ViewShot from 'react-native-view-shot';
-import {
-  getAppProfileOpenUrl,
-  getPublicProfileWebUrl,
-} from '@evoconn/utils/appShareLinks';
+import { buildProfileShareMessage } from '@evoconn/utils/appShareLinks';
 
 function buildShareMessage(username: string, userId: string): string {
-  const web = getPublicProfileWebUrl(userId);
-  const app = getAppProfileOpenUrl(userId);
-  return `Mira el perfil de ${username} en EVO\n\n${web}\n\nAbrir en la app:\n${app}`;
+  return buildProfileShareMessage(username, userId);
 }
 
 async function waitForCaptureReady(): Promise<void> {
@@ -62,21 +56,12 @@ export async function captureAndShareProfileCard(
   try {
     const title = `Perfil de ${options.username}`;
 
-    if (Platform.OS === 'ios') {
-      await Share.share({ url: pngUri, message, title });
-      return;
-    }
-
-    if (await Sharing.isAvailableAsync()) {
-      await Sharing.shareAsync(pngUri, {
-        mimeType: 'image/png',
-        dialogTitle: title,
-        UTI: 'public.png',
-      });
-      return;
-    }
-
-    await Share.share({ message, title });
+    // iOS y Android: imagen + mensaje con enlace HTTPS (clicable en WhatsApp).
+    await Share.share({
+      url: pngUri,
+      message,
+      title,
+    });
   } catch (e) {
     const err = e as { message?: string };
     if (err?.message?.toLowerCase().includes('cancel')) return;

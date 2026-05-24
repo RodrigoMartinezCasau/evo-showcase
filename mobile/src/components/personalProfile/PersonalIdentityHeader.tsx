@@ -7,7 +7,7 @@ import {
   StyleSheet,
   useWindowDimensions,
 } from 'react-native';
-import { getAppProfileOpenUrl } from '@evoconn/utils/appShareLinks';
+import { buildProfileShareMessage } from '@evoconn/utils/appShareLinks';
 import { getTopBarInsigniaByHouse } from '@evoconn/utils/getTopBarInsigniaByHouse';
 import type { Rank } from '@evoconn/types';
 import {
@@ -126,10 +126,8 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
       onSharePress();
       return;
     }
-    const url = getAppProfileOpenUrl(userId);
     Share.share({
-      message: `Mira el perfil de ${username} en EVO\n\n${url}`,
-      url,
+      message: buildProfileShareMessage(username, userId),
     }).catch(() => {});
   }, [username, userId, onSharePress]);
 
