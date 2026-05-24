@@ -90,9 +90,12 @@ export async function saveProfileCaptureToGallery(
 ): Promise<boolean> {
   if (!viewRef.current) return false;
 
-  const { status } = await MediaLibrary.requestPermissionsAsync();
+  const { status } = await MediaLibrary.requestPermissionsAsync(
+    true,
+    Platform.OS === 'android' ? [] : undefined,
+  );
   if (status !== 'granted') {
-    Alert.alert('Permiso necesario', 'Activa el acceso a fotos para guardar la imagen.');
+    Alert.alert('Permiso necesario', 'Activa el permiso para guardar imágenes en la galería.');
     return false;
   }
 
