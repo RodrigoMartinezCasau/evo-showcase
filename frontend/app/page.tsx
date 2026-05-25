@@ -1,44 +1,34 @@
-import styles from './evo-landing.module.css'
-import { WELCOME_STARS } from './welcomeStarfield'
+import './landing.css';
 
-export default function Home() {
-  return (
-    <main className={styles.root}>
-      <div className={styles.starfield} aria-hidden>
-        {WELCOME_STARS.map((s, i) => (
-          <span
-            key={i}
-            className={styles.star}
-            style={{
-              left: `${s.leftPct}%`,
-              top: `${s.topPct}%`,
-              width: s.sizePx,
-              height: s.sizePx,
-              animationDelay: `${s.delayMs}ms`,
-            }}
-          />
-        ))}
-      </div>
+import type { Metadata } from 'next';
+import { headers } from 'next/headers';
+import EvoLanding from './components/landing/EvoLanding';
+import type { Lang } from './lib/clans';
+import { PAGE_METADATA } from './lib/landing-i18n';
 
-      <div className={styles.inner}>
-        <div className={styles.starLogoWrap}>
-          {/* Mismo asset que la app: estrellasPrincipales/17.svg (sin clan) */}
-          <img
-            className={styles.starLogo}
-            src="/evo-entry-star.svg"
-            alt=""
-            width={120}
-            height={120}
-            fetchPriority="high"
-          />
-        </div>
-        <div className={styles.heroText}>
-          <h1 className={styles.evoTitle}>EVO</h1>
-          <p className={styles.tagline}>Diseñado y desarrollado por evoconn</p>
-        </div>
-      </div>
+function pickLangFromHeader(accept: string | null): Lang {
+  if (!accept) return 'es';
+  // Format: "es-ES,es;q=0.9,en;q=0.8"
+  const first = accept.split(',')[0]?.trim().toLowerCase() ?? '';
+  if (first.startsWith('es')) return 'es';
+  if (first.startsWith('en')) return 'en';
+  // fall back to scanning the rest
+  const lower = accept.toLowerCase();
+  if (lower.includes('es')) return 'es';
+  if (lower.includes('en')) return 'en';
+  return 'es';
+}
 
-      <p className={styles.footer}>evoconn.com</p>
-    </main>
-  )
+export async function generateMetadata(): Promise<Metadata> {
+  const lang = pickLangFromHeader(headers().get('accept-language'));
+  const meta = PAGE_METADATA[lang];
+  return {
+    title: meta.title,
+    description: meta.description,
+  };
+}
+
+export default function HomePage() {
+  const lang = pickLangFromHeader(headers().get('accept-language'));
+  return <EvoLanding initialLang={lang} />;
 }

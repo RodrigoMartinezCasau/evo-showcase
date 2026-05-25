@@ -1,12 +1,19 @@
 import type { Metadata } from 'next'
-import { Inria_Serif } from 'next/font/google'
+import { Inria_Serif, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 
 const inria = Inria_Serif({
-  weight: ['400', '700'],
+  weight: ['300', '400', '700'],
   style: ['normal', 'italic'],
   subsets: ['latin'],
   variable: '--font-inria',
+  display: 'swap',
+})
+
+const mono = JetBrains_Mono({
+  weight: ['300', '400', '500'],
+  subsets: ['latin'],
+  variable: '--font-mono',
   display: 'swap',
 })
 
@@ -21,7 +28,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="es" className={inria.variable}>
+    <html lang="es" className={`${inria.variable} ${mono.variable}`}>
       <body>{children}</body>
     </html>
   )
