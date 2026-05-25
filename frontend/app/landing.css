@@ -366,6 +366,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   text-underline-offset: 5px;
   text-decoration-color: rgba(255, 255, 255, 0.18);
   padding: 6px 4px;
+  margin-bottom: clamp(14px, 2.5vh, 32px);
   transition: color 220ms, text-decoration-color 220ms;
   white-space: nowrap;
 }
