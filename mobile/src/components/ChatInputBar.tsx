@@ -42,6 +42,12 @@ import { useVoiceInput } from '@evoconn/hooks/useVoiceInput';
 import { VoiceWaveform } from './VoiceWaveform';
 import { LockedAiButtonIcon } from '@evoconn/components/shared/LockedAiButtonIcon';
 import { showOutOfUsesAlert } from '@evoconn/utils/dailyUsesGate';
+import {
+  clampMessageInput,
+  MESSAGE_MAX_CHARS,
+  MESSAGE_MAX_WORDS,
+  truncateTranscriptToFit,
+} from '@evoconn/utils/messageWordLimit';
 
 // ─── Background color (parsed once for gradient strips) ───────────────────────
 
@@ -269,6 +275,8 @@ export function ChatInputBar({
 }: ChatInputBarProps) {
   const insets = useSafeAreaInsets();
   const [text, setText] = useState('');
+  const textRef = useRef('');
+  textRef.current = text;
   const welcomeOpacity = useRef(new Animated.Value(1)).current;
 
   // The TextInput auto-grows from minHeight to maxInputHeight thanks to
@@ -280,9 +288,18 @@ export function ChatInputBar({
   const handleTranscriptReady = useCallback((transcript: string) => {
     setText((prev) => {
       const trimmed = prev.trim();
-      return trimmed ? `${trimmed} ${transcript}` : transcript;
+      const slice = truncateTranscriptToFit(trimmed, transcript);
+      if (!slice) return clampMessageInput(trimmed);
+      const merged = trimmed ? `${trimmed} ${slice}` : slice;
+      return clampMessageInput(merged);
     });
   }, []);
+
+  const handleTextChange = useCallback((next: string) => {
+    setText(clampMessageInput(next));
+  }, []);
+
+  const getCurrentText = useCallback(() => textRef.current, []);
 
   const {
     voiceState,
@@ -292,7 +309,12 @@ export function ChatInputBar({
     startRecording,
     stopRecording,
     cancelRecording,
-  } = useVoiceInput({ onTranscriptReady: handleTranscriptReady });
+  } = useVoiceInput({
+    onTranscriptReady: handleTranscriptReady,
+    getCurrentText,
+    maxWords: MESSAGE_MAX_WORDS,
+    maxChars: MESSAGE_MAX_CHARS,
+  });
 
   const isRecording    = voiceState === 'recording';
   const isTranscribing = voiceState === 'transcribing';
@@ -304,7 +326,7 @@ export function ChatInputBar({
     }
     const t = text.trim();
     if (t) {
-      onSend(t);
+      onSend(clampMessageInput(t));
       setText('');
     }
   };
@@ -463,7 +485,7 @@ export function ChatInputBar({
             <>
               <TextInput
                 value={text}
-                onChangeText={setText}
+                onChangeText={handleTextChange}
                 placeholder={interimText ? '…' : placeholder}
                 placeholderTextColor={evoconnColors.muted}
                 selectionColor={inputCursorColor}
@@ -481,7 +503,7 @@ export function ChatInputBar({
                 ]}
                 multiline
                 scrollEnabled
-                maxLength={2000}
+                maxLength={MESSAGE_MAX_CHARS}
               />
               <TouchableOpacity
                 onPress={handleStartRecording}

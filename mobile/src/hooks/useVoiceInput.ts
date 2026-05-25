@@ -17,11 +17,16 @@ import { Alert } from 'react-native';
 // requireOptionalNativeModule returns null if the native module is not linked,
 // instead of throwing an uncaught native exception like require() would.
 import { requireOptionalNativeModule } from 'expo';
+import { messageLimitReached, truncateTranscriptToFit } from '@evoconn/utils/messageWordLimit';
 
 export type VoiceState = 'idle' | 'recording' | 'transcribing';
 
 type Options = {
   onTranscriptReady: (text: string) => void;
+  /** Texto ya escrito antes de la transcripción (para respetar límite de palabras). */
+  getCurrentText?: () => string;
+  maxWords?: number;
+  maxChars?: number;
 };
 
 export type UseVoiceInputResult = {
@@ -72,7 +77,7 @@ function nextSimPhrase() {
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
-export function useVoiceInput({ onTranscriptReady }: Options): UseVoiceInputResult {
+export function useVoiceInput({ onTranscriptReady, getCurrentText, maxWords, maxChars }: Options): UseVoiceInputResult {
   const [voiceState, setVoiceState]   = useState<VoiceState>('idle');
   const [interimText, setInterimText] = useState('');
   const [elapsedSeconds, setElapsed]  = useState(0);
@@ -83,6 +88,19 @@ export function useVoiceInput({ onTranscriptReady }: Options): UseVoiceInputResu
   const listenersRef = useRef<Array<{ remove: () => void }>>([]);
   const cancelledRef = useRef(false);
   const simStopRef   = useRef<(() => void) | null>(null);
+  const stopNativeRef  = useRef<(() => void) | null>(null);
+
+  const wordLimitReached = useCallback(
+    (candidateTranscript: string) => {
+      if (!getCurrentText) return false;
+      const base = getCurrentText().trim();
+      const merged = base
+        ? `${base} ${candidateTranscript.trim()}`
+        : candidateTranscript.trim();
+      return messageLimitReached(merged, maxWords, maxChars);
+    },
+    [getCurrentText, maxWords, maxChars],
+  );
 
   // ── cleanup ───────────────────────────────────────────────────────────────
   const clearTimers = useCallback(() => {
@@ -145,8 +163,10 @@ export function useVoiceInput({ onTranscriptReady }: Options): UseVoiceInputResu
           setInterimText('');
         } else {
           setInterimText(text);
-          // Keep updating the best known transcript so stopRecording works too.
           if (text) finalTranscriptRef.current = text;
+        }
+        if (wordLimitReached(text)) {
+          stopNativeRef.current?.();
         }
       }),
     );
@@ -163,7 +183,9 @@ export function useVoiceInput({ onTranscriptReady }: Options): UseVoiceInputResu
         const transcript = finalTranscriptRef.current;
         finalTranscriptRef.current = '';
         if (transcript) {
-          onTranscriptReady(transcript);
+          const base = getCurrentText?.() ?? '';
+          const slice = truncateTranscriptToFit(base, transcript, maxWords, maxChars);
+          if (slice) onTranscriptReady(slice);
         }
         setInterimText('');
         setVoiceState('idle');
@@ -179,13 +201,15 @@ export function useVoiceInput({ onTranscriptReady }: Options): UseVoiceInputResu
     );
 
     speechModule.start({ lang: 'es-ES', interimResults: true, continuous: false });
-  }, [startAnimations, clearTimers, removeListeners, onTranscriptReady]);
+  }, [startAnimations, clearTimers, removeListeners, onTranscriptReady, getCurrentText, maxWords, maxChars, wordLimitReached]);
 
   const stopNative = useCallback(() => {
     speechModule?.stop();
     clearTimers(); setVolume(0);
     setVoiceState('transcribing');
   }, [clearTimers]);
+
+  stopNativeRef.current = stopNative;
 
   const cancelNative = useCallback(() => {
     cancelledRef.current = true;
@@ -217,11 +241,16 @@ export function useVoiceInput({ onTranscriptReady }: Options): UseVoiceInputResu
       clearTimers(); setVolume(0);
       setVoiceState('transcribing');
       setTimeout(() => {
-        if (!cancelledRef.current) onTranscriptReady(nextSimPhrase());
+        if (!cancelledRef.current) {
+          const base = getCurrentText?.() ?? '';
+          const phrase = nextSimPhrase();
+          const slice = truncateTranscriptToFit(base, phrase, maxWords, maxChars);
+          if (slice) onTranscriptReady(slice);
+        }
         setVoiceState('idle'); setInterimText('');
       }, 700);
     };
-  }, [startAnimations, clearTimers, onTranscriptReady]);
+  }, [startAnimations, clearTimers, onTranscriptReady, getCurrentText, maxWords, maxChars]);
 
   const stopSimulation  = useCallback(() => simStopRef.current?.(), []);
   const cancelSimulation = useCallback(() => {

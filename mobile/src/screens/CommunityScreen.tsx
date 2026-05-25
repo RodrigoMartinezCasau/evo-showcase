@@ -59,7 +59,6 @@ import {
   COMMUNITY_DETAIL_UPDATE_CELLS_PERIOD_ANDROID,
 } from '@evoconn/constants/communityDetailFeed';
 import { ReflectionDetailItem } from '@evoconn/components/ReflectionDetailItem';
-import { PANEL_STAR_SURFACE_DEFAULT } from '@evoconn/components/animations/StarFieldBackground';
 import { SearchScreen } from '@evoconn/components/SearchScreen';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { useEffectiveClanId } from '@evoconn/hooks/useEffectiveClanId';
@@ -744,20 +743,17 @@ export default function CommunityScreen() {
         onClanPress={handleClanPress}
         onReadingModeChange={handleReadingModeChange}
         communityVerticalFeed
-        reflectionStarSurfaceColor={
-          activeTab === 'para-ti' || detailFeed?.mode === 'foryou'
-            ? evoconnColors.background
-            : PANEL_STAR_SURFACE_DEFAULT
-        }
+        // Las vistas AMPLIADAS (tanto Para Ti como Siguiendo) deben usar el
+        // fondo de la app, no el gris interior (`PANEL_STAR_SURFACE_DEFAULT`)
+        // que solo aplica a las tarjetas pequeñas del listado de Siguiendo.
+        reflectionStarSurfaceColor={evoconnColors.background}
       />
     ),
     [
-      activeTab,
       feedItemHeight,
       handleAuthorPress,
       handleClanPress,
       handleReadingModeChange,
-      detailFeed?.mode,
     ],
   );
 

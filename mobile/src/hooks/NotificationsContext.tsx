@@ -125,6 +125,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   }, [activeUserId, refreshNotifications]);
 
   // ── Register / refresh Expo push token (necesario para burbujas con app cerrada) ──
+  // El propio registerPushToken tiene mutex + throttle (60 s) y no reabre el
+  // diálogo del sistema si ya fue denegado en esta sesión, así que es seguro
+  // llamarlo en cada AppState 'active' sin entrar en bucle paused↔resumed.
   useEffect(() => {
     if (!isRealUserId(activeUserId)) return;
     registerPushToken(activeUserId).catch(console.error);

@@ -55,50 +55,88 @@ if (Notifications) {
   });
 }
 
+// ─── Anti-loop guard ──────────────────────────────────────────────────────────
+// Evitamos llamar a requestPermissionsAsync repetidamente: en algunos dispositivos
+// abrir el diálogo del sistema dispara el ciclo paused→resumed, y si nuestro
+// AppState listener vuelve a llamar a registerPushToken, entra en bucle infinito
+// que a su vez crashea Fabric con IllegalStateException (vistas no desmontadas).
+let _registrationInFlight: Promise<void> | null = null;
+let _hasPromptedThisSession = false;
+let _lastRegisteredUserId: string | null = null;
+let _lastRegisteredAt = 0;
+const MIN_REREGISTER_INTERVAL_MS = 60_000; // No reescribir el token más de 1×/min.
+
 /** Solicita permisos y registra el push token en Supabase para este dispositivo. */
 export async function registerPushToken(userId: string): Promise<void> {
-  const N = getNotifications();
-  if (!N) return; // Expo Go — sin soporte de push remoto desde SDK 53
-  try {
-    if (Platform.OS === 'android') {
-      await N.setNotificationChannelAsync('default', {
-        name: 'EVO',
-        importance: N.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#C7FF02',
-      });
-    }
+  if (_registrationInFlight) return _registrationInFlight;
 
-    const { status: existingStatus } = await N.getPermissionsAsync();
-    let finalStatus = existingStatus;
-
-    if (existingStatus !== 'granted') {
-      const { status } = await N.requestPermissionsAsync();
-      finalStatus = status;
-    }
-
-    if (finalStatus !== 'granted') {
-      console.log('[Push] Permisos de notificación denegados.');
-      return;
-    }
-
-    const tokenData = await N.getExpoPushTokenAsync({
-      projectId: '160e255b-b9ca-4948-ad82-88a29a5a2633',
-    });
-
-    const token = tokenData.data;
-    console.log('[Push] Token registrado:', token);
-
-    const { error } = await supabase
-      .from('profiles')
-      .update({ push_token: token })
-      .eq('id', userId);
-    if (error) {
-      console.error('[Push] Error guardando push_token en profiles:', error.message);
-    }
-  } catch (err) {
-    console.error('[Push] Error registrando token:', err);
+  // Skip si el mismo usuario ya se registró hace menos de 1 minuto.
+  const now = Date.now();
+  if (_lastRegisteredUserId === userId && now - _lastRegisteredAt < MIN_REREGISTER_INTERVAL_MS) {
+    return;
   }
+
+  _registrationInFlight = (async () => {
+    const N = getNotifications();
+    if (!N) return;
+    try {
+      if (Platform.OS === 'android') {
+        await N.setNotificationChannelAsync('default', {
+          name: 'EVO',
+          importance: N.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#C7FF02',
+        });
+      }
+
+      const perms = await N.getPermissionsAsync();
+      const existingStatus = perms.status;
+      const canAskAgain = (perms as { canAskAgain?: boolean }).canAskAgain ?? true;
+      let finalStatus = existingStatus;
+
+      if (existingStatus !== 'granted') {
+        // Solo pedimos el diálogo del sistema si:
+        //   – el usuario aún puede ser preguntado (no marcó "No volver a preguntar"), y
+        //   – no se lo hemos pedido ya en esta sesión.
+        if (!canAskAgain || _hasPromptedThisSession) {
+          console.log('[Push] Permisos de notificación denegados.');
+          return;
+        }
+        _hasPromptedThisSession = true;
+        const { status } = await N.requestPermissionsAsync();
+        finalStatus = status;
+      }
+
+      if (finalStatus !== 'granted') {
+        console.log('[Push] Permisos de notificación denegados.');
+        return;
+      }
+
+      const tokenData = await N.getExpoPushTokenAsync({
+        projectId: '160e255b-b9ca-4948-ad82-88a29a5a2633',
+      });
+
+      const token = tokenData.data;
+      console.log('[Push] Token registrado:', token);
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ push_token: token })
+        .eq('id', userId);
+      if (error) {
+        console.error('[Push] Error guardando push_token en profiles:', error.message);
+      } else {
+        _lastRegisteredUserId = userId;
+        _lastRegisteredAt = Date.now();
+      }
+    } catch (err) {
+      console.error('[Push] Error registrando token:', err);
+    } finally {
+      _registrationInFlight = null;
+    }
+  })();
+
+  return _registrationInFlight;
 }
 
 /**

@@ -118,8 +118,8 @@ type ReflectionDetailItemProps = {
    */
   communityVerticalFeed?: boolean;
   /**
-   * Fill behind twinkling stars in the reflection panel. Vertical feed: Para ti = app background,
-   * Siguiendo = inner gray (`PANEL_STAR_SURFACE_DEFAULT`). Other screens: omit → app background.
+   * Fill behind twinkling stars in the reflection panel. Vista AMPLIADA
+   * (Para Ti y Siguiendo) = app background. Other screens: omit → app background.
    */
   reflectionStarSurfaceColor?: string;
 };
@@ -1033,8 +1033,14 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                       >
                         {post.body}
                       </Text>
-                      {!readingMode && isLongText ? (
-                        <Text style={styles.readMoreLabel}>Ver más...</Text>
+                      {isLongText ? (
+                        <Text
+                          style={
+                            readingMode ? styles.readLessLabel : styles.readMoreLabel
+                          }
+                        >
+                          {readingMode ? 'Ver menos' : 'Ver más...'}
+                        </Text>
                       ) : null}
                     </View>
                   </View>
@@ -1263,6 +1269,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontStyle: 'italic',
     marginTop: 4,
+  },
+  /** Mostrado al final del cuerpo cuando readingMode está activo, para que el
+   *  usuario sepa que puede pulsar de nuevo y volver al feed. */
+  readLessLabel: {
+    color: '#AAAAAA',
+    fontSize: 14,
+    fontStyle: 'italic',
+    marginTop: 16,
+    textAlign: 'center',
   },
 
   quoteCenter: {
