@@ -328,10 +328,10 @@ function Hero() {
         </a>
         <nav className="evo-topnav-links" aria-label="Primary">
           <a href={IOS_URL} target="_blank" rel="noopener noreferrer">
-            {dict.nav.downloadIos}
+            {dict.nav.ios}
           </a>
           <a href={ANDROID_URL} target="_blank" rel="noopener noreferrer">
-            {dict.nav.downloadAndroid}
+            {dict.nav.android}
           </a>
           <a href="#clans">{dict.nav.info}</a>
           <a href="#footer">{dict.nav.contact}</a>
@@ -350,7 +350,7 @@ function Hero() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              {dict.nav.downloadIos}
+              {dict.hero.downloadIos}
             </a>
             <a
               className="evo-boxbtn evo-boxbtn-solid"
@@ -358,7 +358,7 @@ function Hero() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              {dict.nav.downloadAndroid}
+              {dict.hero.downloadAndroid}
             </a>
           </div>
           <a className="evo-hero-learn" href="#clans">

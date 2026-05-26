@@ -7,12 +7,14 @@ export interface LandingDict {
   nav: {
     info: string;
     contact: string;
-    downloadIos: string;
-    downloadAndroid: string;
+    ios: string;
+    android: string;
   };
   hero: {
     desc: string;
     learn: string;
+    downloadIos: string;
+    downloadAndroid: string;
   };
   join: {
     eyebrow: string;
@@ -78,12 +80,14 @@ const DICT_EN: LandingDict = {
   nav: {
     info: 'Info',
     contact: 'Contact',
-    downloadIos: 'Download iOS',
-    downloadAndroid: 'Download Android',
+    ios: 'iOS',
+    android: 'Android',
   },
   hero: {
     desc: 'Discover your philosophical clan through reflection, debate, and identity.',
     learn: 'Or learn more',
+    downloadIos: 'Download iOS',
+    downloadAndroid: 'Download Android',
   },
   join: {
     eyebrow: '01 — Initiation',
@@ -161,12 +165,14 @@ const DICT_ES: LandingDict = {
   nav: {
     info: 'Info',
     contact: 'Contacto',
-    downloadIos: 'Descargar iOS',
-    downloadAndroid: 'Descargar Android',
+    ios: 'iOS',
+    android: 'Android',
   },
   hero: {
     desc: 'Descubre tu clan filosófico a través de la reflexión, el debate y la identidad.',
     learn: 'O descubre más',
+    downloadIos: 'Descargar iOS',
+    downloadAndroid: 'Descargar Android',
   },
   join: {
     eyebrow: '01 — Iniciación',
