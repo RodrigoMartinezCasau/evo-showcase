@@ -244,7 +244,7 @@ const CLANS_ES: Clan[] = [
   {
     id: 'rationalists',
     name: 'Racionalistas',
-    animal: 'Lechuza de Atenea',
+    animal: 'B\u00faho de Atena',
     origin: 'Mitolog\u00eda Griega',
     country: 'Grecia',
     color: '#395df2',
@@ -260,7 +260,7 @@ const CLANS_ES: Clan[] = [
     thinks:
       'Los racionalistas buscan la coherencia por encima del impulso. Desconf\u00edan de las ideas que se sostienen solo en la emoci\u00f3n, la autoridad o la tradici\u00f3n. La verdad debe sobrevivir a la l\u00f3gica, la estructura y la cr\u00edtica.',
     whyAnimal:
-      'La Lechuza de Atenea simboliza sabidur\u00eda, observaci\u00f3n, l\u00f3gica y claridad intelectual. Representa la creencia de que la verdad emerge mediante la raz\u00f3n y el pensamiento cr\u00edtico.',
+      'El b\u00faho de Atena simboliza sabidur\u00eda, observaci\u00f3n, l\u00f3gica y claridad intelectual. Representa la creencia de que la verdad emerge mediante la raz\u00f3n y el pensamiento cr\u00edtico.',
     whyColor:
       'El azul cian refleja la claridad mental y la fr\u00eda precisi\u00f3n de un pensamiento puesto a prueba contra s\u00ed mismo.',
   },
