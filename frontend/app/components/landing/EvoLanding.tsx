@@ -806,7 +806,7 @@ function Footer() {
             <ul>
               <li>
                 <a
-                  href="https://www.instagram.com/evoconn"
+                  href="https://www.instagram.com/evo.clans"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -817,7 +817,13 @@ function Footer() {
                 <a href="#">X / Twitter</a>
               </li>
               <li>
-                <a href="#">TikTok</a>
+                <a
+                  href="https://www.tiktok.com/@evo.app"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  TikTok
+                </a>
               </li>
               <li>
                 <a href="#">Substack</a>
