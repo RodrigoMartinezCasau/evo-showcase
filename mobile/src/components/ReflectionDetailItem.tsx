@@ -42,6 +42,8 @@ import {
 } from '@evoconn/constants/detailQuoteLayout';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { FollowButton } from './FollowButton';
+import { FirstUsersTesterBadge } from './shared/FirstUsersTesterBadge';
+import { PROFILE_TESTER_BADGE_SIZE } from '@evoconn/constants/personalProfileLayout';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
 import { useFeedStore } from '@evoconn/hooks/useFeedStore';
 import { usePersonalProfile } from '@evoconn/hooks/PersonalProfileContext';
@@ -996,6 +998,10 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
               <TouchableOpacity onPress={handleAuthorPressAction}>
                 <Text style={styles.username}>{post.author.username}</Text>
               </TouchableOpacity>
+              <FirstUsersTesterBadge
+                userId={post.author.id}
+                iconSize={PROFILE_TESTER_BADGE_SIZE}
+              />
               <FollowButton
                 authorId={post.author.id}
                 authorClanId={post.author.clanId}
