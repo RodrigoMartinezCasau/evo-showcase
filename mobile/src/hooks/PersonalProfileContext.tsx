@@ -43,6 +43,40 @@ function simUserToUser(u: SimUser): User {
   return { id: u.id, username: u.username, clanId: u.clanId, rank: u.rank };
 }
 
+function toFollowListEntry(
+  uid: string,
+  users: Record<string, SimUser>,
+  profileCache: Record<string, BasicProfile>,
+): FollowerEntry {
+  const cached = profileCache[uid];
+  const u = users[uid];
+  if (u) {
+    return {
+      id: u.id,
+      username: u.username,
+      clanId: u.clanId,
+      rank: u.rank,
+      avatarUri: cached?.avatarUri ?? null,
+    };
+  }
+  if (cached) {
+    return {
+      id: cached.id,
+      username: cached.username,
+      clanId: cached.clanId,
+      rank: cached.rank as FollowerEntry['rank'],
+      avatarUri: cached.avatarUri ?? null,
+    };
+  }
+  return {
+    id: uid,
+    username: `@${uid.slice(0, 8)}`,
+    clanId: null,
+    rank: 'aprendiz',
+    avatarUri: null,
+  };
+}
+
 function simPostToCommunityPost(
   p: SimPost,
   users: Record<string, SimUser>,
@@ -237,13 +271,7 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
     return Object.entries(followGraph)
       .filter(([, followingSet]) => followingSet.has(activeUserId))
       .filter(([uid]) => !isBlocked(uid))
-      .map(([uid]) => {
-        const u = users[uid];
-        if (u) return { id: u.id, username: u.username, clanId: u.clanId, rank: u.rank };
-        const cached = profileCache[uid];
-        if (cached) return { id: cached.id, username: cached.username, clanId: cached.clanId, rank: cached.rank as FollowerEntry['rank'] };
-        return { id: uid, username: `@${uid.slice(0, 8)}`, clanId: null, rank: 'aprendiz' as const };
-      });
+      .map(([uid]) => toFollowListEntry(uid, users, profileCache));
   }, [followGraph, activeUserId, users, profileCache, isBlocked]);
 
   // ── Following ──────────────────────────────────────────────────────────────
@@ -251,13 +279,7 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
     const myFollowing = followGraph[activeUserId] ?? new Set<string>();
     return [...myFollowing]
       .filter(uid => !isBlocked(uid))
-      .map(uid => {
-        const u = users[uid];
-        if (u) return { id: u.id, username: u.username, clanId: u.clanId, rank: u.rank };
-        const cached = profileCache[uid];
-        if (cached) return { id: cached.id, username: cached.username, clanId: cached.clanId, rank: cached.rank as FollowingEntry['rank'] };
-        return { id: uid, username: `@${uid.slice(0, 8)}`, clanId: null, rank: 'aprendiz' as const };
-      });
+      .map(uid => toFollowListEntry(uid, users, profileCache));
   }, [followGraph, activeUserId, users, profileCache, isBlocked]);
 
   // followingBackIds = users I already follow back (who are in my followers list)

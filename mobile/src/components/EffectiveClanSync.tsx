@@ -31,14 +31,16 @@ export function EffectiveClanSync() {
     if (!profile?.id || SIM_USERS_BY_ID[profile.id]) return;
     setActiveSimUser({
       id: profile.id,
-      username: mockCurrentUser.username,
+      username: profile.username
+        ? '@' + profile.username.toUpperCase()
+        : mockCurrentUser.username,
       clanId: effectiveClanId,
       rank: profile.rank ?? mockCurrentUser.rank,
       followersCount: mockCurrentUser.followersCount,
       followingCount: mockCurrentUser.followingCount,
       avatarUri: profile.avatar_url ?? mockCurrentUser.avatarUri,
     });
-  }, [profile?.id, profile?.rank, profile?.avatar_url, effectiveClanId]);
+  }, [profile?.id, profile?.username, profile?.rank, profile?.avatar_url, effectiveClanId]);
 
   // ── 2) Retry safety net for failed Supabase publishes ─────────────────────
   //

@@ -10,13 +10,15 @@
 import type { User, UserStats } from '../types';
 
 // Mutable object — mutated via Object.assign so every reference stays live.
+// El default queda vacío para que ninguna UI muestre un username "fantasma"
+// antes de que AuthContext cargue el perfil real desde Supabase.
 const _activeUser: User = {
-  id: 'u1',
-  username: '@RODRIGOMARTINEZ',
+  id: '',
+  username: '',
   clanId: null,
-  rank: 'aprendiz',  // sin clan → always aprendiz regardless of pct
-  followersCount: 4,
-  followingCount: 4,
+  rank: 'aprendiz',
+  followersCount: 0,
+  followingCount: 0,
 };
 
 /**

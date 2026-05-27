@@ -8,7 +8,15 @@ import { isRealUserId } from './supabaseSocial';
 
 const PRESENCE_PING_SECONDS = 120;
 
-/** Actualiza presencia + tiempo activo estimado del día (RPC analytics_record_presence_ping). */
+/** Actualiza presencia + tiempo activo estimado del día (RPC analytics_record_presence_ping).
+ *
+ * Antes había un fallback `supabase.from('user_app_presence').upsert(...)`
+ * pero la tabla tiene RLS y NO tiene políticas para `authenticated` (sólo
+ * el RPC `security definer` puede escribir). El fallback fallaba siempre
+ * con `new row violates row-level security policy for table "user_app_presence"`
+ * y, en horas pico, generaba miles de queries fallidas que saturaban el
+ * pool de conexiones de PostgREST. Eliminado.
+ */
 export async function upsertAppPresence(): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user?.id || !isRealUserId(user.id)) return;
@@ -17,15 +25,8 @@ export async function upsertAppPresence(): Promise<void> {
     p_increment_seconds: PRESENCE_PING_SECONDS,
   });
 
-  if (error) {
-    if (__DEV__) console.warn('[Analytics] analytics_record_presence_ping:', error.message);
-    const { error: fallbackErr } = await supabase.from('user_app_presence').upsert(
-      { user_id: user.id, last_seen_at: new Date().toISOString() },
-      { onConflict: 'user_id' },
-    );
-    if (fallbackErr && __DEV__) {
-      console.warn('[Analytics] upsertAppPresence fallback:', fallbackErr.message);
-    }
+  if (error && __DEV__) {
+    console.warn('[Analytics] analytics_record_presence_ping:', error.message);
   }
 }
 

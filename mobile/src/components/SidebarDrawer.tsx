@@ -45,6 +45,7 @@ import { INRIA_SERIF_FONT_FAMILY } from '@evoconn/constants/inriaSerifFontFamily
 import type { Rank } from '@evoconn/types';
 import type { ConversationItem as ConvItem } from '@evoconn/types';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
+import { useAuth } from '../../mobile/lib/AuthContext';
 import { useConversationFolders } from '@evoconn/hooks/ConversationFoldersContext';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { SIDEBAR_DRAWER_OFFSCREEN_TRANSLATE_X } from '@evoconn/constants/communityDrawerGesture';
@@ -93,16 +94,45 @@ function SidebarDrawerInner({
 }: SidebarDrawerProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const activeClan = useActiveClan(mockCurrentUser.clanId);
-  // user object is read by many useMemo selectors below.
-  // Stabilise its identity so getXxxByHouse calls aren't constantly invalidated.
-  const user = useMemo(
-    () => ({ ...mockCurrentUser, clanId: activeClan }),
-    // mockCurrentUser is a mutable singleton; we depend on activeClan + id +
-    // username explicitly to recompute when they actually change.
+  const { profile: authProfile, session } = useAuth();
+  const activeClan = useActiveClan(authProfile?.clan_id ?? mockCurrentUser.clanId);
+  // El sidebar SIEMPRE se deriva del perfil autenticado cuando hay sesión,
+  // así re-renderiza al cargar/cambiar el perfil real. Solo cae al
+  // singleton mockCurrentUser cuando NO hay sesión (uso sim/anónimo).
+  const user = useMemo(() => {
+    if (session && authProfile) {
+      const raw = authProfile.username?.trim();
+      return {
+        id: authProfile.id,
+        username: raw ? `@${raw.toUpperCase()}` : '',
+        clanId: activeClan,
+        rank: authProfile.rank,
+        avatarUri: authProfile.avatar_url ?? undefined,
+      };
+    }
+    if (session && !authProfile) {
+      return {
+        id: session.user?.id ?? '',
+        username: '',
+        clanId: activeClan,
+        rank: 'aprendiz' as Rank,
+        avatarUri: undefined,
+      };
+    }
+    return { ...mockCurrentUser, clanId: activeClan };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [activeClan, mockCurrentUser.id, mockCurrentUser.username, mockCurrentUser.rank, mockCurrentUser.avatarUri],
-  );
+  }, [
+    session,
+    authProfile?.id,
+    authProfile?.username,
+    authProfile?.rank,
+    authProfile?.avatar_url,
+    activeClan,
+    mockCurrentUser.id,
+    mockCurrentUser.username,
+    mockCurrentUser.rank,
+    mockCurrentUser.avatarUri,
+  ]);
   const closeSidebar = onClose;
   const searchInputRef = useRef<TextInput>(null);
   const [drawerSearch, setDrawerSearch] = useState('');
@@ -354,7 +384,7 @@ function SidebarDrawerInner({
           >
             <UserAvatarFrame
               clanId={user.clanId}
-              avatarUri={mockCurrentUser.avatarUri}
+              avatarUri={user.avatarUri}
               size={SIDEBAR_DRAWER_FOOTER_INSIGNIA_SIZE}
             />
           </TouchableOpacity>

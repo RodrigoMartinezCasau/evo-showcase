@@ -460,6 +460,15 @@ export default function SettingsScreen({
       id: 'support',
       title: 'SOPORTE',
       rows: [
+        {
+          id: 'tutorial',
+          label: 'Ver tutorial',
+          subtitle: 'Repasa el recorrido inicial de EVO.',
+          icon: 'play-circle-outline',
+          iconBg: IC.teal,
+          type: 'navigate',
+          onPress: () => router.push('/onboarding-tutorial?preview=1'),
+        },
         { id: 'bug',     label: 'Reportar un error', icon: 'bug-outline',                 iconBg: IC.pink, type: 'navigate', onPress: () => router.push('/report-bug') },
         { id: 'help',    label: 'Centro de ayuda',   icon: 'help-circle-outline',         iconBg: IC.cyan, type: 'navigate', onPress: () => router.push('/settings-help') },
         { id: 'contact', label: 'Contactar soporte', icon: 'chatbubble-ellipses-outline', iconBg: IC.blue, type: 'navigate', onPress: () => router.push('/settings-support') },

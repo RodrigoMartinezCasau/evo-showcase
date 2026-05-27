@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter, usePathname } from 'expo-router';
 import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
+import { sanitizeRouteId } from '@evoconn/utils/sanitizeRouteId';
 import { getClanCardColor } from '@evoconn/theme/theme';
 import { evoconnColors } from '@evoconn/theme/colors';
 import {
@@ -14,7 +15,8 @@ import {
 import { useFeedStore } from '@evoconn/hooks/useFeedStore';
 
 export default function PostDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id: rawId } = useLocalSearchParams<{ id: string }>();
+  const id = sanitizeRouteId(rawId);
   const router = useRouter();
   const pathname = usePathname();
   const { getPostById, updatePostVote, updatePostSaveToggle } = useFeedStore();

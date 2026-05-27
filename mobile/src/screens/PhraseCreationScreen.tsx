@@ -51,6 +51,7 @@ import {
 import { getPublishStarByClan } from '@evoconn/utils/getDebateStarByClan';
 import type { DebateMessage } from '@evoconn/types/debate';
 import { useFeedStore, createPhrasePost } from '@evoconn/hooks/useFeedStore';
+import { userForPublish } from '@evoconn/utils/publishAuthor';
 import { useDebugStreak } from '../debug/DebugStreakContext';
 import { useDebugStats } from '../debug/DebugStatsContext';
 import { requestNoUsesAnimation } from '@evoconn/components/animations/AppAnimationLayer';
@@ -424,7 +425,7 @@ export default function PhraseCreationScreen() {
       publishedRef.current.add(sourceId);
 
       const phraseInner = normalizePhraseInnerForPublish(rawPhraseFromUser);
-      const post = createPhrasePost(mockCurrentUser, phraseInner, authorName);
+      const post = createPhrasePost(userForPublish(authProfile), phraseInner, authorName);
       (post as { id: string }).id = sourceId;
       publishPost(post);
       router.replace({ pathname: '/latest-posts', params: { postId: sourceId } });
@@ -457,7 +458,7 @@ export default function PhraseCreationScreen() {
       handleInputFocusChange(assistantMessageIndex, false);
       Keyboard.dismiss();
     },
-    [publishPost, updateThought, router, handleInputFocusChange],
+    [publishPost, updateThought, router, handleInputFocusChange, authProfile],
   );
 
   const handleAssignPhraseToFolder = useCallback(

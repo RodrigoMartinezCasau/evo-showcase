@@ -14,53 +14,99 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import type { CommunityPost, PhrasePost, User, VoteStats } from '../types';
+import type { CommunityPost, PhrasePost, Rank, User, VoteStats } from '../types';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { SIM_USERS_BY_ID, isPublishedSimPostType, type SimPost } from '@evoconn/data/simulation/simulatedNetwork';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { useNotifications } from '@evoconn/hooks/NotificationsContext';
 import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
-import { isRealUserId, fetchProfilesBatch } from '@evoconn/services/supabaseSocial';
+import {
+  isRealUserId,
+  fetchProfilesBatch,
+  type BasicProfile,
+} from '@evoconn/services/supabaseSocial';
 import { useBlockedUsers } from '@evoconn/hooks/BlockedUsersContext';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+/** Stale snapshot written when publish ran before AuthContext hydrated mockCurrentUser. */
+const STALE_PUBLISH_USERNAME = '@RODRIGOMARTINEZ';
+
+function isStaleAuthorUsername(username: string | undefined): boolean {
+  const u = username?.trim();
+  return !u || u.toUpperCase() === STALE_PUBLISH_USERNAME;
+}
+
+function resolveAuthor(
+  p: SimPost,
+  profileCache?: Record<string, BasicProfile>,
+): User {
+  const cached = profileCache?.[p.authorId];
+  const simAuthor = SIM_USERS_BY_ID[p.authorId];
+
+  if (simAuthor && !isRealUserId(p.authorId)) {
+    return {
+      id: simAuthor.id,
+      username: cached?.username ?? simAuthor.username,
+      clanId: cached?.clanId ?? simAuthor.clanId,
+      rank: (cached?.rank as Rank | undefined) ?? simAuthor.rank,
+      avatarUri: cached?.avatarUri ?? undefined,
+    };
+  }
+
+  if (cached) {
+    return {
+      id: cached.id,
+      username: cached.username,
+      clanId: cached.clanId,
+      rank: cached.rank as Rank,
+      avatarUri: cached.avatarUri ?? undefined,
+    };
+  }
+
+  if (simAuthor) {
+    return {
+      id: simAuthor.id,
+      username: simAuthor.username,
+      clanId: simAuthor.clanId,
+      rank: simAuthor.rank,
+    };
+  }
+
+  const liveUsername =
+    p.authorId === mockCurrentUser.id && !isStaleAuthorUsername(mockCurrentUser.username)
+      ? mockCurrentUser.username
+      : undefined;
+
+  const snapshotUsername = isStaleAuthorUsername(p.authorUsername)
+    ? undefined
+    : p.authorUsername;
+
+  return {
+    id: p.authorId,
+    username: liveUsername ?? snapshotUsername ?? '?',
+    clanId:
+      p.authorId === mockCurrentUser.id
+        ? (mockCurrentUser.clanId ?? p.authorClanId ?? null)
+        : (p.authorClanId ?? null),
+    rank: (p.authorRank as Rank | undefined) ?? 'aprendiz',
+  };
+}
+
 export function simPostToCommunityPost(
   p: SimPost,
-  avatarCache?: Record<string, string | null>,
+  profileCache?: Record<string, BasicProfile>,
 ): CommunityPost {
-  const simAuthor = SIM_USERS_BY_ID[p.authorId];
-  // Fall back to the mutable mockCurrentUser when the authorId is a real
-  // Supabase UUID (not in the 9-user simulation). This covers posts published
-  // by the authenticated user during the current session.
-  const author = simAuthor ?? (p.authorId === mockCurrentUser.id ? mockCurrentUser : undefined);
-  const cachedAvatarUri = avatarCache?.[p.authorId];
+  const author = resolveAuthor(p, profileCache);
   const resolvedClanId =
     p.authorId === mockCurrentUser.id
-      ? (mockCurrentUser.clanId ?? author?.clanId ?? p.authorClanId ?? null)
-      : (author?.clanId ?? p.authorClanId ?? null);
+      ? (mockCurrentUser.clanId ?? author.clanId ?? p.authorClanId ?? null)
+      : (author.clanId ?? p.authorClanId ?? null);
+
   return {
     id: p.id,
     type: p.type,
-    author: author
-      ? {
-          id: author.id,
-          username: author.username,
-          clanId: resolvedClanId,
-          rank: author.rank,
-          // Include avatarUri for the current user (set by AuthContext) or from cache.
-          avatarUri:
-            ('avatarUri' in author ? (author as User).avatarUri : undefined) ??
-            (cachedAvatarUri ?? undefined),
-        }
-      // Use the author snapshot stored at publish time so names survive restarts.
-      : {
-          id: p.authorId,
-          username: p.authorUsername ?? '?',
-          clanId: resolvedClanId,
-          rank: p.authorRank ?? 'aprendiz',
-          avatarUri: cachedAvatarUri ?? undefined,
-        },
+    author: { ...author, clanId: resolvedClanId },
     title: p.title,
     body: p.body,
     quoteAuthor: p.quoteAuthor,
@@ -98,32 +144,27 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
   const taste = useRecommendationTaste();
   const [publishedIds, setPublishedIds] = useState<Set<string>>(new Set());
 
-  // ── Author avatar cache for real Supabase users not in the 9-user sim ──────
-  const [authorAvatarCache, setAuthorAvatarCache] = useState<Record<string, string | null>>({});
+  // Live profiles for real authors (usernames + avatars; fixes stale author_username snapshots).
+  const [authorProfileCache, setAuthorProfileCache] = useState<Record<string, BasicProfile>>({});
   const fetchedAuthorIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const missingIds = sim.posts
       .filter(p => isPublishedSimPostType(p.type))
       .map(p => p.authorId)
-      .filter(id =>
-        isRealUserId(id) &&
-        id !== mockCurrentUser.id &&
-        !fetchedAuthorIds.current.has(id),
-      );
+      .filter(id => isRealUserId(id) && !fetchedAuthorIds.current.has(id));
     const uniqueMissing = [...new Set(missingIds)];
     if (uniqueMissing.length === 0) return;
     uniqueMissing.forEach(id => fetchedAuthorIds.current.add(id));
     fetchProfilesBatch(uniqueMissing)
       .then(profiles => {
-        setAuthorAvatarCache(prev => {
+        setAuthorProfileCache(prev => {
           const next = { ...prev };
-          profiles.forEach(prof => { next[prof.id] = prof.avatarUri ?? null; });
+          profiles.forEach(prof => { next[prof.id] = prof; });
           return next;
         });
       })
       .catch(() => {
-        // Allow retry on next posts update by removing from fetched set.
         uniqueMissing.forEach(id => fetchedAuthorIds.current.delete(id));
       });
   }, [sim.posts]);
@@ -135,8 +176,8 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
       sim.posts
         .filter(p => isPublishedSimPostType(p.type))
         .filter(p => !blockedIds.has(p.authorId))
-        .map(p => simPostToCommunityPost(p, authorAvatarCache)),
-    [sim.posts, authorAvatarCache, blockedIds],
+        .map(p => simPostToCommunityPost(p, authorProfileCache)),
+    [sim.posts, authorProfileCache, blockedIds],
   );
 
   const publishPost = useCallback(
@@ -185,7 +226,7 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
       const previousVote = sim.voteMap[sim.activeUserId]?.[postId] ?? null;
       const preVotePost = sim.posts.find((p) => p.id === postId);
       const tastePost: CommunityPost | undefined = preVotePost
-        ? simPostToCommunityPost(preVotePost)
+        ? simPostToCommunityPost(preVotePost, authorProfileCache)
         : undefined;
       sim.castVote(sim.activeUserId, postId, to);
       if (tastePost) taste.recordVote(tastePost, previousVote, to);
@@ -205,7 +246,7 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
         }
       }
     },
-    [sim, addNotification, taste],
+    [sim, addNotification, taste, authorProfileCache],
   );
 
   // Save count on posts is always up-to-date via SimulationContext.toggleSave

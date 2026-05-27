@@ -26,7 +26,11 @@ import {
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useFeedStore, simPostToCommunityPost } from '@evoconn/hooks/useFeedStore';
 import { mergePanelPostsAuthorAvatars } from '@evoconn/utils/enrichPostsAuthorAvatar';
-import { fetchProfilesBatch, isRealUserId } from '@evoconn/services/supabaseSocial';
+import {
+  fetchProfilesBatch,
+  isRealUserId,
+  type BasicProfile,
+} from '@evoconn/services/supabaseSocial';
 import { isPublishedSimPostType, type SimPost } from '@evoconn/data/simulation/simulatedNetwork';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
@@ -87,27 +91,25 @@ function tabToFeedMode(tab: TabId): FeedMode {
   }
 }
 
-/** Avatares de autores reales para hidratar Para ti tras refresh o antes del cache del feed. */
-async function buildAuthorAvatarCacheFromSimPosts(
+/** Perfiles de autores reales para hidratar Para ti tras refresh (nombres + avatares). */
+async function buildAuthorProfileCacheFromSimPosts(
   simPosts: SimPost[],
-): Promise<Record<string, string | null>> {
+): Promise<Record<string, BasicProfile>> {
   const ids = [
     ...new Set(
       simPosts
         .filter((p) => isPublishedSimPostType(p.type))
         .map((p) => p.authorId)
-        .filter((id) => isRealUserId(id) && id !== mockCurrentUser.id),
+        .filter((id) => isRealUserId(id)),
     ),
   ];
-  const cache: Record<string, string | null> = {};
+  const cache: Record<string, BasicProfile> = {};
   if (ids.length > 0) {
     const profiles = await fetchProfilesBatch(ids);
     profiles.forEach((p) => {
-      cache[p.id] = p.avatarUri ?? null;
+      cache[p.id] = p;
     });
   }
-  const mine = mockCurrentUser.avatarUri?.trim();
-  if (mine) cache[mockCurrentUser.id] = mine;
   return cache;
 }
 
@@ -250,7 +252,7 @@ export default function CommunityScreen() {
   const { thoughts } = useThoughts();
   const { posts: allPosts, getPostById } = useFeedStore();
   const { blockedIds } = useBlockedUsers();
-  const { refreshSocialFromSupabase } = useSimulation();
+  const { refreshSocialFromSupabase, activeUserId } = useSimulation();
   const { getBoost, revision: tasteRevision, recordDwell } = useRecommendationTaste();
   const { seenIds: paratiSeenIds, markParatiPostSeen } = useParatiSeenPosts();
   const { triggerHaptic } = useEvoPreferences();
@@ -372,22 +374,68 @@ export default function CommunityScreen() {
    * data. If `allPosts` is still empty (Supabase hydrating), the effect
    * re-runs as soon as `allPosts` changes, and tries again. Without this
    * guard, the panel would mount empty and stay empty (black screen).
+   *
+   * Robustez añadida:
+   * 1. Refs para leer los valores frescos dentro del callback. Sin esto,
+   *    si `followingSet` / `viewerClanId` cambian durante la hidratación
+   *    de Supabase (que en cold-start oscila por refresh_token 504), el
+   *    effect se re-ejecuta y cancela el handle de InteractionManager
+   *    antes de que llegue a resolverse → loading infinito.
+   * 2. Fallback timer de 1200ms: si InteractionManager nunca resuelve
+   *    porque hay animaciones suspendidas o el JS thread está saturado,
+   *    forzamos el mount de igual manera.
+   * 3. Reset del ref cuando cambia `activeUserId` (sim ↔ real): así
+   *    cuando llega la hidratación de Supabase tras el login real, el
+   *    panel se rehidrata con los 502 posts en vez de quedarse con la
+   *    snapshot anterior (sim/vacía).
    */
+  const allPostsRef = useRef(allPosts);
+  allPostsRef.current = allPosts;
+  const followingSetRef = useRef(followingSet);
+  followingSetRef.current = followingSet;
+  const viewerClanIdRef = useRef(viewerClanId);
+  viewerClanIdRef.current = viewerClanId;
+  const followingSortRef = useRef(followingSort);
+  followingSortRef.current = followingSort;
+  const getBoostRef = useRef(getBoost);
+  getBoostRef.current = getBoost;
+  const paratiSeenIdsRef = useRef(paratiSeenIds);
+  paratiSeenIdsRef.current = paratiSeenIds;
+
+  // Reset panel hydration solo cuando el usuario activo es un UUID REAL
+  // nuevo (sim → real por primera vez, o real → otro real al cambiar de
+  // cuenta). NO resetear en oscilaciones u1 ↔ UUID provocadas por fallos
+  // de refresh_token: pisaría el mount cada pocos segundos durante un
+  // 504 sostenido y mostraría loading infinito.
+  const lastRealUserIdRef = useRef<string | null>(null);
+
   useEffect(() => {
+    const isReal = isRealUserId(activeUserId);
+    const switchedToNewReal =
+      isReal && lastRealUserIdRef.current !== activeUserId;
+    if (switchedToNewReal) {
+      lastRealUserIdRef.current = activeUserId;
+      paratiPanelHydratedRef.current = false;
+      setParatiPanelData([]);
+      setParatiPanelMounted(false);
+    }
+
     if (paratiPanelHydratedRef.current) return;
     if (allPosts.length === 0) return;
-    const handle = InteractionManager.runAfterInteractions(() => {
+
+    const doMount = () => {
       if (paratiPanelHydratedRef.current) return;
-      if (allPosts.length === 0) return;
-      const snap = new Set(paratiSeenIds);
+      const posts = allPostsRef.current;
+      if (posts.length === 0) return;
+      const snap = new Set(paratiSeenIdsRef.current);
       const data = getDataForMode(
         'foryou',
-        allPosts,
-        followingSet,
-        viewerClanId,
+        posts,
+        followingSetRef.current,
+        viewerClanIdRef.current,
         mockCurrentUser.id,
-        followingSort,
-        getBoost,
+        followingSortRef.current,
+        getBoostRef.current,
         snap,
       );
       if (data.length === 0) return;
@@ -395,12 +443,20 @@ export default function CommunityScreen() {
       setParatiPanelData(data);
       setParatiPanelInitialIndex(0);
       setParatiPanelMounted(true);
-    });
-    return () => handle.cancel();
-    // Hydrate on first available data; we deliberately do NOT depend on
-    // `paratiSeenIds` / `getBoost` to avoid re-running once hydrated.
+    };
+
+    const handle = InteractionManager.runAfterInteractions(doMount);
+    const fallbackTimer = setTimeout(doMount, 1200);
+
+    return () => {
+      handle.cancel();
+      clearTimeout(fallbackTimer);
+    };
+    // Re-correr solo cuando cambia la cantidad de posts disponibles o cuando
+    // cambia el usuario activo. Las refs de arriba garantizan que el callback
+    // siempre lee los valores frescos sin necesidad de deps inestables.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allPosts, followingSet, viewerClanId, followingSort]);
+  }, [allPosts.length, activeUserId]);
 
   /**
    * Hydrate / re-target the persistent Para Ti panel.
@@ -623,11 +679,11 @@ export default function CommunityScreen() {
                 }),
                 refreshSocialFromSupabase(),
               ]);
-              const avatarCache = await buildAuthorAvatarCacheFromSimPosts(simPosts);
+              const profileCache = await buildAuthorProfileCacheFromSimPosts(simPosts);
               const freshAll = simPosts
                 .filter((p) => isPublishedSimPostType(p.type))
                 .filter((p) => !blockedIds.has(p.authorId))
-                .map((p) => simPostToCommunityPost(p, avatarCache));
+                .map((p) => simPostToCommunityPost(p, profileCache));
               const emptySeen = new Set<string>();
               const data = getDataForMode(
                 'foryou',

@@ -304,17 +304,12 @@ export default function StreakScreen() {
                           },
                         ]}
                       >
-                        <Animated.View
-                          style={[
-                            StyleSheet.absoluteFill,
-                            { opacity: Animated.subtract(1, transitionAnim) },
-                          ]}
-                        >
+                        <View style={StyleSheet.absoluteFill}>
                           <FuegoApagadoIcon
                             width={HERO_STREAK_BASE_ICON_SIZE}
                             height={HERO_STREAK_BASE_ICON_SIZE}
                           />
-                        </Animated.View>
+                        </View>
                         <Animated.View
                           style={[
                             StyleSheet.absoluteFill,

@@ -28,11 +28,19 @@ export function getAppProfileOpenUrl(userId: string): string {
   return Linking.createURL(`profile/${id}`, { scheme: APP_SCHEME });
 }
 
-/** Mensaje + enlaces recomendados al compartir un perfil. HTTPS primero (clicable en chats). */
+/** Mensaje + enlaces recomendados al compartir un perfil.
+ *
+ * IMPORTANTE: la URL va al FINAL. Si va al principio y luego se concatenan
+ * `\n\n` + texto descriptivo, parsers permisivos (algunos clientes de chat
+ * Android) tratan el bloque entero como una sola URL hasta el primer espacio
+ * real, así que el deep link entrante llega como
+ * `/profile/UUID%0A%0AMira%20el%20perfil...` y la pantalla pasa esa cadena
+ * a Supabase como UUID → `invalid input syntax for type uuid` en BD.
+ */
 export function buildProfileShareMessage(username: string, userId: string): string {
   const web = getPublicProfileWebUrl(userId);
   const cleanName = username.startsWith('@') ? username : `@${username}`;
-  return `${web}\n\nMira el perfil de ${cleanName} en EVO`;
+  return `Mira el perfil de ${cleanName} en EVO\n\n${web}`;
 }
 
 /** URL web de una publicación (clicable en WhatsApp / iMessage). */
@@ -49,7 +57,9 @@ export function getAppPostOpenUrl(postId: string): string {
   return Linking.createURL(`post/${id}`, { scheme: APP_SCHEME });
 }
 
-/** Mensaje al compartir una publicación — el enlace HTTPS va primero (más clicable). */
+/** Mensaje al compartir una publicación. La URL va al FINAL para evitar
+ * que el texto descriptivo contamine el deep link entrante (mismo motivo
+ * que `buildProfileShareMessage` — ver comentario allí). */
 export function buildPostShareMessage(
   authorUsername: string,
   preview: string,
@@ -57,5 +67,5 @@ export function buildPostShareMessage(
 ): string {
   const web = getPublicPostWebUrl(postId);
   const author = authorUsername.startsWith('@') ? authorUsername : `@${authorUsername}`;
-  return `${web}\n\n${author}: «${preview}»`;
+  return `${author}: «${preview}»\n\n${web}`;
 }

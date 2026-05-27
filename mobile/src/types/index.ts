@@ -52,6 +52,11 @@ export type Comment = {
   body: string
   upCount: number
   createdAt: string
+  /**
+   * Si está informado, este comentario responde a otro del mismo post.
+   * La UI agrupa los hijos en hilos plegables bajo su padre raíz.
+   */
+  parentId?: string | null
 }
 
 export type ConversationItem = {

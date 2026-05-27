@@ -1,4 +1,5 @@
 import * as Linking from 'expo-linking';
+import { sanitizeRouteId } from './sanitizeRouteId';
 
 export type WidgetPostDeepLink = { tab: 'para-ti'; postId: string };
 
@@ -20,6 +21,11 @@ export function parseWidgetPostDeepLink(url: string | null | undefined): WidgetP
   return { tab: 'para-ti', postId };
 }
 
+/** Normaliza un route/query param y limpia caracteres no-id (texto del share
+ * que un parser permisivo de chat pega al URL). Devuelve `undefined` si tras
+ * limpiar no queda un id válido. */
 export function normalizeRouteParam(value: string | string[] | undefined): string | undefined {
-  return normalizeQueryParam(value);
+  const normalized = normalizeQueryParam(value);
+  if (!normalized) return undefined;
+  return sanitizeRouteId(normalized);
 }

@@ -103,6 +103,9 @@ export default function PersonalProfileScreen() {
   // not the rodrigomartinez simulation fallback.
   const profileWithClan = useMemo(() => ({
     ...profile,
+    username: authProfile?.username
+      ? '@' + authProfile.username.toUpperCase()
+      : profile.username,
     clanId: activeClan,
     philosophyPercentages: realPercentages,
     rank: displayRank,
@@ -111,6 +114,7 @@ export default function PersonalProfileScreen() {
     totalQuotes: authProfile?.total_quotes ?? profile.totalQuotes,
   }), [
     profile,
+    authProfile?.username,
     activeClan,
     realPercentages,
     displayRank,

@@ -3,6 +3,7 @@ import { View, Text, ScrollView, StyleSheet, Animated, Easing, useWindowDimensio
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, usePathname, useFocusEffect } from 'expo-router';
 import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
+import { sanitizeRouteId } from '@evoconn/utils/sanitizeRouteId';
 import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { mockCurrentUser, mockUserStats } from '@evoconn/data/mockUser';
@@ -43,7 +44,8 @@ import {
 const ANIM_DURATION = 200;
 
 export default function ProfileScreen() {
-  const { id, username: initialUsername } = useLocalSearchParams<{ id?: string; username?: string }>();
+  const { id: rawId, username: initialUsername } = useLocalSearchParams<{ id?: string; username?: string }>();
+  const id = sanitizeRouteId(rawId);
   const router = useRouter();
   const isOwn = !id || id === mockCurrentUser.id;
 

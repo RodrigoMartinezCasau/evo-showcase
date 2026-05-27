@@ -67,6 +67,12 @@ export type SimComment = {
   body: string;
   upCount: number;
   createdAt: string;
+  /**
+   * Si está informado, este comentario es una respuesta a otro comentario
+   * del mismo post. La UI muestra los comentarios con `parentId == null`
+   * como raíces y agrupa los hijos en un hilo plegable.
+   */
+  parentId?: string | null;
 };
 
 /** followerId → array of followed user IDs */
@@ -94,7 +100,7 @@ function rankFrom(pcts: ClanPct[], clanId: string | null): Rank {
 const _SIM_USERS_RAW: Omit<SimUser, 'rank'>[] = [
   {
     id: 'u1',
-    username: '@RODRIGOMARTINEZ',
+    username: '@INVITADO',
     clanId: null,
     insigniaPhrase: '"El universo no tiene obligación de tener sentido para ti."',
     philosophyPercentages: [

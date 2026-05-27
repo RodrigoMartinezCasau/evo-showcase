@@ -48,7 +48,7 @@ import { usePersonalProfile } from '@evoconn/hooks/PersonalProfileContext';
 import { useNotifications } from '@evoconn/hooks/NotificationsContext';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import type { SimComment } from '@evoconn/data/simulation/simulatedNetwork';
-import { insertReport, isRealUserId } from '@evoconn/services/supabaseSocial';
+import { insertReport, isRealUserId, deleteComment as dbDeleteComment } from '@evoconn/services/supabaseSocial';
 import { useBlockedUsers } from '@evoconn/hooks/BlockedUsersContext';
 import { useAuth } from '../../mobile/lib/AuthContext';
 import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
@@ -197,7 +197,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     else unsavePost(post.id);
   }, [post, isSaved, updatePostSaveToggle, savePost, unsavePost]);
 
-  const { commentsMap, addComment: addSimComment, users: simUsers, ensureCommentsForPost } = useSimulation();
+  const { commentsMap, addComment: addSimComment, users: simUsers, ensureCommentsForPost, deleteCommentById } = useSimulation();
 
   // Fetch fresh comments from Supabase the first time this post is opened.
   useEffect(() => {
@@ -212,19 +212,31 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   }, []);
 
   // Comments come from the shared persistent store — no local state needed.
+  const { block, isBlocked } = useBlockedUsers();
+  const { session, profile: authProfile } = useAuth();
+
   const contextComments = useMemo<Comment[]>(() => {
     const simComments = commentsMap[post.id] ?? [];
+    const liveSelfUsername =
+      authProfile?.username?.trim()
+        ? `@${authProfile.username.trim().toUpperCase()}`
+        : mockCurrentUser.username;
     return simComments.map((sc): Comment => {
       const su = simUsers[sc.authorId];
-      const isSelf = sc.authorId === mockCurrentUser.id;
+      const isSelf =
+        (session?.user?.id != null && sc.authorId === session.user.id) ||
+        sc.authorId === mockCurrentUser.id;
       return {
         id: sc.id,
         author: su
           ? { id: su.id, username: su.username, clanId: su.clanId, rank: su.rank }
-          // Self: use live mockCurrentUser (stays up to date if they change username).
           : isSelf
-            ? { id: mockCurrentUser.id, username: mockCurrentUser.username, clanId: mockCurrentUser.clanId, rank: mockCurrentUser.rank }
-            // Other real users: use snapshot stored at comment time.
+            ? {
+                id: authProfile?.id ?? mockCurrentUser.id,
+                username: liveSelfUsername,
+                clanId: authProfile?.clan_id ?? mockCurrentUser.clanId,
+                rank: (authProfile?.rank ?? mockCurrentUser.rank) as Comment['author']['rank'],
+              }
             : {
                 id: sc.authorId,
                 username: sc.authorUsername ?? '?',
@@ -234,12 +246,19 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
         body: sc.body,
         upCount: sc.upCount,
         createdAt: sc.createdAt,
+        parentId: sc.parentId ?? null,
       };
     });
-  }, [commentsMap, post.id, simUsers]);
-
-  const { block, isBlocked } = useBlockedUsers();
-  const { session, profile: authProfile } = useAuth();
+  }, [
+    commentsMap,
+    post.id,
+    simUsers,
+    session?.user?.id,
+    authProfile?.id,
+    authProfile?.username,
+    authProfile?.clan_id,
+    authProfile?.rank,
+  ]);
 
   const [postMoreSheetOpen, setPostMoreSheetOpen] = useState(false);
   const [reportReasonPickerOpen, setReportReasonPickerOpen] = useState(false);
@@ -255,6 +274,10 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   const { addNotification } = useNotifications();
   const { recordComment, recordBlockUser } = useRecommendationTaste();
 
+  // ── Hilos de respuestas (estado declarado ANTES de handleAddComment) ──
+  const [expandedThreads, setExpandedThreads] = useState<Record<string, boolean>>({});
+  const [replyingTo, setReplyingTo] = useState<{ commentId: string; username: string } | null>(null);
+
   const handleAddComment = useCallback(
     async (text: string) => {
       const authorId =
@@ -266,6 +289,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
           ? `@${authProfile.username.trim().toUpperCase()}`
           : mockCurrentUser.username;
       const newId = `co-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const parentForThis = replyingTo?.commentId ?? null;
       const simComment: SimComment = {
         id: newId,
         postId: post.id,
@@ -276,9 +300,15 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
         body: text,
         upCount: 0,
         createdAt: new Date().toISOString(),
+        parentId: parentForThis,
       };
       await addSimComment(simComment);
       recordComment(post);
+      // Auto-expandir el hilo destino para que el autor vea su respuesta.
+      if (parentForThis) {
+        setExpandedThreads(prev => ({ ...prev, [parentForThis]: true }));
+      }
+      setReplyingTo(null);
       void addNotification({
         recipientUserId: post.author.id,
         type: 'comment',
@@ -300,8 +330,34 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
       authProfile?.username,
       authProfile?.clan_id,
       authProfile?.rank,
+      replyingTo,
     ],
   );
+
+  // ── Acciones de hilo (callbacks) ───────────────────────────────────────
+  const toggleThread = useCallback((rootId: string) => {
+    setExpandedThreads(prev => ({ ...prev, [rootId]: !prev[rootId] }));
+  }, []);
+
+  const startReply = useCallback((commentId: string, username: string) => {
+    setReplyingTo({ commentId, username });
+  }, []);
+
+  const cancelReply = useCallback(() => setReplyingTo(null), []);
+
+  const handleDeleteComment = useCallback(
+    (commentId: string) => {
+      void deleteCommentById(post.id, commentId);
+    },
+    [deleteCommentById, post.id],
+  );
+
+  // Identidad del visor: ¿soy el autor del post? (puedo borrar comentarios ajenos).
+  const isPostAuthor = useMemo(() => {
+    const myId = session?.user?.id ?? mockCurrentUser.id;
+    return myId === post.author.id;
+  }, [session?.user?.id, post.author.id]);
+  const myId = session?.user?.id ?? mockCurrentUser.id;
 
   const { isFollowing: checkFollowing, toggleFollow } = useFollowState();
 
@@ -1085,23 +1141,113 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                       paddingRight: COMMENTS_CONTENT_INSETS.right,
                     }}
                   >
-                    {visibleComments.map((c) => (
-                      <CommentCard
-                        key={c.id}
-                        authorId={c.author.id}
-                        username={c.author.username}
-                        text={c.body}
-                        clanId={c.author.clanId}
-                        upvotes={
-                          c.upCount + (commentVotes[c.id] ? 1 : 0)
+                    {(() => {
+                      // Hilos:
+                      // - parent_comment_id en DB conserva el padre inmediato.
+                      // - En UI, todos los descendientes de una raíz se
+                      //   muestran como una lista plana bajo la raíz, con un
+                      //   único nivel de sangría (no se anida más profundo).
+                      // - Si la migración SQL aún no se aplicó, todos los
+                      //   comentarios son raíces y la UI se comporta como antes.
+                      const rootIdById = new Map<string, string>();
+                      for (const c of visibleComments) {
+                        if (!c.parentId) rootIdById.set(c.id, c.id);
+                      }
+                      // Resolver raíz subiendo por parentId (varias pasadas
+                      // porque el orden no garantiza topología).
+                      let changed = true;
+                      while (changed) {
+                        changed = false;
+                        for (const c of visibleComments) {
+                          if (rootIdById.has(c.id)) continue;
+                          if (c.parentId && rootIdById.has(c.parentId)) {
+                            rootIdById.set(c.id, rootIdById.get(c.parentId)!);
+                            changed = true;
+                          }
                         }
-                        isUpvoted={!!commentVotes[c.id]}
-                        onUpvote={() => toggleCommentVote(c.id)}
-                        onReport={() => console.log(`Reported comment ${c.id}`)}
-                        onBlockUser={() => handleBlockUser(c.author.id)}
-                        onAuthorPress={() => onAuthorPress(c.author.id)}
-                      />
-                    ))}
+                      }
+                      const roots = visibleComments.filter((c) => !c.parentId);
+                      const descendantsByRoot = new Map<string, typeof visibleComments>();
+                      for (const c of visibleComments) {
+                        if (!c.parentId) continue;
+                        const rid = rootIdById.get(c.id);
+                        if (!rid) continue; // raíz desconocida (padre filtrado)
+                        const arr = descendantsByRoot.get(rid) ?? [];
+                        arr.push(c);
+                        descendantsByRoot.set(rid, arr);
+                      }
+                      // Lookup rápido id → comment, usado para resolver el
+                      // username del comentario respondido en hilos profundos.
+                      const commentById = new Map<string, typeof visibleComments[number]>();
+                      for (const c of visibleComments) commentById.set(c.id, c);
+
+                      return roots.map((c) => {
+                        const descendants = descendantsByRoot.get(c.id) ?? [];
+                        const expanded = !!expandedThreads[c.id];
+                        const canDelete = isPostAuthor || c.author.id === myId;
+                        return (
+                          <React.Fragment key={c.id}>
+                            <CommentCard
+                              authorId={c.author.id}
+                              username={c.author.username}
+                              text={c.body}
+                              clanId={c.author.clanId}
+                              upvotes={c.upCount + (commentVotes[c.id] ? 1 : 0)}
+                              isUpvoted={!!commentVotes[c.id]}
+                              createdAt={c.createdAt}
+                              onUpvote={() => toggleCommentVote(c.id)}
+                              onReport={() => console.log(`Reported comment ${c.id}`)}
+                              onBlockUser={() => handleBlockUser(c.author.id)}
+                              onAuthorPress={() => onAuthorPress(c.author.id)}
+                              onReply={() => startReply(c.id, c.author.username)}
+                              onDelete={canDelete ? () => handleDeleteComment(c.id) : undefined}
+                              replyCount={descendants.length}
+                              threadExpanded={expanded}
+                              onToggleThread={descendants.length > 0 ? () => toggleThread(c.id) : undefined}
+                            />
+                            {expanded
+                              ? descendants.map((child) => {
+                                  const childCanDelete = isPostAuthor || child.author.id === myId;
+                                  // Si el padre real NO es la raíz del hilo,
+                                  // mostramos "→ @padre" para indicar a quién
+                                  // se está respondiendo dentro del hilo.
+                                  const parent = child.parentId
+                                    ? commentById.get(child.parentId)
+                                    : undefined;
+                                  const replyingToUsername =
+                                    parent && parent.id !== c.id
+                                      ? parent.author.username
+                                      : undefined;
+                                  return (
+                                    <CommentCard
+                                      key={child.id}
+                                      authorId={child.author.id}
+                                      username={child.author.username}
+                                      text={child.body}
+                                      clanId={child.author.clanId}
+                                      upvotes={child.upCount + (commentVotes[child.id] ? 1 : 0)}
+                                      isUpvoted={!!commentVotes[child.id]}
+                                      createdAt={child.createdAt}
+                                      indented
+                                      replyingToUsername={replyingToUsername}
+                                      onUpvote={() => toggleCommentVote(child.id)}
+                                      onReport={() => console.log(`Reported comment ${child.id}`)}
+                                      onBlockUser={() => handleBlockUser(child.author.id)}
+                                      onAuthorPress={() => onAuthorPress(child.author.id)}
+                                      onReply={() => startReply(child.id, child.author.username)}
+                                      onDelete={
+                                        childCanDelete
+                                          ? () => handleDeleteComment(child.id)
+                                          : undefined
+                                      }
+                                    />
+                                  );
+                                })
+                              : null}
+                          </React.Fragment>
+                        );
+                      });
+                    })()}
                   </ScrollView>
                 </View>
                 <View ref={newCommentMeasureRef} collapsable={false}>
@@ -1114,6 +1260,16 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                       },
                     ]}
                   >
+                    {replyingTo ? (
+                      <View style={threadStyles.replyBanner}>
+                        <Text style={threadStyles.replyBannerText}>
+                          Respondiendo a @{replyingTo.username.replace(/^@/, '')}
+                        </Text>
+                        <TouchableOpacity onPress={cancelReply} hitSlop={8}>
+                          <Text style={threadStyles.replyBannerCancel}>Cancelar</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : null}
                     <NewCommentBox onSend={handleAddComment} clanId={post.author.clanId} />
                   </Animated.View>
                 </View>
@@ -1313,5 +1469,39 @@ const styles = StyleSheet.create({
   },
   newCommentRow: {
     paddingTop: 6,
+  },
+});
+
+const threadStyles = StyleSheet.create({
+  toggleRow: {
+    paddingVertical: 6,
+    paddingHorizontal: 20,
+    marginBottom: 6,
+    alignSelf: 'flex-start',
+  },
+  toggleText: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  replyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+  },
+  replyBannerText: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  replyBannerCancel: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

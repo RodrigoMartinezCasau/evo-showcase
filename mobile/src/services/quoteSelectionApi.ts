@@ -1,4 +1,5 @@
 import { getApiBaseUrl } from '@evoconn/services/debateApi';
+import { mergeApiHeaders } from '@evoconn/services/apiRuntimeConfig';
 import type { Quote } from '@evoconn/types/quotes';
 
 type QuoteCandidatePayload = {
@@ -38,7 +39,7 @@ export async function selectQuoteWithAI(
   try {
     const res = await fetch(`${getApiBaseUrl()}/quotes/select`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: mergeApiHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         reflection: reflectionText,
         candidates: candidates.map(toCandidatePayload),

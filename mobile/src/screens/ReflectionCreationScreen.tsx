@@ -105,6 +105,7 @@ import { EMPTY_WELCOME_TRIPLE_STARS_LAYOUT as EMPTY_WELCOME_TRIPLE_STARS } from 
 import { getReflectionTripleStarsByHouse } from '@evoconn/utils/getReflectionTripleStarsByHouse';
 import { DebateResponseDisplay, PublishBlock } from '@evoconn/components/debate';
 import { useFeedStore, createReflectionPost } from '@evoconn/hooks/useFeedStore';
+import { userForPublish } from '@evoconn/utils/publishAuthor';
 import {
   AI_RESPONSE_BORDER_WIDTH as DEBATE_BW,
   getBlockBorderColor,
@@ -166,12 +167,12 @@ export default function ReflectionCreationScreen() {
         const sourceId = `${messageId ?? 'msg'}_pub`;
         if (publishedRef.current.has(sourceId)) return;
         publishedRef.current.add(sourceId);
-        const post = createReflectionPost(mockCurrentUser, title, body);
+        const post = createReflectionPost(userForPublish(authProfile), title, body);
         (post as any).id = sourceId;
         publishPost(post);
         router.replace({ pathname: '/latest-posts', params: { postId: sourceId } });
       },
-    [publishPost, router],
+    [publishPost, router, authProfile],
   );
 
   const insets = useSafeAreaInsets();

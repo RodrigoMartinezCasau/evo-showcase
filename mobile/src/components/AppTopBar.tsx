@@ -349,14 +349,16 @@ function AppTopBarInner({
               hitSlop={14}
             >
               <View style={[styles.iconFrame, counterIconFrame, topBarIconEditorStyle('fireIcon', 'fireIcon')]}>
-                <>
-                  <Animated.View style={[StyleSheet.absoluteFill, { opacity: Animated.subtract(1, fireAnim) }]}>
-                    <FuegoApagadoIcon width={counterIconFrame.width} height={counterIconFrame.height} />
-                  </Animated.View>
-                  <Animated.View style={[StyleSheet.absoluteFill, { opacity: fireAnim }]}>
-                    <RachaIcon width={counterIconFrame.width} height={counterIconFrame.height} />
-                  </Animated.View>
-                </>
+                {/* Apagado: capa base SIEMPRE visible. Antes usábamos
+                    Animated.subtract(1, fireAnim) y la nueva arquitectura
+                    (Fabric) tardaba un frame en calcularla → el icono se
+                    veía vacío al arrancar hasta tocar la pantalla. */}
+                <View style={StyleSheet.absoluteFill}>
+                  <FuegoApagadoIcon width={counterIconFrame.width} height={counterIconFrame.height} />
+                </View>
+                <Animated.View style={[StyleSheet.absoluteFill, { opacity: fireAnim }]}>
+                  <RachaIcon width={counterIconFrame.width} height={counterIconFrame.height} />
+                </Animated.View>
               </View>
               {showCounters && (
                 <View style={[styles.textBox, { height: counterIconFrame.height }, topBarIconEditorStyle('fireText', 'fireText')]}>

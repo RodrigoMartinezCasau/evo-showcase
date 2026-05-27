@@ -814,7 +814,13 @@ function Footer() {
                 </a>
               </li>
               <li>
-                <a href="#">X / Twitter</a>
+                <a
+                  href="https://discord.gg/4yJqaGxjA8"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Discord
+                </a>
               </li>
               <li>
                 <a

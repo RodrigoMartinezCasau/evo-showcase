@@ -163,12 +163,12 @@ export function FollowProvider({ children }: { children: React.ReactNode }) {
 
         simToggle(activeUserId, uid);
         taste.recordFollow(uid);
-        void addNotification({
-          recipientUserId: uid,
-          type: 'follow',
-          fromUserId: activeUserId,
-          fromUsername: notifName,
-        });
+        // No insertamos la notificación 'follow' desde el cliente: lo hace el
+        // trigger `tr_follow_created_notify` en Supabase al detectar la fila
+        // en `follows`. Insertarla aquí además provocaba notificaciones (y
+        // pushes Expo) duplicadas en el destinatario.
+        // `notifName` se conserva por si reintroducimos avisos locales.
+        void notifName;
       })();
     },
     [

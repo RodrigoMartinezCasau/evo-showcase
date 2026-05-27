@@ -116,25 +116,31 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   }, [activeUserId]);
 
   // Si Realtime no está habilitado en Supabase, refrescar al volver a primer plano.
+  // Debounce ~500 ms para no encadenar refresh + registro de push + hidratación social
+  // en el mismo frame al volver de background (causa de IllegalStateException en Fabric).
   useEffect(() => {
     if (!isRealUserId(activeUserId)) return;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') refreshNotifications().catch(console.error);
+      if (state !== 'active') return;
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        refreshNotifications().catch(console.error);
+      }, 500);
     });
-    return () => sub.remove();
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      sub.remove();
+    };
   }, [activeUserId, refreshNotifications]);
 
   // ── Register / refresh Expo push token (necesario para burbujas con app cerrada) ──
-  // El propio registerPushToken tiene mutex + throttle (60 s) y no reabre el
-  // diálogo del sistema si ya fue denegado en esta sesión, así que es seguro
-  // llamarlo en cada AppState 'active' sin entrar en bucle paused↔resumed.
+  // Llamamos UNA VEZ al iniciar sesión. registerPushToken ya tiene mutex + throttle
+  // (60 s) interno, así que llamarlo además al volver de background es redundante
+  // y solo añade carga al frame en el que el usuario interactúa con la UI.
   useEffect(() => {
     if (!isRealUserId(activeUserId)) return;
     registerPushToken(activeUserId).catch(console.error);
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') registerPushToken(activeUserId).catch(console.error);
-    });
-    return () => sub.remove();
   }, [activeUserId]);
 
   // ── Realtime subscription — new notifications arrive instantly ───────────
@@ -164,10 +170,16 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
             createdAt: String(r.created_at ?? new Date().toISOString()),
             read: false,
           };
-          setDb(prev => ({
-            ...prev,
-            [activeUserId]: [notif, ...(prev[activeUserId] ?? [])],
-          }));
+          setDb((prev) => {
+            const slice = prev[activeUserId] ?? [];
+            // Dedup defensivo por id: si por cualquier motivo (refresh manual
+            // + realtime, doble trigger, etc.) llega la misma fila dos veces,
+            // no la añadimos otra vez a la campana.
+            if (notif.id && slice.some((n) => n.id === notif.id)) {
+              return prev;
+            }
+            return { ...prev, [activeUserId]: [notif, ...slice] };
+          });
           // Burbujas del sistema: trigger en Supabase → Expo Push (supabase_push_remote.sql).
           // Aquí solo actualizamos la campana in-app vía Realtime.
         },

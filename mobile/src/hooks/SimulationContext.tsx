@@ -28,7 +28,7 @@ import {
   type FollowGraph,
 } from '@evoconn/data/simulation/simulatedNetwork';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AppState, type AppStateStatus } from 'react-native';
+import { AppState, InteractionManager, type AppStateStatus } from 'react-native';
 import { setActiveSimUser, mockCurrentUser } from '@evoconn/data/mockUser';
 import { useAuth } from '../../mobile/lib/AuthContext';
 import { supabase } from '../../mobile/lib/supabase';
@@ -36,9 +36,11 @@ import { primeFollowProfileIds } from '@evoconn/hooks/followProfilePrime';
 import {
   isRealUserId,
   fetchAllPosts,
+  fetchPostsByAuthor,
   fetchVotesForPosts,
   fetchMyVotes,
   fetchMySaves,
+  fetchCommentsForPosts,
   fetchFollowing,
   fetchFollowers,
   fetchCommentsForPost,
@@ -51,8 +53,14 @@ import {
   insertFollow,
   deleteFollow as dbDeleteFollow,
   insertComment,
+  deleteComment as dbDeleteComment,
   dbRowToSimPost,
 } from '@evoconn/services/supabaseSocial';
+import {
+  loadCachedHydration,
+  saveCachedHydration,
+  type CachedHydrationPayload,
+} from '@evoconn/services/socialCache';
 
 // v2: bumped to wipe cached sim data and start fresh for public launch
 // v3: bumped to wipe old posts/comments that lack authorUsername snapshot fields.
@@ -72,7 +80,26 @@ async function loadSupabaseHydrationPayload(hydrateFor: string): Promise<{
   followers: string[];
   commentsByPost: Record<string, SimComment[]>;
 }> {
-  const sbPosts = await fetchAllPosts();
+  // El feed global está limitado a 500 posts recientes. Para garantizar
+  // que el usuario SIEMPRE vea TODOS sus posts en su perfil (aunque caigan
+  // fuera de ese top global a medida que la red crece), traemos también
+  // los posts del autor activo sin límite y los fusionamos deduplicando.
+  // Antes (sin esto + con limit=200) los posts antiguos del usuario
+  // "desaparecían" de su perfil al pasar de ~200 posts en la red.
+  const [globalPosts, ownPosts] = await Promise.all([
+    fetchAllPosts(),
+    fetchPostsByAuthor(hydrateFor),
+  ]);
+
+  const byId = new Map<string, SimPost>();
+  for (const p of globalPosts) byId.set(p.id, p);
+  for (const p of ownPosts) {
+    // Preferimos el del feed global (incluye flags como is_hidden filtrados);
+    // solo añadimos los del autor que no estaban en el top global.
+    if (!byId.has(p.id)) byId.set(p.id, p);
+  }
+  const sbPosts = Array.from(byId.values());
+
   const postIds = sbPosts.map(p => p.id);
   const allVoteRows = await fetchVotesForPosts(postIds);
   for (const row of allVoteRows) {
@@ -94,11 +121,11 @@ async function loadSupabaseHydrationPayload(hydrateFor: string): Promise<{
     fetchFollowers(hydrateFor),
   ]);
 
-  const allComments = await Promise.all(postIds.map(id => fetchCommentsForPost(id)));
-  const commentsByPost: Record<string, SimComment[]> = {};
-  postIds.forEach((id, i) => {
-    if (allComments[i].length > 0) commentsByPost[id] = allComments[i];
-  });
+  // UNA sola consulta `.in('post_id', postIds)` en lugar de N en paralelo.
+  // Antes hacía Promise.all(postIds.map(...)) → 80+ XHR concurrentes en el
+  // arranque que colapsaban Fabric en Android gama media (causa raíz del
+  // IllegalStateException: addViewAt en 1.1.4).
+  const commentsByPost: Record<string, SimComment[]> = await fetchCommentsForPosts(postIds);
 
   return { sbPosts, myVotesMap, mySavedPostIds, following, followers, commentsByPost };
 }
@@ -187,6 +214,8 @@ export type SimulationContextValue = {
   toggleHidePost: (userId: string, postId: string) => void;
   publishPost: (post: SimPost) => void;
   addComment: (comment: SimComment) => Promise<void>;
+  /** Borra un comentario propio (o del autor del post). RLS lo valida. */
+  deleteCommentById: (postId: string, commentId: string) => Promise<void>;
   /** Lazily fetch fresh comments from Supabase for a specific post. */
   ensureCommentsForPost: (postId: string) => Promise<void>;
   /**
@@ -218,14 +247,39 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   const [realtimeEpoch, setRealtimeEpoch] = useState(0);
   useEffect(() => {
     let lastState: AppStateStatus = AppState.currentState;
+    let lastEpochAt = 0;
+    let pendingTimeout: ReturnType<typeof setTimeout> | null = null;
+    // Mínimo entre re-creaciones de canal Realtime para evitar que un usuario
+    // que entra y sale rápido de la app dispare 5 hidrataciones encadenadas
+    // (causa raíz de los IllegalStateException en Android Fabric: árbol React
+    // se re-monta mientras el anterior aún se está desmontando).
+    const MIN_EPOCH_INTERVAL_MS = 30_000;
+    // Pequeño debounce para coalescer eventos `inactive` → `active` que
+    // Android emite muy juntos cuando el usuario interactúa con el sistema.
+    const RESUME_DEBOUNCE_MS = 600;
+
+    const scheduleEpochBump = () => {
+      if (pendingTimeout) clearTimeout(pendingTimeout);
+      pendingTimeout = setTimeout(() => {
+        pendingTimeout = null;
+        const now = Date.now();
+        if (now - lastEpochAt < MIN_EPOCH_INTERVAL_MS) return;
+        lastEpochAt = now;
+        setRealtimeEpoch((e) => e + 1);
+      }, RESUME_DEBOUNCE_MS);
+    };
+
     const sub = AppState.addEventListener('change', (next) => {
       const wasBackground = lastState === 'background' || lastState === 'inactive';
       lastState = next;
       if (next === 'active' && wasBackground) {
-        setRealtimeEpoch((e) => e + 1);
+        scheduleEpochBump();
       }
     });
-    return () => sub.remove();
+    return () => {
+      if (pendingTimeout) clearTimeout(pendingTimeout);
+      sub.remove();
+    };
   }, []);
 
   // When a real Supabase user is authenticated (UUID not in the 9-user sim),
@@ -256,53 +310,191 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   const followHydrated = useRef(false);
   const commentsHydrated = useRef(false);
 
-  // ── Supabase hydration for real users ────────────────────────────────────
-  // When the authenticated user's UUID is known, load ALL social data from
-  // Supabase so the app is consistent across devices.
-  // Re-runs on every real `activeUserId` change (account switch) with cancellation.
+  // ── Supabase hydration for real users (FASEADO) ─────────────────────────
+  // Fase 0  (instant, <150 ms): cache de AsyncStorage → setPosts inmediato.
+  //                              Permite ver el feed aunque Supabase tarde.
+  // Fase 1  (crítica, 1-3 s):    posts globales + posts propios en paralelo.
+  //                              setPosts con datos frescos.
+  // Fase 2  (background):        votes + saves + follows + followers
+  //                              + voteRows en paralelo. Aplica conforme llegan.
+  // Fase 3  (deferido):          comentarios. Diferido vía InteractionManager
+  //                              para no competir con el primer paint.
+  //
+  // Antes era SECUENCIAL y traía 500 posts + comentarios en el critical
+  // path → el cold-start tardaba 10-30 s con Supabase saturado y los
+  // 4200 queries simultáneas (700 usuarios × 6 queries cada uno)
+  // mataban a PostgREST. Ahora cada usuario hace 1 query crítica + 5
+  // de background, y la app abre INSTANTÁNEAMENTE con datos cacheados.
   useEffect(() => {
     if (!isRealUserId(activeUserId)) return;
 
     let cancelled = false;
     const hydrateFor = activeUserId;
 
-    (async () => {
-      console.log('[Social] Hydrating from Supabase for user', hydrateFor);
-
-      const payload = await loadSupabaseHydrationPayload(hydrateFor);
-
+    const applyPosts = (sbPosts: SimPost[]) => {
       if (cancelled || activeUserIdRef.current !== hydrateFor) return;
+      setPosts(() => sbPosts);
+      postsHydrated.current = true;
+    };
 
-      // ── Apply to state ──────────────────────────────────────────────────
-      setPosts(() => payload.sbPosts);
-      setVoteMapRaw(prev => ({
-        ...prev,
-        [hydrateFor]: payload.myVotesMap,
-      }));
+    const applyMyVotes = (myVotesMap: Record<string, 'up' | 'down'>) => {
+      if (cancelled || activeUserIdRef.current !== hydrateFor) return;
+      setVoteMapRaw(prev => ({ ...prev, [hydrateFor]: myVotesMap }));
+      votesHydrated.current = true;
+    };
+
+    const applyMySaves = (mySavedPostIds: string[]) => {
+      if (cancelled || activeUserIdRef.current !== hydrateFor) return;
       setSavedMapArr(prev => {
         const updated = { ...prev };
-        updated[hydrateFor] = payload.mySavedPostIds;
+        updated[hydrateFor] = mySavedPostIds;
         return updated;
       });
+      savedHydrated.current = true;
+    };
+
+    const applyFollowGraph = (following: string[], followers: string[]) => {
+      if (cancelled || activeUserIdRef.current !== hydrateFor) return;
       setFollowGraph(prev => {
         const updated = { ...prev };
         const prevMine = prev[hydrateFor] ?? [];
-        updated[hydrateFor] = [...new Set([...payload.following, ...prevMine])];
-        for (const followerId of payload.followers) {
+        updated[hydrateFor] = [...new Set([...following, ...prevMine])];
+        for (const followerId of followers) {
           updated[followerId] = [
             ...new Set([...(updated[followerId] ?? []), hydrateFor]),
           ];
         }
         return updated;
       });
-      setCommentsMap(prev => ({ ...prev, ...payload.commentsByPost }));
-
-      postsHydrated.current  = true;
-      votesHydrated.current  = true;
       followHydrated.current = true;
-      commentsHydrated.current = true;
-      savedHydrated.current  = true;
-      console.log('[Social] Supabase hydration complete. Posts:', payload.sbPosts.length);
+    };
+
+    // Cache de votos/saves leídos en fase 0 — usados en fase 1 para
+    // preservar los conteos al reemplazar posts hasta que fase 2 traiga
+    // los votos frescos del servidor. Sin esto, los cards verían sus
+    // votos caer a 0 entre fase 1 y fase 2 (regresión visible).
+    const cachedPostsByIdRef: { current: Map<string, SimPost> } = { current: new Map() };
+
+    // ── FASE 0: render cache instantáneo ────────────────────────────────
+    loadCachedHydration(hydrateFor)
+      .then(cached => {
+        if (cancelled || activeUserIdRef.current !== hydrateFor || !cached) return;
+        if (cached.sbPosts.length > 0) {
+          cachedPostsByIdRef.current = new Map(cached.sbPosts.map(p => [p.id, p]));
+          applyPosts(cached.sbPosts);
+        }
+        if (Object.keys(cached.myVotesMap).length > 0) applyMyVotes(cached.myVotesMap);
+        if (cached.mySavedPostIds.length > 0) applyMySaves(cached.mySavedPostIds);
+        if (cached.following.length > 0 || cached.followers.length > 0) {
+          applyFollowGraph(cached.following, cached.followers);
+        }
+        if (cached.commentsByPost && Object.keys(cached.commentsByPost).length > 0) {
+          const cachedComments = cached.commentsByPost;
+          InteractionManager.runAfterInteractions(() => {
+            if (cancelled || activeUserIdRef.current !== hydrateFor) return;
+            setCommentsMap(prev => ({ ...prev, ...cachedComments }));
+          });
+        }
+      })
+      .catch(() => {/* cache es best-effort */});
+
+    // ── FASE 1: posts frescos (crítica) ──────────────────────────────────
+    (async () => {
+      console.log('[Social] Hydrating posts (critical path) for', hydrateFor);
+      const [globalPosts, ownPosts] = await Promise.all([
+        fetchAllPosts(),
+        fetchPostsByAuthor(hydrateFor),
+      ]);
+      if (cancelled || activeUserIdRef.current !== hydrateFor) return;
+
+      const byId = new Map<string, SimPost>();
+      for (const p of globalPosts) byId.set(p.id, p);
+      for (const p of ownPosts) {
+        if (!byId.has(p.id)) byId.set(p.id, p);
+      }
+
+      // Preservar conteos de votos/saves de la cache hasta que fase 2 los
+      // refresque desde el servidor — evita parpadeo a 0 votos al pintar.
+      const cachedById = cachedPostsByIdRef.current;
+      if (cachedById.size > 0) {
+        for (const p of byId.values()) {
+          const cached = cachedById.get(p.id);
+          if (cached) {
+            p.upvoterIds = cached.upvoterIds;
+            p.downvoterIds = cached.downvoterIds;
+            p.saverIds = cached.saverIds;
+          }
+        }
+      }
+
+      const sbPosts = Array.from(byId.values());
+      const postIds = sbPosts.map(p => p.id);
+
+      applyPosts(sbPosts);
+      console.log('[Social] Posts hydrated:', sbPosts.length);
+
+      // ── FASE 2: todo lo demás en paralelo (background) ─────────────────
+      const [
+        allVoteRows,
+        myVotesMap,
+        mySavedPostIds,
+        following,
+        followers,
+      ] = await Promise.all([
+        fetchVotesForPosts(postIds),
+        fetchMyVotes(hydrateFor),
+        fetchMySaves(hydrateFor),
+        fetchFollowing(hydrateFor),
+        fetchFollowers(hydrateFor),
+      ]);
+      if (cancelled || activeUserIdRef.current !== hydrateFor) return;
+
+      // Aplicar vote rows a los posts (mutación segura: cada post es nuestro).
+      // Antes resetear: fase 1 puede haber preservado votos cacheados para
+      // evitar parpadeo a 0, así que fase 2 SUSTITUYE (no añade) con la
+      // verdad del servidor.
+      const postById = new Map(sbPosts.map(p => [p.id, p] as const));
+      for (const p of postById.values()) {
+        p.upvoterIds = [];
+        p.downvoterIds = [];
+        p.saverIds = [];
+      }
+      for (const row of allVoteRows) {
+        const post = postById.get(row.post_id);
+        if (!post) continue;
+        if (row.vote === 'up') post.upvoterIds = [...post.upvoterIds, row.user_id];
+        if (row.vote === 'down') post.downvoterIds = [...post.downvoterIds, row.user_id];
+      }
+      for (const pid of mySavedPostIds) {
+        const post = postById.get(pid);
+        if (post) post.saverIds = [...post.saverIds, hydrateFor];
+      }
+      setPosts(() => Array.from(postById.values()));
+
+      applyMyVotes(myVotesMap);
+      applyMySaves(mySavedPostIds);
+      applyFollowGraph(following, followers);
+
+      // ── FASE 3: comentarios (deferido) ─────────────────────────────────
+      InteractionManager.runAfterInteractions(async () => {
+        if (cancelled || activeUserIdRef.current !== hydrateFor) return;
+        const commentsByPost = await fetchCommentsForPosts(postIds);
+        if (cancelled || activeUserIdRef.current !== hydrateFor) return;
+        setCommentsMap(prev => ({ ...prev, ...commentsByPost }));
+        commentsHydrated.current = true;
+
+        // Persistir la cache COMPLETA tras todas las fases — próximo cold
+        // start abrirá la app instantáneamente con estos datos.
+        const cachedPayload: CachedHydrationPayload = {
+          sbPosts: Array.from(postById.values()),
+          myVotesMap,
+          mySavedPostIds,
+          following,
+          followers,
+          commentsByPost,
+        };
+        void saveCachedHydration(hydrateFor, cachedPayload);
+      });
     })();
 
     return () => {
@@ -672,9 +864,17 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   );
 
   // ── Keep mockCurrentUser in sync ─────────────────────────────────────────
-  // For simulated users: sync from SimulationContext.
+  // Solo escribimos mockCurrentUser desde el sim cuando activeUserId es un
+  // sim id (u1-u9). Para usuarios reales (UUID), AuthContext.loadProfile es
+  // la ÚNICA fuente de verdad — no interferir aunque session sea null
+  // momentáneamente (token refresh fallido, AuthRetryableFetchError 504).
+  // Antes dependíamos de `session?.user`; durante glitches de red esa
+  // referencia oscilaba y dejaba caer la guardia, pisando la identidad real
+  // con @RODRIGOMARTINEZ.
   useEffect(() => {
     if (!activeUser) return;
+    if (authLoading) return;
+    if (isRealUserId(activeUserId)) return;
     setActiveSimUser({
       id: activeUser.id,
       username: activeUser.username,
@@ -683,7 +883,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       followersCount: activeFollowersCount,
       followingCount: activeFollowingCount,
     });
-  }, [activeUser, activeFollowersCount, activeFollowingCount]);
+  }, [activeUser, activeFollowersCount, activeFollowingCount, authLoading, activeUserId]);
 
   // Real-user clan sync → EffectiveClanSync (ClassificationProvider tree).
 
@@ -851,6 +1051,27 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  /**
+   * Borra un comentario (y, por cascada en DB, sus respuestas) tanto en
+   * Supabase como en el estado local. RLS valida que el caller sea autor
+   * del comentario o autor del post.
+   */
+  const deleteCommentById = useCallback(async (postId: string, commentId: string) => {
+    try {
+      await dbDeleteComment(commentId);
+    } catch (err) {
+      console.error('[Sim] deleteCommentById:', err);
+      return;
+    }
+    setCommentsMap(prev => {
+      const arr = prev[postId];
+      if (!arr) return prev;
+      // Quita el comentario y cualquier respuesta cuyo parentId sea este id.
+      const next = arr.filter(c => c.id !== commentId && c.parentId !== commentId);
+      return { ...prev, [postId]: next };
+    });
+  }, []);
+
   /** Fetch fresh comments from Supabase for a specific post (lazy-load on open). */
   const ensureCommentsForPost = useCallback(async (postId: string) => {
     if (!isRealUserId(activeUserId)) return; // sim users: already in local state
@@ -948,6 +1169,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       toggleHidePost,
       publishPost,
       addComment,
+      deleteCommentById,
       ensureCommentsForPost,
       refreshSocialFromSupabase,
     }),
@@ -957,7 +1179,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       commentsMap,
       activeUser, activeFollowersCount, activeFollowingCount,
       follow, unfollow, toggleFollow, castVote, toggleSave,
-      deletePost, toggleHidePost, publishPost, addComment, ensureCommentsForPost,
+      deletePost, toggleHidePost, publishPost, addComment, deleteCommentById, ensureCommentsForPost,
       refreshSocialFromSupabase,
     ],
   );

@@ -9,6 +9,7 @@ import {
   useWindowDimensions,
   Modal,
   Pressable,
+  InteractionManager,
 } from 'react-native';
 import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { useRouter, usePathname } from 'expo-router';
@@ -143,16 +144,35 @@ export function BottomCommunityTabs({
 
   const closeCreate = useCallback(() => setCreateOpen(false), []);
 
+  // Cerrar el Modal y navegar en el MISMO tick provoca en Android + Fabric un
+  // crash `IllegalStateException: addViewAt failed to insert view` cuando el
+  // árbol nuevo se monta antes de que el Modal termine de desmontarse.
+  // Cerramos primero el modal, dejamos que la animación / mount-queue se
+  // estabilicen (`InteractionManager`) y solo entonces navegamos.
+  const navigateAfterClose = useCallback(
+    (run: () => void) => {
+      setCreateOpen(false);
+      InteractionManager.runAfterInteractions(() => {
+        // Doble RAF da tiempo a Fabric a completar el unmount del Modal en
+        // dispositivos lentos (Galaxy/Xiaomi de gama media-baja).
+        requestAnimationFrame(() => requestAnimationFrame(run));
+      });
+    },
+    [],
+  );
+
   const onNewReflection = useCallback(() => {
-    closeCreate();
-    // No guard: pathname es siempre `/reflection` aunque cambie `thoughtId` en query.
-    router.push('/reflection');
-  }, [closeCreate, router]);
+    navigateAfterClose(() => {
+      // No guard: pathname es siempre `/reflection` aunque cambie `thoughtId` en query.
+      router.push('/reflection');
+    });
+  }, [navigateAfterClose, router]);
 
   const onNewPhrase = useCallback(() => {
-    closeCreate();
-    router.replace({ pathname: '/phrase' });
-  }, [closeCreate, router]);
+    navigateAfterClose(() => {
+      router.replace({ pathname: '/phrase' });
+    });
+  }, [navigateAfterClose, router]);
 
   const createSz = BOTTOM_BAR_LAYOUT.BOTTOM_BAR_CREATE_BUTTON_SIZE;
   const createButtonColor = createOpen ? selectedColor : evoconnColors.muted;
