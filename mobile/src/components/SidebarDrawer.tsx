@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -47,6 +47,7 @@ import type { ConversationItem as ConvItem } from '@evoconn/types';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { useAuth } from '../../mobile/lib/AuthContext';
 import { useConversationFolders } from '@evoconn/hooks/ConversationFoldersContext';
+import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { SIDEBAR_DRAWER_OFFSCREEN_TRANSLATE_X } from '@evoconn/constants/communityDrawerGesture';
 import {
@@ -136,12 +137,36 @@ function SidebarDrawerInner({
   const closeSidebar = onClose;
   const searchInputRef = useRef<TextInput>(null);
   const [drawerSearch, setDrawerSearch] = useState('');
-  const [convState, setConvState] = useState(conversations);
   const { folders: folderState, setFolders: setFolderState } = useConversationFolders();
+  const { updateThought, removeThought } = useThoughts();
 
-  useEffect(() => {
-    setConvState(conversations);
-  }, [conversations]);
+  // Persistir favoritos / carpeta / título en thoughtsStorage (antes solo
+  // mutaba estado local y el próximo render desde `thoughts` lo pisaba).
+  const handleConversationsChange = useCallback(
+    (next: ConvItem[]) => {
+      const prevById = new Map(conversations.map((c) => [c.id, c]));
+      const nextIds = new Set(next.map((c) => c.id));
+
+      for (const c of next) {
+        const prev = prevById.get(c.id);
+        if (!prev) continue;
+        const patch: {
+          folderId?: string | null;
+          isFavorite?: boolean;
+          title?: string;
+        } = {};
+        if (prev.folderId !== c.folderId) patch.folderId = c.folderId ?? null;
+        if (prev.isFavorite !== c.isFavorite) patch.isFavorite = c.isFavorite;
+        if (prev.title !== c.title) patch.title = c.title;
+        if (Object.keys(patch).length > 0) updateThought(c.id, patch);
+      }
+
+      for (const prev of prevById.values()) {
+        if (!nextIds.has(prev.id)) removeThought(prev.id);
+      }
+    },
+    [conversations, updateThought, removeThought],
+  );
 
   useEffect(() => {
     if (!visible) {
@@ -356,8 +381,8 @@ function SidebarDrawerInner({
             <View style={styles.sidebarConversationsFixedColumn}>
               <SidebarConversationsPanel
                 clanId={user.clanId}
-                conversations={convState}
-                onConversationsChange={setConvState}
+                conversations={conversations}
+                onConversationsChange={handleConversationsChange}
                 folders={folderState}
                 onFoldersChange={setFolderState}
                 drawerSearch={drawerSearch}
