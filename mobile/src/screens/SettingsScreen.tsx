@@ -16,6 +16,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { DAILY_USES_LIMIT } from '@evoconn/services/userStatsStorage';
@@ -486,7 +487,14 @@ export default function SettingsScreen({
       id: 'info',
       title: 'INFORMACIÓN',
       rows: [
-        { id: 'version', label: 'Versión', value: '1.0.0', icon: 'information-circle-outline', iconBg: IC.gray, type: 'info' },
+        {
+          id: 'version',
+          label: 'Versión',
+          value: Constants.expoConfig?.version ?? '—',
+          icon: 'information-circle-outline',
+          iconBg: IC.gray,
+          type: 'info',
+        },
       ],
     },
   ], [remainingUses, userEmail, userPhone, deletingAccount, confirmDeleteAccount, router, profile?.id]);
