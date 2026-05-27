@@ -246,14 +246,17 @@ export default function PersonalProfileScreen() {
 
   const handleRecentPostPress = useCallback(
     (post: CommunityPost) => {
-      router.push({ pathname: '/latest-posts', params: { postId: post.id } });
+      router.push({
+        pathname: '/latest-posts',
+        params: { postId: post.id, userId: profileWithClan.id },
+      });
     },
-    [router],
+    [router, profileWithClan.id],
   );
 
   const handleSeeMoreRecentPosts = useCallback(() => {
-    router.push({ pathname: '/latest-posts' });
-  }, [router]);
+    router.push({ pathname: '/latest-posts', params: { userId: profileWithClan.id } });
+  }, [router, profileWithClan.id]);
 
   const handlePostMenuAction = useCallback(
     (action: 'hide' | 'delete', postId: string) => {

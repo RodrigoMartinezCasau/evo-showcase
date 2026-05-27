@@ -50,11 +50,14 @@ export function getPublicPostWebUrl(postId: string): string {
 }
 
 /**
- * Deep link nativo: abre `/post/[id]`.
+ * Deep link nativo: abre Comunidad → Para ti con la publicación en el visor fullscreen
+ * (misma UX que el widget; no usa la pantalla legacy `/post/[id]`).
  */
 export function getAppPostOpenUrl(postId: string): string {
-  const id = encodeURIComponent(postId);
-  return Linking.createURL(`post/${id}`, { scheme: APP_SCHEME });
+  return Linking.createURL('/', {
+    scheme: APP_SCHEME,
+    queryParams: { tab: 'para-ti', postId },
+  });
 }
 
 /** Mensaje al compartir una publicación. La URL va al FINAL para evitar

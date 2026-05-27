@@ -26,6 +26,8 @@ import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
 import { getMainColumnHeightForFloatingBottomBar } from '@evoconn/constants/appShellLayout';
 import { useFeedStore } from '@evoconn/hooks/useFeedStore';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
+import { usePersonalProfile } from '@evoconn/hooks/PersonalProfileContext';
+import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import type { CommunityPost } from '@evoconn/types';
 import { ReflectionDetailItem } from '@evoconn/components/ReflectionDetailItem';
@@ -68,8 +70,16 @@ export default function LatestPostsScreen() {
   const params = useLocalSearchParams<{ postId?: string; userId?: string }>();
   const postId = typeof params.postId === 'string' ? params.postId : undefined;
   const paramUserId = typeof params.userId === 'string' ? params.userId : undefined;
-  const targetUserId = paramUserId ?? mockCurrentUser.id;
-  const viewingOtherUser = targetUserId !== mockCurrentUser.id;
+  const { activeUserId } = useSimulation();
+  const { posts: myProfilePosts } = usePersonalProfile();
+  const { session, profile: authProfile } = useAuth();
+
+  /** Mismo id que el perfil personal (SimulationContext), no mockCurrentUser.id vacío en cuentas reales. */
+  const selfUserId =
+    (session?.user?.id && isRealUserId(session.user.id) ? session.user.id : null) ??
+    (activeUserId || mockCurrentUser.id);
+  const targetUserId = paramUserId ?? selfUserId;
+  const viewingOtherUser = targetUserId !== selfUserId;
   const needsRemoteFetch = isRealUserId(targetUserId) && viewingOtherUser;
 
   const insets = useSafeAreaInsets();
@@ -77,7 +87,6 @@ export default function LatestPostsScreen() {
   const { height: screenH } = useWindowDimensions();
   const { posts: allPosts } = useFeedStore();
   const { thoughts } = useThoughts();
-  const { profile: authProfile } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const ready = useDeferredRender();
   const [feedScrollEnabled, setFeedScrollEnabled] = useState(true);
@@ -155,15 +164,19 @@ export default function LatestPostsScreen() {
         postId,
       );
     }
-    const fromFeed = sortMyPostsNewestFirst(
-      allPosts.filter((p) => p.author.id === targetUserId),
-    );
+    // Misma fuente que el preview del perfil (simPosts), no solo el feed global.
+    const ownPosts =
+      myProfilePosts.length > 0
+        ? myProfilePosts
+        : sortMyPostsNewestFirst(allPosts.filter((p) => p.author.id === targetUserId));
+    const sorted = sortMyPostsNewestFirst(ownPosts);
     return pinPostFirst(
-      enrichPostsAuthorAvatar(fromFeed, targetUserId, profileAvatar),
+      enrichPostsAuthorAvatar(sorted, targetUserId, profileAvatar),
       postId,
     );
   }, [
     allPosts,
+    myProfilePosts,
     postId,
     targetUserId,
     needsRemoteFetch,
@@ -183,13 +196,13 @@ export default function LatestPostsScreen() {
 
   const handleAuthorPress = useCallback(
     (userId: string) => {
-      if (userId === mockCurrentUser.id) {
+      if (userId === selfUserId) {
         navigateUnlessCurrent(pathname, '/my-profile');
       } else {
         navigateUnlessCurrent(pathname, `/profile/${userId}`);
       }
     },
-    [router, pathname],
+    [pathname, selfUserId],
   );
 
   const handleClanPress = useCallback(

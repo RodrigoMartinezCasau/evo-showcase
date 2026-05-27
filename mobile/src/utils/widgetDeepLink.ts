@@ -10,15 +10,56 @@ function normalizeQueryParam(value: string | string[] | undefined): string | und
   return s.length > 0 ? s : undefined;
 }
 
-/** Deep link emitted by the home-screen widget (`evo:///?tab=para-ti&postId=…`). */
-export function parseWidgetPostDeepLink(url: string | null | undefined): WidgetPostDeepLink | null {
+function postIdFromPathSegment(segment: string | undefined): string | undefined {
+  if (!segment) return undefined;
+  const cleaned = sanitizeRouteId(segment);
+  return cleaned || undefined;
+}
+
+/** Widget + share + universal link → abrir publicación en visor Para ti. */
+export function parseCommunityPostDeepLink(url: string | null | undefined): WidgetPostDeepLink | null {
   if (!url) return null;
-  const { queryParams } = Linking.parse(url);
-  if (!queryParams) return null;
+
+  const parsed = Linking.parse(url);
+  const queryParams = parsed.queryParams ?? {};
+
   const tab = normalizeQueryParam(queryParams.tab as string | string[] | undefined);
-  const postId = normalizeQueryParam(queryParams.postId as string | string[] | undefined);
-  if (tab !== 'para-ti' || !postId) return null;
-  return { tab: 'para-ti', postId };
+  const postIdFromQuery = normalizeQueryParam(
+    queryParams.postId as string | string[] | undefined,
+  );
+  if (tab === 'para-ti' && postIdFromQuery) {
+    const id = postIdFromQuery ? sanitizeRouteId(postIdFromQuery) : undefined;
+    if (id) return { tab: 'para-ti', postId: id };
+  }
+
+  const path = (parsed.path ?? '').replace(/^\//, '');
+  const host = (parsed.hostname ?? '').toLowerCase();
+
+  // evo://post/{uuid}
+  if (host === 'post') {
+    const id = postIdFromPathSegment(path || undefined);
+    if (id) return { tab: 'para-ti', postId: id };
+  }
+  if (path.startsWith('post/')) {
+    const id = postIdFromPathSegment(path.slice('post/'.length).split('/')[0]);
+    if (id) return { tab: 'para-ti', postId: id };
+  }
+
+  // https://www.evoconn.com/post/{uuid} (universal / app link)
+  const isWeb =
+    host.includes('evoconn.com') ||
+    (parsed.scheme === 'https' && path.startsWith('post/'));
+  if (isWeb && path.startsWith('post/')) {
+    const id = postIdFromPathSegment(path.slice('post/'.length).split('/')[0]);
+    if (id) return { tab: 'para-ti', postId: id };
+  }
+
+  return null;
+}
+
+/** @deprecated Usa {@link parseCommunityPostDeepLink}. */
+export function parseWidgetPostDeepLink(url: string | null | undefined): WidgetPostDeepLink | null {
+  return parseCommunityPostDeepLink(url);
 }
 
 /** Normaliza un route/query param y limpia caracteres no-id (texto del share

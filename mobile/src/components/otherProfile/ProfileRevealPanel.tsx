@@ -12,6 +12,7 @@ import { PhilosophyPercentagesPanel } from './PhilosophyPercentagesPanel';
 import { UserTotalsStats } from './UserTotalsStats';
 import { RecentPostsSlider } from './RecentPostsSlider';
 import type { CommunityPost } from '@evoconn/types';
+import { navigateToCommunityPost } from '@evoconn/utils/notificationNavigation';
 
 type Props = {
   authorId: string;
@@ -62,7 +63,7 @@ export const ProfileRevealPanel = React.memo(function ProfileRevealPanel({ autho
 
   const handlePostPress = useCallback(
     (post: CommunityPost) => {
-      router.push({ pathname: '/post/[id]', params: { id: post.id } });
+      navigateToCommunityPost(router, post.id);
     },
     [router],
   );

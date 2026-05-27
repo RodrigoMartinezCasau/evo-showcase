@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { ShareOpenInApp } from '@/components/ShareOpenInApp'
-import { DEFAULT_OG_IMAGE, publicPostUrl } from '@/lib/share/constants'
+import { DEFAULT_OG_IMAGE, appPostDeepLink, publicPostUrl } from '@/lib/share/constants'
 import { fetchSharePost, truncatePreview } from '@/lib/share/supabaseShareServer'
 
 type Props = { params: Promise<{ id: string }> }
@@ -40,7 +40,7 @@ export default async function PostSharePage({ params }: Props) {
 
   return (
     <ShareOpenInApp
-      appPath={`post/${id}`}
+      deepLink={appPostDeepLink(id)}
       title={author}
       subtitle={post?.type === 'phrase' ? 'Frase en EVO' : 'Reflexión en EVO'}
       preview={preview ? `«${preview}»` : undefined}
