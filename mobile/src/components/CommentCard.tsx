@@ -13,6 +13,7 @@ import {
 } from '@evoconn/constants/newCommentBoxLayout';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
 import { timeAgo } from '@evoconn/utils/timeAgo';
+import { UserAvatarFrame } from '@evoconn/components/shared/UserAvatarFrame';
 
 import UpvoteInactive from '../assets/detailActions/31.svg';
 import UpvoteActive from '../assets/detailActions/32.svg';
@@ -20,6 +21,8 @@ import UpvoteActive from '../assets/detailActions/32.svg';
 type CommentCardProps = {
   authorId: string;
   username: string;
+  /** Foto de perfil del autor (clan badge si falta). */
+  avatarUri?: string | null;
   text: string;
   clanId: string | null | undefined;
   upvotes: number;
@@ -54,6 +57,7 @@ type CommentCardProps = {
 export const CommentCard = React.memo(function CommentCard({
   authorId,
   username,
+  avatarUri,
   text,
   clanId,
   upvotes,
@@ -212,47 +216,63 @@ export const CommentCard = React.memo(function CommentCard({
           },
         ]}
       >
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={onAuthorPress} disabled={!onAuthorPress} hitSlop={8}>
-            <Text style={[styles.username, { fontSize: CARD.usernameFontSize }]}>
-              {displayUsername}
-            </Text>
-          </TouchableOpacity>
-          {relTime ? (
-            <Text style={[styles.timeText, { fontSize: Math.max(10, CARD.usernameFontSize - 2) }]}>
-              · {relTime}
-            </Text>
-          ) : null}
-          {replyingToUsername ? (
-            <Text
-              numberOfLines={1}
-              style={[styles.replyTargetText, { fontSize: Math.max(10, CARD.usernameFontSize - 2) }]}
-            >
-              · → @{replyingToUsername.replace(/^@/, '').toUpperCase()}
-            </Text>
-          ) : null}
-        </View>
-        <Text style={[styles.body, { fontSize: CARD.bodyFontSize }]}>
-          {visibleText}
-        </Text>
-        {(onReply || (replyCount > 0 && onToggleThread)) ? (
-          <View style={styles.actionRow}>
-            {onReply ? (
-              <TouchableOpacity onPress={onReply} hitSlop={8}>
-                <Text style={styles.replyBtnText}>Responder</Text>
-              </TouchableOpacity>
+        <TouchableOpacity
+          onPress={onAuthorPress}
+          disabled={!onAuthorPress}
+          activeOpacity={0.85}
+          hitSlop={6}
+          style={styles.avatarTap}
+        >
+          <UserAvatarFrame
+            clanId={clanId}
+            avatarUri={avatarUri}
+            size={CARD.avatarSize}
+            noPhotoFallback="by-clan"
+          />
+        </TouchableOpacity>
+        <View style={[styles.cardContent, { marginLeft: CARD.avatarGap }]}>
+          <View style={styles.headerRow}>
+            <TouchableOpacity onPress={onAuthorPress} disabled={!onAuthorPress} hitSlop={8}>
+              <Text style={[styles.username, { fontSize: CARD.usernameFontSize }]}>
+                {displayUsername}
+              </Text>
+            </TouchableOpacity>
+            {relTime ? (
+              <Text style={[styles.timeText, { fontSize: Math.max(10, CARD.usernameFontSize - 2) }]}>
+                · {relTime}
+              </Text>
             ) : null}
-            {replyCount > 0 && onToggleThread ? (
-              <TouchableOpacity onPress={onToggleThread} hitSlop={8}>
-                <Text style={styles.replyBtnText}>
-                  {threadExpanded
-                    ? '— Ocultar respuestas'
-                    : `— Ver ${replyCount} ${replyCount === 1 ? 'respuesta' : 'respuestas'}`}
-                </Text>
-              </TouchableOpacity>
+            {replyingToUsername ? (
+              <Text
+                numberOfLines={1}
+                style={[styles.replyTargetText, { fontSize: Math.max(10, CARD.usernameFontSize - 2) }]}
+              >
+                · → @{replyingToUsername.replace(/^@/, '').toUpperCase()}
+              </Text>
             ) : null}
           </View>
-        ) : null}
+          <Text style={[styles.body, { fontSize: CARD.bodyFontSize }]}>
+            {visibleText}
+          </Text>
+          {(onReply || (replyCount > 0 && onToggleThread)) ? (
+            <View style={styles.actionRow}>
+              {onReply ? (
+                <TouchableOpacity onPress={onReply} hitSlop={8}>
+                  <Text style={styles.replyBtnText}>Responder</Text>
+                </TouchableOpacity>
+              ) : null}
+              {replyCount > 0 && onToggleThread ? (
+                <TouchableOpacity onPress={onToggleThread} hitSlop={8}>
+                  <Text style={styles.replyBtnText}>
+                    {threadExpanded
+                      ? '— Ocultar respuestas'
+                      : `— Ver ${replyCount} ${replyCount === 1 ? 'respuesta' : 'respuestas'}`}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
       </TouchableOpacity>
 
       {/* Upvote — sibling of the card, width = SEND_BTN.size, gap = INBOX.gap.
@@ -290,6 +310,15 @@ const styles = StyleSheet.create({
   },
   card: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  avatarTap: {
+    marginTop: 1,
+  },
+  cardContent: {
+    flex: 1,
+    minWidth: 0,
   },
   upvoteAnchor: {
     width: SEND_BTN.size,

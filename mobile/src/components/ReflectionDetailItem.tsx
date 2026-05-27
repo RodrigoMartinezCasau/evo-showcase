@@ -48,7 +48,13 @@ import { usePersonalProfile } from '@evoconn/hooks/PersonalProfileContext';
 import { useNotifications } from '@evoconn/hooks/NotificationsContext';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import type { SimComment } from '@evoconn/data/simulation/simulatedNetwork';
-import { insertReport, isRealUserId, deleteComment as dbDeleteComment } from '@evoconn/services/supabaseSocial';
+import {
+  insertReport,
+  isRealUserId,
+  deleteComment as dbDeleteComment,
+  fetchProfilesBatch,
+  type BasicProfile,
+} from '@evoconn/services/supabaseSocial';
 import { useBlockedUsers } from '@evoconn/hooks/BlockedUsersContext';
 import { useAuth } from '../../mobile/lib/AuthContext';
 import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
@@ -199,12 +205,41 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
 
   const { commentsMap, addComment: addSimComment, users: simUsers, ensureCommentsForPost, deleteCommentById } = useSimulation();
 
+  const [commentAuthorCache, setCommentAuthorCache] = useState<Record<string, BasicProfile>>({});
+  const fetchedCommentAuthorIds = useRef<Set<string>>(new Set());
+
   // Fetch fresh comments from Supabase the first time this post is opened.
   useEffect(() => {
     ensureCommentsForPost(post.id).catch(console.error);
   // We only want to run this once per post open, not on every update.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [post.id]);
+
+  useEffect(() => {
+    const simComments = commentsMap[post.id] ?? [];
+    const missing = [
+      ...new Set(
+        simComments
+          .map((c) => c.authorId)
+          .filter((id) => isRealUserId(id) && !fetchedCommentAuthorIds.current.has(id)),
+      ),
+    ];
+    if (missing.length === 0) return;
+    missing.forEach((id) => fetchedCommentAuthorIds.current.add(id));
+    fetchProfilesBatch(missing)
+      .then((profiles) => {
+        setCommentAuthorCache((prev) => {
+          const next = { ...prev };
+          profiles.forEach((p) => {
+            next[p.id] = p;
+          });
+          return next;
+        });
+      })
+      .catch(() => {
+        missing.forEach((id) => fetchedCommentAuthorIds.current.delete(id));
+      });
+  }, [commentsMap, post.id]);
 
   const [commentVotes, setCommentVotes] = useState<Record<string, boolean>>({});
   const toggleCommentVote = useCallback((commentId: string) => {
@@ -226,22 +261,37 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
       const isSelf =
         (session?.user?.id != null && sc.authorId === session.user.id) ||
         sc.authorId === mockCurrentUser.id;
+      const cached = commentAuthorCache[sc.authorId];
+      const selfAvatar =
+        authProfile?.avatar_url?.trim() || mockCurrentUser.avatarUri || undefined;
+      const authorAvatar = isSelf
+        ? selfAvatar
+        : cached?.avatarUri?.trim() || undefined;
+
       return {
         id: sc.id,
         author: su
-          ? { id: su.id, username: su.username, clanId: su.clanId, rank: su.rank }
+          ? {
+              id: su.id,
+              username: su.username,
+              clanId: su.clanId,
+              rank: su.rank,
+              avatarUri: authorAvatar,
+            }
           : isSelf
             ? {
                 id: authProfile?.id ?? mockCurrentUser.id,
                 username: liveSelfUsername,
                 clanId: authProfile?.clan_id ?? mockCurrentUser.clanId,
                 rank: (authProfile?.rank ?? mockCurrentUser.rank) as Comment['author']['rank'],
+                avatarUri: selfAvatar,
               }
             : {
                 id: sc.authorId,
-                username: sc.authorUsername ?? '?',
-                clanId: sc.authorClanId ?? null,
-                rank: sc.authorRank ?? 'aprendiz',
+                username: cached?.username ?? sc.authorUsername ?? '?',
+                clanId: cached?.clanId ?? sc.authorClanId ?? null,
+                rank: (cached?.rank ?? sc.authorRank ?? 'aprendiz') as Comment['author']['rank'],
+                avatarUri: authorAvatar,
               },
         body: sc.body,
         upCount: sc.upCount,
@@ -258,6 +308,8 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     authProfile?.username,
     authProfile?.clan_id,
     authProfile?.rank,
+    authProfile?.avatar_url,
+    commentAuthorCache,
   ]);
 
   const [postMoreSheetOpen, setPostMoreSheetOpen] = useState(false);
@@ -1190,6 +1242,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                             <CommentCard
                               authorId={c.author.id}
                               username={c.author.username}
+                              avatarUri={c.author.avatarUri}
                               text={c.body}
                               clanId={c.author.clanId}
                               upvotes={c.upCount + (commentVotes[c.id] ? 1 : 0)}
@@ -1223,6 +1276,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                                       key={child.id}
                                       authorId={child.author.id}
                                       username={child.author.username}
+                                      avatarUri={child.author.avatarUri}
                                       text={child.body}
                                       clanId={child.author.clanId}
                                       upvotes={child.upCount + (commentVotes[child.id] ? 1 : 0)}

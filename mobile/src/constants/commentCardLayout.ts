@@ -19,6 +19,10 @@ export const COMMENT_CARD_LAYOUT = {
   usernameFontSize: 13,
   /** Tamaño del texto del comentario. */
   bodyFontSize: 13,
+  /** Avatar del autor junto al header (px). */
+  avatarSize: 34,
+  /** Espacio entre avatar y bloque de texto. */
+  avatarGap: 10,
 } as const;
 
 /** Expansión progresiva del texto del comentario. */
