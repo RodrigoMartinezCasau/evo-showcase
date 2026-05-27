@@ -1,5 +1,5 @@
 import type { Router } from 'expo-router';
-import { activateWidgetDeepLinkBypass } from '../../mobile/lib/animationState';
+import { scheduleCommunityPostDeepLink } from './communityPostDeepLink';
 
 /** Fuerza que CommunityScreen vuelva a procesar el mismo deep link (p. ej. otro post). */
 let forcedCommunityPostId: string | null = null;
@@ -12,6 +12,7 @@ export function consumeForcedCommunityPostOpen(): string | null {
 
 function scheduleCommunityPostOpen(postId: string): void {
   forcedCommunityPostId = postId;
+  scheduleCommunityPostDeepLink({ tab: 'para-ti', postId });
 }
 
 /**
@@ -21,7 +22,6 @@ function scheduleCommunityPostOpen(postId: string): void {
 export function navigateToCommunityPost(router: Router, postId: string | undefined): void {
   const id = postId?.trim();
   if (!id) return;
-  activateWidgetDeepLinkBypass();
   scheduleCommunityPostOpen(id);
   router.replace({
     pathname: '/(tabs)',

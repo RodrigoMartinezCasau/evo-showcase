@@ -27,8 +27,8 @@ export function parseCommunityPostDeepLink(url: string | null | undefined): Widg
   const postIdFromQuery = normalizeQueryParam(
     queryParams.postId as string | string[] | undefined,
   );
-  if (tab === 'para-ti' && postIdFromQuery) {
-    const id = postIdFromQuery ? sanitizeRouteId(postIdFromQuery) : undefined;
+  if (postIdFromQuery) {
+    const id = sanitizeRouteId(postIdFromQuery);
     if (id) return { tab: 'para-ti', postId: id };
   }
 

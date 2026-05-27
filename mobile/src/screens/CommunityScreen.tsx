@@ -76,8 +76,12 @@ import {
 } from '@evoconn/constants/followingFeedSort';
 import { getParatiAuthorClanMembershipMultiplier } from '@evoconn/logic/feed/paratiFeedRanking';
 import { normalizeRouteParam } from '@evoconn/utils/widgetDeepLink';
+import {
+  consumeCommunityPostDeepLink,
+  peekCommunityPostId,
+} from '@evoconn/utils/communityPostDeepLink';
 import { consumeForcedCommunityPostOpen } from '@evoconn/utils/notificationNavigation';
-import { activateWidgetDeepLinkBypass } from '../../mobile/lib/animationState';
+import { useEntryAnimPlaying } from '../../mobile/lib/animationState';
 
 type TabId = 'siguiendo' | 'para-ti' | 'search';
 type FeedMode = 'following' | 'foryou';
@@ -273,7 +277,10 @@ export default function CommunityScreen() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const drawerOpenProgress = useRef(new Animated.Value(0)).current;
   const gestureCommittingRef = useRef(false);
-  const [activeTab, setActiveTab] = useState<TabId>('siguiendo');
+  const entryAnimPlaying = useEntryAnimPlaying();
+  const [activeTab, setActiveTab] = useState<TabId>(() =>
+    peekCommunityPostId() ? 'para-ti' : 'siguiendo',
+  );
   const [followingSort, setFollowingSort] = useState<FollowingSortOption>('recientes');
   // While "Para ti" was a transient overlay we needed to freeze seen-ids so
   // the list did not jump as posts were marked seen. Now that the panel is
@@ -557,53 +564,53 @@ export default function CommunityScreen() {
 
   /**
    * useLayoutEffect fires synchronously after React commits but BEFORE the
-   * native thread paints the frame. This means state changes made here are
-   * included in the very first native frame — so Para Ti is already open by
-   * the time the navigation animation reveals CommunityScreen, eliminating
-   * the card-list flash entirely.
+   * native thread paints the frame. Params de expo-router pueden perderse en
+   * cold start; el intent en `communityPostDeepLink` cubre widget / share.
    */
   useLayoutEffect(() => {
-    if (!tabParam) return;
-    const normalized =
-      tabParam === 'mas-votadas' ? 'para-ti' : (tabParam as TabId);
-    if (!VALID_TAB_IDS.includes(normalized)) return;
-    const pid = normalizeRouteParam(postIdParam);
+    const scheduled = consumeCommunityPostDeepLink();
     const forcedPid = consumeForcedCommunityPostOpen();
     if (forcedPid) consumedDeepLinkRef.current = undefined;
-    const deepLinkKey = `${tabParam}|${pid ?? forcedPid ?? ''}`;
+
+    const pid =
+      normalizeRouteParam(postIdParam) ?? forcedPid ?? scheduled?.postId;
+    let tab: TabId | null = null;
+    if (tabParam) {
+      const normalized =
+        tabParam === 'mas-votadas' ? 'para-ti' : (tabParam as TabId);
+      if (VALID_TAB_IDS.includes(normalized)) tab = normalized;
+    }
+    if (scheduled?.tab === 'para-ti') tab = 'para-ti';
+    if (pid) tab = 'para-ti';
+
+    if (!tab) return;
+
+    const deepLinkKey = `${tab}|${pid ?? ''}`;
     if (consumedDeepLinkRef.current === deepLinkKey) return;
     consumedDeepLinkRef.current = deepLinkKey;
 
-    const tab = normalized;
     if (tab === 'para-ti') {
-      const openPostId = pid ?? forcedPid;
-      if (openPostId) activateWidgetDeepLinkBypass();
-      // skipAnimation=true: detail visible in the same frame (widget / deep link).
-      openDetailFeed('foryou', openPostId, true);
+      setActiveTab('para-ti');
+      if (pid) {
+        if (entryAnimPlaying) {
+          pendingWidgetPostIdRef.current = pid;
+        } else {
+          openDetailFeed('foryou', pid, true);
+        }
+      }
     } else {
       setActiveTab(tab);
     }
-  }, [tabParam, postIdParam, openDetailFeed]);
+  }, [tabParam, postIdParam, openDetailFeed, entryAnimPlaying]);
 
-  // Cold start from widget: Supabase hydration may arrive after the first open attempt.
+  // Tras animación de bienvenida y/o hidratación del feed: centrar el post del widget.
   useEffect(() => {
     const pid = pendingWidgetPostIdRef.current;
-    if (!pid || !getPostById(pid)) return;
+    if (!pid || entryAnimPlaying) return;
+    if (!getPostById(pid)) return;
     pendingWidgetPostIdRef.current = null;
-    const { resolved, data } = hydrateParatiPanel(pid);
-    if (resolved) {
-      setActiveTab('para-ti');
-      if (data.length > 0) {
-        const idx = clampDetailInitialIndex(
-          data.length,
-          data.findIndex((p) => p.id === pid),
-        );
-        requestAnimationFrame(() => {
-          paratiPanelListRef.current?.scrollToIndex({ index: idx, animated: false });
-        });
-      }
-    }
-  }, [allPosts, getPostById, hydrateParatiPanel]);
+    openDetailFeed('foryou', pid, true);
+  }, [entryAnimPlaying, allPosts, getPostById, openDetailFeed]);
 
   useEffect(() => {
     if (!paratiPanelVisible) {
