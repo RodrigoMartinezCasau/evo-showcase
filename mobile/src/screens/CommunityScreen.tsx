@@ -77,10 +77,16 @@ import {
 import { getParatiAuthorClanMembershipMultiplier } from '@evoconn/logic/feed/paratiFeedRanking';
 import { normalizeRouteParam } from '@evoconn/utils/widgetDeepLink';
 import {
-  consumeCommunityPostDeepLink,
+  peekCommunityPostDeepLink,
+  acknowledgeCommunityPostDeepLink,
   peekCommunityPostId,
 } from '@evoconn/utils/communityPostDeepLink';
-import { consumeForcedCommunityPostOpen } from '@evoconn/utils/notificationNavigation';
+import {
+  consumeForcedCommunityPostOpen,
+  consumeForcedCommunityCommentOpen,
+  consumeForcedNavigationEpoch,
+  subscribeCommunityPostNavigation,
+} from '@evoconn/utils/notificationNavigation';
 import { useEntryAnimPlaying } from '../../mobile/lib/animationState';
 
 type TabId = 'siguiendo' | 'para-ti' | 'search';
@@ -248,7 +254,8 @@ const COMMUNITY_FEED_SLOT_BOTTOM_WIDE = 18;
 export default function CommunityScreen() {
   const router = useRouter();
   const pathname = usePathname();
-  const { tab: tabParam, postId: postIdParam } = useLocalSearchParams<{ tab?: string; postId?: string }>();
+  const { tab: tabParam, postId: postIdParam, commentId: commentIdParam, nav: navParam } =
+    useLocalSearchParams<{ tab?: string; postId?: string; commentId?: string; nav?: string }>();
   const insets = useSafeAreaInsets();
   const safeFrame = useSafeAreaFrame();
   const { width: screenW, height: screenH } = useWindowDimensions();
@@ -289,8 +296,17 @@ export default function CommunityScreen() {
 
   // Track which deep-link (tab + postId) we already handled.
   const consumedDeepLinkRef = useRef<string | undefined>(undefined);
-  /** Widget postId when feed is not hydrated yet — open once the post exists. */
+  /** Widget / notificación postId cuando el feed aún no está hidratado. */
   const pendingWidgetPostIdRef = useRef<string | null>(null);
+  /** Comentario a centrar tras abrir el post (notificaciones). */
+  const pendingCommentIdRef = useRef<string | null>(null);
+  const [focusPostId, setFocusPostId] = useState<string | null>(null);
+  const [focusCommentId, setFocusCommentId] = useState<string | null>(null);
+  const [postNavigationTick, setPostNavigationTick] = useState(0);
+
+  useEffect(() => subscribeCommunityPostNavigation(() => {
+    setPostNavigationTick((t) => t + 1);
+  }), []);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [feedScrollEnabled, setFeedScrollEnabled] = useState(true);
@@ -530,9 +546,13 @@ export default function CommunityScreen() {
               data.length,
               data.findIndex((p) => p.id === postId),
             );
-            requestAnimationFrame(() => {
+            const scrollToPost = () => {
               paratiPanelListRef.current?.scrollToIndex({ index: idx, animated: false });
+            };
+            requestAnimationFrame(() => {
+              InteractionManager.runAfterInteractions(scrollToPost);
             });
+            setTimeout(scrollToPost, 120);
           }
         }
         setActiveTab('para-ti');
@@ -568,49 +588,75 @@ export default function CommunityScreen() {
    * cold start; el intent en `communityPostDeepLink` cubre widget / share.
    */
   useLayoutEffect(() => {
-    const scheduled = consumeCommunityPostDeepLink();
+    const scheduled = peekCommunityPostDeepLink();
     const forcedPid = consumeForcedCommunityPostOpen();
-    if (forcedPid) consumedDeepLinkRef.current = undefined;
+    const forcedCommentId = consumeForcedCommunityCommentOpen();
+    const forcedNavEpoch = consumeForcedNavigationEpoch();
+
+    if (forcedPid || forcedCommentId || forcedNavEpoch > 0) {
+      consumedDeepLinkRef.current = undefined;
+    }
 
     const pid =
       normalizeRouteParam(postIdParam) ?? forcedPid ?? scheduled?.postId;
-    let tab: TabId | null = null;
+    const commentId =
+      normalizeRouteParam(commentIdParam) ??
+      forcedCommentId ??
+      scheduled?.commentId;
+
+    if (!pid) return;
+
+    let tab: TabId = 'para-ti';
     if (tabParam) {
       const normalized =
         tabParam === 'mas-votadas' ? 'para-ti' : (tabParam as TabId);
       if (VALID_TAB_IDS.includes(normalized)) tab = normalized;
     }
-    if (scheduled?.tab === 'para-ti') tab = 'para-ti';
-    if (pid) tab = 'para-ti';
 
-    if (!tab) return;
+    const navEpoch =
+      normalizeRouteParam(navParam) ??
+      (forcedNavEpoch > 0 ? String(forcedNavEpoch) : '0');
 
-    const deepLinkKey = `${tab}|${pid ?? ''}`;
+    const deepLinkKey = `${navEpoch}|${tab}|${pid}|${commentId ?? ''}`;
     if (consumedDeepLinkRef.current === deepLinkKey) return;
     consumedDeepLinkRef.current = deepLinkKey;
+    acknowledgeCommunityPostDeepLink();
+
+    setFocusPostId(pid);
+    setFocusCommentId(commentId ?? null);
+    pendingCommentIdRef.current = commentId ?? null;
 
     if (tab === 'para-ti') {
       setActiveTab('para-ti');
-      if (pid) {
-        if (entryAnimPlaying) {
-          pendingWidgetPostIdRef.current = pid;
-        } else {
-          openDetailFeed('foryou', pid, true);
-        }
+      if (entryAnimPlaying) {
+        pendingWidgetPostIdRef.current = pid;
+      } else {
+        openDetailFeed('foryou', pid, true);
       }
     } else {
       setActiveTab(tab);
     }
-  }, [tabParam, postIdParam, openDetailFeed, entryAnimPlaying]);
+  }, [
+    tabParam,
+    postIdParam,
+    commentIdParam,
+    navParam,
+    postNavigationTick,
+    openDetailFeed,
+    entryAnimPlaying,
+  ]);
 
-  // Tras animación de bienvenida y/o hidratación del feed: centrar el post del widget.
+  // Tras animación de bienvenida y/o hidratación del feed: centrar el post del deep link.
   useEffect(() => {
     const pid = pendingWidgetPostIdRef.current;
     if (!pid || entryAnimPlaying) return;
-    if (!getPostById(pid)) return;
+    if (!getPostById(pid)) {
+      void refreshSocialFromSupabase();
+      return;
+    }
     pendingWidgetPostIdRef.current = null;
     openDetailFeed('foryou', pid, true);
-  }, [entryAnimPlaying, allPosts, getPostById, openDetailFeed]);
+  }, [entryAnimPlaying, allPosts, getPostById, openDetailFeed, refreshSocialFromSupabase]);
 
   useEffect(() => {
     if (!paratiPanelVisible) {
@@ -624,6 +670,9 @@ export default function CommunityScreen() {
     // Reset so widget / deep links can open Para ti again after closing.
     consumedDeepLinkRef.current = undefined;
     pendingWidgetPostIdRef.current = null;
+    pendingCommentIdRef.current = null;
+    setFocusPostId(null);
+    setFocusCommentId(null);
   }, [slideAnim]);
 
   const listTranslateX = slideAnim.interpolate({
@@ -806,9 +855,9 @@ export default function CommunityScreen() {
         onClanPress={handleClanPress}
         onReadingModeChange={handleReadingModeChange}
         communityVerticalFeed
-        // Las vistas AMPLIADAS (tanto Para Ti como Siguiendo) deben usar el
-        // fondo de la app, no el gris interior (`PANEL_STAR_SURFACE_DEFAULT`)
-        // que solo aplica a las tarjetas pequeñas del listado de Siguiendo.
+        highlightCommentId={
+          focusPostId === item.id ? (focusCommentId ?? undefined) : undefined
+        }
         reflectionStarSurfaceColor={evoconnColors.background}
       />
     ),
@@ -817,6 +866,8 @@ export default function CommunityScreen() {
       handleAuthorPress,
       handleClanPress,
       handleReadingModeChange,
+      focusPostId,
+      focusCommentId,
     ],
   );
 

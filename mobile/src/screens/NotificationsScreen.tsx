@@ -242,7 +242,7 @@ export default function NotificationsScreen() {
   const handlePressContent = useCallback(
     (n: AppNotification) => {
       if (n.targetPostId) {
-        navigateToCommunityPost(router, n.targetPostId);
+        navigateToCommunityPost(router, n.targetPostId, n.targetCommentId);
         return;
       }
       navigateToUserProfile(router, n.fromUserId, n.fromUsername);

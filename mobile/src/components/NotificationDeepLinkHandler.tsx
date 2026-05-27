@@ -29,13 +29,19 @@ function getNotificationsModule() {
 
 type NotificationResponse = import('expo-notifications').NotificationResponse;
 
-function readPushData(raw: unknown): { postId?: string; fromUserId?: string } {
+function readPushData(raw: unknown): {
+  postId?: string;
+  commentId?: string;
+  fromUserId?: string;
+} {
   if (!raw || typeof raw !== 'object') return {};
   const d = raw as Record<string, unknown>;
   const postId = d.postId ?? d.post_id;
+  const commentId = d.commentId ?? d.comment_id;
   const fromUserId = d.fromUserId ?? d.from_user_id;
   return {
     postId: postId != null ? String(postId).trim() : undefined,
+    commentId: commentId != null ? String(commentId).trim() : undefined,
     fromUserId: fromUserId != null ? String(fromUserId).trim() : undefined,
   };
 }
@@ -59,11 +65,13 @@ export function NotificationDeepLinkHandler() {
       const dedupeKey = responseDedupeKey(response);
       if (handledResponseKeysRef.current.has(dedupeKey)) return;
 
-      const { postId, fromUserId } = readPushData(response.notification.request.content.data);
+      const { postId, commentId, fromUserId } = readPushData(
+        response.notification.request.content.data,
+      );
 
       if (postId) {
         handledResponseKeysRef.current.add(dedupeKey);
-        navigateToCommunityPost(router, postId);
+        navigateToCommunityPost(router, postId, commentId);
         return;
       }
       if (fromUserId) {

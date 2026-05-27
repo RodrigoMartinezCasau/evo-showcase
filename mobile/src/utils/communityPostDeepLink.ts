@@ -5,9 +5,12 @@
 import type { WidgetPostDeepLink } from './widgetDeepLink';
 
 let pending: WidgetPostDeepLink | null = null;
+let navigationEpoch = 0;
 
-export function scheduleCommunityPostDeepLink(link: WidgetPostDeepLink): void {
+export function scheduleCommunityPostDeepLink(link: WidgetPostDeepLink): number {
   pending = link;
+  navigationEpoch += 1;
+  return navigationEpoch;
 }
 
 export function peekCommunityPostDeepLink(): WidgetPostDeepLink | null {
@@ -21,6 +24,14 @@ export function consumeCommunityPostDeepLink(): WidgetPostDeepLink | null {
   return link;
 }
 
+export function acknowledgeCommunityPostDeepLink(): void {
+  pending = null;
+}
+
 export function peekCommunityPostId(): string | undefined {
   return pending?.postId;
+}
+
+export function peekCommunityPostNavigationEpoch(): number {
+  return navigationEpoch;
 }

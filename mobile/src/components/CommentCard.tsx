@@ -52,6 +52,8 @@ type CommentCardProps = {
    * Aparece como "→ @usuario" junto al tiempo en el header.
    */
   replyingToUsername?: string;
+  /** Resaltado breve al navegar desde una notificación. */
+  highlighted?: boolean;
 };
 
 export const CommentCard = React.memo(function CommentCard({
@@ -74,6 +76,7 @@ export const CommentCard = React.memo(function CommentCard({
   threadExpanded = false,
   onToggleThread,
   replyingToUsername,
+  highlighted = false,
 }: CommentCardProps) {
   const [charLimit, setCharLimit] = useState<number>(EXP.initialLimit);
   const isLong = text.length > EXP.initialLimit;
@@ -206,6 +209,7 @@ export const CommentCard = React.memo(function CommentCard({
         delayLongPress={500}
         style={[
           styles.card,
+          highlighted && styles.cardHighlighted,
           {
             backgroundColor: CARD.backgroundColor,
             borderRadius: CARD.borderRadius,
@@ -312,6 +316,9 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'flex-start',
+  },
+  cardHighlighted: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
   },
   avatarTap: {
     marginTop: 1,

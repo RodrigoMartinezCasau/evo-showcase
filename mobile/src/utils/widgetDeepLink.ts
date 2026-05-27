@@ -1,7 +1,7 @@
 import * as Linking from 'expo-linking';
 import { sanitizeRouteId } from './sanitizeRouteId';
 
-export type WidgetPostDeepLink = { tab: 'para-ti'; postId: string };
+export type WidgetPostDeepLink = { tab: 'para-ti'; postId: string; commentId?: string };
 
 function normalizeQueryParam(value: string | string[] | undefined): string | undefined {
   if (value == null) return undefined;
@@ -27,9 +27,13 @@ export function parseCommunityPostDeepLink(url: string | null | undefined): Widg
   const postIdFromQuery = normalizeQueryParam(
     queryParams.postId as string | string[] | undefined,
   );
+  const commentIdFromQuery = normalizeQueryParam(
+    queryParams.commentId as string | string[] | undefined,
+  );
   if (postIdFromQuery) {
     const id = sanitizeRouteId(postIdFromQuery);
-    if (id) return { tab: 'para-ti', postId: id };
+    const commentId = commentIdFromQuery ? sanitizeRouteId(commentIdFromQuery) : undefined;
+    if (id) return { tab: 'para-ti', postId: id, commentId };
   }
 
   const path = (parsed.path ?? '').replace(/^\//, '');

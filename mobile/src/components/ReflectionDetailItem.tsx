@@ -130,7 +130,21 @@ type ReflectionDetailItemProps = {
    * (Para Ti y Siguiendo) = app background. Other screens: omit → app background.
    */
   reflectionStarSurfaceColor?: string;
+  /** Centrar y resaltar un comentario concreto (p. ej. notificación de comentario). */
+  highlightCommentId?: string;
 };
+
+function findCommentThreadRoot(comments: Comment[], targetId: string): string | undefined {
+  const byId = new Map(comments.map((c) => [c.id, c]));
+  let cur = byId.get(targetId);
+  if (!cur) return undefined;
+  while (cur.parentId) {
+    const parent = byId.get(cur.parentId);
+    if (!parent) break;
+    cur = parent;
+  }
+  return cur.id;
+}
 
 export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   post,
@@ -140,6 +154,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   onReadingModeChange,
   communityVerticalFeed = false,
   reflectionStarSurfaceColor,
+  highlightCommentId,
 }: ReflectionDetailItemProps) {
   const isNoClanAuthor =
     post.author.clanId == null || String(post.author.clanId).trim() === '';
@@ -330,6 +345,12 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
 
   // ── Hilos de respuestas (estado declarado ANTES de handleAddComment) ──
   const [expandedThreads, setExpandedThreads] = useState<Record<string, boolean>>({});
+  const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null);
+  const commentsScrollRef = useRef<ScrollView>(null);
+  const commentOffsetsRef = useRef<Map<string, number>>(new Map());
+  const registerCommentOffset = useCallback((commentId: string, y: number) => {
+    commentOffsetsRef.current.set(commentId, y);
+  }, []);
   const [replyingTo, setReplyingTo] = useState<{ commentId: string; username: string } | null>(null);
 
   const handleAddComment = useCallback(
@@ -866,6 +887,42 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     });
   }, [contextComments, isBlocked, viewerClanIdForRanking, viewerIdForRanking]);
 
+  // Notificación / deep link: desplegar hilo del comentario objetivo.
+  useEffect(() => {
+    if (!highlightCommentId || !commentsReady) return;
+    if (!visibleComments.some((c) => c.id === highlightCommentId)) {
+      void ensureCommentsForPost(post.id);
+      return;
+    }
+    const rootId = findCommentThreadRoot(visibleComments, highlightCommentId);
+    if (!rootId) return;
+    setExpandedThreads((prev) => (prev[rootId] ? prev : { ...prev, [rootId]: true }));
+  }, [highlightCommentId, commentsReady, visibleComments, post.id, ensureCommentsForPost]);
+
+  // Scroll + flash visual al comentario objetivo.
+  useEffect(() => {
+    if (!highlightCommentId || !commentsReady) return;
+    if (!visibleComments.some((c) => c.id === highlightCommentId)) return;
+
+    setHighlightedCommentId(highlightCommentId);
+    const scrollToTarget = () => {
+      const y = commentOffsetsRef.current.get(highlightCommentId);
+      if (y != null) {
+        commentsScrollRef.current?.scrollTo({ y: Math.max(0, y - 12), animated: true });
+      }
+    };
+    const t1 = setTimeout(scrollToTarget, 120);
+    const t2 = setTimeout(scrollToTarget, 350);
+    const t3 = setTimeout(scrollToTarget, 700);
+    const clearHighlight = setTimeout(() => setHighlightedCommentId(null), 2800);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      clearTimeout(clearHighlight);
+    };
+  }, [highlightCommentId, commentsReady, visibleComments, expandedThreads]);
+
   const actionColStyle = useMemo(() => {
     if (reflPanelLayout) {
       // Compute the panel's visual right edge in container coordinates.
@@ -1187,6 +1244,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
               <>
                 <View style={[styles.commentsClip, { borderRadius: CP.borderRadius }]}>
                   <ScrollView
+                    ref={commentsScrollRef}
                     showsVerticalScrollIndicator={false}
                     nestedScrollEnabled
                     keyboardShouldPersistTaps="handled"
@@ -1245,6 +1303,11 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                         const canDelete = isPostAuthor || c.author.id === myId;
                         return (
                           <React.Fragment key={c.id}>
+                            <View
+                              onLayout={(e) =>
+                                registerCommentOffset(c.id, e.nativeEvent.layout.y)
+                              }
+                            >
                             <CommentCard
                               authorId={c.author.id}
                               username={c.author.username}
@@ -1254,6 +1317,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                               upvotes={c.upCount + (commentVotes[c.id] ? 1 : 0)}
                               isUpvoted={!!commentVotes[c.id]}
                               createdAt={c.createdAt}
+                              highlighted={highlightedCommentId === c.id}
                               onUpvote={() => toggleCommentVote(c.id)}
                               onReport={() => console.log(`Reported comment ${c.id}`)}
                               onBlockUser={() => handleBlockUser(c.author.id)}
@@ -1264,6 +1328,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                               threadExpanded={expanded}
                               onToggleThread={descendants.length > 0 ? () => toggleThread(c.id) : undefined}
                             />
+                            </View>
                             {expanded
                               ? descendants.map((child) => {
                                   const childCanDelete = isPostAuthor || child.author.id === myId;
@@ -1278,8 +1343,13 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                                       ? parent.author.username
                                       : undefined;
                                   return (
-                                    <CommentCard
+                                    <View
                                       key={child.id}
+                                      onLayout={(e) =>
+                                        registerCommentOffset(child.id, e.nativeEvent.layout.y)
+                                      }
+                                    >
+                                    <CommentCard
                                       authorId={child.author.id}
                                       username={child.author.username}
                                       avatarUri={child.author.avatarUri}
@@ -1289,6 +1359,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                                       isUpvoted={!!commentVotes[child.id]}
                                       createdAt={child.createdAt}
                                       indented
+                                      highlighted={highlightedCommentId === child.id}
                                       replyingToUsername={replyingToUsername}
                                       onUpvote={() => toggleCommentVote(child.id)}
                                       onReport={() => console.log(`Reported comment ${child.id}`)}
@@ -1301,6 +1372,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                                           : undefined
                                       }
                                     />
+                                    </View>
                                   );
                                 })
                               : null}
