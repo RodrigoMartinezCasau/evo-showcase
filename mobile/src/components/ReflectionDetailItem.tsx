@@ -61,6 +61,8 @@ import { useBlockedUsers } from '@evoconn/hooks/BlockedUsersContext';
 import { useAuth } from '../../mobile/lib/AuthContext';
 import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
 import { rankCommentsForViewer } from '@evoconn/logic/comments/commentRanking';
+import { useIncrementalList } from '@evoconn/hooks/useIncrementalList';
+import { ClanLoadingDot } from '@evoconn/components/shared/ClanLoadingDot';
 import { computePhraseDetailTypography } from '@evoconn/utils/phraseDetailTypography';
 import { buildPostShareMessage } from '@evoconn/utils/appShareLinks';
 import {
@@ -133,6 +135,9 @@ type ReflectionDetailItemProps = {
   /** Centrar y resaltar un comentario concreto (p. ej. notificación de comentario). */
   highlightCommentId?: string;
 };
+
+/** Comentarios raíz mostrados por bloque (se cargan más al hacer scroll). */
+const COMMENTS_PAGE_SIZE = 8;
 
 function findCommentThreadRoot(comments: Comment[], targetId: string): string | undefined {
   const byId = new Map(comments.map((c) => [c.id, c]));
@@ -887,6 +892,63 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     });
   }, [contextComments, isBlocked, viewerClanIdForRanking, viewerIdForRanking]);
 
+  // Agrupa comentarios en raíces + descendientes UNA vez (antes se recalculaba
+  // en cada render dentro del JSX). Las raíces se paginan: en posts con cientos
+  // de comentarios montar todas las CommentCard de golpe colgaba el hilo de UI.
+  const { commentRoots, descendantsByRoot, commentById } = useMemo(() => {
+    const rootIdById = new Map<string, string>();
+    for (const c of visibleComments) {
+      if (!c.parentId) rootIdById.set(c.id, c.id);
+    }
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const c of visibleComments) {
+        if (rootIdById.has(c.id)) continue;
+        if (c.parentId && rootIdById.has(c.parentId)) {
+          rootIdById.set(c.id, rootIdById.get(c.parentId)!);
+          changed = true;
+        }
+      }
+    }
+    const roots = visibleComments.filter((c) => !c.parentId);
+    const byRoot = new Map<string, typeof visibleComments>();
+    for (const c of visibleComments) {
+      if (!c.parentId) continue;
+      const rid = rootIdById.get(c.id);
+      if (!rid) continue;
+      const arr = byRoot.get(rid) ?? [];
+      arr.push(c);
+      byRoot.set(rid, arr);
+    }
+    const byId = new Map<string, typeof visibleComments[number]>();
+    for (const c of visibleComments) byId.set(c.id, c);
+    return { commentRoots: roots, descendantsByRoot: byRoot, commentById: byId };
+  }, [visibleComments]);
+
+  const {
+    visibleData: visibleRoots,
+    hasMore: hasMoreComments,
+    loadMore: loadMoreComments,
+    reset: resetCommentsPaging,
+    ensureCount: ensureCommentsVisible,
+  } = useIncrementalList(commentRoots, COMMENTS_PAGE_SIZE);
+
+  // Al cambiar de post, vuelve a empezar por los primeros comentarios.
+  useEffect(() => {
+    resetCommentsPaging();
+  }, [post.id, resetCommentsPaging]);
+
+  // Deep link / notificación a un comentario concreto: si su raíz cae más allá
+  // del bloque visible, revela hasta ahí para que el scroll-to funcione.
+  useEffect(() => {
+    if (!highlightCommentId) return;
+    const rootId = findCommentThreadRoot(visibleComments, highlightCommentId);
+    if (!rootId) return;
+    const idx = commentRoots.findIndex((c) => c.id === rootId);
+    if (idx >= 0) ensureCommentsVisible(idx + 1);
+  }, [highlightCommentId, visibleComments, commentRoots, ensureCommentsVisible]);
+
   // Notificación / deep link: desplegar hilo del comentario objetivo.
   useEffect(() => {
     if (!highlightCommentId || !commentsReady) return;
@@ -1249,6 +1311,16 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                     nestedScrollEnabled
                     keyboardShouldPersistTaps="handled"
                     keyboardDismissMode="on-drag"
+                    scrollEventThrottle={16}
+                    onScroll={(e) => {
+                      if (!hasMoreComments) return;
+                      const { contentOffset, contentSize, layoutMeasurement } =
+                        e.nativeEvent;
+                      const distanceFromBottom =
+                        contentSize.height -
+                        (contentOffset.y + layoutMeasurement.height);
+                      if (distanceFromBottom < 400) loadMoreComments();
+                    }}
                     style={styles.commentsScroll}
                     contentContainerStyle={{
                       paddingTop: COMMENTS_CONTENT_INSETS.top,
@@ -1263,41 +1335,9 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                       // - En UI, todos los descendientes de una raíz se
                       //   muestran como una lista plana bajo la raíz, con un
                       //   único nivel de sangría (no se anida más profundo).
-                      // - Si la migración SQL aún no se aplicó, todos los
-                      //   comentarios son raíces y la UI se comporta como antes.
-                      const rootIdById = new Map<string, string>();
-                      for (const c of visibleComments) {
-                        if (!c.parentId) rootIdById.set(c.id, c.id);
-                      }
-                      // Resolver raíz subiendo por parentId (varias pasadas
-                      // porque el orden no garantiza topología).
-                      let changed = true;
-                      while (changed) {
-                        changed = false;
-                        for (const c of visibleComments) {
-                          if (rootIdById.has(c.id)) continue;
-                          if (c.parentId && rootIdById.has(c.parentId)) {
-                            rootIdById.set(c.id, rootIdById.get(c.parentId)!);
-                            changed = true;
-                          }
-                        }
-                      }
-                      const roots = visibleComments.filter((c) => !c.parentId);
-                      const descendantsByRoot = new Map<string, typeof visibleComments>();
-                      for (const c of visibleComments) {
-                        if (!c.parentId) continue;
-                        const rid = rootIdById.get(c.id);
-                        if (!rid) continue; // raíz desconocida (padre filtrado)
-                        const arr = descendantsByRoot.get(rid) ?? [];
-                        arr.push(c);
-                        descendantsByRoot.set(rid, arr);
-                      }
-                      // Lookup rápido id → comment, usado para resolver el
-                      // username del comentario respondido en hilos profundos.
-                      const commentById = new Map<string, typeof visibleComments[number]>();
-                      for (const c of visibleComments) commentById.set(c.id, c);
-
-                      return roots.map((c) => {
+                      // - El agrupamiento se calcula en `useMemo` (arriba) y las
+                      //   raíces se revelan por bloques (`visibleRoots`).
+                      return visibleRoots.map((c) => {
                         const descendants = descendantsByRoot.get(c.id) ?? [];
                         const expanded = !!expandedThreads[c.id];
                         const canDelete = isPostAuthor || c.author.id === myId;
@@ -1380,6 +1420,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                         );
                       });
                     })()}
+                    {hasMoreComments ? <ClanLoadingDot inline /> : null}
                   </ScrollView>
                 </View>
                 <View ref={newCommentMeasureRef} collapsable={false}>

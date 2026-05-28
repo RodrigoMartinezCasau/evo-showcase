@@ -20,6 +20,7 @@ import React, {
   useState,
   useCallback,
   useMemo,
+  useRef,
   type ReactNode,
 } from 'react';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
@@ -36,11 +37,14 @@ import {
   applyStreakActivation,
   applyDecrementUses,
   reconcileStreakOnLoad,
+  mergeStatsFromRemote,
   getLocalDayKey,
   DAILY_USES_LIMIT,
   type UserStats,
   type StatsDatabase,
 } from '@evoconn/services/userStatsStorage';
+import { fetchStreak } from '@evoconn/services/streakApi';
+import { isRealUserId } from '@evoconn/services/supabaseSocial';
 
 // ─── Master switch ─────────────────────────────────────────────────────────────
 
@@ -124,6 +128,7 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
   // ── Whole multi-user DB held in memory ────────────────────────────────────
   const [db, setDB] = useState<StatsDatabase>({});
   const [statsLoaded, setStatsLoaded] = useState(false);
+  const remoteStatsHydratedRef = useRef<Set<string>>(new Set());
 
   // Load the entire DB ONCE on app mount.
   // After loading, reconcile every user's streak so that stale non-zero
@@ -243,6 +248,79 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
   }, [
     statsLoaded,
     authProfile?.id,
+    authProfile?.remaining_uses,
+    authProfile?.last_uses_reset_date,
+  ]);
+
+  // Cross-device: racha + actividad de hoy desde Supabase profiles + backend streak.
+  useEffect(() => {
+    const uid = authProfile?.id;
+    if (!uid || !isRealUserId(uid) || !statsLoaded) return;
+    if (remoteStatsHydratedRef.current.has(uid)) return;
+    remoteStatsHydratedRef.current.add(uid);
+
+    let cancelled = false;
+    void (async () => {
+      const today = getLocalDayKey();
+      const serverDay = authProfile.last_uses_reset_date
+        ? String(authProfile.last_uses_reset_date).slice(0, 10)
+        : null;
+      let serverRemaining = Math.min(
+        DAILY_USES_LIMIT,
+        Math.max(0, Number(authProfile.remaining_uses ?? DAILY_USES_LIMIT)),
+      );
+      if (serverDay !== today) {
+        serverRemaining = DAILY_USES_LIMIT;
+      }
+
+      let remoteStreak = Math.max(0, Number(authProfile.streak_days ?? 0));
+      let hasSentToday = false;
+      try {
+        const streakData = await fetchStreak(uid);
+        if (!cancelled) {
+          remoteStreak = Math.max(remoteStreak, streakData.streak_current ?? 0);
+          hasSentToday =
+            streakData.last_activity_date === today ||
+            (streakData.activity_log ?? []).includes(today);
+        }
+      } catch {
+        // Offline: usar solo profiles.streak_days
+      }
+
+      if (cancelled) return;
+
+      setDB((prev) => {
+        const local = prev[uid] ?? defaultUserStats();
+        const merged = mergeStatsFromRemote(
+          local,
+          {
+            streakDays: remoteStreak,
+            remainingUses: serverRemaining,
+            hasSentToday,
+            lastUsesResetDate: today,
+          },
+          today,
+        );
+        if (
+          merged.currentStreak === local.currentStreak &&
+          merged.dailyUsesRemaining === local.dailyUsesRemaining &&
+          merged.hasSentTodayDate === local.hasSentTodayDate
+        ) {
+          return prev;
+        }
+        const nextDB: StatsDatabase = { ...prev, [uid]: merged };
+        saveStatsDB(nextDB);
+        return nextDB;
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    statsLoaded,
+    authProfile?.id,
+    authProfile?.streak_days,
     authProfile?.remaining_uses,
     authProfile?.last_uses_reset_date,
   ]);

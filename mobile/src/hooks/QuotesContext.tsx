@@ -10,7 +10,8 @@
  * the specific quote IDs stored here, so they reflect only real activity.
  *
  * Data is persisted per-user in AsyncStorage and survives reloads and
- * profile switches.
+ * profile switches. Real users (Supabase UUID) also sync to
+ * `user_unlocked_phrases` for cross-device recovery.
  */
 import React, {
   createContext,
@@ -18,6 +19,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -26,6 +28,14 @@ import { ALL_QUOTES, selectBestQuote, selectQuoteCandidates } from '@evoconn/dat
 import { selectQuoteWithAI } from '@evoconn/services/quoteSelectionApi';
 import type { Quote } from '@evoconn/types/quotes';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
+import { useAuth } from '../../mobile/lib/AuthContext';
+import { isRealUserId } from '@evoconn/services/supabaseSocial';
+import {
+  fetchUnlockedPhrases,
+  mergeUnlockedPhraseIds,
+  pushMissingUnlockedPhrases,
+  pushUnlockedPhrase,
+} from '@evoconn/services/quotesSync';
 
 // v2: reset to zero — old sequential unlocks (unlockNextPhrase) are discarded.
 // Only phrases selected and shown via selectAndUnlockQuote count from now on.
@@ -78,10 +88,16 @@ const QuotesContext = createContext<QuotesContextValue>({
 
 export function QuotesProvider({ children }: { children: React.ReactNode }) {
   const sim = useSimulation();
+  const { profile: authProfile } = useAuth();
+  const activeUserId = authProfile?.id ?? sim.activeUserId;
 
   // Full DB loaded from AsyncStorage (all users).
   const [db, setDb] = useState<QuotesDB>({});
   const [loaded, setLoaded] = useState(false);
+  const dbRef = useRef<QuotesDB>(db);
+  dbRef.current = db;
+
+  const hydratedRemoteRef = useRef<Set<string>>(new Set());
 
   // Load once on mount.
   useEffect(() => {
@@ -94,10 +110,42 @@ export function QuotesProvider({ children }: { children: React.ReactNode }) {
       .finally(() => setLoaded(true));
   }, []);
 
+  // Cross-device recovery: merge Supabase backup for real users.
+  useEffect(() => {
+    const uid = authProfile?.id;
+    if (!uid || !isRealUserId(uid)) return;
+    if (!loaded) return;
+    if (hydratedRemoteRef.current.has(uid)) return;
+    hydratedRemoteRef.current.add(uid);
+
+    let cancelled = false;
+    void (async () => {
+      const remote = await fetchUnlockedPhrases(uid);
+      if (cancelled) return;
+      const local = dbRef.current[uid] ?? [];
+      const merged = mergeUnlockedPhraseIds(local, remote);
+      if (merged.length === local.length && merged.every((id, i) => id === local[i])) {
+        if (remote.length > 0) {
+          void pushMissingUnlockedPhrases(uid, local, remote);
+        }
+        return;
+      }
+      setDb((prev) => {
+        const next = { ...prev, [uid]: merged };
+        AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(console.error);
+        return next;
+      });
+      void pushMissingUnlockedPhrases(uid, merged, remote);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authProfile?.id, loaded]);
+
   // Active user's unlocked IDs (empty array until loaded or if never unlocked).
   const unlockedPhraseIds: string[] = useMemo(
-    () => (loaded ? (db[sim.activeUserId] ?? []) : []),
-    [db, sim.activeUserId, loaded],
+    () => (loaded ? (db[activeUserId] ?? []) : []),
+    [db, activeUserId, loaded],
   );
 
   // Persist updated ID list for a user and update local state atomically.
@@ -108,22 +156,29 @@ export function QuotesProvider({ children }: { children: React.ReactNode }) {
         AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated)).catch(console.error);
         return updated;
       });
+      if (isRealUserId(userId)) {
+        const prevIds = dbRef.current[userId] ?? [];
+        const added = ids.filter((id) => !prevIds.includes(id));
+        for (const phraseId of added) {
+          void pushUnlockedPhrase(userId, phraseId);
+        }
+      }
     },
     [],
   );
 
   const unlockPhrase = useCallback(
     (id: string) => {
-      const current = db[sim.activeUserId] ?? [];
+      const current = dbRef.current[activeUserId] ?? [];
       if (current.includes(id)) return;
-      persistForUser(sim.activeUserId, [...current, id]);
+      persistForUser(activeUserId, [...current, id]);
     },
-    [db, sim.activeUserId, persistForUser],
+    [activeUserId, persistForUser],
   );
 
   const unlockNextPhrase = useCallback(
     (preferDomain?: string) => {
-      const current = new Set(db[sim.activeUserId] ?? []);
+      const current = new Set(dbRef.current[activeUserId] ?? []);
 
       // First try the preferred domain, then fall back to all quotes in order.
       const next = preferDomain
@@ -132,9 +187,9 @@ export function QuotesProvider({ children }: { children: React.ReactNode }) {
         : ALL_QUOTES.find((q) => !current.has(q.id));
 
       if (!next) return; // all quotes already unlocked
-      persistForUser(sim.activeUserId, [...Array.from(current), next.id]);
+      persistForUser(activeUserId, [...Array.from(current), next.id]);
     },
-    [db, sim.activeUserId, persistForUser],
+    [activeUserId, persistForUser],
   );
 
   const isUnlocked = useCallback(
@@ -150,14 +205,13 @@ export function QuotesProvider({ children }: { children: React.ReactNode }) {
         (aiSelectedId ? candidates.find((quote) => quote.id === aiSelectedId) : null) ??
         candidates[0] ??
         selectBestQuote(reflectionText);
-      // Unlock it (unlockPhrase is a no-op if already unlocked, counter stays same)
-      const current = db[sim.activeUserId] ?? [];
+      const current = dbRef.current[activeUserId] ?? [];
       if (!current.includes(selected.id)) {
-        persistForUser(sim.activeUserId, [...current, selected.id]);
+        persistForUser(activeUserId, [...current, selected.id]);
       }
       return selected;
     },
-    [db, sim.activeUserId, persistForUser],
+    [activeUserId, persistForUser],
   );
 
   const domainStats = useMemo(

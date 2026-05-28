@@ -64,6 +64,26 @@ export default function PersonalProfileScreen() {
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const ready = useDeferredRender();
+
+  // Render por trozos: primero las secciones ligeras (armazón visible al
+  // instante tras la transición), y las pesadas (panel filosófico, slider de
+  // posts, bloques) un par de frames después. Evita montar TODO el árbol de
+  // SVG en un solo frame, que es lo que congelaba la pantalla 5-7s al entrar.
+  const [heavyReady, setHeavyReady] = useState(false);
+  useEffect(() => {
+    if (!ready) {
+      setHeavyReady(false);
+      return;
+    }
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => setHeavyReady(true));
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      if (raf2) cancelAnimationFrame(raf2);
+    };
+  }, [ready]);
   const { thoughts } = useThoughts();
   const classification = useClassification();
   const { isPreviewActive } = usePreviewMode();
@@ -403,28 +423,32 @@ export default function PersonalProfileScreen() {
               totalPhrases={phraseCount}
               onPress={profileWithClan.clanId ? () => navigateUnlessCurrent(pathname, '/philosophy-profile') : undefined}
             />
-            <View style={styles.contentGap} />
-            <PersonalPhilosophyPanel
-              percentages={profileWithClan.philosophyPercentages}
-              clanId={profileWithClan.clanId}
-              onPress={() => navigateUnlessCurrent(pathname, '/philosophy-profile')}
-              allowLockedAccess={isPreviewActive}
-            />
-            <View style={styles.contentGap} />
-            <PersonalRecentPostsSlider
-              posts={posts}
-              onPostPress={handleRecentPostPress}
-              onMenuAction={handlePostMenuAction}
-              isHiddenFn={isHidden}
-              onSeeMorePress={handleSeeMoreRecentPosts}
-            />
-            <View style={styles.contentGap} />
-            <PersonalBottomBlocks
-              clanId={profileWithClan.clanId}
-              friends={friends}
-              savedPosts={savedPosts}
-              onSavedPostPress={handleSavedPostPress}
-            />
+            {heavyReady ? (
+              <>
+                <View style={styles.contentGap} />
+                <PersonalPhilosophyPanel
+                  percentages={profileWithClan.philosophyPercentages}
+                  clanId={profileWithClan.clanId}
+                  onPress={() => navigateUnlessCurrent(pathname, '/philosophy-profile')}
+                  allowLockedAccess={isPreviewActive}
+                />
+                <View style={styles.contentGap} />
+                <PersonalRecentPostsSlider
+                  posts={posts}
+                  onPostPress={handleRecentPostPress}
+                  onMenuAction={handlePostMenuAction}
+                  isHiddenFn={isHidden}
+                  onSeeMorePress={handleSeeMoreRecentPosts}
+                />
+                <View style={styles.contentGap} />
+                <PersonalBottomBlocks
+                  clanId={profileWithClan.clanId}
+                  friends={friends}
+                  savedPosts={savedPosts}
+                  onSavedPostPress={handleSavedPostPress}
+                />
+              </>
+            ) : null}
             <View style={styles.bottomSpacer} />
           </ScrollView>
         )}

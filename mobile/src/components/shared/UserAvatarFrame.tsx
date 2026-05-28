@@ -8,9 +8,10 @@
  * Usage:
  *   <UserAvatarFrame clanId={user.clanId} avatarUri={user.avatarUri} size={60} />
  */
-import React, { useId, useMemo } from 'react';
-import { View, StyleSheet, StyleProp, ViewStyle } from 'react-native';
+import React, { useEffect, useId, useMemo, useState } from 'react';
+import { View, StyleSheet, StyleProp, ViewStyle, InteractionManager } from 'react-native';
 import Svg, { ClipPath, Path, Defs, Image as SvgImage } from 'react-native-svg';
+import { Image as ExpoImage } from 'expo-image';
 import {
   getClanProfileByHouse,
   PROFILE_PERSON_SILHOUETTE,
@@ -52,11 +53,55 @@ type Props = {
    * `by-clan` = icono de perfil del clan del usuario.
    */
   noPhotoFallback?: 'person-silhouette' | 'by-clan';
+  /**
+   * Listas largas: pinta un círculo placeholder barato y monta los SVG del
+   * escudo SOLO tras terminar la transición/interacciones. Evita bloquear el
+   * hilo JS al entrar (botones que no responden, "atrás" lento en Android
+   * gama baja). Por defecto `false` (montaje inmediato, como antes).
+   */
+  deferRender?: boolean;
 };
 
 const DEFAULT_SIZE = 60;
 
-export function UserAvatarFrame({
+/**
+ * Descarga el avatar una vez con `expo-image` (caché en disco) y devuelve su
+ * ruta local `file://`, que se pasa al SVG en lugar de la URL remota. Evita que
+ * `react-native-svg` re-descargue el mismo avatar en cada lista/montaje (en iOS
+ * no cachea remotos), reduciendo tráfico y parpadeos.
+ */
+function useCachedAvatarUri(remoteUri: string | null): string | null {
+  const [cachedUri, setCachedUri] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCachedUri(null);
+    if (!remoteUri || !/^https?:\/\//i.test(remoteUri)) return;
+
+    let active = true;
+    const toFileUri = (p: string) => (p.startsWith('file://') ? p : `file://${p}`);
+
+    void (async () => {
+      try {
+        let path = await ExpoImage.getCachePathAsync(remoteUri);
+        if (!path) {
+          await ExpoImage.prefetch(remoteUri, { cachePolicy: 'disk' });
+          path = await ExpoImage.getCachePathAsync(remoteUri);
+        }
+        if (active && path) setCachedUri(toFileUri(path));
+      } catch {
+        /* sin caché → se usa la URL remota como fallback */
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [remoteUri]);
+
+  return cachedUri;
+}
+
+function UserAvatarFrameBase({
   clanId,
   avatarUri,
   size = DEFAULT_SIZE,
@@ -65,7 +110,16 @@ export function UserAvatarFrame({
   iconOffsetX = 0,
   iconOffsetY = 0,
   noPhotoFallback = 'by-clan',
+  deferRender = false,
 }: Props) {
+  // Difiere el montaje de los SVG hasta que la transición de navegación acabe.
+  const [svgReady, setSvgReady] = useState(!deferRender);
+  useEffect(() => {
+    if (!deferRender || svgReady) return;
+    const handle = InteractionManager.runAfterInteractions(() => setSvgReady(true));
+    return () => handle.cancel();
+  }, [deferRender, svgReady]);
+
   const ClanSvg = useMemo(() => {
     if (noPhotoFallback === 'person-silhouette') return PROFILE_PERSON_SILHOUETTE;
     return getClanProfileByHouse(clanId);
@@ -78,9 +132,29 @@ export function UserAvatarFrame({
       ? trimmed
       : null;
 
+  // Sirve desde caché en disco cuando esté disponible; si no, usa la remota.
+  const cachedAvatar = useCachedAvatarUri(resolvedAvatar);
+  const displayAvatar = cachedAvatar ?? resolvedAvatar;
+
+  // Placeholder barato mientras se difiere el montaje del SVG (listas largas).
+  if (!svgReady) {
+    return (
+      <View
+        style={[
+          { width: size, height: size, borderRadius: size / 2, backgroundColor: 'rgba(255,255,255,0.07)' },
+          style,
+        ]}
+      />
+    );
+  }
+
   if (!resolvedAvatar) {
     return (
-      <View style={[{ width: size, height: size }, style]}>
+      <View
+        style={[{ width: size, height: size }, style]}
+        renderToHardwareTextureAndroid
+        shouldRasterizeIOS
+      >
         <View
           style={{
             transform: [
@@ -97,7 +171,11 @@ export function UserAvatarFrame({
   }
 
   return (
-    <View style={[{ width: size, height: size }, style]}>
+    <View
+      style={[{ width: size, height: size }, style]}
+      renderToHardwareTextureAndroid
+      shouldRasterizeIOS
+    >
       {/* Layer 1: full clan SVG — preserves top star decorations and base shape */}
       <ClanSvg width={size} height={size} />
 
@@ -114,7 +192,7 @@ export function UserAvatarFrame({
           </ClipPath>
         </Defs>
         <SvgImage
-          href={{ uri: resolvedAvatar }}
+          href={{ uri: displayAvatar }}
           x={100}
           y={75}
           width={400}
@@ -134,3 +212,10 @@ export function UserAvatarFrame({
     </View>
   );
 }
+
+/**
+ * Memoized + rasterized: the badge is a 2–3 layer SVG that never animates, so
+ * we cache it as a GPU texture and skip re-renders when props are unchanged.
+ * Big win in avatar-heavy lists (seguidores/seguidos/amigos, buscador, detalle).
+ */
+export const UserAvatarFrame = React.memo(UserAvatarFrameBase);

@@ -199,3 +199,40 @@ export function applyDecrementUses(stats: UserStats): UserStats {
   if (stats.dailyUsesRemaining <= 0) return stats;
   return { ...stats, dailyUsesRemaining: stats.dailyUsesRemaining - 1 };
 }
+
+/**
+ * Fusiona stats locales con datos remotos (Supabase profiles + backend streak).
+ * Toma el máximo de racha y preserva hasSentToday si el servidor indica actividad hoy.
+ * No destruye datos locales más recientes.
+ */
+export function mergeStatsFromRemote(
+  local: UserStats,
+  remote: {
+    streakDays?: number;
+    remainingUses?: number;
+    hasSentToday?: boolean;
+    lastUsesResetDate?: string | null;
+  },
+  today: string,
+): UserStats {
+  const rolled = applyDailyRollover(local, today);
+  let next = { ...rolled };
+
+  if (typeof remote.streakDays === 'number') {
+    next.currentStreak = Math.max(next.currentStreak, Math.max(0, remote.streakDays));
+  }
+  if (typeof remote.remainingUses === 'number') {
+    next.dailyUsesRemaining = Math.min(
+      DAILY_USES_LIMIT,
+      Math.max(0, remote.remainingUses),
+    );
+  }
+  if (remote.hasSentToday) {
+    next.hasSentTodayDate = today;
+  }
+  if (remote.lastUsesResetDate) {
+    next.lastUsesResetDate = remote.lastUsesResetDate;
+  }
+
+  return next;
+}

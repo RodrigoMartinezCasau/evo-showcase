@@ -6,7 +6,7 @@
  * Each row shows "Siguiendo"; tapping unfollows and removes from the list.
  * Derived from PersonalProfileContext so state is always in sync.
  */
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -25,13 +25,19 @@ import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { BOTTOM_BAR_LAYOUT, getBottomBarScrollContentPaddingBottom } from '@evoconn/constants/bottomBarLayout';
 import { getMainColumnHeightForFloatingBottomBar } from '@evoconn/constants/appShellLayout';
 import { UserAvatarFrame } from '@evoconn/components/shared/UserAvatarFrame';
+import { ClanLoadingDot } from '@evoconn/components/shared/ClanLoadingDot';
+import { useDeferredRender } from '@evoconn/hooks/useDeferredRender';
 import { usePersonalProfile } from '@evoconn/hooks/PersonalProfileContext';
+import { useIncrementalList } from '@evoconn/hooks/useIncrementalList';
 import type { FollowingEntry } from '@evoconn/data/mockPersonalProfile';
 
 const AVATAR_SIZE = 42;
 const PROFILE_ICON_SCALE = 1.1;
+const FOLLOW_LIST_PAGE_SIZE = 20;
+/** Filas montadas en el primer frame — bajo para no bloquear el hilo JS al entrar. */
+const FOLLOW_LIST_INITIAL_RENDER = 8;
 
-function FriendRow({
+const FriendRow = React.memo(function FriendRow({
   user,
   onUnfollow,
   onUserPress,
@@ -57,6 +63,7 @@ function FriendRow({
             avatarUri={user.avatarUri}
             size={AVATAR_SIZE}
             iconScale={PROFILE_ICON_SCALE}
+            deferRender
           />
         </View>
       </TouchableOpacity>
@@ -81,7 +88,7 @@ function FriendRow({
       </TouchableOpacity>
     </View>
   );
-}
+});
 
 export default function PersonalFriendsScreen() {
   const router = useRouter();
@@ -92,7 +99,19 @@ export default function PersonalFriendsScreen() {
   const { thoughts } = useThoughts();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
 
-  const { friends, unfollowUser } = usePersonalProfile();
+  const { friends, unfollowUser, primeProfiles } = usePersonalProfile();
+
+  const ready = useDeferredRender();
+
+  const { visibleData, hasMore, loadMore } = useIncrementalList(
+    friends,
+    FOLLOW_LIST_PAGE_SIZE,
+  );
+
+  // Pide a Supabase solo los perfiles de la página visible (no toda la red).
+  useEffect(() => {
+    primeProfiles(visibleData.map((u) => u.id));
+  }, [visibleData, primeProfiles]);
 
   const handleUserPress = useCallback(
     (id: string) => {
@@ -135,26 +154,37 @@ export default function PersonalFriendsScreen() {
       </View>
 
       <View style={{ height: listPanelHeight, overflow: 'hidden' }}>
-        <FlatList
-          style={{ flex: 1 }}
-          data={friends}
-          keyExtractor={item => item.id}
-          renderItem={renderItem}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{
-            paddingBottom: getBottomBarScrollContentPaddingBottom(
-              insets.bottom,
-              screenH,
-              safeFrame.height,
-            ),
-          }}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-          ListEmptyComponent={
-            <View style={styles.emptyWrap}>
-              <Text style={styles.emptyText}>Sin amigos mutuos aún</Text>
-            </View>
-          }
-        />
+        {!ready ? (
+          <ClanLoadingDot />
+        ) : (
+          <FlatList
+            style={{ flex: 1 }}
+            data={visibleData}
+            keyExtractor={item => item.id}
+            renderItem={renderItem}
+            showsVerticalScrollIndicator={false}
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.5}
+            initialNumToRender={FOLLOW_LIST_INITIAL_RENDER}
+            maxToRenderPerBatch={6}
+            windowSize={5}
+            removeClippedSubviews
+            contentContainerStyle={{
+              paddingBottom: getBottomBarScrollContentPaddingBottom(
+                insets.bottom,
+                screenH,
+                safeFrame.height,
+              ),
+            }}
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
+            ListFooterComponent={hasMore ? <ClanLoadingDot inline /> : null}
+            ListEmptyComponent={
+              <View style={styles.emptyWrap}>
+                <Text style={styles.emptyText}>Sin amigos mutuos aún</Text>
+              </View>
+            }
+          />
+        )}
       </View>
 
       <AppShellBottomTabsWrap

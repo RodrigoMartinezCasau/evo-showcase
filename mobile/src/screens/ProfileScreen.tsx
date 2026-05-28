@@ -43,6 +43,20 @@ import {
 
 const ANIM_DURATION = 200;
 
+/**
+ * Caché en memoria de perfiles de OTROS usuarios (stale-while-revalidate).
+ * Al reabrir un perfil ya visitado mostramos al instante lo último cacheado
+ * mientras `reloadOtherProfile` refresca por detrás — sin punto de carga ni
+ * parpadeo. Se limpia al cerrar la app (no persiste a disco a propósito).
+ */
+type OtherProfileCacheEntry = {
+  profile: OtherUserProfile;
+  posts: CommunityPost[];
+  isPrivate: boolean;
+  followSnap: { followers: number; following: number; iFollowed: boolean } | null;
+};
+const otherProfileCache = new Map<string, OtherProfileCacheEntry>();
+
 export default function ProfileScreen() {
   const { id: rawId, username: initialUsername } = useLocalSearchParams<{ id?: string; username?: string }>();
   const id = sanitizeRouteId(rawId);
@@ -110,9 +124,10 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
   const pathname = usePathname();
   // Try the 9-user simulation first; if not found, fetch from Supabase.
   const mockProfile = getOtherUserProfile(userId);
-  const [supabaseProfile, setSupabaseProfile] = useState<OtherUserProfile | null>(null);
-  const [supabasePosts, setSupabasePosts] = useState<CommunityPost[]>([]);
-  const [targetIsPrivate, setTargetIsPrivate] = useState(false);
+  const seededCache = otherProfileCache.get(userId);
+  const [supabaseProfile, setSupabaseProfile] = useState<OtherUserProfile | null>(seededCache?.profile ?? null);
+  const [supabasePosts, setSupabasePosts] = useState<CommunityPost[]>(seededCache?.posts ?? []);
+  const [targetIsPrivate, setTargetIsPrivate] = useState(seededCache?.isPrivate ?? false);
   const {
     followGraph,
     activeUserId: viewerId,
@@ -133,11 +148,16 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
     followers: number;
     following: number;
     iFollowed: boolean;
-  } | null>(null);
+  } | null>(seededCache?.followSnap ?? null);
 
+  // Al cambiar de usuario, re-sembramos desde caché (no a vacío) para que el
+  // perfil aparezca al instante con lo último visto mientras refrescamos.
   useLayoutEffect(() => {
-    setFollowCountSnap(null);
-    setTargetIsPrivate(false);
+    const c = otherProfileCache.get(userId);
+    setSupabaseProfile(c?.profile ?? null);
+    setSupabasePosts(c?.posts ?? []);
+    setFollowCountSnap(c?.followSnap ?? null);
+    setTargetIsPrivate(c?.isPrivate ?? false);
   }, [userId]);
 
   // Fetcher refactored so we can invoke it both on userId change and on
@@ -163,18 +183,23 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
         isRealUserId(viewerId) && isRealUserId(userId)
           ? (vid[viewerId]?.has(userId) ?? false)
           : false;
+
+      let builtProfile: OtherUserProfile | null = null;
+      let builtSnap: OtherProfileCacheEntry['followSnap'] = null;
+      let builtIsPrivate = false;
       if (data) {
-        const isPrivate = Boolean((data as { is_private?: boolean }).is_private);
-        setTargetIsPrivate(isPrivate);
-        setFollowCountSnap({
+        builtIsPrivate = Boolean((data as { is_private?: boolean }).is_private);
+        builtSnap = {
           followers: counts.followersCount,
           following: counts.followingCount,
           iFollowed,
-        });
+        };
+        setTargetIsPrivate(builtIsPrivate);
+        setFollowCountSnap(builtSnap);
         const remotePcts = Array.isArray((data as { clan_percentages?: unknown }).clan_percentages)
           ? ((data as { clan_percentages: unknown[] }).clan_percentages as { clanId: string; label: string; pct: number }[])
           : [];
-        setSupabaseProfile({
+        builtProfile = {
           id: data.id,
           username: '@' + (data.username ?? '').toUpperCase(),
           clanId: data.clan_id ?? null,
@@ -187,14 +212,15 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
           totalQuotes: data.total_quotes ?? 0,
           recentPosts: [],
           avatarUri: (data as { avatar_url?: string | null }).avatar_url ?? null,
-        });
+        };
+        setSupabaseProfile(builtProfile);
       }
       const resolvedUsername = data?.username
         ? '@' + data.username.toUpperCase()
         : null;
       const authorAvatar =
         (data as { avatar_url?: string | null } | null | undefined)?.avatar_url ?? undefined;
-      setSupabasePosts(posts.map(p => ({
+      const builtPosts: CommunityPost[] = posts.map(p => ({
         id: p.id,
         type: p.type,
         author: {
@@ -209,7 +235,18 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
         quoteAuthor: p.quoteAuthor,
         voteStats: { up: p.upvoterIds.length, down: p.downvoterIds.length, save: p.saverIds.length },
         createdAt: p.createdAt,
-      })));
+      }));
+      setSupabasePosts(builtPosts);
+
+      // Stale-while-revalidate: persist the freshest snapshot for instant reopen.
+      if (builtProfile) {
+        otherProfileCache.set(userId, {
+          profile: builtProfile,
+          posts: builtPosts,
+          isPrivate: builtIsPrivate,
+          followSnap: builtSnap,
+        });
+      }
     },
     [userId, mockProfile, viewerId],
   );

@@ -2,28 +2,16 @@ import type { Router } from 'expo-router';
 import {
   scheduleCommunityPostDeepLink,
   peekCommunityPostNavigationEpoch,
+  notifyCommunityPostNavigation,
+  subscribeCommunityPostNavigation,
 } from './communityPostDeepLink';
+
+export { subscribeCommunityPostNavigation };
 
 /** Fuerza que CommunityScreen vuelva a procesar el mismo deep link (p. ej. otro post). */
 let forcedCommunityPostId: string | null = null;
 let forcedCommunityCommentId: string | null = null;
 let forcedNavigationEpoch = 0;
-
-type NavigationListener = () => void;
-const navigationListeners: NavigationListener[] = [];
-
-function notifyCommunityPostNavigation(): void {
-  navigationListeners.forEach((fn) => fn());
-}
-
-/** CommunityScreen se suscribe para re-procesar aunque expo-router no actualice params. */
-export function subscribeCommunityPostNavigation(listener: NavigationListener): () => void {
-  navigationListeners.push(listener);
-  return () => {
-    const idx = navigationListeners.indexOf(listener);
-    if (idx >= 0) navigationListeners.splice(idx, 1);
-  };
-}
 
 export function consumeForcedCommunityPostOpen(): string | null {
   const id = forcedCommunityPostId;
@@ -66,16 +54,10 @@ export function navigateToCommunityPost(
   const id = postId?.trim();
   if (!id) return;
   const cleanComment = commentId?.trim() || undefined;
-  const epoch = scheduleCommunityPostOpen(id, cleanComment);
-  router.replace({
-    pathname: '/(tabs)',
-    params: {
-      tab: 'para-ti',
-      postId: id,
-      ...(cleanComment ? { commentId: cleanComment } : {}),
-      nav: String(epoch),
-    },
-  });
+  scheduleCommunityPostOpen(id, cleanComment);
+  // Sin postId en params: evita starfield colgado en cold start; CommunityScreen
+  // consume el intent vía forced + subscribe (mismo flujo que widget).
+  router.replace('/(tabs)');
 }
 
 /** Epoch actual del intent pendiente (para deps en CommunityScreen). */

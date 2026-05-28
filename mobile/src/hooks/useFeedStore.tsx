@@ -171,14 +171,98 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
 
   // All posts: derive CommunityPost[] from the live SimPost[] so vote/save
   // counts always reflect the current simulation state.
-  const posts = useMemo<CommunityPost[]>(
-    () =>
-      sim.posts
-        .filter(p => isPublishedSimPostType(p.type))
-        .filter(p => !blockedIds.has(p.authorId))
-        .map(p => simPostToCommunityPost(p, authorProfileCache)),
-    [sim.posts, authorProfileCache, blockedIds],
-  );
+  //
+  // PERF: we keep a per-post cache so that an unchanged post returns the SAME
+  // object reference across renders. Voting on one post only rebuilds THAT
+  // post's object (and the array), leaving every other card reference-stable —
+  // so memoized rows/detail items don't repaint on unrelated mutations.
+  const postCacheRef = useRef<
+    Map<
+      string,
+      {
+        community: CommunityPost;
+        up: number;
+        down: number;
+        save: number;
+        title?: string;
+        body?: string;
+        type: SimPost['type'];
+        authorClanId: SimPost['authorClanId'];
+        authorUsername?: string;
+        authorRank?: SimPost['authorRank'];
+        profile?: BasicProfile;
+      }
+    >
+  >(new Map());
+  const prevPostsArrRef = useRef<CommunityPost[]>([]);
+
+  const posts = useMemo<CommunityPost[]>(() => {
+    const cache = postCacheRef.current;
+    const seen = new Set<string>();
+    const next: CommunityPost[] = [];
+
+    for (const p of sim.posts) {
+      if (!isPublishedSimPostType(p.type)) continue;
+      if (blockedIds.has(p.authorId)) continue;
+      seen.add(p.id);
+
+      const profile = authorProfileCache[p.authorId];
+      const cached = cache.get(p.id);
+      const upLen = p.upvoterIds.length;
+      const downLen = p.downvoterIds.length;
+      const saveLen = p.saverIds.length;
+
+      // Reuse the previous object when nothing that affects rendering changed.
+      if (
+        cached &&
+        cached.up === upLen &&
+        cached.down === downLen &&
+        cached.save === saveLen &&
+        cached.title === p.title &&
+        cached.body === p.body &&
+        cached.type === p.type &&
+        cached.authorClanId === p.authorClanId &&
+        cached.authorUsername === p.authorUsername &&
+        cached.authorRank === p.authorRank &&
+        cached.profile === profile
+      ) {
+        next.push(cached.community);
+        continue;
+      }
+
+      const community = simPostToCommunityPost(p, authorProfileCache);
+      cache.set(p.id, {
+        community,
+        up: upLen,
+        down: downLen,
+        save: saveLen,
+        title: p.title,
+        body: p.body,
+        type: p.type,
+        authorClanId: p.authorClanId,
+        authorUsername: p.authorUsername,
+        authorRank: p.authorRank,
+        profile,
+      });
+      next.push(community);
+    }
+
+    // Drop cache entries for posts that no longer exist.
+    if (cache.size > seen.size) {
+      for (const key of [...cache.keys()]) {
+        if (!seen.has(key)) cache.delete(key);
+      }
+    }
+
+    // Keep the ARRAY reference stable too when every element is reference-equal,
+    // so the context value doesn't churn on no-op recomputations.
+    const prev = prevPostsArrRef.current;
+    if (prev.length === next.length && prev.every((el, i) => el === next[i])) {
+      return prev;
+    }
+    prevPostsArrRef.current = next;
+    return next;
+  }, [sim.posts, authorProfileCache, blockedIds]);
 
   const publishPost = useCallback(
     (post: CommunityPost) => {

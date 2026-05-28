@@ -42,9 +42,9 @@ const V = SVG_CARD_VISUAL;
 
 type CommunityPostCardProps = {
   post: CommunityPost;
-  onPress: () => void;
-  onAuthorPress: () => void;
-  onClanPress: () => void;
+  onPress: (post: CommunityPost) => void;
+  onAuthorPress: (authorId: string) => void;
+  onClanPress?: (clanId: string | null) => void;
   /**
    * Solo en PARA TI (lista compacta). Siguiendo: false.
    * Vistas ampliadas usan `ReflectionDetailItem`, no esta tarjeta.
@@ -61,7 +61,7 @@ type CommunityPostCardProps = {
   followingFeedStyle?: boolean;
 };
 
-export function CommunityPostCard({
+function CommunityPostCardBase({
   post,
   onPress,
   onAuthorPress,
@@ -225,7 +225,7 @@ export function CommunityPostCard({
   );
 
   return (
-    <TouchableOpacity activeOpacity={0.92} onPress={onPress}>
+    <TouchableOpacity activeOpacity={0.92} onPress={() => onPress(post)}>
       <View
         onLayout={onCardLayout}
         style={{
@@ -244,6 +244,8 @@ export function CommunityPostCard({
             { width: cardWidth, height: layout.cardHeight, borderRadius: V.CARD_BORDER_RADIUS },
           ]}
           pointerEvents="none"
+          renderToHardwareTextureAndroid
+          shouldRasterizeIOS
         >
           <CardBgSvg
             width={layout.svgRenderSize}
@@ -285,7 +287,7 @@ export function CommunityPostCard({
           }}
         >
           <View style={styles.feedUsernameRow}>
-            <TouchableOpacity onPress={onAuthorPress} hitSlop={6} style={styles.usernameHit}>
+            <TouchableOpacity onPress={() => onAuthorPress(post.author.id)} hitSlop={6} style={styles.usernameHit}>
               <Text
                 style={[
                   styles.usernameHeader,
@@ -403,6 +405,13 @@ export function CommunityPostCard({
     </TouchableOpacity>
   );
 }
+
+/**
+ * Memoized: with stable `post` references (see useFeedStore) and stable
+ * callbacks, an unrelated feed mutation no longer repaints every card —
+ * only the card whose post actually changed re-renders.
+ */
+export const CommunityPostCard = React.memo(CommunityPostCardBase);
 
 const styles = StyleSheet.create({
   svgCrop: {

@@ -10,6 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { evoconnColors } from '@evoconn/theme/colors';
+import { useSinglePress } from '@evoconn/hooks/useSinglePress';
 
 type Props = {
   visible: boolean;
@@ -25,13 +26,16 @@ export function PhraseFolderCreateModal({ visible, onClose, onCreate }: Props) {
     if (!visible) setName('');
   }, [visible]);
 
-  const submit = useCallback(() => {
+  const rawSubmit = useCallback(() => {
     const t = name.trim();
     if (!t) return;
     onCreate(t);
     setName('');
     onClose();
   }, [name, onCreate, onClose]);
+
+  // Guard against rapid multi-tap on "Crear" (Android Fabric crash, see useSinglePress).
+  const submit = useSinglePress(rawSubmit);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>

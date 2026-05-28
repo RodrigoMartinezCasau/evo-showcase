@@ -39,6 +39,9 @@ import { useAuth } from '../../mobile/lib/AuthContext';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+/** Perfiles precargados al entrar al perfil (contadores + preview + 1ª página). */
+const PROFILE_PRIME_BATCH = 24;
+
 function simUserToUser(u: SimUser): User {
   return { id: u.id, username: u.username, clanId: u.clanId, rank: u.rank };
 }
@@ -145,6 +148,9 @@ type PersonalProfileContextValue = {
   // ── Mutual friends (following ∩ followers) ──
   friends: FollowingEntry[];
 
+  /** Pide a Supabase los perfiles que falten para estos IDs (página visible). */
+  primeProfiles: (ids: string[]) => void;
+
   // ── Saved posts ──
   savedPosts: CommunityPost[];
   savedPostIds: Set<string>;
@@ -199,19 +205,25 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
     [users, profileCache],
   );
 
-  // Collect all unknown UUIDs from followers + following, batch-fetch their profiles.
+  // Precarga SOLO un primer lote de perfiles (suficiente para contadores y la
+  // vista previa de "Amigos" + la primera página de cada lista). El resto se
+  // pide página a página desde cada pantalla vía `primeProfiles`, para no
+  // descargar de golpe los perfiles de TODA la red de follows en horas pico.
   useLayoutEffect(() => {
-    const allUids = new Set<string>();
+    const firstBatch: string[] = [];
+    const pushMissing = (uid: string) => {
+      if (!users[uid] && !SIM_USERS_BY_ID[uid]) firstBatch.push(uid);
+    };
     Object.entries(followGraph)
       .filter(([, set]) => set.has(activeUserId))
-      .forEach(([uid]) => {
-        if (!users[uid] && !SIM_USERS_BY_ID[uid]) allUids.add(uid);
-      });
-    const myFollowing = followGraph[activeUserId] ?? new Set<string>();
-    myFollowing.forEach(uid => {
-      if (!users[uid] && !SIM_USERS_BY_ID[uid]) allUids.add(uid);
-    });
-    fetchMissingProfiles([...allUids]);
+      .slice(0, PROFILE_PRIME_BATCH)
+      .forEach(([uid]) => pushMissing(uid));
+    const myFollowing = [...(followGraph[activeUserId] ?? new Set<string>())].slice(
+      0,
+      PROFILE_PRIME_BATCH,
+    );
+    myFollowing.forEach(pushMissing);
+    fetchMissingProfiles(firstBatch);
   }, [followGraph, activeUserId, users, fetchMissingProfiles]);
 
   // Authors of saved posts (often real users not in the 9-user sim) → fill `profileCache` for usernames.
@@ -371,6 +383,7 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
       following,
       unfollowUser,
       friends,
+      primeProfiles: fetchMissingProfiles,
       savedPosts,
       savedPostIds,
       savePost,
@@ -380,7 +393,7 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
     [
       posts, hiddenPostIds, deletePost, toggleHidePost, isHidden,
       followers, followingBackIds, followBack, unfollowBack, isFollowingBack,
-      following, unfollowUser, friends,
+      following, unfollowUser, friends, fetchMissingProfiles,
       savedPosts, savedPostIds, savePost, unsavePost, isSaved,
     ],
   );

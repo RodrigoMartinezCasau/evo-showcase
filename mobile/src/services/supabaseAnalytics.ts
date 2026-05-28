@@ -6,7 +6,7 @@ import { countSentryMetric } from '../../mobile/lib/sentry';
 import { supabase } from '../../mobile/lib/supabase';
 import { isRealUserId } from './supabaseSocial';
 
-const PRESENCE_PING_SECONDS = 120;
+const PRESENCE_PING_SECONDS = 300;
 
 /** Actualiza presencia + tiempo activo estimado del día (RPC analytics_record_presence_ping).
  *

@@ -1905,6 +1905,11 @@ def select_quote(payload: QuoteSelectRequest):
 
     allowed_ids = {c.id for c in candidates}
     fallback_id = candidates[0].id
+
+    # Ahorra 1 request OpenAI por reflexión en picos (fallback local es aceptable).
+    if os.getenv("QUOTE_SELECTOR_SKIP_LLM", "").strip().lower() in ("1", "true", "yes"):
+        return QuoteSelectResponse(quote_id=fallback_id, reason=None, source="fallback")
+
     candidates_payload = [
         {
             "id": c.id,

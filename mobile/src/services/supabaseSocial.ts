@@ -135,6 +135,57 @@ export async function fetchPostsByAuthor(authorId: string): Promise<SimPost[]> {
     .map(dbRowToSimPost);
 }
 
+/** Posts concretos por ID (p. ej. guardados que no están en el feed global). */
+export async function fetchPostsByIds(postIds: string[]): Promise<SimPost[]> {
+  if (postIds.length === 0) return [];
+  const unique = [...new Set(postIds.filter(Boolean))];
+
+  const fromView = await supabase
+    .from('posts_with_author_clan')
+    .select('*')
+    .in('id', unique)
+    .in('type', ['reflection', 'phrase']);
+
+  let rows: Record<string, unknown>[];
+  if (fromView.error) {
+    console.warn(
+      '[Social] fetchPostsByIds view fallback:',
+      fromView.error.message,
+    );
+    const fallback = await supabase
+      .from('posts')
+      .select('*')
+      .in('id', unique)
+      .in('type', ['reflection', 'phrase']);
+    if (fallback.error) {
+      console.error('[Social] fetchPostsByIds:', fallback.error.message);
+      return [];
+    }
+    rows = (fallback.data ?? []) as Record<string, unknown>[];
+  } else {
+    rows = (fromView.data ?? []) as Record<string, unknown>[];
+  }
+
+  return rows
+    .filter((row) => isPublishedSimPostType(row['type']))
+    .map(dbRowToSimPost);
+}
+
+/** IDs de posts ocultos del autor (para hidratar hiddenMap en otro dispositivo). */
+export async function fetchHiddenPostIdsByAuthor(authorId: string): Promise<string[]> {
+  if (!isRealUserId(authorId)) return [];
+  const { data, error } = await supabase
+    .from('posts')
+    .select('id')
+    .eq('author_id', authorId)
+    .eq('is_hidden', true);
+  if (error) {
+    console.warn('[Social] fetchHiddenPostIdsByAuthor:', error.message);
+    return [];
+  }
+  return (data ?? []).map((row) => String(row.id));
+}
+
 export async function insertPost(post: SimPost): Promise<void> {
   if (!isRealUserId(post.authorId)) return;
   const { error } = await supabase.from('posts').upsert(simPostToDbRow(post), { onConflict: 'id' });
@@ -643,7 +694,7 @@ export async function searchSupabaseUsers(query: string): Promise<BasicProfile[]
     .from('profiles')
     .select('id, username, clan_id, rank, avatar_url')
     .ilike('username', `%${query.trim()}%`)
-    .limit(30);
+    .limit(15);
   if (error) { console.error('[Social] searchSupabaseUsers:', error.message); return []; }
   return (data ?? []).map(r => ({
     id: r.id,

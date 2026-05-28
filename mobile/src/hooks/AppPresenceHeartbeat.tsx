@@ -3,17 +3,20 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { useAuth } from '../../mobile/lib/AuthContext';
 import { upsertAppPresence } from '@evoconn/services/supabaseAnalytics';
 
-const HEARTBEAT_MS = 120_000;
+const HEARTBEAT_MS = 300_000;
 
 /**
  * Con sesión activa, envía last_seen a Supabase al entrar en primer plano
- * y cada ~2 minutos mientras la app está activa.
+ * y cada ~5 minutos mientras la app está activa.
+ *
+ * Desactivar en pico (EAS): EXPO_PUBLIC_DISABLE_PRESENCE_PING=1
  */
 export function AppPresenceHeartbeat() {
   const { session } = useAuth();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
+    if (process.env.EXPO_PUBLIC_DISABLE_PRESENCE_PING === '1') return;
     if (!session?.user?.id) return;
 
     const ping = () => {

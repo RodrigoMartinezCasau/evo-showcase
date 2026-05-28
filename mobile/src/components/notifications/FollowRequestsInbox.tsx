@@ -10,6 +10,7 @@ import { getClanColor } from '@evoconn/constants/clanColors';
 
 const AVATAR_SIZE = 42;
 const PROFILE_ICON_SCALE = 1.05;
+const REQUESTS_PAGE_SIZE = 8;
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -38,6 +39,7 @@ export function FollowRequestsInbox({
   onReject,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(REQUESTS_PAGE_SIZE);
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const { visibleClanId } = useClassification();
   const effectiveClan = visibleClanId ?? activeClan;
@@ -46,8 +48,19 @@ export function FollowRequestsInbox({
 
   const toggleExpanded = useCallback(() => {
     if (count === 0) return;
-    setExpanded((v) => !v);
+    setExpanded((v) => {
+      const next = !v;
+      if (!next) setVisibleCount(REQUESTS_PAGE_SIZE);
+      return next;
+    });
   }, [count]);
+
+  const visibleRequests = requests.slice(0, visibleCount);
+  const remaining = count - visibleRequests.length;
+
+  const showMore = useCallback(() => {
+    setVisibleCount((c) => c + REQUESTS_PAGE_SIZE);
+  }, []);
 
   if (count === 0) return null;
 
@@ -77,7 +90,7 @@ export function FollowRequestsInbox({
 
       {expanded ? (
         <View style={styles.expandedList}>
-          {requests.map((req, index) => {
+          {visibleRequests.map((req, index) => {
             const username = req.username.replace(/^@+/, '');
             const busy = busyRequesterId === req.requesterId;
             return (
@@ -96,6 +109,7 @@ export function FollowRequestsInbox({
                       avatarUri={req.avatarUri}
                       size={AVATAR_SIZE}
                       iconScale={PROFILE_ICON_SCALE}
+                      deferRender
                     />
                   </View>
                 </TouchableOpacity>
@@ -133,6 +147,17 @@ export function FollowRequestsInbox({
               </View>
             );
           })}
+          {remaining > 0 ? (
+            <TouchableOpacity
+              style={styles.showMoreBtn}
+              onPress={showMore}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.showMoreText, { color: accentColor }]}>
+                Ver {remaining} más
+              </Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       ) : null}
     </View>
@@ -248,5 +273,15 @@ const styles = StyleSheet.create({
   },
   btnDisabled: {
     opacity: 0.45,
+  },
+  showMoreBtn: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255,255,255,0.06)',
+  },
+  showMoreText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

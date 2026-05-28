@@ -37,10 +37,11 @@ import {
   isRealUserId,
   fetchAllPosts,
   fetchPostsByAuthor,
+  fetchPostsByIds,
+  fetchHiddenPostIdsByAuthor,
   fetchVotesForPosts,
   fetchMyVotes,
   fetchMySaves,
-  fetchCommentsForPosts,
   fetchFollowing,
   fetchFollowers,
   fetchCommentsForPost,
@@ -98,6 +99,15 @@ async function loadSupabaseHydrationPayload(hydrateFor: string): Promise<{
     // solo añadimos los del autor que no estaban en el top global.
     if (!byId.has(p.id)) byId.set(p.id, p);
   }
+
+  const mySavedPostIds = await fetchMySaves(hydrateFor);
+  const missingSavedIds = mySavedPostIds.filter((id) => !byId.has(id));
+  if (missingSavedIds.length > 0) {
+    const savedPosts = await fetchPostsByIds(missingSavedIds);
+    for (const p of savedPosts) {
+      byId.set(p.id, p);
+    }
+  }
   const sbPosts = Array.from(byId.values());
 
   const postIds = sbPosts.map(p => p.id);
@@ -110,7 +120,6 @@ async function loadSupabaseHydrationPayload(hydrateFor: string): Promise<{
   }
 
   const myVotesMap = await fetchMyVotes(hydrateFor);
-  const mySavedPostIds = await fetchMySaves(hydrateFor);
   for (const pid of mySavedPostIds) {
     const post = sbPosts.find(p => p.id === pid);
     if (post) post.saverIds = [...post.saverIds, hydrateFor];
@@ -121,11 +130,11 @@ async function loadSupabaseHydrationPayload(hydrateFor: string): Promise<{
     fetchFollowers(hydrateFor),
   ]);
 
-  // UNA sola consulta `.in('post_id', postIds)` en lugar de N en paralelo.
-  // Antes hacía Promise.all(postIds.map(...)) → 80+ XHR concurrentes en el
-  // arranque que colapsaban Fabric en Android gama media (causa raíz del
-  // IllegalStateException: addViewAt en 1.1.4).
-  const commentsByPost: Record<string, SimComment[]> = await fetchCommentsForPosts(postIds);
+  // Los comentarios YA NO se descargan en bloque aquí. Se piden por post al
+  // abrirlo (`ensureCommentsForPost`). Antes un refresh traía los comentarios
+  // de TODOS los posts (cientos de filas de comments_with_author_view) aunque
+  // el usuario no abriera ninguno → tráfico innecesario a Supabase en horas pico.
+  const commentsByPost: Record<string, SimComment[]> = {};
 
   return { sbPosts, myVotesMap, mySavedPostIds, following, followers, commentsByPost };
 }
@@ -440,20 +449,30 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
         mySavedPostIds,
         following,
         followers,
+        hiddenPostIds,
       ] = await Promise.all([
         fetchVotesForPosts(postIds),
         fetchMyVotes(hydrateFor),
         fetchMySaves(hydrateFor),
         fetchFollowing(hydrateFor),
         fetchFollowers(hydrateFor),
+        fetchHiddenPostIdsByAuthor(hydrateFor),
       ]);
       if (cancelled || activeUserIdRef.current !== hydrateFor) return;
 
       // Aplicar vote rows a los posts (mutación segura: cada post es nuestro).
-      // Antes resetear: fase 1 puede haber preservado votos cacheados para
-      // evitar parpadeo a 0, así que fase 2 SUSTITUYE (no añade) con la
-      // verdad del servidor.
       const postById = new Map(sbPosts.map(p => [p.id, p] as const));
+
+      // Guardados fuera del feed global: traer cuerpos para perfil / lista guardados.
+      const missingSavedIds = mySavedPostIds.filter((id) => !postById.has(id));
+      if (missingSavedIds.length > 0) {
+        const savedPosts = await fetchPostsByIds(missingSavedIds);
+        for (const p of savedPosts) {
+          postById.set(p.id, p);
+        }
+      }
+
+      // Antes resetear: fase 1 puede haber preservado votos cacheados para
       for (const p of postById.values()) {
         p.upvoterIds = [];
         p.downvoterIds = [];
@@ -474,24 +493,25 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       applyMyVotes(myVotesMap);
       applyMySaves(mySavedPostIds);
       applyFollowGraph(following, followers);
+      if (hiddenPostIds.length > 0) {
+        setHiddenMapArr((prev) => ({ ...prev, [hydrateFor]: hiddenPostIds }));
+      }
 
-      // ── FASE 3: comentarios (deferido) ─────────────────────────────────
-      InteractionManager.runAfterInteractions(async () => {
+      // ── FASE 3: persistir cache (sin descargar comentarios) ────────────
+      // Los comentarios YA NO se descargan en bloque al arrancar: se piden por
+      // post al abrirlo (`ensureCommentsForPost`). Antes esta fase traía los
+      // comentarios de TODOS los posts en cada cold start → miles de filas de
+      // comments_with_author_view sin que el usuario abriera ninguno.
+      // Los comentarios ya abiertos se conservan vía SIM_COMMENTS_STORAGE_KEY.
+      InteractionManager.runAfterInteractions(() => {
         if (cancelled || activeUserIdRef.current !== hydrateFor) return;
-        const commentsByPost = await fetchCommentsForPosts(postIds);
-        if (cancelled || activeUserIdRef.current !== hydrateFor) return;
-        setCommentsMap(prev => ({ ...prev, ...commentsByPost }));
-        commentsHydrated.current = true;
-
-        // Persistir la cache COMPLETA tras todas las fases — próximo cold
-        // start abrirá la app instantáneamente con estos datos.
         const cachedPayload: CachedHydrationPayload = {
           sbPosts: Array.from(postById.values()),
           myVotesMap,
           mySavedPostIds,
           following,
           followers,
-          commentsByPost,
+          commentsByPost: {},
         };
         void saveCachedHydration(hydrateFor, cachedPayload);
       });
@@ -1125,6 +1145,10 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       updated[hydrateFor] = payload.mySavedPostIds;
       return updated;
     });
+    const hiddenIds = await fetchHiddenPostIdsByAuthor(hydrateFor);
+    if (hiddenIds.length > 0) {
+      setHiddenMapArr((prev) => ({ ...prev, [hydrateFor]: hiddenIds }));
+    }
     setFollowGraph(prev => {
       const updated = { ...prev };
       const prevMine = prev[hydrateFor] ?? [];

@@ -21,6 +21,7 @@ import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-cont
 import { Ionicons } from '@expo/vector-icons';
 import { AppTopBar, AppShellBottomTabsWrap, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
 import { useDeferredRender } from '@evoconn/hooks/useDeferredRender';
+import { useIncrementalList } from '@evoconn/hooks/useIncrementalList';
 import { ClanLoadingDot } from '@evoconn/components/shared/ClanLoadingDot';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { BOTTOM_BAR_LAYOUT, getBottomBarScrollContentPaddingBottom } from '@evoconn/constants/bottomBarLayout';
@@ -100,6 +101,7 @@ const NotificationRow = React.memo(function NotificationRow({
             avatarUri={avatarUri}
             size={AVATAR_SIZE}
             iconScale={PROFILE_ICON_SCALE}
+            deferRender
           />
         </View>
       </TouchableOpacity>
@@ -151,6 +153,12 @@ export default function NotificationsScreen() {
     () => notifications.filter((n) => n.type !== 'follow_request'),
     [notifications],
   );
+
+  const {
+    visibleData: visibleNotifications,
+    hasMore: hasMoreNotifications,
+    loadMore: loadMoreNotifications,
+  } = useIncrementalList(feedNotifications, 15);
 
   const handleTabChange = useCallback(
     (tab: TabId) => {
@@ -318,10 +326,17 @@ export default function NotificationsScreen() {
         ) : (
         <FlatList
           style={{ flex: 1 }}
-          data={feedNotifications}
+          data={visibleNotifications}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
           ItemSeparatorComponent={Separator}
+          onEndReached={loadMoreNotifications}
+          onEndReachedThreshold={0.5}
+          initialNumToRender={8}
+          maxToRenderPerBatch={6}
+          windowSize={5}
+          removeClippedSubviews
+          ListFooterComponent={hasMoreNotifications ? <ClanLoadingDot inline /> : null}
           ListEmptyComponent={
             showEmpty ? (
               <EmptyState hasFollowRequests={false} />

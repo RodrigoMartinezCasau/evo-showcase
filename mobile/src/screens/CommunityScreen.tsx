@@ -11,6 +11,7 @@ import {
   Keyboard,
   InteractionManager,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { useRouter, useLocalSearchParams, usePathname } from 'expo-router';
@@ -69,6 +70,8 @@ import { useEffectiveClanId } from '@evoconn/hooks/useEffectiveClanId';
 import { useBlockedUsers } from '@evoconn/hooks/BlockedUsersContext';
 import { getClanColor } from '@evoconn/constants/clanColors';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
+import { useIncrementalList } from '@evoconn/hooks/useIncrementalList';
+import { ClanLoadingDot } from '@evoconn/components/shared/ClanLoadingDot';
 import { ProfileRevealPanel } from '@evoconn/components/otherProfile';
 import {
   sortFollowingPosts,
@@ -389,6 +392,24 @@ export default function CommunityScreen() {
     [allPosts, followingSet, viewerClanId, mockCurrentUser.id, followingSort],
   );
 
+  // #3 Prefetch (caché en disco) de los avatares de los primeros posts de cada
+  // feed, para que al hacer scroll/abrir el detalle ya estén descargados y no
+  // se vea el parpadeo de carga. Additive: solo calienta la caché de expo-image.
+  useEffect(() => {
+    const uris = new Set<string>();
+    const collect = (arr: CommunityPost[]) => {
+      const n = Math.min(arr.length, 12);
+      for (let i = 0; i < n; i++) {
+        const u = arr[i]?.author?.avatarUri?.trim();
+        if (u && /^https?:\/\//i.test(u)) uris.add(u);
+      }
+    };
+    collect(paratiPanelDisplayData);
+    collect(followingFeedOrdered);
+    if (uris.size === 0) return;
+    void ExpoImage.prefetch([...uris], { cachePolicy: 'disk' });
+  }, [paratiPanelDisplayData, followingFeedOrdered]);
+
   /**
    * Defer first mount of Para Ti panel until after Community paints, so the
    * very first open of CommunityScreen is not penalised by mounting two feeds.
@@ -646,10 +667,21 @@ export default function CommunityScreen() {
     entryAnimPlaying,
   ]);
 
-  // Tras animación de bienvenida y/o hidratación del feed: centrar el post del deep link.
+  // Tras animación de bienvenida: abrir el post del widget (cold start puede programar
+  // el intent después del primer layout; peek + notify lo cubren).
   useEffect(() => {
+    if (entryAnimPlaying) return;
+
+    const scheduled = peekCommunityPostDeepLink();
+    if (scheduled?.postId && !pendingWidgetPostIdRef.current) {
+      pendingWidgetPostIdRef.current = scheduled.postId;
+      pendingCommentIdRef.current = scheduled.commentId ?? null;
+      acknowledgeCommunityPostDeepLink();
+      setActiveTab('para-ti');
+    }
+
     const pid = pendingWidgetPostIdRef.current;
-    if (!pid || entryAnimPlaying) return;
+    if (!pid) return;
     if (!getPostById(pid)) {
       void refreshSocialFromSupabase();
       return;
@@ -815,7 +847,11 @@ export default function CommunityScreen() {
    * (más abajo). Mantenemos la data aunque la pestaña activa sea Para Ti / Search:
    * así no se re-renderiza al volver a Siguiendo (sólo se oculta con display:none).
    */
-  const listData = followingFeedOrdered;
+  const {
+    visibleData: listData,
+    hasMore: hasMoreFollowing,
+    loadMore: loadMoreFollowing,
+  } = useIncrementalList(followingFeedOrdered, 10);
 
   const communityFeedUsableWidth =
     screenW - SVG_CARD_VISUAL.CARD_HORIZONTAL_MARGIN * 2;
@@ -835,15 +871,11 @@ export default function CommunityScreen() {
         showPhraseAuthor={activeTab === 'para-ti'}
         slotOuterHeight={feedCardSlotOuterHeight}
         followingFeedStyle={activeTab === 'siguiendo'}
-        onPress={() => handlePostPress(item)}
-        onAuthorPress={() => handleAuthorPress(item.author.id)}
-        onClanPress={() => {
-          const cid = item.author.clanId;
-          if (cid) handleClanPress(cid);
-        }}
+        onPress={handlePostPress}
+        onAuthorPress={handleAuthorPress}
       />
     ),
-    [activeTab, feedCardSlotOuterHeight, handlePostPress, handleAuthorPress, handleClanPress],
+    [activeTab, feedCardSlotOuterHeight, handlePostPress, handleAuthorPress],
   );
 
   const renderFeedItem = useCallback(
@@ -1211,6 +1243,13 @@ export default function CommunityScreen() {
               data={listData}
               renderItem={renderMainListItem}
               keyExtractor={(item) => item.id}
+              onEndReached={loadMoreFollowing}
+              onEndReachedThreshold={0.6}
+              initialNumToRender={10}
+              maxToRenderPerBatch={10}
+              windowSize={7}
+              removeClippedSubviews
+              ListFooterComponent={hasMoreFollowing ? <ClanLoadingDot inline /> : null}
               contentContainerStyle={[
                 styles.list,
                 {

@@ -1,7 +1,11 @@
 /**
  * Hojas de acciones y confirmaciones con estilo EVO (oscuro), sustituyen Alert.alert nativo.
+ *
+ * Todos los modales de este archivo gatean los handlers con `useSinglePressGate`
+ * para evitar el crash de Android Fabric `IllegalStateException: addViewAt ...
+ * already has a parent` causado por multi-tap rápido (ver useSinglePress.ts).
  */
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   Modal,
   View,
@@ -14,6 +18,7 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSinglePressGate } from '@evoconn/hooks/useSinglePress';
 
 const OVERLAY = 'rgba(0,0,0,0.78)';
 const SHEET_BG = '#12121a';
@@ -38,11 +43,17 @@ type ActionSheetProps = {
 
 export function EvoActionSheetModal({ visible, onClose, title, options }: ActionSheetProps) {
   const insets = useSafeAreaInsets();
+  const { runGuarded, reset } = useSinglePressGate();
 
-  const runOption = (fn: () => void) => {
-    onClose();
-    requestAnimationFrame(fn);
-  };
+  useEffect(() => {
+    if (!visible) reset();
+  }, [visible, reset]);
+
+  const runOption = (fn: () => void) =>
+    runGuarded(() => {
+      onClose();
+      requestAnimationFrame(fn);
+    });
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -107,6 +118,18 @@ export function EvoConfirmModal({
   destructive,
   onConfirm,
 }: ConfirmProps) {
+  const { runGuarded, reset } = useSinglePressGate();
+
+  useEffect(() => {
+    if (!visible) reset();
+  }, [visible, reset]);
+
+  const handleConfirm = () =>
+    runGuarded(() => {
+      onClose();
+      requestAnimationFrame(onConfirm);
+    });
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.overlayCenter} onPress={onClose}>
@@ -119,10 +142,7 @@ export function EvoConfirmModal({
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.dialogBtnPrimary, destructive && styles.dialogBtnDest]}
-              onPress={() => {
-                onClose();
-                requestAnimationFrame(onConfirm);
-              }}
+              onPress={handleConfirm}
               activeOpacity={0.8}
             >
               <Text style={[styles.dialogBtnPrimaryText, destructive && styles.dialogBtnDestText]}>
@@ -145,6 +165,18 @@ type PickerProps = {
 
 export function EvoPickerModal({ visible, onClose, title, items }: PickerProps) {
   const insets = useSafeAreaInsets();
+  const { runGuarded, reset } = useSinglePressGate();
+
+  useEffect(() => {
+    if (!visible) reset();
+  }, [visible, reset]);
+
+  const runItem = (fn: () => void) =>
+    runGuarded(() => {
+      onClose();
+      requestAnimationFrame(fn);
+    });
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
@@ -158,10 +190,7 @@ export function EvoPickerModal({ visible, onClose, title, items }: PickerProps) 
               <TouchableOpacity
                 key={it.key}
                 style={styles.optionRow}
-                onPress={() => {
-                  onClose();
-                  requestAnimationFrame(it.onPress);
-                }}
+                onPress={() => runItem(it.onPress)}
                 activeOpacity={0.65}
               >
                 <Text style={styles.optionLabel}>{it.label}</Text>

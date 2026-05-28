@@ -65,7 +65,13 @@ class OpenAIClient(LLMClient):
         # that take 10-15 s each and push total latency to 40 s.
         kwargs["max_tokens"] = max_tokens if max_tokens is not None else MAX_TOKENS_DEBATE
         kwargs["temperature"] = 0.7
-        r = client.chat.completions.create(**kwargs)
+        try:
+            r = client.chat.completions.create(**kwargs)
+        except Exception as e:
+            err = str(e).lower()
+            if "rate limit" in err or "429" in err:
+                raise RuntimeError("openai_rate_limit") from e
+            raise
         return (r.choices[0].message.content or "").strip()
 
     def complete_stream(

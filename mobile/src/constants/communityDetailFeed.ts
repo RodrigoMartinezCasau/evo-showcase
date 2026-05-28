@@ -8,11 +8,12 @@
  * del JS thread que causa stutters al scrollear. El número de posts renderizados
  * en paralelo es mucho menor (3 vs 15 viewports), lo que mejora el rendimiento.
  */
-export const COMMUNITY_DETAIL_PREFETCH_POSTS = 7;
+export const COMMUNITY_DETAIL_PREFETCH_POSTS = 5;
 export const COMMUNITY_DETAIL_PREFETCH_POSTS_ANDROID = 3;
 
-/** ~7 viewports arriba + abajo del buffer (default RN es 21). */
-export const COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE = 15;
+/** ~5 viewports arriba + abajo del buffer (default RN es 21). Bajado de 15→11
+ * para montar menos posts a la vez y reducir el trabajo del JS thread. */
+export const COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE = 11;
 /** Android: ventana más pequeña = menos posts montados = menos lag en JS thread. */
 export const COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE_ANDROID = 5;
 

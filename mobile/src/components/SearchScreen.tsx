@@ -23,6 +23,8 @@ import { getClanColor } from '@evoconn/constants/clanColors';
 
 const MAX_RECENTS = 10;
 const DEBOUNCE_MS = 250;
+/** Solo mostramos las N coincidencias más relevantes (Supabase + locales). */
+const SEARCH_MAX_RESULTS = 10;
 
 // ── Search result profile icon editors ────────────────────────────────────────
 // Affect ONLY the SVG inside each result row — not the row layout.
@@ -99,11 +101,15 @@ export function SearchScreen({ onUserPress }: SearchScreenProps) {
     [debouncedQuery],
   );
 
-  // Merge: Supabase results first, then local sim results not already in Supabase.
+  // Merge: Supabase results first, then local sim results not already en Supabase.
+  // Limitado a las 10 mejores coincidencias: evita montar decenas de filas (con
+  // su SVG de avatar) en cada pulsación de tecla y reduce el coste de render.
   const results: ScoredUser[] = useMemo(() => {
     const sbIds = new Set(supabaseResults.map(r => r.id));
     const localOnly = localResults.filter(r => !sbIds.has(r.id));
-    const merged = [...supabaseResults, ...localOnly].filter((r) => !isBlocked(r.id));
+    const merged = [...supabaseResults, ...localOnly]
+      .filter((r) => !isBlocked(r.id))
+      .slice(0, SEARCH_MAX_RESULTS);
     if (!profile?.id || !myEffectiveClanId) return merged;
     return merged.map((r) =>
       r.id === profile.id ? { ...r, clanId: myEffectiveClanId } : r,
