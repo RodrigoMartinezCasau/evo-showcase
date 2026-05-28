@@ -347,6 +347,16 @@ export default function PhraseCreationScreen() {
           if (needsPersistRepair) {
             updateThought(phraseId, { messages: hydrated });
           }
+          // Reparar frases guardadas solo en el turno assistant (sidebar no las veía).
+          if (thoughtMeta?.folderId == null) {
+            for (let j = hydrated.length - 1; j >= 0; j--) {
+              const m = hydrated[j];
+              if (m.role === 'assistant' && m.folderId) {
+                updateThought(phraseId, { folderId: m.folderId });
+                break;
+              }
+            }
+          }
           // For reopened threads we never re-run the typewriter — surface the
           // intro as already-revealed static text so the user sees it instantly.
           const doneBySlot: Record<string, boolean> = { [phraseId]: true };
@@ -471,7 +481,7 @@ export default function PhraseCreationScreen() {
             : m,
         );
         messagesRef.current = next;
-        updateThought(phraseId, { messages: next });
+        updateThought(phraseId, { messages: next, folderId: folder.id });
         return next;
       });
       Alert.alert('Carpeta', `La frase se ha guardado en «${folder.name}».`);

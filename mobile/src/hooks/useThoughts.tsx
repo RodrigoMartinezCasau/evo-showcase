@@ -74,6 +74,35 @@ type ThoughtsContextValue = {
 
 const ThoughtsContext = createContext<ThoughtsContextValue | null>(null);
 
+/** Sidebar usa `thought.folderId`; la UI de frase guarda en `assistant.folderId`. */
+function applyThoughtPatch(
+  thought: PersistedThought,
+  patch: Partial<ThoughtEntry>,
+  ownerUserId: string,
+): PersistedThought {
+  const next: PersistedThought = {
+    ...thought,
+    ...patch,
+    updatedAt: new Date().toISOString(),
+    ownerUserId,
+  };
+
+  if (
+    thought.type === 'phrase' &&
+    'folderId' in patch &&
+    patch.folderId !== undefined &&
+    !('messages' in patch) &&
+    (next.messages?.length ?? 0) > 0
+  ) {
+    const folderId = patch.folderId ?? null;
+    next.messages = next.messages!.map((m) =>
+      m.role === 'assistant' ? { ...m, folderId } : m,
+    );
+  }
+
+  return next;
+}
+
 export function ThoughtsProvider({ children }: { children: React.ReactNode }) {
   const sim = useSimulation();
   const activeUserId = sim.activeUserId;
@@ -297,12 +326,7 @@ export function ThoughtsProvider({ children }: { children: React.ReactNode }) {
       mutateUserSlice(targetUserId, (prev) =>
         prev.map((t) =>
           t.id === id
-            ? ({
-                ...t,
-                ...patch,
-                updatedAt: new Date().toISOString(),
-                ownerUserId: targetUserId!, // keep ownership stable
-              } as PersistedThought)
+            ? applyThoughtPatch(t, patch, targetUserId!)
             : t,
         ),
       );

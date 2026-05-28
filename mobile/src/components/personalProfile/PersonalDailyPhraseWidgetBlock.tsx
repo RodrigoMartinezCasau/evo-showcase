@@ -162,11 +162,6 @@ export const PersonalDailyPhraseWidgetBlock = React.memo(function PersonalDailyP
         <Pressable style={styles.modalBackdrop} onPress={closeModal}>
           <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
             <Text style={styles.sheetTitle}>Añadir widget en la pantalla de inicio</Text>
-            <Text style={styles.sheetSubtitle}>
-              No se puede abrir la galería de widgets desde la app; añádelo manualmente con los pasos de
-              abajo. El contenido será la frase más votada del día anterior; permanece igual hasta medianoche
-              cuando el widget nativo esté instalado en tu build.
-            </Text>
             <ScrollView style={styles.stepsScroll} showsVerticalScrollIndicator={false}>
               {steps.map((line, i) => (
                 <View key={i} style={styles.stepRow}>
@@ -230,12 +225,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '800',
-    marginBottom: 10,
-  },
-  sheetSubtitle: {
-    color: 'rgba(255,255,255,0.65)',
-    fontSize: 14,
-    lineHeight: 20,
     marginBottom: 16,
   },
   stepsScroll: {

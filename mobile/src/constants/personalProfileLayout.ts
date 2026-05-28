@@ -315,13 +315,13 @@ export const PERSONAL_POSTS_TOTAL_STATS_SCALE = 1;
 /**
  * Horizontal gap between each stat item (icon+number pair).
  */
-export const PERSONAL_POSTS_TOTAL_STATS_ITEM_GAP = 48;
+export const PERSONAL_POSTS_TOTAL_STATS_ITEM_GAP = 34;
 
 /**
  * Base size (px) of each stat icon in the summary row.
  * Uses the same SVGs as the post card stats.
  */
-export const PERSONAL_POSTS_TOTAL_STATS_ICON_SIZE = 22;
+export const PERSONAL_POSTS_TOTAL_STATS_ICON_SIZE = 14;
 
 /**
  * Fine-tune vertical offset of the text label relative to its icon sibling.
@@ -352,19 +352,19 @@ export const RECOMMENDED_BOOKS_ITEM_GAP = 12;
 
 export const TOTAL_STATS_UPVOTES_OFFSET_X    = 0;
 export const TOTAL_STATS_UPVOTES_OFFSET_Y    = 0;
-export const TOTAL_STATS_UPVOTES_SCALE       = 1.5;
+export const TOTAL_STATS_UPVOTES_SCALE       = 1;
 
 export const TOTAL_STATS_DOWNVOTES_OFFSET_X  = 0;
 export const TOTAL_STATS_DOWNVOTES_OFFSET_Y  = 0;
-export const TOTAL_STATS_DOWNVOTES_SCALE     = 1.5;
+export const TOTAL_STATS_DOWNVOTES_SCALE     = 1;
 
 export const TOTAL_STATS_SAVED_OFFSET_X      = 0;
 export const TOTAL_STATS_SAVED_OFFSET_Y      = 0;
-export const TOTAL_STATS_SAVED_SCALE         = 1.5;
+export const TOTAL_STATS_SAVED_SCALE         = 1;
 
 export const TOTAL_STATS_PERCENTAGE_OFFSET_X = 0;
 export const TOTAL_STATS_PERCENTAGE_OFFSET_Y = 0;
-export const TOTAL_STATS_PERCENTAGE_SCALE    = 1.5;
+export const TOTAL_STATS_PERCENTAGE_SCALE    = 1;
 
 // Block 2 — Friends display
 export const FRIENDS_BLOCK_OFFSET_X = 0;
