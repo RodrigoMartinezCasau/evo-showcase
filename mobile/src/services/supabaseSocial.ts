@@ -135,6 +135,66 @@ export async function fetchPostsByAuthor(authorId: string): Promise<SimPost[]> {
     .map(dbRowToSimPost);
 }
 
+/**
+ * Trae TODOS los posts de un conjunto de autores (sin el techo global de 200).
+ *
+ * Se usa para el feed de "Siguiendo": garantiza que las publicaciones ANTIGUAS
+ * de la gente a la que sigues sigan apareciendo aunque caigan fuera del top
+ * global por created_at. Antes el feed de "Siguiendo" se derivaba del feed
+ * global (limit 200), por lo que los posts antiguos de seguidos "desaparecían"
+ * cuando la red superaba ese límite — no había borrado, solo paginación
+ * insuficiente.
+ *
+ * Hace una sola query por lote (`.in('author_id', ...)`) para no disparar N
+ * peticiones; trocea en lotes para no pasarse del límite de longitud de URL.
+ */
+export async function fetchPostsByAuthors(authorIds: string[]): Promise<SimPost[]> {
+  const realIds = [...new Set(authorIds.filter(isRealUserId))];
+  if (realIds.length === 0) return [];
+
+  const CHUNK = 80;
+  const chunks: string[][] = [];
+  for (let i = 0; i < realIds.length; i += CHUNK) {
+    chunks.push(realIds.slice(i, i + CHUNK));
+  }
+
+  const byId = new Map<string, SimPost>();
+  for (const ids of chunks) {
+    const fromView = await supabase
+      .from('posts_with_author_clan')
+      .select('*')
+      .in('author_id', ids)
+      .in('type', ['reflection', 'phrase'])
+      .order('created_at', { ascending: false });
+
+    let rows: Record<string, unknown>[];
+    if (fromView.error) {
+      const fallback = await supabase
+        .from('posts')
+        .select('*')
+        .in('author_id', ids)
+        .in('type', ['reflection', 'phrase'])
+        .order('created_at', { ascending: false });
+      if (fallback.error) {
+        console.error('[Social] fetchPostsByAuthors:', fallback.error.message);
+        continue;
+      }
+      rows = (fallback.data ?? []) as Record<string, unknown>[];
+    } else {
+      rows = (fromView.data ?? []) as Record<string, unknown>[];
+    }
+
+    for (const row of rows) {
+      if (row['is_hidden'] === true) continue;
+      if (!isPublishedSimPostType(row['type'])) continue;
+      const post = dbRowToSimPost(row);
+      byId.set(post.id, post);
+    }
+  }
+
+  return Array.from(byId.values());
+}
+
 /** Posts concretos por ID (p. ej. guardados que no están en el feed global). */
 export async function fetchPostsByIds(postIds: string[]): Promise<SimPost[]> {
   if (postIds.length === 0) return [];

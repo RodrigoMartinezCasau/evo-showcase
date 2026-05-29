@@ -1246,8 +1246,14 @@ export default function CommunityScreen() {
               onEndReached={loadMoreFollowing}
               onEndReachedThreshold={0.6}
               initialNumToRender={10}
-              maxToRenderPerBatch={10}
-              windowSize={7}
+              maxToRenderPerBatch={8}
+              updateCellsBatchingPeriod={50}
+              // Salvavidas de memoria: aunque vayas desbloqueando cientos de posts
+              // de 10 en 10, FlatList solo mantiene MONTADA una ventana pequeña de
+              // tarjetas alrededor de lo visible; las de arriba/abajo se descargan
+              // de verdad (removeClippedSubviews). Así nunca hay "mil tarjetas"
+              // montadas a la vez por mucho que sigas bajando.
+              windowSize={5}
               removeClippedSubviews
               ListFooterComponent={hasMoreFollowing ? <ClanLoadingDot inline /> : null}
               contentContainerStyle={[

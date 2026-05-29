@@ -80,7 +80,7 @@ export async function ensureAnimationAssets(): Promise<void> {
 
   _copyPromise = (async () => {
     const STAMP_FILE = ANIM_DIR + '.stamp';
-    const APP_VERSION = '58';
+    const APP_VERSION = '60';
 
     try {
       const stampInfo = await FileSystem.getInfoAsync(STAMP_FILE);
@@ -185,6 +185,36 @@ type Props = {
 // SVGs → already in SVG_DATA (bundled JS module, zero filesystem access needed).
 // PNGs → read from ASSETS_DIR as base64 (copied there by ensureAnimationAssets).
 
+// Cache del HTML inlined por animación (depende solo de `name`; los params van
+// aparte vía EVO_PROPS). Precalentar clanEntry evita reconstruirlo cuando el
+// hilo JS ya está saturado al arranque en Android gama baja.
+const _inlinedHtmlCache = new Map<EvoAnimationName, string>();
+const _inlinedHtmlInflight = new Map<EvoAnimationName, Promise<string>>();
+
+function getInlinedHtml(name: EvoAnimationName): Promise<string> {
+  const cached = _inlinedHtmlCache.get(name);
+  if (cached) return Promise.resolve(cached);
+  const inflight = _inlinedHtmlInflight.get(name);
+  if (inflight) return inflight;
+  const p = buildInlinedHtml(name)
+    .then((html) => {
+      _inlinedHtmlCache.set(name, html);
+      _inlinedHtmlInflight.delete(name);
+      return html;
+    })
+    .catch((e) => {
+      _inlinedHtmlInflight.delete(name);
+      throw e;
+    });
+  _inlinedHtmlInflight.set(name, p);
+  return p;
+}
+
+/** Precalienta el HTML de entrada en cuanto los assets estén copiados. */
+export function prewarmClanEntryHtml(): Promise<string> {
+  return ensureAnimationAssets().then(() => getInlinedHtml('clanEntry'));
+}
+
 async function buildInlinedHtml(name: EvoAnimationName): Promise<string> {
   let html = await FileSystem.readAsStringAsync(ANIM_DIR + HTML_FILENAMES[name]);
 
@@ -225,7 +255,7 @@ async function buildInlinedHtml(name: EvoAnimationName): Promise<string> {
   // 1. Replace SVG references using the in-memory SVG_DATA map.
   html = html.replace(/(['"`])assets\/([\w.\-]+\.svg)\1/g, (_match: string, q: string, filename: string) => {
     const svg = SVG_DATA[filename];
-    if (!svg) return match;
+    if (!svg) return _match;
     return `${q}data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}${q}`;
   });
 
@@ -251,7 +281,7 @@ async function buildInlinedHtml(name: EvoAnimationName): Promise<string> {
   // 4. Replace PNG references with data URIs.
   html = html.replace(/(['"`])assets\/([\w.\-]+\.png)\1/g, (_match: string, q: string, filename: string) => {
     const uri = pngData[filename];
-    return uri ? `${q}${uri}${q}` : match;
+    return uri ? `${q}${uri}${q}` : _match;
   });
 
   return html;
@@ -334,9 +364,10 @@ export function EvoAnimationWebView({
     if (visible) {
       rootOpacity.setValue(1);
       webOpacity.setValue(0);
-      setHtmlContent(null);
+      const cached = _inlinedHtmlCache.get(name);
+      setHtmlContent(cached ?? null);
     }
-  }, [visible, rootOpacity, webOpacity]);
+  }, [visible, name, rootOpacity, webOpacity]);
 
   // Called when the animation signals completion (or is closed).
   //
@@ -358,7 +389,7 @@ export function EvoAnimationWebView({
     if (!visible) return;
     let cancelled = false;
     ensureAnimationAssets()
-      .then(() => buildInlinedHtml(name))
+      .then(() => getInlinedHtml(name))
       .then((content) => {
         if (!cancelled) setHtmlContent(content);
       })

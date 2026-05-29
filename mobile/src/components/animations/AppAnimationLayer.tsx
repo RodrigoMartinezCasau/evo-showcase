@@ -20,7 +20,7 @@
  */
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { EvoAnimationWebView, ensureAnimationAssets } from './EvoAnimationWebView';
+import { EvoAnimationWebView, ensureAnimationAssets, prewarmClanEntryHtml } from './EvoAnimationWebView';
 import {
   isClanRevealSuppressed,
   setEntryAnimPlaying,
@@ -110,7 +110,12 @@ export default function AppAnimationLayer() {
 
   useEffect(() => {
     ensureAnimationAssets()
-      .then(() => setAssetsReady(true))
+      .then(() => {
+        setAssetsReady(true);
+        // Precalentar el HTML de entrada en background mientras auth/nav siguen
+        // cargando, para que al abrir showEntry el WebView monte al instante.
+        return prewarmClanEntryHtml();
+      })
       .catch(() => setAssetsReady(true));
   }, []);
 

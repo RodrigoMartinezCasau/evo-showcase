@@ -37,6 +37,7 @@ import {
   isRealUserId,
   fetchAllPosts,
   fetchPostsByAuthor,
+  fetchPostsByAuthors,
   fetchPostsByIds,
   fetchHiddenPostIdsByAuthor,
   fetchVotesForPosts,
@@ -81,15 +82,25 @@ async function loadSupabaseHydrationPayload(hydrateFor: string): Promise<{
   followers: string[];
   commentsByPost: Record<string, SimComment[]>;
 }> {
-  // El feed global está limitado a 500 posts recientes. Para garantizar
-  // que el usuario SIEMPRE vea TODOS sus posts en su perfil (aunque caigan
-  // fuera de ese top global a medida que la red crece), traemos también
-  // los posts del autor activo sin límite y los fusionamos deduplicando.
-  // Antes (sin esto + con limit=200) los posts antiguos del usuario
-  // "desaparecían" de su perfil al pasar de ~200 posts en la red.
-  const [globalPosts, ownPosts] = await Promise.all([
+  // Lista de seguidos/seguidores primero: la necesitamos para traer también
+  // los posts de la gente a la que sigues (feed de "Siguiendo").
+  const [following, followers] = await Promise.all([
+    fetchFollowing(hydrateFor),
+    fetchFollowers(hydrateFor),
+  ]);
+
+  // El feed global está limitado a 200 posts recientes. Para garantizar:
+  //   1. que el usuario SIEMPRE vea TODOS sus posts en su perfil, y
+  //   2. que las publicaciones ANTIGUAS de la gente a la que sigues sigan
+  //      apareciendo en "Siguiendo" (aunque caigan fuera del top global),
+  // traemos también los posts del autor activo y de los seguidos sin límite y
+  // los fusionamos deduplicando. Antes (con limit=200) los posts antiguos
+  // "desaparecían" al pasar de ~200 posts en la red — no había borrado, solo
+  // paginación insuficiente.
+  const [globalPosts, ownPosts, followedPosts] = await Promise.all([
     fetchAllPosts(),
     fetchPostsByAuthor(hydrateFor),
+    fetchPostsByAuthors(following),
   ]);
 
   const byId = new Map<string, SimPost>();
@@ -97,6 +108,11 @@ async function loadSupabaseHydrationPayload(hydrateFor: string): Promise<{
   for (const p of ownPosts) {
     // Preferimos el del feed global (incluye flags como is_hidden filtrados);
     // solo añadimos los del autor que no estaban en el top global.
+    if (!byId.has(p.id)) byId.set(p.id, p);
+  }
+  for (const p of followedPosts) {
+    // Igual que con los propios: añadimos los posts de seguidos que no estaban
+    // en el top global, para que "Siguiendo" muestre también los antiguos.
     if (!byId.has(p.id)) byId.set(p.id, p);
   }
 
@@ -124,11 +140,6 @@ async function loadSupabaseHydrationPayload(hydrateFor: string): Promise<{
     const post = sbPosts.find(p => p.id === pid);
     if (post) post.saverIds = [...post.saverIds, hydrateFor];
   }
-
-  const [following, followers] = await Promise.all([
-    fetchFollowing(hydrateFor),
-    fetchFollowers(hydrateFor),
-  ]);
 
   // Los comentarios YA NO se descargan en bloque aquí. Se piden por post al
   // abrirlo (`ensureCommentsForPost`). Antes un refresh traía los comentarios
@@ -472,13 +483,32 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      // Posts antiguos de la gente a la que sigues (fuera del top global de 200)
+      // → que sigan apareciendo en "Siguiendo". Traemos sus cuerpos y, para los
+      // que no estaban ya, sus votos (allVoteRows solo cubría el top global).
+      const voteRows = [...allVoteRows];
+      if (following.length > 0) {
+        const followedPosts = await fetchPostsByAuthors(following);
+        const newFollowedIds: string[] = [];
+        for (const p of followedPosts) {
+          if (!postById.has(p.id)) {
+            postById.set(p.id, p);
+            newFollowedIds.push(p.id);
+          }
+        }
+        if (newFollowedIds.length > 0) {
+          const followedVoteRows = await fetchVotesForPosts(newFollowedIds);
+          voteRows.push(...followedVoteRows);
+        }
+      }
+
       // Antes resetear: fase 1 puede haber preservado votos cacheados para
       for (const p of postById.values()) {
         p.upvoterIds = [];
         p.downvoterIds = [];
         p.saverIds = [];
       }
-      for (const row of allVoteRows) {
+      for (const row of voteRows) {
         const post = postById.get(row.post_id);
         if (!post) continue;
         if (row.vote === 'up') post.upvoterIds = [...post.upvoterIds, row.user_id];
