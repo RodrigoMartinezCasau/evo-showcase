@@ -226,11 +226,14 @@ export async function fetchClanMemberCountsByClan(): Promise<Record<string, numb
   return counts;
 }
 
+/** Cota de filas leídas para hallar el top por % (acota coste de la consulta). */
+const CLAN_MEMBERS_SCAN_CAP = 200;
+
 export async function fetchClanMembers(
   clanId: string,
   options: { limit?: number; excludeUserId?: string | null } = {},
 ): Promise<ClanMemberSummary[]> {
-  const { limit = 24, excludeUserId = null } = options;
+  const { limit = 10, excludeUserId = null } = options;
 
   let query = supabase
     .from('profiles')
@@ -239,10 +242,12 @@ export async function fetchClanMembers(
     )
     .eq('clan_id', clanId);
   if (excludeUserId) query = query.neq('id', excludeUserId);
+  // El % por clan vive dentro de clan_percentages (jsonb), no es ordenable
+  // server-side. Leemos un lote acotado y elegimos el top por % en cliente.
   query = query
     .order('total_reflections', { ascending: false })
     .order('total_quotes', { ascending: false })
-    .limit(limit);
+    .limit(CLAN_MEMBERS_SCAN_CAP);
 
   const { data, error } = await query;
   if (error) {
@@ -250,7 +255,7 @@ export async function fetchClanMembers(
     return [];
   }
 
-  return (data ?? []).map((row): ClanMemberSummary => {
+  const mapped = (data ?? []).map((row): ClanMemberSummary => {
     const raw = (row as { clan_percentages?: unknown }).clan_percentages;
     const pcts = Array.isArray(raw) ? (raw as PublishedClanPct[]) : [];
     const dominant = pcts.find((e) => e.clanId === clanId)?.pct ?? 0;
@@ -267,6 +272,11 @@ export async function fetchClanMembers(
       avatarUri: typeof avatarRaw === 'string' ? avatarRaw.trim() || null : null,
     };
   });
+
+  // Top `limit` por mayor % de este clan.
+  return mapped
+    .sort((a, b) => b.clanPct - a.clanPct)
+    .slice(0, Math.max(0, limit));
 }
 
 /**

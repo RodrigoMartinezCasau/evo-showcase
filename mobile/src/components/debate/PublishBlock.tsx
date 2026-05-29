@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, LayoutChangeEvent, type View as RNView } from 'react-native';
+import { View, Text, TextInput, StyleSheet, LayoutChangeEvent, TouchableOpacity, type View as RNView } from 'react-native';
 import type { FC } from 'react';
 import type { SvgProps } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
+import { EvoConfirmModal } from '@evoconn/components/shared/EvoActionSheetModal';
 import {
   AI_SPECIAL_BLOCK_LAYOUT as SB,
   DEBATE_CARD_LAYOUT as CARD,
@@ -50,6 +51,10 @@ type Props = {
   /** Ref al contenedor del campo autor (para scroll preciso con teclado). */
   authorInputAnchorRef?: React.Ref<RNView>;
   /**
+   * Solo frases ya publicadas: elimina la publicación en la comunidad sin borrar el hilo local.
+   */
+  onDeletePublication?: () => void;
+  /**
    * Padding horizontal dentro del botón PUBLICAR. Solo frases suelen pasar un valor > 0;
    * reflexiones omiten y queda 0.
    */
@@ -76,12 +81,14 @@ export const PublishBlock = React.memo(function PublishBlock({
   phraseHintOverride = null,
   onAuthorFocusChange,
   authorInputAnchorRef,
+  onDeletePublication,
   actionBarInnerPaddingHorizontal = 0,
 }: Props) {
   const isAuthorControlled = authorValue !== undefined;
   const [internalTitle, setInternalTitle] = useState(() =>
     published && initialAuthorValue ? initialAuthorValue : '',
   );
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const title = isAuthorControlled ? authorValue : internalTitle;
 
   const handleChange = (t: string) => {
@@ -178,6 +185,32 @@ export const PublishBlock = React.memo(function PublishBlock({
         externallyPublished={published}
         innerPaddingHorizontal={actionBarInnerPaddingHorizontal}
       />
+
+      {published && onDeletePublication ? (
+        <>
+          <TouchableOpacity
+            style={styles.deletePublicationBtn}
+            onPress={() => setDeleteConfirmOpen(true)}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Eliminar publicación"
+          >
+            <Text style={styles.deletePublicationText}>Eliminar publicación</Text>
+          </TouchableOpacity>
+          <EvoConfirmModal
+            visible={deleteConfirmOpen}
+            onClose={() => setDeleteConfirmOpen(false)}
+            title="Eliminar post"
+            message="¿Seguro que quieres eliminar esta publicación? Esta acción no se puede deshacer."
+            confirmLabel="Eliminar"
+            destructive
+            onConfirm={() => {
+              setDeleteConfirmOpen(false);
+              onDeletePublication();
+            }}
+          />
+        </>
+      ) : null}
     </View>
   );
 });
@@ -202,5 +235,17 @@ const styles = StyleSheet.create({
   phraseHintText: {
     flex: 1,
     fontWeight: '400',
+  },
+  deletePublicationBtn: {
+    width: '100%',
+    marginTop: 10,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  deletePublicationText: {
+    color: 'rgba(255,100,100,0.92)',
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
 });

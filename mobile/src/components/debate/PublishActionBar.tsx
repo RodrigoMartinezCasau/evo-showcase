@@ -54,7 +54,11 @@ export const PublishActionBar = React.memo(function PublishActionBar({
   useEffect(() => cleanup, [cleanup]);
 
   useEffect(() => {
-    if (externallyPublished) setState('published');
+    if (externallyPublished) {
+      setState('published');
+      return;
+    }
+    setState((prev) => (prev === 'publishing' ? prev : 'idle'));
   }, [externallyPublished]);
 
   const handlePress = useCallback(async () => {

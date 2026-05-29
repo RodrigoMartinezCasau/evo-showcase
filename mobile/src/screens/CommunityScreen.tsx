@@ -1237,7 +1237,7 @@ export default function CommunityScreen() {
           ]}
         >
           {activeTab === 'search' ? (
-            <SearchScreen onUserPress={handleAuthorPress} />
+            <SearchScreen onUserPress={handleAuthorPress} onClanPress={handleClanPress} />
           ) : (
             <FlatList
               data={listData}

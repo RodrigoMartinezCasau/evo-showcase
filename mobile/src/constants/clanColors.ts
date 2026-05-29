@@ -85,9 +85,10 @@ export const NO_CLAN_PARATI_SURFACE_COLOR = evoconnColors.background;
 export const NO_CLAN_COMMUNITY_POST_FRAME_COLOR = NO_CLAN_PARATI_SURFACE_COLOR;
 
 export function getClanSecondaryColor(clanId: string | null | undefined): string {
-  if (!clanId || String(clanId).trim() === '') return NO_CLAN_ACCENT_COLOR;
-  const key = clanId.trim().toLowerCase();
-  return (CLAN_SECONDARY_COLOR as Record<string, string>)[key] ?? NO_CLAN_ACCENT_COLOR;
+  if (clanId == null) return NO_CLAN_SECONDARY_COLOR;
+  const key = String(clanId).trim().toLowerCase();
+  if (key === '' || key === 'none') return NO_CLAN_SECONDARY_COLOR;
+  return (CLAN_SECONDARY_COLOR as Record<string, string>)[key] ?? CLAN_SECONDARY_DEFAULT;
 }
 
 export function getClanColor(clanId: string | null | undefined): string {

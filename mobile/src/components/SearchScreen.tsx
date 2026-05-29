@@ -13,7 +13,9 @@ import { evoconnColors } from '../theme/colors';
 import { SEARCH_LAYOUT as SL } from '../constants/searchScreenLayout';
 import { mockSearchableUsers } from '../data/mockSearchUsers';
 import { searchUsers, type ScoredUser } from '../utils/searchUsers';
+import { searchClans, type ScoredClan } from '../utils/searchClans';
 import { UserResultCard } from './UserResultCard';
+import { ClanResultCard } from './ClanResultCard';
 import { fetchFollowersCountsBatch, searchSupabaseUsers } from '../services/supabaseSocial';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../mobile/lib/AuthContext';
@@ -35,9 +37,14 @@ const SEARCH_PROFILE_ICON_OFFSET_Y  = 0;   // positive = down
 
 type SearchScreenProps = {
   onUserPress: (userId: string, username?: string) => void;
+  onClanPress: (clanId: string) => void;
 };
 
-export function SearchScreen({ onUserPress }: SearchScreenProps) {
+type SearchListItem =
+  | { kind: 'clan'; key: string; score: number; clan: ScoredClan }
+  | { kind: 'user'; key: string; score: number; user: ScoredUser };
+
+export function SearchScreen({ onUserPress, onClanPress }: SearchScreenProps) {
   const { profile } = useAuth();
   const { isBlocked } = useBlockedUsers();
   const myEffectiveClanId = useEffectiveClanId();
@@ -101,10 +108,7 @@ export function SearchScreen({ onUserPress }: SearchScreenProps) {
     [debouncedQuery],
   );
 
-  // Merge: Supabase results first, then local sim results not already en Supabase.
-  // Limitado a las 10 mejores coincidencias: evita montar decenas de filas (con
-  // su SVG de avatar) en cada pulsación de tecla y reduce el coste de render.
-  const results: ScoredUser[] = useMemo(() => {
+  const userResults: ScoredUser[] = useMemo(() => {
     const sbIds = new Set(supabaseResults.map(r => r.id));
     const localOnly = localResults.filter(r => !sbIds.has(r.id));
     const merged = [...supabaseResults, ...localOnly]
@@ -115,6 +119,29 @@ export function SearchScreen({ onUserPress }: SearchScreenProps) {
       r.id === profile.id ? { ...r, clanId: myEffectiveClanId } : r,
     );
   }, [supabaseResults, localResults, profile?.id, myEffectiveClanId, isBlocked]);
+
+  const clanResults = useMemo(
+    () => searchClans(debouncedQuery).slice(0, 3),
+    [debouncedQuery],
+  );
+
+  const listItems: SearchListItem[] = useMemo(() => {
+    const items: SearchListItem[] = [
+      ...clanResults.map((clan) => ({
+        kind: 'clan' as const,
+        key: `clan-${clan.id}`,
+        score: clan.score,
+        clan,
+      })),
+      ...userResults.map((user) => ({
+        kind: 'user' as const,
+        key: user.id,
+        score: user.score,
+        user,
+      })),
+    ];
+    return items.sort((a, b) => b.score - a.score).slice(0, SEARCH_MAX_RESULTS);
+  }, [clanResults, userResults]);
 
   const addRecent = useCallback((term: string) => {
     const trimmed = term.trim();
@@ -147,19 +174,35 @@ export function SearchScreen({ onUserPress }: SearchScreenProps) {
     onUserPress(user.id, user.username);
   }, [addRecent, onUserPress]);
 
+  const handleClanPress = useCallback((clan: ScoredClan) => {
+    addRecent(clan.name);
+    onClanPress(clan.id);
+  }, [addRecent, onClanPress]);
+
   const showResults = debouncedQuery.trim().length > 0;
 
-  const renderResultItem = useCallback(({ item }: { item: ScoredUser }) => (
-    <UserResultCard
-      id={item.id}
-      username={item.username}
-      clanId={item.clanId}
-      rank={item.rank}
-      followersCount={item.followersCount ?? 0}
-      avatarUri={item.avatarUri}
-      onPress={() => handleUserPress(item)}
-    />
-  ), [handleUserPress]);
+  const renderListItem = useCallback(({ item }: { item: SearchListItem }) => {
+    if (item.kind === 'clan') {
+      return (
+        <ClanResultCard
+          clanId={item.clan.id}
+          name={item.clan.name}
+          onPress={() => handleClanPress(item.clan)}
+        />
+      );
+    }
+    return (
+      <UserResultCard
+        id={item.user.id}
+        username={item.user.username}
+        clanId={item.user.clanId}
+        rank={item.user.rank}
+        followersCount={item.user.followersCount ?? 0}
+        avatarUri={item.user.avatarUri}
+        onPress={() => handleUserPress(item.user)}
+      />
+    );
+  }, [handleClanPress, handleUserPress]);
 
   const renderRecentItem = useCallback(({ item }: { item: string }) => (
     <View style={[styles.recentItem, { height: SL.resultItemHeight - 8 }]}>
@@ -197,7 +240,7 @@ export function SearchScreen({ onUserPress }: SearchScreenProps) {
           value={query}
           onChangeText={handleChangeText}
           onSubmitEditing={handleSubmit}
-          placeholder="Buscar usuarios..."
+          placeholder="Buscar usuarios o clanes..."
           placeholderTextColor={evoconnColors.muted}
           returnKeyType="search"
           autoCapitalize="none"
@@ -216,18 +259,18 @@ export function SearchScreen({ onUserPress }: SearchScreenProps) {
       </View>
 
       {showResults ? (
-        results.length > 0 ? (
+        listItems.length > 0 ? (
           <FlatList
-            data={results}
-            keyExtractor={(item) => item.id}
-            renderItem={renderResultItem}
+            data={listItems}
+            keyExtractor={(item) => item.key}
+            renderItem={renderListItem}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
             style={styles.list}
           />
         ) : (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No se encontraron usuarios</Text>
+            <Text style={styles.emptyText}>No se encontraron usuarios ni clanes</Text>
           </View>
         )
       ) : recentSearches.length > 0 ? (

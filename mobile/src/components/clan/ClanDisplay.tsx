@@ -23,6 +23,7 @@ import {
   useWindowDimensions,
   Animated,
   Easing,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
@@ -129,7 +130,10 @@ type Props = {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-const WINDOW_24H = 24 * 60 * 60 * 1000;
+/** Publicaciones que se cargan por tanda al deslizar (en ambos sentidos). */
+const POSTS_PAGE = 5;
+/** Máximo de publicaciones montadas a la vez (ventana deslizante). */
+const POSTS_WINDOW_MAX = 15;
 
 export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
   const router     = useRouter();
@@ -231,7 +235,12 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
     );
     members.push(...filteredSim);
 
-    return members;
+    // Solo los 10 con mayor % de este clan, mostrados de mayor a menor.
+    const pctOf = (m: { _clanPct?: string }) =>
+      m._clanPct != null ? parseFloat(m._clanPct) || 0 : 0;
+    return members
+      .sort((a, b) => pctOf(b) - pctOf(a))
+      .slice(0, 10);
   }, [
     authProfile,
     realUserClanId,
@@ -245,27 +254,80 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
   // ── Top posts en vivo — publicaciones del clan con ≥1 voto en las últimas 24h ──
   // Para 'indefinido', los autores sin clan asignado tienen clanId: null.
   const { posts: allPosts } = useFeedStore();
-  const livePosts = useMemo(() => {
-    const since = Date.now() - WINDOW_24H;
+
+  // Todas las publicaciones del clan, de más votadas a menos. Sin tope.
+  const rankedPosts = useMemo(() => {
     const matchClan = clanId === 'indefinido'
       ? (authorClanId: string | null) => authorClanId == null
       : (authorClanId: string | null) => authorClanId === clanId;
 
-    const inWindow = allPosts.filter((p) =>
-      matchClan(p.author.clanId) &&
-      new Date(p.createdAt).getTime() >= since &&
-      p.voteStats.up + p.voteStats.down >= 1,
-    );
-
-    // Si no hay posts en las últimas 24h, muestra los más votados sin límite de tiempo.
-    const source = inWindow.length > 0
-      ? inWindow
-      : allPosts.filter((p) =>
-          matchClan(p.author.clanId) && p.voteStats.up + p.voteStats.down >= 1,
-        );
-
-    return source.sort((a, b) => b.voteStats.up - a.voteStats.up);
+    return allPosts
+      .filter((p) => matchClan(p.author.clanId) && p.voteStats.up + p.voteStats.down >= 1)
+      .sort((a, b) => b.voteStats.up - a.voteStats.up);
   }, [allPosts, clanId]);
+
+  // Ventana deslizante: se cargan 5 en 5 (con spinner) en ambos sentidos y
+  // como mucho POSTS_WINDOW_MAX (20) están montadas a la vez. Al avanzar se
+  // sueltan las del principio; al retroceder se vuelven a cargar igual que a
+  // la ida. maintainVisibleContentPosition evita saltos de scroll.
+  const [postWindow, setPostWindow] = useState({ start: 0, end: POSTS_PAGE });
+  const [postLoadDir, setPostLoadDir] = useState<null | 'forward' | 'backward'>(null);
+  const postLoadingRef = useRef(false);
+  const postWindowRef = useRef(postWindow);
+  postWindowRef.current = postWindow;
+
+  useEffect(() => {
+    setPostWindow({ start: 0, end: POSTS_PAGE });
+    setPostLoadDir(null);
+    postLoadingRef.current = false;
+  }, [clanId]);
+
+  const livePosts = useMemo(
+    () => rankedPosts.slice(postWindow.start, postWindow.end),
+    [rankedPosts, postWindow],
+  );
+
+  const loadPostsForward = useCallback(() => {
+    if (postLoadingRef.current) return;
+    if (postWindowRef.current.end >= rankedPosts.length) return;
+    postLoadingRef.current = true;
+    setPostLoadDir('forward');
+    setTimeout(() => {
+      setPostWindow((w) => {
+        const end = Math.min(w.end + POSTS_PAGE, rankedPosts.length);
+        const start = end - w.start > POSTS_WINDOW_MAX ? w.start + POSTS_PAGE : w.start;
+        return { start, end };
+      });
+      setPostLoadDir(null);
+      postLoadingRef.current = false;
+    }, 350);
+  }, [rankedPosts.length]);
+
+  const loadPostsBackward = useCallback(() => {
+    if (postLoadingRef.current) return;
+    if (postWindowRef.current.start <= 0) return;
+    postLoadingRef.current = true;
+    setPostLoadDir('backward');
+    setTimeout(() => {
+      setPostWindow((w) => {
+        const start = Math.max(w.start - POSTS_PAGE, 0);
+        const end = w.end - start > POSTS_WINDOW_MAX ? w.end - POSTS_PAGE : w.end;
+        return { start, end };
+      });
+      setPostLoadDir(null);
+      postLoadingRef.current = false;
+    }, 350);
+  }, []);
+
+  // Dispara la carga por la izquierda en cuanto la primera tarjeta toca el
+  // borde. Se engancha a onScroll + fin de arrastre + fin de inercia para que
+  // baste con deslizar hasta el borde (sin vaivén).
+  const handlePostsScroll = useCallback(
+    (e: { nativeEvent: { contentOffset: { x: number } } }) => {
+      if (e.nativeEvent.contentOffset.x <= cardW * 0.5) loadPostsBackward();
+    },
+    [cardW, loadPostsBackward],
+  );
 
   // ── Ranking del clan ──────────────────────────────────────────────────────
   const memberCounts = useMemo(
@@ -560,17 +622,42 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
                 <Text style={styles.emptyText}>Sin publicaciones recientes</Text>
               </View>
             ) : (
-              <FlatList
-                data={livePosts}
-                keyExtractor={(p) => p.id}
-                renderItem={renderPostCard}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
-                snapToInterval={cardW + 12}
-                decelerationRate="fast"
-                scrollEnabled
-              />
+              <View>
+                <FlatList
+                  data={livePosts}
+                  keyExtractor={(p) => p.id}
+                  renderItem={renderPostCard}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
+                  snapToInterval={cardW + 12}
+                  decelerationRate="fast"
+                  scrollEnabled
+                  onScroll={handlePostsScroll}
+                  onScrollEndDrag={handlePostsScroll}
+                  onMomentumScrollEnd={handlePostsScroll}
+                  scrollEventThrottle={16}
+                  onEndReached={loadPostsForward}
+                  onEndReachedThreshold={0.5}
+                  initialNumToRender={POSTS_PAGE}
+                  maxToRenderPerBatch={POSTS_PAGE}
+                  windowSize={5}
+                  removeClippedSubviews
+                  maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
+                  ListFooterComponent={
+                    postLoadDir === 'forward' ? (
+                      <View style={[styles.postsLoader, { width: cardW * 0.5 }]}>
+                        <ActivityIndicator size="small" color={clanColor} />
+                      </View>
+                    ) : null
+                  }
+                />
+                {postLoadDir === 'backward' ? (
+                  <View style={styles.postsLoaderLeft} pointerEvents="none">
+                    <ActivityIndicator size="small" color={clanColor} />
+                  </View>
+                ) : null}
+              </View>
             )}
           </View>
         </ScrollView>
@@ -708,6 +795,20 @@ const styles = StyleSheet.create({
   // ── Section 6: Posts — tarjeta delegada a PersonalRecentPostCard ─────────
   postsSection: {
     gap: 12,
+  },
+  postsLoader: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'stretch',
+  },
+  postsLoaderLeft: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // ── Empty states ─────────────────────────────────────────────────────────

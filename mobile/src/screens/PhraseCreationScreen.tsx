@@ -51,6 +51,7 @@ import {
 import { getPublishStarByClan } from '@evoconn/utils/getDebateStarByClan';
 import type { DebateMessage } from '@evoconn/types/debate';
 import { useFeedStore, createPhrasePost } from '@evoconn/hooks/useFeedStore';
+import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { userForPublish } from '@evoconn/utils/publishAuthor';
 import { useDebugStreak } from '../debug/DebugStreakContext';
 import { useDebugStats } from '../debug/DebugStatsContext';
@@ -197,6 +198,7 @@ export default function PhraseCreationScreen() {
   const { recordInput: recordClassificationInput } = useClassification();
   const { folders } = useConversationFolders();
   const { publishPost } = useFeedStore();
+  const { deletePost } = useSimulation();
   const { markStreakActivated } = useDebugStreak();
   const { decrementUses, remainingUses } = useDebugStats();
   const { hasAiUses, blockIfNoUses } = useDailyUsesGate();
@@ -469,6 +471,39 @@ export default function PhraseCreationScreen() {
       Keyboard.dismiss();
     },
     [publishPost, updateThought, router, handleInputFocusChange, authProfile],
+  );
+
+  const handleDeletePhrasePublication = useCallback(
+    (threadId: string, assistantMessageIndex: number) => {
+      const sourceId = `${threadId}_phrase_pub_${assistantMessageIndex}`;
+      deletePost(apiUserId, sourceId);
+      publishedRef.current.delete(sourceId);
+
+      const liveMessages = messagesRef.current;
+      const assistantMsg = liveMessages[assistantMessageIndex];
+      const prevAuthor =
+        assistantMsg?.role === 'assistant'
+          ? getPhrasePublishUI(assistantMsg)?.author ?? ''
+          : '';
+
+      const nextMessages = liveMessages.map((m, idx) =>
+        idx === assistantMessageIndex && m.role === 'assistant'
+          ? {
+              ...m,
+              phrasePublishUI: { status: 'pending' as const },
+            }
+          : m,
+      );
+      messagesRef.current = nextMessages;
+      setMessages(nextMessages);
+      updateThought(threadId, { messages: nextMessages });
+
+      const author = prevAuthor.trim();
+      if (author) {
+        onAuthorDraftChange(assistantMessageIndex, author);
+      }
+    },
+    [deletePost, apiUserId, updateThought, onAuthorDraftChange],
   );
 
   const handleAssignPhraseToFolder = useCallback(
@@ -992,6 +1027,11 @@ export default function PhraseCreationScreen() {
                         published
                           ? undefined
                           : () => handlePhrasePublish(effectiveThreadId, userPhrase, i)
+                      }
+                      onDeletePublication={
+                        published
+                          ? () => handleDeletePhrasePublication(effectiveThreadId, i)
+                          : undefined
                       }
                     />
                   </View>
