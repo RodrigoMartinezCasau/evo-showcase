@@ -18,7 +18,7 @@ const mono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'EVO — evoconn.com',
+  title: 'EVO - evoconn.com',
   description: 'EVO: reflexión, comunidad y crecimiento personal.',
 }
 

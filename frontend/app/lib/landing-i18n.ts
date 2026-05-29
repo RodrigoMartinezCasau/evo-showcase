@@ -252,12 +252,12 @@ export function getDict(lang: Lang): LandingDict {
 
 export const PAGE_METADATA: Record<Lang, { title: string; description: string }> = {
   en: {
-    title: 'Evo — Philosophy. Identity. Reflection.',
+    title: 'Evo - Philosophy & Identity.',
     description:
       'Discover your philosophical clan through reflection, debate, and identity.',
   },
   es: {
-    title: 'Evo — Filosofía. Identidad. Reflexión.',
+    title: 'Evo - Filosofía & Identidad.',
     description:
       'Descubre tu clan filosófico a través de la reflexión, el debate y la identidad.',
   },

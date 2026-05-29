@@ -21,8 +21,8 @@ export type AppLaunchGate =
 const DEFAULT_ANDROID_STORE =
   'https://play.google.com/store/apps/details?id=com.evoconn.evo';
 
-/** Replace with your App Store id when the listing is live, or set ios_store_url in Supabase. */
-const DEFAULT_IOS_STORE = 'https://apps.apple.com/app/evo/id0000000000';
+/** App Store listing for EVO (ascAppId 6764981767). Override via ios_store_url in Supabase if needed. */
+const DEFAULT_IOS_STORE = 'https://apps.apple.com/app/id6764981767';
 
 export function getInstalledVersionInfo(): {
   marketingVersion: string;
