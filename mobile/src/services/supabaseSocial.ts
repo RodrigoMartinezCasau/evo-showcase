@@ -1033,3 +1033,33 @@ export async function deleteComment(commentId: string): Promise<void> {
     .eq('id', commentId);
   if (error) console.error('[Social] deleteComment:', error.message);
 }
+
+// ─── Admin ──────────────────────────────────────────────────────────────────
+
+/** True si el usuario autenticado está en public.admins (vía RPC is_admin). */
+export async function checkIsAdmin(): Promise<boolean> {
+  const { data, error } = await supabase.rpc('is_admin');
+  if (error) {
+    console.warn('[Social] checkIsAdmin:', error.message);
+    return false;
+  }
+  return data === true;
+}
+
+/** Borra cualquier publicación (solo admin; verificado en la RPC). */
+export async function adminDeletePost(postId: string): Promise<void> {
+  const { error } = await supabase.rpc('admin_delete_post', { p_post_id: postId });
+  if (error) throw new Error(error.message);
+}
+
+/** Borra cualquier comentario (solo admin; verificado en la RPC). */
+export async function adminDeleteComment(commentId: string): Promise<void> {
+  const { error } = await supabase.rpc('admin_delete_comment', { p_comment_id: commentId });
+  if (error) throw new Error(error.message);
+}
+
+/** Borra por completo la cuenta de otro usuario (solo admin). Irreversible. */
+export async function adminDeleteUser(userId: string): Promise<void> {
+  const { error } = await supabase.rpc('admin_delete_user', { p_user_id: userId });
+  if (error) throw new Error(error.message);
+}

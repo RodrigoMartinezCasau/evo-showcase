@@ -56,6 +56,8 @@ import {
   deleteFollow as dbDeleteFollow,
   insertComment,
   deleteComment as dbDeleteComment,
+  adminDeletePost,
+  adminDeleteComment,
   dbRowToSimPost,
 } from '@evoconn/services/supabaseSocial';
 import {
@@ -230,12 +232,13 @@ export type SimulationContextValue = {
   toggleFollow: (fromId: string, toId: string) => void;
   castVote: (userId: string, postId: string, newVote: 'up' | 'down' | null) => void;
   toggleSave: (userId: string, postId: string) => void;
-  deletePost: (authorId: string, postId: string) => void;
+  deletePost: (authorId: string, postId: string, options?: { admin?: boolean }) => void;
   toggleHidePost: (userId: string, postId: string) => void;
   publishPost: (post: SimPost) => void;
   addComment: (comment: SimComment) => Promise<void>;
-  /** Borra un comentario propio (o del autor del post). RLS lo valida. */
-  deleteCommentById: (postId: string, commentId: string) => Promise<void>;
+  /** Borra un comentario propio (o del autor del post). RLS lo valida.
+   *  Con { admin: true } usa la RPC privilegiada (borra cualquiera). */
+  deleteCommentById: (postId: string, commentId: string, options?: { admin?: boolean }) => Promise<void>;
   /** Lazily fetch fresh comments from Supabase for a specific post. */
   ensureCommentsForPost: (postId: string) => Promise<void>;
   /**
@@ -1065,8 +1068,12 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // ── Delete / Hide post ────────────────────────────────────────────────────
-  const deletePost = useCallback((authorId: string, postId: string) => {
-    removePost(postId); // remove from Supabase (no-op for sim users)
+  const deletePost = useCallback((authorId: string, postId: string, options?: { admin?: boolean }) => {
+    if (options?.admin) {
+      void adminDeletePost(postId).catch((err) => console.error('[Sim] adminDeletePost:', err));
+    } else {
+      removePost(postId); // remove from Supabase (no-op for sim users)
+    }
     setPosts((prev) => {
       const updated = prev.filter((p) => !(p.id === postId && p.authorId === authorId));
       if (!isRealUserId(authorId)) {
@@ -1106,9 +1113,10 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
    * Supabase como en el estado local. RLS valida que el caller sea autor
    * del comentario o autor del post.
    */
-  const deleteCommentById = useCallback(async (postId: string, commentId: string) => {
+  const deleteCommentById = useCallback(async (postId: string, commentId: string, options?: { admin?: boolean }) => {
     try {
-      await dbDeleteComment(commentId);
+      if (options?.admin) await adminDeleteComment(commentId);
+      else await dbDeleteComment(commentId);
     } catch (err) {
       console.error('[Sim] deleteCommentById:', err);
       return;

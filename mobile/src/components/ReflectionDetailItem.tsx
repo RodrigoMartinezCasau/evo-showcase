@@ -59,6 +59,7 @@ import {
 } from '@evoconn/services/supabaseSocial';
 import { useBlockedUsers } from '@evoconn/hooks/BlockedUsersContext';
 import { useAuth } from '../../mobile/lib/AuthContext';
+import { useIsAdmin } from '@evoconn/hooks/useIsAdmin';
 import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
 import { rankCommentsForViewer } from '@evoconn/logic/comments/commentRanking';
 import { useIncrementalList } from '@evoconn/hooks/useIncrementalList';
@@ -225,7 +226,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     else unsavePost(post.id);
   }, [post, isSaved, updatePostSaveToggle, savePost, unsavePost]);
 
-  const { commentsMap, addComment: addSimComment, users: simUsers, ensureCommentsForPost, deleteCommentById } = useSimulation();
+  const { commentsMap, addComment: addSimComment, users: simUsers, ensureCommentsForPost, deleteCommentById, deletePost } = useSimulation();
 
   const [commentAuthorCache, setCommentAuthorCache] = useState<Record<string, BasicProfile>>({});
   const fetchedCommentAuthorIds = useRef<Set<string>>(new Set());
@@ -271,6 +272,8 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   // Comments come from the shared persistent store — no local state needed.
   const { block, isBlocked } = useBlockedUsers();
   const { session, profile: authProfile } = useAuth();
+  const isAdmin = useIsAdmin();
+  const [adminDeletePostOpen, setAdminDeletePostOpen] = useState(false);
 
   const contextComments = useMemo<Comment[]>(() => {
     const simComments = commentsMap[post.id] ?? [];
@@ -426,8 +429,8 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   const cancelReply = useCallback(() => setReplyingTo(null), []);
 
   const handleDeleteComment = useCallback(
-    (commentId: string) => {
-      void deleteCommentById(post.id, commentId);
+    (commentId: string, viaAdmin = false) => {
+      void deleteCommentById(post.id, commentId, viaAdmin ? { admin: true } : undefined);
     },
     [deleteCommentById, post.id],
   );
@@ -523,8 +526,21 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
         destructive: true,
         onPress: () => setBlockConfirmOpen(true),
       },
+      ...(isAdmin
+        ? [{
+            key: 'adminDeletePost',
+            label: 'Eliminar publicación (admin)',
+            destructive: true,
+            onPress: () => setAdminDeletePostOpen(true),
+          }]
+        : []),
     ];
-  }, [post, livePost, checkFollowing, toggleFollow]);
+  }, [post, livePost, checkFollowing, toggleFollow, isAdmin]);
+
+  const confirmAdminDeletePost = useCallback(() => {
+    deletePost(post.author.id, post.id, { admin: true });
+    showInfo('Publicación eliminada', 'La publicación se ha eliminado.');
+  }, [deletePost, post.author.id, post.id, showInfo]);
 
   const handleMorePress = useCallback(() => {
     setPostMoreSheetOpen(true);
@@ -1340,7 +1356,8 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                       return visibleRoots.map((c) => {
                         const descendants = descendantsByRoot.get(c.id) ?? [];
                         const expanded = !!expandedThreads[c.id];
-                        const canDelete = isPostAuthor || c.author.id === myId;
+                        const isOwnerDelete = isPostAuthor || c.author.id === myId;
+                        const canDelete = isOwnerDelete || isAdmin;
                         return (
                           <React.Fragment key={c.id}>
                             <View
@@ -1363,7 +1380,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                               onBlockUser={() => handleBlockUser(c.author.id)}
                               onAuthorPress={() => onAuthorPress(c.author.id)}
                               onReply={() => startReply(c.id, c.author.username)}
-                              onDelete={canDelete ? () => handleDeleteComment(c.id) : undefined}
+                              onDelete={canDelete ? () => handleDeleteComment(c.id, !isOwnerDelete) : undefined}
                               replyCount={descendants.length}
                               threadExpanded={expanded}
                               onToggleThread={descendants.length > 0 ? () => toggleThread(c.id) : undefined}
@@ -1371,7 +1388,8 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                             </View>
                             {expanded
                               ? descendants.map((child) => {
-                                  const childCanDelete = isPostAuthor || child.author.id === myId;
+                                  const childIsOwnerDelete = isPostAuthor || child.author.id === myId;
+                                  const childCanDelete = childIsOwnerDelete || isAdmin;
                                   // Si el padre real NO es la raíz del hilo,
                                   // mostramos "→ @padre" para indicar a quién
                                   // se está respondiendo dentro del hilo.
@@ -1408,7 +1426,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                                       onReply={() => startReply(child.id, child.author.username)}
                                       onDelete={
                                         childCanDelete
-                                          ? () => handleDeleteComment(child.id)
+                                          ? () => handleDeleteComment(child.id, !childIsOwnerDelete)
                                           : undefined
                                       }
                                     />
@@ -1498,6 +1516,15 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
         confirmLabel="Bloquear"
         destructive
         onConfirm={confirmBlockUser}
+      />
+      <EvoConfirmModal
+        visible={adminDeletePostOpen}
+        onClose={() => setAdminDeletePostOpen(false)}
+        title="Eliminar publicación (admin)"
+        message="¿Eliminar esta publicación de forma permanente? Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        destructive
+        onConfirm={confirmAdminDeletePost}
       />
       <EvoInfoModal
         visible={infoModalOpen}

@@ -10,7 +10,8 @@ import { useRouter } from 'expo-router';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
 import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
 import { useAuth } from '../../../mobile/lib/AuthContext';
-import { insertReport, isRealUserId } from '@evoconn/services/supabaseSocial';
+import { insertReport, isRealUserId, adminDeleteUser } from '@evoconn/services/supabaseSocial';
+import { useIsAdmin } from '@evoconn/hooks/useIsAdmin';
 import { useBlockedUsers } from '@evoconn/hooks/BlockedUsersContext';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import {
@@ -39,6 +40,7 @@ export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({
 }: Props) {
   const router = useRouter();
   const { session } = useAuth();
+  const isAdmin = useIsAdmin();
   const { isFollowing, toggleFollow } = useFollowState();
   const { recordBlockUser } = useRecommendationTaste();
   const { block } = useBlockedUsers();
@@ -48,6 +50,7 @@ export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({
   const [reportOpen, setReportOpen] = useState(false);
   const [reportAvatarOpen, setReportAvatarOpen] = useState(false);
   const [blockOpen, setBlockOpen] = useState(false);
+  const [adminDeleteOpen, setAdminDeleteOpen] = useState(false);
   const [info, setInfo] = useState<{ title: string; message?: string } | null>(null);
 
   const isOwnProfile =
@@ -56,6 +59,17 @@ export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({
   const openInfo = useCallback((title: string, message?: string) => {
     setInfo({ title, message });
   }, []);
+
+  const confirmAdminDeleteUser = useCallback(async () => {
+    try {
+      await adminDeleteUser(userId);
+      openInfo('Cuenta eliminada', `${username} se ha eliminado por completo.`);
+      if (router.canGoBack()) router.back();
+      else router.navigate('/(tabs)');
+    } catch (e) {
+      openInfo('No se pudo eliminar', e instanceof Error ? e.message : 'Inténtalo de nuevo.');
+    }
+  }, [userId, username, router, openInfo]);
 
   const handleShare = useCallback(async () => {
     try {
@@ -193,6 +207,14 @@ export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({
             destructive: true,
             onPress: () => setBlockOpen(true),
           },
+          ...(isAdmin
+            ? [{
+                key: 'adminDeleteUser',
+                label: 'Eliminar cuenta (admin)',
+                destructive: true,
+                onPress: () => setAdminDeleteOpen(true),
+              }]
+            : []),
         ]}
       />
 
@@ -250,6 +272,16 @@ export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({
         confirmLabel="Bloquear"
         destructive
         onConfirm={() => void confirmBlock()}
+      />
+
+      <EvoConfirmModal
+        visible={adminDeleteOpen}
+        onClose={() => setAdminDeleteOpen(false)}
+        title="Eliminar cuenta (admin)"
+        message={`¿Eliminar por completo la cuenta de ${username}? Se borrarán su perfil, publicaciones y comentarios. Esta acción NO se puede deshacer.`}
+        confirmLabel="Eliminar cuenta"
+        destructive
+        onConfirm={() => void confirmAdminDeleteUser()}
       />
 
       <EvoInfoModal
