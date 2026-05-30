@@ -152,6 +152,9 @@ function findCommentThreadRoot(comments: Comment[], targetId: string): string | 
   return cur.id;
 }
 
+/** Referencia estable para evitar re-renders cuando el usuario no ha votado nada. */
+const EMPTY_COMMENT_VOTES: Record<string, true> = {};
+
 export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   post,
   itemHeight,
@@ -226,7 +229,17 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     else unsavePost(post.id);
   }, [post, isSaved, updatePostSaveToggle, savePost, unsavePost]);
 
-  const { commentsMap, addComment: addSimComment, users: simUsers, ensureCommentsForPost, deleteCommentById, deletePost } = useSimulation();
+  const {
+    commentsMap,
+    addComment: addSimComment,
+    users: simUsers,
+    ensureCommentsForPost,
+    deleteCommentById,
+    deletePost,
+    commentVoteMap,
+    castCommentVote,
+    activeUserId,
+  } = useSimulation();
 
   const [commentAuthorCache, setCommentAuthorCache] = useState<Record<string, BasicProfile>>({});
   const fetchedCommentAuthorIds = useRef<Set<string>>(new Set());
@@ -264,10 +277,34 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
       });
   }, [commentsMap, post.id]);
 
-  const [commentVotes, setCommentVotes] = useState<Record<string, boolean>>({});
-  const toggleCommentVote = useCallback((commentId: string) => {
-    setCommentVotes((prev) => ({ ...prev, [commentId]: !prev[commentId] }));
-  }, []);
+  // Voto de comentarios desde el store compartido → persiste en Supabase y se
+  // mantiene tras refrescar (igual que los votos de posts). `myCommentVotes`
+  // dice qué comentarios he votado YO; el conteo total vive en `c.upCount`.
+  const myCommentVotes = commentVoteMap[activeUserId] ?? EMPTY_COMMENT_VOTES;
+  const toggleCommentVote = useCallback(
+    (commentId: string, commentAuthorId: string) => {
+      const isNewVote = !myCommentVotes[commentId];
+      castCommentVote(activeUserId, post.id, commentId);
+      // Notificación SOLO cuando el AUTOR DEL POST vota un comentario ajeno:
+      // el autor del comentario recibe un "me gusta" del autor de la publicación.
+      // El resto de votos (de otros usuarios) no generan notificación.
+      if (isNewVote && activeUserId === post.author.id && commentAuthorId !== activeUserId) {
+        const voterUsername =
+          authProfile?.username != null && authProfile.username.trim().length > 0
+            ? `@${authProfile.username.trim().toUpperCase()}`
+            : mockCurrentUser.username;
+        void addNotification({
+          recipientUserId: commentAuthorId,
+          type: 'upvote_comment',
+          fromUserId: activeUserId,
+          fromUsername: voterUsername,
+          targetPostId: post.id,
+          targetCommentId: commentId,
+        });
+      }
+    },
+    [castCommentVote, activeUserId, post.id, post.author.id, myCommentVotes, authProfile, addNotification],
+  );
 
   // Comments come from the shared persistent store — no local state needed.
   const { block, isBlocked } = useBlockedUsers();
@@ -1393,11 +1430,11 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                               avatarUri={c.author.avatarUri}
                               text={c.body}
                               clanId={c.author.clanId}
-                              upvotes={c.upCount + (commentVotes[c.id] ? 1 : 0)}
-                              isUpvoted={!!commentVotes[c.id]}
+                              upvotes={c.upCount}
+                              isUpvoted={!!myCommentVotes[c.id]}
                               createdAt={c.createdAt}
                               highlighted={highlightedCommentId === c.id}
-                              onUpvote={() => toggleCommentVote(c.id)}
+                              onUpvote={() => toggleCommentVote(c.id, c.author.id)}
                               onReport={() => console.log(`Reported comment ${c.id}`)}
                               onBlockUser={() => handleBlockUser(c.author.id)}
                               onAuthorPress={() => onAuthorPress(c.author.id)}
@@ -1435,13 +1472,13 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                                       avatarUri={child.author.avatarUri}
                                       text={child.body}
                                       clanId={child.author.clanId}
-                                      upvotes={child.upCount + (commentVotes[child.id] ? 1 : 0)}
-                                      isUpvoted={!!commentVotes[child.id]}
+                                      upvotes={child.upCount}
+                                      isUpvoted={!!myCommentVotes[child.id]}
                                       createdAt={child.createdAt}
                                       indented
                                       highlighted={highlightedCommentId === child.id}
                                       replyingToUsername={replyingToUsername}
-                                      onUpvote={() => toggleCommentVote(child.id)}
+                                      onUpvote={() => toggleCommentVote(child.id, child.author.id)}
                                       onReport={() => console.log(`Reported comment ${child.id}`)}
                                       onBlockUser={() => handleBlockUser(child.author.id)}
                                       onAuthorPress={() => onAuthorPress(child.author.id)}

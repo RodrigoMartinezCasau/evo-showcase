@@ -42,7 +42,9 @@ export const PersonalPhilosophyPanel = React.memo(function PersonalPhilosophyPan
   allowLockedAccess = false,
 }: Props) {
   const titleColor = getClanColor(clanId ?? null);
-  const sorted = [...percentages].sort((a, b) => b.pct - a.pct);
+  // Preview: solo los 4 clanes con mayor porcentaje. El resto se ven en el
+  // detalle completo (pantalla "Pensamiento filosófico" al pulsar).
+  const topFour = [...percentages].sort((a, b) => b.pct - a.pct).slice(0, 4);
   const isSinClan = clanId === null || clanId === undefined;
 
   // Sin clan: tapping anywhere on the card shows the alert instead of navigating
@@ -70,7 +72,7 @@ export const PersonalPhilosophyPanel = React.memo(function PersonalPhilosophyPan
           onPress && <Text style={styles.expandHint}>Ver detalle →</Text>
         )}
       </View>
-      {!isSinClan && sorted.map((entry, i) => (
+      {!isSinClan && topFour.map((entry, i) => (
           <View
             key={entry.clanId}
             style={[

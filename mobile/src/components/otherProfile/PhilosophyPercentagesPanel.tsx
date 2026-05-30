@@ -32,7 +32,9 @@ type Props = {
 };
 
 export const PhilosophyPercentagesPanel = React.memo(function PhilosophyPercentagesPanel({ percentages, clanId }: Props) {
-  const sorted = [...percentages].sort((a, b) => b.pct - a.pct);
+  // Preview: solo los 4 clanes con mayor porcentaje. El resto se ven en el
+  // detalle completo al pulsar.
+  const topFour = [...percentages].sort((a, b) => b.pct - a.pct).slice(0, 4);
   const titleColor = getClanColor(clanId ?? null);
   const isSinClan = clanId === null || clanId === undefined;
 
@@ -71,7 +73,7 @@ export const PhilosophyPercentagesPanel = React.memo(function PhilosophyPercenta
           </TouchableOpacity>
         )}
       </View>
-      {!isSinClan && sorted.map((entry, i) => (
+      {!isSinClan && topFour.map((entry, i) => (
           <View
             key={entry.clanId}
             style={[

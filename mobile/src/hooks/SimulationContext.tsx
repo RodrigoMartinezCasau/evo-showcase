@@ -56,6 +56,9 @@ import {
   deleteFollow as dbDeleteFollow,
   insertComment,
   deleteComment as dbDeleteComment,
+  upsertCommentVote,
+  deleteCommentVote as dbDeleteCommentVote,
+  fetchMyCommentVotes,
   adminDeletePost,
   adminDeleteComment,
   dbRowToSimPost,
@@ -72,6 +75,7 @@ const SIM_POSTS_STORAGE_KEY    = '@physicscopilot/sim_posts_v3';
 const SIM_VOTES_STORAGE_KEY    = '@physicscopilot/sim_votes_v2';
 const SIM_FOLLOW_STORAGE_KEY   = '@physicscopilot/sim_follow_v2';
 const SIM_COMMENTS_STORAGE_KEY = '@physicscopilot/sim_comments_v3';
+const SIM_COMMENT_VOTES_STORAGE_KEY = '@physicscopilot/sim_comment_votes_v1';
 const SIM_SAVED_STORAGE_KEY    = '@physicscopilot/sim_saved_v1';
 const SIM_HIDDEN_STORAGE_KEY   = '@physicscopilot/sim_hidden_v1';
 
@@ -225,12 +229,16 @@ export type SimulationContextValue = {
 
   /** postId → persisted comments for that post. */
   commentsMap: Record<string, SimComment[]>;
+  /** userId → { commentId → true } : comentarios que el usuario ha votado. */
+  commentVoteMap: Record<string, Record<string, true>>;
 
   // ── Actions ──────────────────────────────────────────────────────────────
   follow: (fromId: string, toId: string) => void;
   unfollow: (fromId: string, toId: string) => void;
   toggleFollow: (fromId: string, toId: string) => void;
   castVote: (userId: string, postId: string, newVote: 'up' | 'down' | null) => void;
+  /** Alterna el upvote de un comentario (persiste como castVote para posts). */
+  castCommentVote: (userId: string, postId: string, commentId: string) => void;
   toggleSave: (userId: string, postId: string) => void;
   deletePost: (authorId: string, postId: string, options?: { admin?: boolean }) => void;
   toggleHidePost: (userId: string, postId: string) => void;
@@ -343,6 +351,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   const votesHydrated  = useRef(false);
   const followHydrated = useRef(false);
   const commentsHydrated = useRef(false);
+  const commentVotesHydrated = useRef(false);
 
   // ── Supabase hydration for real users (FASEADO) ─────────────────────────
   // Fase 0  (instant, <150 ms): cache de AsyncStorage → setPosts inmediato.
@@ -375,6 +384,14 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       if (cancelled || activeUserIdRef.current !== hydrateFor) return;
       setVoteMapRaw(prev => ({ ...prev, [hydrateFor]: myVotesMap }));
       votesHydrated.current = true;
+    };
+
+    const applyMyCommentVotes = (commentIds: string[]) => {
+      if (cancelled || activeUserIdRef.current !== hydrateFor) return;
+      const mine: Record<string, true> = {};
+      for (const id of commentIds) mine[id] = true;
+      setCommentVoteMap(prev => ({ ...prev, [hydrateFor]: mine }));
+      commentVotesHydrated.current = true;
     };
 
     const applyMySaves = (mySavedPostIds: string[]) => {
@@ -471,6 +488,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       const [
         allVoteRows,
         myVotesMap,
+        myCommentVoteIds,
         mySavedPostIds,
         following,
         followers,
@@ -478,6 +496,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       ] = await Promise.all([
         fetchVotesForPosts(postIds),
         fetchMyVotes(hydrateFor),
+        fetchMyCommentVotes(hydrateFor),
         fetchMySaves(hydrateFor),
         fetchFollowing(hydrateFor),
         fetchFollowers(hydrateFor),
@@ -535,6 +554,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       setPosts(() => Array.from(postById.values()));
 
       applyMyVotes(myVotesMap);
+      applyMyCommentVotes(myCommentVoteIds);
       applyMySaves(mySavedPostIds);
       applyFollowGraph(following, followers);
       if (hiddenPostIds.length > 0) {
@@ -838,6 +858,35 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     AsyncStorage.setItem(SIM_COMMENTS_STORAGE_KEY, JSON.stringify(commentsMap)).catch(console.error);
   }, [commentsMap]);
 
+  // ── Comment vote map ──────────────────────────────────────────────────────
+  // userId → { commentId → true } : qué comentarios ha votado cada usuario.
+  // El conteo total (`upCount`) vive en cada SimComment de commentsMap; esto es
+  // solo "¿he votado YO este comentario?" (paralelo a voteMap para posts).
+  const [commentVoteMap, setCommentVoteMap] = useState<Record<string, Record<string, true>>>({});
+  const commentVoteMapRef = useRef(commentVoteMap);
+  useEffect(() => { commentVoteMapRef.current = commentVoteMap; }, [commentVoteMap]);
+
+  useEffect(() => {
+    AsyncStorage.getItem(SIM_COMMENT_VOTES_STORAGE_KEY)
+      .then((raw) => {
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw) as Record<string, Record<string, true>>;
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+              setCommentVoteMap(parsed);
+            }
+          } catch { /* ignore */ }
+        }
+        commentVotesHydrated.current = true;
+      })
+      .catch(() => { commentVotesHydrated.current = true; });
+  }, []);
+
+  useEffect(() => {
+    if (!commentVotesHydrated.current) return;
+    AsyncStorage.setItem(SIM_COMMENT_VOTES_STORAGE_KEY, JSON.stringify(commentVoteMap)).catch(console.error);
+  }, [commentVoteMap]);
+
   // ── Saved map ─────────────────────────────────────────────────────────────
   const [savedMapArr, setSavedMapArr] = useState<Record<string, string[]>>(() => {
     const m: Record<string, string[]> = {};
@@ -1048,6 +1097,50 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       });
     },
     [], // intentionally empty — uses voteMapRef for fresh reads
+  );
+
+  // ── Comment vote ────────────────────────────────────────────────────────────
+  // Toggle del upvote de un comentario. Persiste en Supabase (usuarios reales)
+  // o en AsyncStorage (sim) y mantiene el `upCount` del comentario en sync.
+  const castCommentVote = useCallback(
+    (userId: string, postId: string, commentId: string) => {
+      const alreadyVoted = !!commentVoteMapRef.current[userId]?.[commentId];
+      const willVote = !alreadyVoted;
+
+      // Write to Supabase (fire-and-forget; no-op para sim users).
+      if (willVote) upsertCommentVote(userId, commentId);
+      else dbDeleteCommentVote(userId, commentId);
+
+      // "Mi voto"
+      setCommentVoteMap((prev) => {
+        const updated = { ...prev, [userId]: { ...(prev[userId] ?? {}) } };
+        if (willVote) updated[userId][commentId] = true;
+        else delete updated[userId][commentId];
+        if (!isRealUserId(userId) && commentVotesHydrated.current) {
+          AsyncStorage.setItem(SIM_COMMENT_VOTES_STORAGE_KEY, JSON.stringify(updated)).catch(console.error);
+        }
+        return updated;
+      });
+
+      // Conteo total del comentario.
+      setCommentsMap((prev) => {
+        const arr = prev[postId];
+        if (!arr) return prev;
+        let changed = false;
+        const next = arr.map((c) => {
+          if (c.id !== commentId) return c;
+          changed = true;
+          return { ...c, upCount: Math.max(0, c.upCount + (willVote ? 1 : -1)) };
+        });
+        if (!changed) return prev;
+        const updatedMap = { ...prev, [postId]: next };
+        if (!isRealUserId(userId) && commentsHydrated.current) {
+          AsyncStorage.setItem(SIM_COMMENTS_STORAGE_KEY, JSON.stringify(updatedMap)).catch(console.error);
+        }
+        return updatedMap;
+      });
+    },
+    [], // uses commentVoteMapRef for fresh reads
   );
 
   // ── Save ──────────────────────────────────────────────────────────────────
@@ -1261,6 +1354,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       voteMap: voteMapRaw,
       hiddenMap,
       commentsMap,
+      commentVoteMap,
       activeUser,
       activeFollowersCount,
       activeFollowingCount,
@@ -1268,6 +1362,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       unfollow,
       toggleFollow,
       castVote,
+      castCommentVote,
       toggleSave,
       deletePost,
       toggleHidePost,
@@ -1281,9 +1376,9 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     [
       activeUserId, setActiveUserId, users, posts,
       followGraph_sets, savedMap, voteMapRaw, hiddenMap,
-      commentsMap,
+      commentsMap, commentVoteMap,
       activeUser, activeFollowersCount, activeFollowingCount,
-      follow, unfollow, toggleFollow, castVote, toggleSave,
+      follow, unfollow, toggleFollow, castVote, castCommentVote, toggleSave,
       deletePost, toggleHidePost, publishPost, addComment, deleteCommentById, ensureCommentsForPost,
       refreshSocialFromSupabase, ingestPostsByIds,
     ],

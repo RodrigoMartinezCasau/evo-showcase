@@ -285,7 +285,7 @@ export async function fetchCommentsForPost(postId: string): Promise<SimComment[]
   } else {
     rows = (primary.data ?? []) as Record<string, unknown>[];
   }
-  return rows.map(dbRowToSimComment);
+  return applyCommentVoteCounts(rows.map(dbRowToSimComment));
 }
 
 /**
@@ -331,9 +331,11 @@ export async function fetchCommentsForPosts(
     rows = (fromView.data ?? []) as Record<string, unknown>[];
   }
 
+  const allComments = rows.map(dbRowToSimComment);
+  const withCounts = await applyCommentVoteCounts(allComments);
+
   const byPost: Record<string, SimComment[]> = {};
-  for (const row of rows) {
-    const comment = dbRowToSimComment(row);
+  for (const comment of withCounts) {
     const arr = byPost[comment.postId];
     if (arr) arr.push(comment);
     else byPost[comment.postId] = [comment];
@@ -348,6 +350,69 @@ export async function insertComment(comment: SimComment): Promise<void> {
     console.error('[Social] insertComment:', error.message);
     throw new Error(error.message);
   }
+}
+
+// ─── Comment votes ──────────────────────────────────────────────────────────
+
+/** Cuenta de votos por comentario (agregado de todos los usuarios). */
+export async function fetchCommentVoteCounts(
+  commentIds: string[],
+): Promise<Record<string, number>> {
+  if (commentIds.length === 0) return {};
+  const { data, error } = await supabase
+    .from('comment_votes')
+    .select('comment_id')
+    .in('comment_id', commentIds);
+  if (error) {
+    // La tabla puede no existir aún (migración sin aplicar): degradar a 0.
+    console.warn('[Social] fetchCommentVoteCounts:', error.message);
+    return {};
+  }
+  const counts: Record<string, number> = {};
+  for (const row of data ?? []) {
+    const id = (row as { comment_id: string }).comment_id;
+    counts[id] = (counts[id] ?? 0) + 1;
+  }
+  return counts;
+}
+
+/** Lista de comment_ids que el usuario ha votado (para reconstruir "mi voto"). */
+export async function fetchMyCommentVotes(userId: string): Promise<string[]> {
+  if (!isRealUserId(userId)) return [];
+  const { data, error } = await supabase
+    .from('comment_votes')
+    .select('comment_id')
+    .eq('user_id', userId);
+  if (error) {
+    console.warn('[Social] fetchMyCommentVotes:', error.message);
+    return [];
+  }
+  return (data ?? []).map((r) => (r as { comment_id: string }).comment_id);
+}
+
+export async function upsertCommentVote(userId: string, commentId: string): Promise<void> {
+  if (!isRealUserId(userId)) return;
+  const { error } = await supabase
+    .from('comment_votes')
+    .upsert({ user_id: userId, comment_id: commentId }, { onConflict: 'user_id,comment_id' });
+  if (error) console.error('[Social] upsertCommentVote:', error.message);
+}
+
+export async function deleteCommentVote(userId: string, commentId: string): Promise<void> {
+  if (!isRealUserId(userId)) return;
+  const { error } = await supabase
+    .from('comment_votes')
+    .delete()
+    .eq('user_id', userId)
+    .eq('comment_id', commentId);
+  if (error) console.error('[Social] deleteCommentVote:', error.message);
+}
+
+/** Aplica las cuentas de votos (de comment_votes) al `upCount` de cada comentario. */
+async function applyCommentVoteCounts(comments: SimComment[]): Promise<SimComment[]> {
+  if (comments.length === 0) return comments;
+  const counts = await fetchCommentVoteCounts(comments.map((c) => c.id));
+  return comments.map((c) => ({ ...c, upCount: counts[c.id] ?? 0 }));
 }
 
 // ─── Votes ────────────────────────────────────────────────────────────────────
