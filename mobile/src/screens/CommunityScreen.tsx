@@ -302,6 +302,17 @@ export default function CommunityScreen() {
   const paratiUserClanColor = useMemo(() => getClanColor(viewerClanId), [viewerClanId]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const drawerOpenProgress = useRef(new Animated.Value(0)).current;
+  // Callbacks estables para que el React.memo del SidebarDrawer funcione: con
+  // props inline el drawer (montado siempre) se re-renderizaba en casi todos
+  // los renders del feed aunque estuviera cerrado.
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+  const handleSidebarConversationPress = useCallback(
+    (id: string) => {
+      setSidebarOpen(false);
+      router.push({ pathname: '/reflection', params: { thoughtId: id } });
+    },
+    [router],
+  );
   const gestureCommittingRef = useRef(false);
   const entryAnimPlaying = useEntryAnimPlaying();
   const [activeTab, setActiveTab] = useState<TabId>(() =>
@@ -1746,12 +1757,9 @@ export default function CommunityScreen() {
 
       <SidebarDrawer
         visible={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
+        onClose={closeSidebar}
         conversations={thoughts}
-        onConversationPress={(id) => {
-          setSidebarOpen(false);
-          router.push({ pathname: '/reflection', params: { thoughtId: id } });
-        }}
+        onConversationPress={handleSidebarConversationPress}
         searchQuery={searchQuery}
         openProgress={drawerOpenProgress}
       />

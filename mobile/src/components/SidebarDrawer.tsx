@@ -314,6 +314,7 @@ function SidebarDrawerInner({
           accessibilityLabel="Comunidad"
           menuRowStyle={styles.communityMenuRow}
           communityRimColor={communityRimColor}
+          pauseStars={!interactable}
           leftOverlay={{
             element: (
               <EstrellaComunidadSvg

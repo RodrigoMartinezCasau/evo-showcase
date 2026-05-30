@@ -21,10 +21,27 @@ function pseudoRandom(seed: number): number {
   return x - Math.floor(x);
 }
 
-function Star({ x, y, size, delay }: { x: number; y: number; size: number; delay: number }) {
+function Star({
+  x,
+  y,
+  size,
+  delay,
+  paused = false,
+}: {
+  x: number;
+  y: number;
+  size: number;
+  delay: number;
+  paused?: boolean;
+}) {
   const opacity = React.useRef(new Animated.Value(0.2)).current;
 
   React.useEffect(() => {
+    // Cuando el contenedor está oculto (p. ej. el sidebar cerrado) no arrancamos
+    // el bucle infinito: 18 loops parpadeando fuera de pantalla gastan CPU/GPU
+    // sin que el usuario lo vea. Al volver visible, el efecto se re-ejecuta y
+    // reanuda el parpadeo.
+    if (paused) return;
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(opacity, {
@@ -44,7 +61,7 @@ function Star({ x, y, size, delay }: { x: number; y: number; size: number; delay
     );
     loop.start();
     return () => loop.stop();
-  }, [opacity, delay]);
+  }, [opacity, delay, paused]);
 
   return (
     <Animated.View
@@ -101,9 +118,14 @@ export const PANEL_STAR_SURFACE_DEFAULT = '#0d0d11';
 type PanelStarFieldProps = {
   /** Panel fill behind stars. Para ti feed uses app background; Siguiendo uses inner gray. */
   surfaceColor?: string;
+  /** Si true, las estrellas no parpadean (se usa cuando el panel está oculto, p. ej. sidebar cerrado). */
+  paused?: boolean;
 };
 
-export function PanelStarField({ surfaceColor = PANEL_STAR_SURFACE_DEFAULT }: PanelStarFieldProps) {
+export function PanelStarField({
+  surfaceColor = PANEL_STAR_SURFACE_DEFAULT,
+  paused = false,
+}: PanelStarFieldProps) {
   const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
 
   const handleLayout = (e: LayoutChangeEvent) => {
@@ -130,7 +152,7 @@ export function PanelStarField({ surfaceColor = PANEL_STAR_SURFACE_DEFAULT }: Pa
       onLayout={handleLayout}
     >
       {stars.map((s, i) => (
-        <Star key={i} x={s.x} y={s.y} size={s.size} delay={s.delay} />
+        <Star key={i} x={s.x} y={s.y} size={s.size} delay={s.delay} paused={paused} />
       ))}
     </View>
   );

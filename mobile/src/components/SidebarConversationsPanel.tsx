@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   Modal,
   TextInput,
   Pressable,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from 'react-native';
 import { SIDEBAR_CONVERSATIONS_LAYOUT as L } from '@evoconn/constants/sidebarConversationsLayout';
 import { getSidebarFolderColors } from '@evoconn/constants/sidebarFolderColors';
@@ -32,6 +34,9 @@ const SECTION_ICON_FOLDERS = require('../assets/sidebar/conversationsSections/se
 
 /** null = todas las conversaciones; los filtros se apagan al pulsar de nuevo el mismo botón */
 type ActiveFilter = null | 'favorites' | 'folders';
+
+/** Conversaciones montadas inicialmente; las siguientes se montan al hacer scroll. */
+const CONVERSATIONS_PAGE_SIZE = 20;
 
 type SidebarConversationsPanelProps = {
   clanId: string | null;
@@ -92,6 +97,39 @@ export function SidebarConversationsPanel({
     }
     return conversations;
   }, [conversations, activeFilter, q, foldersBrowseId]);
+
+  // ── Virtualización ligera ──────────────────────────────────────────────
+  // Montamos solo las primeras N conversaciones y vamos añadiendo más conforme
+  // el usuario hace scroll hacia abajo. Evita renderizar cientos de filas de
+  // golpe (el panel usa ScrollView, no FlatList) cuando alguien acumula muchas
+  // conversaciones.
+  const [visibleCount, setVisibleCount] = useState(CONVERSATIONS_PAGE_SIZE);
+
+  // Al cambiar de vista (búsqueda, favoritos, carpeta) volvemos a empezar por
+  // las primeras N para no arrastrar un contador alto de la vista anterior.
+  useEffect(() => {
+    setVisibleCount(CONVERSATIONS_PAGE_SIZE);
+  }, [q, activeFilter, foldersBrowseId]);
+
+  const visibleConversations = useMemo(
+    () => listConversations.slice(0, visibleCount),
+    [listConversations, visibleCount],
+  );
+
+  const handleConversationsScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+      const distanceToBottom =
+        contentSize.height - (contentOffset.y + layoutMeasurement.height);
+      if (distanceToBottom > 240) return;
+      setVisibleCount((prev) =>
+        prev < listConversations.length
+          ? Math.min(prev + CONVERSATIONS_PAGE_SIZE, listConversations.length)
+          : prev,
+      );
+    },
+    [listConversations.length],
+  );
 
   const toggleFavorites = useCallback(() => {
     setActiveFilter((prev) => (prev === 'favorites' ? null : 'favorites'));
@@ -345,6 +383,8 @@ export function SidebarConversationsPanel({
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="always"
               keyboardDismissMode="on-drag"
+              onScroll={handleConversationsScroll}
+              scrollEventThrottle={64}
             >
               {activeFilter === 'folders' && !q && !foldersBrowseId ? (
                 <View
@@ -378,7 +418,7 @@ export function SidebarConversationsPanel({
               ) : null}
 
               {(q || activeFilter !== 'folders' || foldersBrowseId) &&
-                listConversations.map((item) => (
+                visibleConversations.map((item) => (
                   <View
                     key={item.id}
                     style={[

@@ -156,6 +156,11 @@ type SidebarPngMenuButtonProps = {
    * Sin clan → verde lima; cada clan → su color principal.
    */
   communityRimColor?: string | null;
+  /**
+   * Pausa el parpadeo del campo de estrellas (solo aplica al botón COMUNIDAD).
+   * Se usa para no animar 18 loops mientras el sidebar está cerrado/offscreen.
+   */
+  pauseStars?: boolean;
 };
 
 export function SidebarPngMenuButton({
@@ -168,6 +173,7 @@ export function SidebarPngMenuButton({
   textAdjustsFontSizeToFit = true,
   leftOverlay = null,
   communityRimColor = null,
+  pauseStars = false,
 }: SidebarPngMenuButtonProps) {
   const imgW = config.imageWidth;
   const imgH = config.imageHeight;
@@ -229,7 +235,7 @@ export function SidebarPngMenuButton({
                   backgroundColor: evoconnColors.background,
                 }}
               >
-                <PanelStarField surfaceColor={evoconnColors.background} />
+                <PanelStarField surfaceColor={evoconnColors.background} paused={pauseStars} />
                 <ClanCardFeedRimOverlay
                   width={layoutW}
                   height={communityRim.bodyHeight}
