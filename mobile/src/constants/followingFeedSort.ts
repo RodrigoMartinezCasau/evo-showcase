@@ -15,6 +15,16 @@ export const FOLLOWING_SORT_LABELS: Record<FollowingSortOption, string> = {
   recientes: 'Más recientes',
 };
 
+/**
+ * Texto de la pestaña inferior "Siguiendo" según el filtro activo.
+ * Recientes (default) mantiene "SIGUIENDO"; las votadas usan etiqueta corta.
+ */
+export const FOLLOWING_SORT_TAB_LABELS: Record<FollowingSortOption, string> = {
+  recientes: 'SIGUIENDO',
+  votadas_24h: '24 HORAS',
+  votadas_mes: '30 DÍAS',
+};
+
 const MS_DAY = 86_400_000;
 
 export function isFollowingSortOption(v: string): v is FollowingSortOption {

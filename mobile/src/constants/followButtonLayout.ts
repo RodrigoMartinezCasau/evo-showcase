@@ -9,7 +9,7 @@ export const FOLLOW_OUTLINE_PX = 10;
 export const COMMUNITY_FOLLOW_BUTTON_LAYOUT = {
   offsetX: 3,
   offsetY: -0.5,
-  scale: 0.4,
+  scale: 0.25,
 } as const;
 
 export const DETAIL_FOLLOW_BUTTON_LAYOUT = {

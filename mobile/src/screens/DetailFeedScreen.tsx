@@ -13,6 +13,7 @@ import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-g
 import { runOnJS } from 'react-native-reanimated';
 import { useLocalSearchParams, useRouter, usePathname } from 'expo-router';
 import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
+import { requestCommunityTab } from '@evoconn/utils/communityPostDeepLink';
 import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
 import type { CommunityPost } from '@evoconn/types';
@@ -199,12 +200,14 @@ export default function DetailFeedScreen() {
   const handleTabChange = useCallback(
     (tab: string) => {
       if (tab === 'search') {
+        requestCommunityTab('search');
         router.navigate('/(tabs)');
         return;
       }
       const newMode: FeedMode = tab === 'siguiendo' ? 'following' : 'foryou';
 
       if (tab === 'siguiendo') {
+        requestCommunityTab('siguiendo');
         router.navigate('/(tabs)');
         return;
       }

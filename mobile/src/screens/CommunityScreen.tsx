@@ -83,6 +83,7 @@ import {
   peekCommunityPostDeepLink,
   acknowledgeCommunityPostDeepLink,
   peekCommunityPostId,
+  consumeRequestedCommunityTab,
 } from '@evoconn/utils/communityPostDeepLink';
 import {
   consumeForcedCommunityPostOpen,
@@ -166,7 +167,12 @@ function getDataForMode(
   switch (mode) {
     case 'following': {
       const ids = followingSet ?? new Set<string>();
-      const pool = allPosts.filter((p) => ids.has(p.author.id));
+      // "Más recientes" → solo cuentas que sigues (sin cambios).
+      // "Más votadas" (24h / mes) → ranking GENERAL de toda la app, no solo seguidos.
+      const pool =
+        followingSort === 'recientes'
+          ? allPosts.filter((p) => ids.has(p.author.id))
+          : allPosts;
       return sortFollowingPosts(pool, followingSort);
     }
     case 'foryou': {
@@ -192,6 +198,16 @@ function clampDetailInitialIndex(dataLength: number, initialIndex: number): numb
   if (dataLength <= 0) return 0;
   return Math.min(Math.max(0, initialIndex), dataLength - 1);
 }
+
+/**
+ * Feed "Siguiendo" (todas las ordenaciones: recientes / 24h / 30d):
+ * solo se mantienen MONTADAS a la vez `FOLLOWING_FEED_WINDOW` tarjetas pesadas,
+ * las MÁS CERCANAS a la pantalla (centradas en lo visible: la mitad por encima
+ * y la mitad por debajo). Las que quedan a más de ~media ventana de distancia
+ * se desmontan y muestran un placeholder con la ruedita; al volver a acercarte
+ * se vuelven a montar. Las cercanas NUNCA muestran ruedita (siguen cargadas).
+ */
+const FOLLOWING_FEED_WINDOW = 15;
 
 /** Ensures the widget target post is in the detail list and selected. */
 function foryouDetailWithTargetPost(
@@ -291,6 +307,15 @@ export default function CommunityScreen() {
   const [activeTab, setActiveTab] = useState<TabId>(() =>
     peekCommunityPostId() ? 'para-ti' : 'siguiendo',
   );
+  // Spinner del clan mientras "llegamos" a Comunidad desde otra pantalla
+  // (perfil, racha, etc.). Unifica la sensación de carga con ProfileScreen y
+  // tapa el destello del fondo de estrellas al revelar el panel. Se mantiene
+  // hasta que terminan las interacciones/render pendientes (adaptativo al
+  // dispositivo, mismo criterio que useDeferredRender), con un piso mínimo para
+  // evitar el parpadeo de 1 frame y un tope de seguridad. Los cambios de
+  // pestaña INTERNOS no lo activan.
+  const [arrivalLoading, setArrivalLoading] = useState(false);
+  const arrivalLoadingCancelRef = useRef<(() => void) | null>(null);
   const [followingSort, setFollowingSort] = useState<FollowingSortOption>('recientes');
   // While "Para ti" was a transient overlay we needed to freeze seen-ids so
   // the list did not jump as posts were marked seen. Now that the panel is
@@ -305,6 +330,13 @@ export default function CommunityScreen() {
   const pendingCommentIdRef = useRef<string | null>(null);
   /** postId que ya pedimos por ID a Supabase (evita reintentos en bucle). */
   const deepLinkFetchRef = useRef<string | null>(null);
+
+  // ── Ventana de montaje del feed Siguiendo (máx. 15 tarjetas pesadas) ───────
+  /** Índice de inicio de la ventana de 15 tarjetas montadas. */
+  const [followingWindowStart, setFollowingWindowStart] = useState(0);
+  const followingWindowStartRef = useRef(0);
+  /** Alturas medidas por id, para que el placeholder mantenga el scroll exacto. */
+  const followingCardHeightsRef = useRef<Map<string, number>>(new Map());
   const [focusPostId, setFocusPostId] = useState<string | null>(null);
   const [focusCommentId, setFocusCommentId] = useState<string | null>(null);
   const [postNavigationTick, setPostNavigationTick] = useState(0);
@@ -855,6 +887,112 @@ export default function CommunityScreen() {
     ],
   );
 
+  // Aplica la pestaña pedida desde OTRA pantalla (perfil, racha, etc.) sin los
+  // efectos secundarios de handleTabChange (p. ej. el pull-to-refresh de Para Ti
+  // al re-pulsar). Solo selecciona la pestaña y cierra el visor de detalle si
+  // estuviera abierto.
+  // Spinner de "aparición diferida" al llegar a Comunidad desde otra pantalla.
+  // NO se muestra de entrada: si la pantalla carga rápido (caso normal), el
+  // contenido sale al instante y nunca se ve spinner — así no añadimos retraso
+  // artificial. Solo si tras una pequeña gracia (GRACE_MS) las interacciones/
+  // render aún no terminaron, aparece el spinner para tapar la espera; una vez
+  // visible se mantiene un mínimo (MIN_VISIBLE_MS) para no parpadear. Tope de
+  // seguridad (MAX_MS) para que nunca quede colgado.
+  const beginArrivalLoading = useCallback(() => {
+    const GRACE_MS = 160;
+    const MIN_VISIBLE_MS = 300;
+    const MAX_MS = 4000;
+
+    arrivalLoadingCancelRef.current?.();
+
+    let shownAt = 0;
+    let hideTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const graceTimer = setTimeout(() => {
+      shownAt = Date.now();
+      setArrivalLoading(true);
+    }, GRACE_MS);
+
+    const finish = () => {
+      clearTimeout(graceTimer);
+      clearTimeout(maxTimer);
+      if (shownAt === 0) {
+        // Nunca llegó a mostrarse: carga rápida, nada que ocultar.
+        arrivalLoadingCancelRef.current = null;
+        return;
+      }
+      const remaining = Math.max(0, MIN_VISIBLE_MS - (Date.now() - shownAt));
+      if (remaining === 0) {
+        setArrivalLoading(false);
+        arrivalLoadingCancelRef.current = null;
+      } else {
+        hideTimer = setTimeout(() => {
+          setArrivalLoading(false);
+          arrivalLoadingCancelRef.current = null;
+        }, remaining);
+      }
+    };
+
+    const maxTimer = setTimeout(finish, MAX_MS);
+    const interaction = InteractionManager.runAfterInteractions(finish);
+
+    arrivalLoadingCancelRef.current = () => {
+      clearTimeout(graceTimer);
+      clearTimeout(maxTimer);
+      if (hideTimer) clearTimeout(hideTimer);
+      interaction.cancel();
+      setArrivalLoading(false);
+    };
+  }, []);
+
+  useEffect(() => () => arrivalLoadingCancelRef.current?.(), []);
+
+  const applyRequestedTab = useCallback(
+    (tabId: TabId) => {
+      beginArrivalLoading();
+      if (tabId === 'para-ti') {
+        if (!paratiPanelHydratedRef.current) hydrateParatiPanel();
+        if (detailFeed) closeDetailFeed();
+        setActiveTab('para-ti');
+        return;
+      }
+      if (detailFeed) closeDetailFeed();
+      setActiveTab(tabId);
+    },
+    [detailFeed, closeDetailFeed, hydrateParatiPanel, beginArrivalLoading],
+  );
+
+  // Consume la pestaña solicitada cuando se navega a Comunidad desde fuera. Se
+  // dispara con postNavigationTick (que sube tanto en deep-links como al pedir
+  // pestaña). Cubre el caso de RE-PULSAR la misma pestaña (el query param no
+  // cambia, así que el efecto de param de abajo no se reactivaría).
+  //
+  // useLayoutEffect (no useEffect): corre tras el commit pero ANTES del pintado,
+  // así el spinner y la pestaña correcta se aplican en el primer frame visible.
+  // Con useEffect se veía un parpadeo: contenido/pestaña equivocada → spinner.
+  useLayoutEffect(() => {
+    const requested = consumeRequestedCommunityTab();
+    if (!requested) return;
+    const normalized = requested === 'mas-votadas' ? 'para-ti' : requested;
+    if (!VALID_TAB_IDS.includes(normalized as TabId)) return;
+    applyRequestedTab(normalized as TabId);
+  }, [postNavigationTick, applyRequestedTab]);
+
+  // Mecanismo principal: aplica la pestaña del query param `tab` cuando CAMBIA
+  // (navegación desde perfil/racha/etc.). El ref-guard evita reaplicarla en
+  // re-renders posteriores (p. ej. al llegar avatares), lo que pisaría un cambio
+  // de pestaña interno. Los deep-links con postId los maneja el useLayoutEffect.
+  const lastAppliedTabParamRef = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    if (!tabParam) return;
+    if (normalizeRouteParam(postIdParam)) return;
+    if (lastAppliedTabParamRef.current === tabParam) return;
+    lastAppliedTabParamRef.current = tabParam;
+    const normalized = tabParam === 'mas-votadas' ? 'para-ti' : tabParam;
+    if (!VALID_TAB_IDS.includes(normalized as TabId)) return;
+    applyRequestedTab(normalized as TabId);
+  }, [tabParam, postIdParam, applyRequestedTab]);
+
   const topBarHeight = getAppTopBarLayoutHeight(insets.top);
   const feedItemHeight = getMainColumnHeightForFloatingBottomBar(
     screenH,
@@ -874,6 +1012,39 @@ export default function CommunityScreen() {
     loadMore: loadMoreFollowing,
   } = useIncrementalList(followingFeedOrdered, 10);
 
+  // Ventana de montaje anclada a lo visible. `onViewableItemsChanged` y
+  // `viewabilityConfig` deben ser referencias ESTABLES (FlatList lanza error si
+  // cambian entre renders), por eso van en refs.
+  const followingViewabilityConfigRef = useRef({ itemVisiblePercentThreshold: 10 });
+  const onFollowingViewableChangedRef = useRef(
+    ({ viewableItems }: { viewableItems: { index: number | null }[] }) => {
+      if (viewableItems.length === 0) return;
+      let first = Number.POSITIVE_INFINITY;
+      let last = Number.NEGATIVE_INFINITY;
+      for (const v of viewableItems) {
+        if (v.index == null) continue;
+        if (v.index < first) first = v.index;
+        if (v.index > last) last = v.index;
+      }
+      if (!Number.isFinite(first)) return;
+      // Centramos la ventana en lo visible: la mitad por encima y la mitad por
+      // debajo, para que al subir o bajar las cercanas sigan montadas.
+      const center = Math.floor((first + last) / 2);
+      const next = Math.max(0, center - Math.floor(FOLLOWING_FEED_WINDOW / 2));
+      if (next !== followingWindowStartRef.current) {
+        followingWindowStartRef.current = next;
+        setFollowingWindowStart(next);
+      }
+    },
+  );
+
+  // Al cambiar la ordenación (recientes / 24h / 30d) la lista se reordena: la
+  // ventana vuelve al principio.
+  useEffect(() => {
+    followingWindowStartRef.current = 0;
+    setFollowingWindowStart(0);
+  }, [followingSort]);
+
   const communityFeedUsableWidth =
     screenW - SVG_CARD_VISUAL.CARD_HORIZONTAL_MARGIN * 2;
   const communityWideFeedLayout =
@@ -886,17 +1057,50 @@ export default function CommunityScreen() {
     (communityWideFeedLayout ? COMMUNITY_FEED_SLOT_BOTTOM_WIDE : 0);
 
   const renderMainListItem = useCallback(
-    ({ item }: { item: CommunityPost }): React.ReactElement => (
-      <CommunityPostCard
-        post={item}
-        showPhraseAuthor={activeTab === 'para-ti'}
-        slotOuterHeight={feedCardSlotOuterHeight}
-        followingFeedStyle={activeTab === 'siguiendo'}
-        onPress={handlePostPress}
-        onAuthorPress={handleAuthorPress}
-      />
-    ),
-    [activeTab, feedCardSlotOuterHeight, handlePostPress, handleAuthorPress],
+    ({ item, index }: { item: CommunityPost; index: number }): React.ReactElement => {
+      const inWindow =
+        index >= followingWindowStart &&
+        index < followingWindowStart + FOLLOWING_FEED_WINDOW;
+
+      if (!inWindow) {
+        // Lejos de la pantalla (fuera de la ventana de las ~20 cercanas): no
+        // montamos la tarjeta pesada. Mantenemos el hueco con la altura medida
+        // y mostramos la ruedita; al acercarte de nuevo se vuelve a montar.
+        const placeholderHeight =
+          followingCardHeightsRef.current.get(item.id) ?? feedCardSlotOuterHeight;
+        return (
+          <View style={{ height: placeholderHeight, justifyContent: 'center' }}>
+            <ClanLoadingDot inline clanId={viewerClanId} />
+          </View>
+        );
+      }
+
+      return (
+        <View
+          onLayout={(e) => {
+            const h = e.nativeEvent.layout.height;
+            if (h > 0) followingCardHeightsRef.current.set(item.id, h);
+          }}
+        >
+          <CommunityPostCard
+            post={item}
+            showPhraseAuthor={activeTab === 'para-ti'}
+            slotOuterHeight={feedCardSlotOuterHeight}
+            followingFeedStyle={activeTab === 'siguiendo'}
+            onPress={handlePostPress}
+            onAuthorPress={handleAuthorPress}
+          />
+        </View>
+      );
+    },
+    [
+      activeTab,
+      feedCardSlotOuterHeight,
+      handlePostPress,
+      handleAuthorPress,
+      followingWindowStart,
+      viewerClanId,
+    ],
   );
 
   const renderFeedItem = useCallback(
@@ -1264,6 +1468,9 @@ export default function CommunityScreen() {
               data={listData}
               renderItem={renderMainListItem}
               keyExtractor={(item) => item.id}
+              extraData={followingWindowStart}
+              onViewableItemsChanged={onFollowingViewableChangedRef.current}
+              viewabilityConfig={followingViewabilityConfigRef.current}
               onEndReached={loadMoreFollowing}
               onEndReachedThreshold={0.6}
               initialNumToRender={10}
@@ -1478,6 +1685,17 @@ export default function CommunityScreen() {
               contentHeight={feedItemHeight}
             />
           </Animated.View>
+        ) : null}
+
+        {/* Spinner del clan al LLEGAR a Comunidad desde otra pantalla. Cubre
+            todos los paneles para unificar la carga con el resto de la app. */}
+        {arrivalLoading ? (
+          <View
+            style={[styles.panel, styles.panelOverlay, styles.paratiLoadingCenter]}
+            pointerEvents="none"
+          >
+            <ClanLoadingDot clanId={viewerClanId} />
+          </View>
         ) : null}
       </View>
 

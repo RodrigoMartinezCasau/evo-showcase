@@ -10,6 +10,7 @@ import {
   LayoutChangeEvent,
 } from 'react-native';
 import { FollowButton } from './FollowButton';
+import { FirstUsersTesterBadge } from './shared/FirstUsersTesterBadge';
 import type { CommunityPost } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getReflectionCardTier } from '@evoconn/utils/getCardSizeFromText';
@@ -304,11 +305,17 @@ function CommunityPostCardBase({
                 {post.author.username}
               </Text>
             </TouchableOpacity>
-            <FollowButton
-              authorId={post.author.id}
-              authorClanId={post.author.clanId}
-              context="community"
+            <FirstUsersTesterBadge
+              userId={post.author.id}
+              iconSize={Math.max(11, Math.round(feedContent.usernameFontSize * 0.72))}
             />
+            {showCommunityFollow ? (
+              <FollowButton
+                authorId={post.author.id}
+                authorClanId={post.author.clanId}
+                context="community"
+              />
+            ) : null}
           </View>
         </View>
 
@@ -423,13 +430,14 @@ const styles = StyleSheet.create({
   feedUsernameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
     width: '100%',
   },
   usernameHit: {
-    flex: 1,
+    // Solo ocupa el ancho del nombre (se encoge con elipsis si es largo) para
+    // que la insignia y el botón "+" queden pegados al username, no al borde.
+    flexShrink: 1,
     minWidth: 0,
-    marginRight: 4,
   },
   usernameHeader: {
     color: evoconnColors.text,

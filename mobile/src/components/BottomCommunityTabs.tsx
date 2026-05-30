@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { useRouter, usePathname } from 'expo-router';
 import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
+import { requestCommunityTab } from '@evoconn/utils/communityPostDeepLink';
 import { Ionicons } from '@expo/vector-icons';
 import { evoconnColors } from '@evoconn/theme/colors';
 import {
@@ -30,6 +31,7 @@ import {
 import {
   FOLLOWING_SORT_LABELS,
   FOLLOWING_SORT_MENU_ORDER,
+  FOLLOWING_SORT_TAB_LABELS,
   type FollowingSortOption,
 } from '@evoconn/constants/followingFeedSort';
 import {
@@ -183,13 +185,26 @@ export function BottomCommunityTabs({
     safeFrame.height,
   );
 
+  // En pantallas secundarias (activeTab === null) la barra navega a Comunidad;
+  // registramos la pestaña pedida para que CommunityScreen la aplique SIEMPRE,
+  // incluso al re-pulsar la misma pestaña (expo-router puede no re-emitir el
+  // query param si no cambia). En la propia Comunidad (activeTab !== null) el
+  // cambio es interno y no debe emitir la señal.
+  const emitTabChange = useCallback(
+    (id: TabId) => {
+      if (activeTab === null) requestCommunityTab(id);
+      onTabChange(id);
+    },
+    [activeTab, onTabChange],
+  );
+
   const onSiguiendoPress = useCallback(() => {
     if (activeTab === 'siguiendo') {
       setFollowingMenuOpen((o) => !o);
       return;
     }
-    onTabChange('siguiendo');
-  }, [activeTab, onTabChange]);
+    emitTabChange('siguiendo');
+  }, [activeTab, emitTabChange]);
 
   const onPickFollowingSort = useCallback(
     (sort: FollowingSortOption) => {
@@ -275,6 +290,7 @@ export function BottomCommunityTabs({
           const chevronColor = isActive ? selectedColor : evoconnColors.muted;
 
           if (slot.variant === 'siguiendo') {
+            const siguiendoLabel = FOLLOWING_SORT_TAB_LABELS[followingSort];
             return (
               <TouchableOpacity key={id} onPress={onSiguiendoPress} style={styles.tab}>
                 <View style={styles.siguendoRow}>
@@ -282,7 +298,7 @@ export function BottomCommunityTabs({
                     style={[styles.label, { fontSize: tabFontSize }, isActive && { color: selectedColor }]}
                     numberOfLines={1}
                   >
-                    {label}
+                    {siguiendoLabel}
                   </Text>
                   <Ionicons
                     name={followingMenuOpen ? 'chevron-up' : 'chevron-down'}
@@ -317,7 +333,7 @@ export function BottomCommunityTabs({
           }
 
           return (
-            <TouchableOpacity key={id} onPress={() => onTabChange(id)} style={styles.tab}>
+            <TouchableOpacity key={id} onPress={() => emitTabChange(id)} style={styles.tab}>
               {id === 'search' ? (
                 <View
                   style={[
