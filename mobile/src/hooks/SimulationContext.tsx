@@ -246,6 +246,12 @@ export type SimulationContextValue = {
    * Sim users: resets the post list to `SIM_POSTS`. Returns the post array after refresh.
    */
   refreshSocialFromSupabase: () => Promise<SimPost[]>;
+  /**
+   * Trae posts concretos por ID desde Supabase y los inyecta en el feed si no
+   * estaban (deep links: widget / compartidos cuyo post no está en el feed local).
+   * Devuelve true si tras la operación el post está disponible.
+   */
+  ingestPostsByIds: (postIds: string[]) => Promise<boolean>;
 };
 
 // ─── Context ─────────────────────────────────────────────────────────────────
@@ -326,6 +332,11 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
 
   // ── Posts ─────────────────────────────────────────────────────────────────
   const [posts, setPosts] = useState<SimPost[]>(() => SIM_POSTS.map(p => ({ ...p })));
+  // Espejo de `posts` para lecturas frescas dentro de callbacks async (deep links).
+  const postsRef = useRef(posts);
+  useEffect(() => {
+    postsRef.current = posts;
+  }, [posts]);
 
   // Hydration guards — prevent saves from overwriting storage before loading completes.
   const postsHydrated  = useRef(false);
@@ -1161,6 +1172,37 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const ingestPostsByIds = useCallback(
+    async (postIds: string[]): Promise<boolean> => {
+      const ids = [...new Set(postIds.filter(Boolean))];
+      if (ids.length === 0) return false;
+
+      // Si ya están todos en el feed, no hace falta tocar Supabase.
+      const missing = ids.filter((id) => !postsRef.current.some((p) => p.id === id));
+      if (missing.length === 0) return true;
+
+      const fetched = await fetchPostsByIds(missing);
+      if (fetched.length === 0) {
+        // Puede que llegaran mientras tanto por otra hidratación.
+        return ids.every((id) => postsRef.current.some((p) => p.id === id));
+      }
+
+      setPosts((prev) => {
+        const known = new Set(prev.map((p) => p.id));
+        const additions = fetched.filter((p) => !known.has(p.id));
+        if (additions.length === 0) return prev;
+        return [...additions, ...prev];
+      });
+
+      const known = new Set([
+        ...postsRef.current.map((p) => p.id),
+        ...fetched.map((p) => p.id),
+      ]);
+      return ids.every((id) => known.has(id));
+    },
+    [],
+  );
+
   const refreshSocialFromSupabase = useCallback(async (): Promise<SimPost[]> => {
     if (!isRealUserId(activeUserId)) {
       const seed = SIM_POSTS.map(p => ({ ...p }));
@@ -1234,6 +1276,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       deleteCommentById,
       ensureCommentsForPost,
       refreshSocialFromSupabase,
+      ingestPostsByIds,
     }),
     [
       activeUserId, setActiveUserId, users, posts,
@@ -1242,7 +1285,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       activeUser, activeFollowersCount, activeFollowingCount,
       follow, unfollow, toggleFollow, castVote, toggleSave,
       deletePost, toggleHidePost, publishPost, addComment, deleteCommentById, ensureCommentsForPost,
-      refreshSocialFromSupabase,
+      refreshSocialFromSupabase, ingestPostsByIds,
     ],
   );
 

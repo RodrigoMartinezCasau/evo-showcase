@@ -38,7 +38,22 @@ export type UserStats = {
   dailyUsesRemaining: number;
   /** The device date on which uses were last reset. */
   lastUsesResetDate: string | null;
+  /**
+   * Recuperación de racha: cuando una racha de >2 días se rompe (el usuario se
+   * salta un día), guardamos aquí los días que tenía. El usuario puede
+   * recuperarla publicando una frase el día SIGUIENTE al día saltado (la ventana
+   * de 24 h). Pasada esa ventana ya no es recuperable. null = nada que recuperar.
+   */
+  streakLostValue: number | null;
+  /**
+   * Día (YYYY-MM-DD) en el que ya mostramos la animación de "racha perdida", para
+   * no repetirla en cada render. Se compara contra hoy.
+   */
+  lostStreakAckDate: string | null;
 };
+
+/** Racha mínima (en días) que debe tener una racha para ser recuperable. */
+const MIN_RECOVERABLE_STREAK = 2; // estrictamente "más de 2 días" → > 2
 
 export type StatsDatabase = Record<string, UserStats>;
 
@@ -79,6 +94,16 @@ function getPrevDayKey(dayKey: string): string {
   ].join('-');
 }
 
+/**
+ * Whole number of calendar days between two YYYY-MM-DD keys (to - from).
+ * Uses noon to avoid DST edge cases.
+ */
+export function daysBetweenDayKeys(fromKey: string, toKey: string): number {
+  const a = new Date(`${fromKey}T12:00:00`).getTime();
+  const b = new Date(`${toKey}T12:00:00`).getTime();
+  return Math.round((b - a) / 86_400_000);
+}
+
 /** Default stats for a brand-new user. */
 export function defaultUserStats(): UserStats {
   return {
@@ -86,6 +111,8 @@ export function defaultUserStats(): UserStats {
     hasSentTodayDate: null,
     dailyUsesRemaining: DAILY_USES_LIMIT,
     lastUsesResetDate: getLocalDayKey(),
+    streakLostValue: null,
+    lostStreakAckDate: null,
   };
 }
 
@@ -146,11 +173,20 @@ export function applyDailyRollover(stats: UserStats, today: string): UserStats {
     stats.hasSentTodayDate === today ||
     stats.hasSentTodayDate === yesterday;
 
+  // Si la racha se rompe y era recuperable (>2 días), guardamos su valor para
+  // que el usuario pueda recuperarla publicando una frase. La ventana de 24 h
+  // se valida en getStreakRecovery() a partir de hasSentTodayDate.
+  let streakLostValue = stats.streakLostValue;
+  if (!streakAlive && stats.currentStreak > MIN_RECOVERABLE_STREAK) {
+    streakLostValue = stats.currentStreak;
+  }
+
   return {
     ...stats,
     dailyUsesRemaining: DAILY_USES_LIMIT,
     lastUsesResetDate: today,
     currentStreak: streakAlive ? stats.currentStreak : 0,
+    streakLostValue,
   };
 }
 
@@ -172,7 +208,56 @@ export function reconcileStreakOnLoad(stats: UserStats, today: string): UserStat
     stats.hasSentTodayDate === today ||
     stats.hasSentTodayDate === yesterday;
   if (streakAlive) return stats;
-  return { ...stats, currentStreak: 0 };
+  // La racha murió. Capturamos su valor para posible recuperación (si era >2).
+  // IMPORTANTE: hacerlo aquí además del rollover, porque en arranque en frío
+  // este reconcile pone currentStreak=0 antes de que corra applyDailyRollover.
+  const streakLostValue =
+    stats.currentStreak > MIN_RECOVERABLE_STREAK
+      ? stats.currentStreak
+      : stats.streakLostValue;
+  return { ...stats, currentStreak: 0, streakLostValue };
+}
+
+// ─── Recuperación de racha ──────────────────────────────────────────────────
+
+export type StreakRecovery = { eligible: boolean; lostValue: number };
+
+/**
+ * ¿Puede el usuario recuperar su racha perdida AHORA?
+ *
+ * Reglas (según el producto):
+ *  - La racha perdida debe haber sido >2 días (streakLostValue presente).
+ *  - Solo el día SIGUIENTE al día que se saltó. Como hasSentTodayDate guarda el
+ *    último día activo (A), el día saltado es A+1 y la racha se rompe en A+2.
+ *    La ventana de recuperación es exactamente A+2 (24 h). Es decir, hoy debe
+ *    estar a 2 días del último día activo.
+ *  - Pasado ese día (≥3 días), ya no aparece ni se puede recuperar.
+ */
+export function getStreakRecovery(stats: UserStats, today: string): StreakRecovery {
+  const lastActive = stats.hasSentTodayDate;
+  const lost = stats.streakLostValue ?? 0;
+  if (!lastActive || lost <= MIN_RECOVERABLE_STREAK) {
+    return { eligible: false, lostValue: 0 };
+  }
+  const days = daysBetweenDayKeys(lastActive, today);
+  return { eligible: days === 2, lostValue: lost };
+}
+
+/**
+ * Recupera la racha perdida: la restablece (días perdidos + el día de hoy) y
+ * limpia el marcador de recuperación. Pensado para llamarse desde la activación
+ * de racha cuando getStreakRecovery() es elegible.
+ */
+export function applyStreakRecovery(stats: UserStats): UserStats {
+  const today = getLocalDayKey();
+  const lost = stats.streakLostValue ?? 0;
+  return {
+    ...stats,
+    currentStreak: lost + 1,
+    hasSentTodayDate: today,
+    streakLostValue: null,
+    lostStreakAckDate: today,
+  };
 }
 
 /**
@@ -191,6 +276,8 @@ export function applyStreakActivation(stats: UserStats): UserStats {
     ...stats,
     currentStreak: newStreak,
     hasSentTodayDate: today,
+    // Activación normal: ya no hay racha perdida pendiente de recuperar.
+    streakLostValue: null,
   };
 }
 

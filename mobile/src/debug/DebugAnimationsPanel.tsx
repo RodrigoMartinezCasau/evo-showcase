@@ -33,7 +33,7 @@ function getPrevClan(current: AnimClanId): Exclude<AnimClanId, 'none'> {
   return options[0] ?? 'estoico';
 }
 
-type AnimKey = 'entry' | 'assign' | 'change' | 'streak' | 'rank' | 'noUses';
+type AnimKey = 'entry' | 'assign' | 'change' | 'streak' | 'rank' | 'noUses' | 'lostStreak';
 
 interface AnimOption {
   key: AnimKey;
@@ -48,6 +48,7 @@ const ANIM_OPTIONS: AnimOption[] = [
   { key: 'streak',  label: 'Aumento de racha',      emoji: '🔥' },
   { key: 'rank',    label: 'Aumento de rango',      emoji: '🏆' },
   { key: 'noUses',  label: 'Sin usos diarios',     emoji: '💔' },
+  { key: 'lostStreak', label: 'Racha perdida',     emoji: '🥀' },
 ];
 
 export function DebugAnimationsPanel() {
@@ -95,6 +96,8 @@ export function DebugAnimationsPanel() {
         };
       case 'noUses':
         return { name: 'noUses' as const, params: { clanId } };
+      case 'lostStreak':
+        return { name: 'lostStreak' as const, params: { clanId, streakCount: 21 } };
     }
   }
 

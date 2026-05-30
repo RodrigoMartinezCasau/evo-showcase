@@ -35,7 +35,7 @@ import { useEvoPreferences } from '@evoconn/hooks/EvoPreferencesContext';
 // svg-data.json and written to documentDirectory at runtime.
 // PNG animal files are bundled normally (binary assets).
 
-export type EvoAnimationName = 'streak' | 'clanEntry' | 'clanReveal' | 'rankUp' | 'noUses';
+export type EvoAnimationName = 'streak' | 'clanEntry' | 'clanReveal' | 'rankUp' | 'noUses' | 'lostStreak';
 
 const HTML_MODULES: Record<EvoAnimationName, () => number> = {
   streak:     () => require('../../../mobile/assets/animations/streak.html'),
@@ -43,6 +43,7 @@ const HTML_MODULES: Record<EvoAnimationName, () => number> = {
   clanReveal: () => require('../../../mobile/assets/animations/clan-reveal.html'),
   rankUp:     () => require('../../../mobile/assets/animations/rank-up.html'),
   noUses:    () => require('../../../mobile/assets/animations/no-uses.html'),
+  lostStreak: () => require('../../../mobile/assets/animations/lost-streak.html'),
 };
 
 // SVG data as pre-compiled JSON (avoids the react-native-svg-transformer conflict)
@@ -67,6 +68,7 @@ const HTML_FILENAMES: Record<EvoAnimationName, string> = {
   clanReveal: 'clan-reveal.html',
   rankUp:     'rank-up.html',
   noUses:    'no-uses.html',
+  lostStreak: 'lost-streak.html',
 };
 
 // ─── File system setup ────────────────────────────────────────────────────────
@@ -80,7 +82,7 @@ export async function ensureAnimationAssets(): Promise<void> {
 
   _copyPromise = (async () => {
     const STAMP_FILE = ANIM_DIR + '.stamp';
-    const APP_VERSION = '60';
+    const APP_VERSION = '61';
 
     try {
       const stampInfo = await FileSystem.getInfoAsync(STAMP_FILE);

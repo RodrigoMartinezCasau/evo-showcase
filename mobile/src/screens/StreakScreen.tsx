@@ -115,7 +115,11 @@ export default function StreakScreen() {
   const { hasSentToday } = useDebugStreak();
 
   // ─── Debug stats (streak days / remaining uses simulation) ────────────────
-  const { streakDays, setRealStreakDays } = useDebugStats();
+  const { streakDays, setRealStreakDays, streakRecovery } = useDebugStats();
+
+  // Aviso de recuperación: visible solo durante la ventana de 24 h (el día
+  // siguiente al día saltado). Desaparece solo al pasar la ventana.
+  const canRecoverStreak = streakRecovery.eligible;
 
   // Siempre usa el activity_log real de la API cuando esté disponible.
   // En modo debug sin datos de API (p.ej. sin sesión real) genera días sintéticos
@@ -289,6 +293,25 @@ export default function StreakScreen() {
             </View>
           ) : data ? (
             <>
+              {/* ── Aviso de recuperación de racha (solo durante la ventana 24 h) ── */}
+              {canRecoverStreak ? (
+                <>
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => router.push('/phrase')}
+                    style={[styles.recoverBanner, { borderColor: clanColors.tertiary }]}
+                  >
+                    <View style={styles.recoverBannerIconWrap}>
+                      <FuegoApagadoIcon width={28} height={28} />
+                    </View>
+                    <Text style={[styles.recoverBannerText, { color: clanColors.tertiary }]}>
+                      Publica una frase para restaurar tu racha anterior
+                    </Text>
+                  </TouchableOpacity>
+                  <View style={styles.gap} />
+                </>
+              ) : null}
+
               {/* ── Hero: streak count (icon + text centered as one block in the card) ── */}
               <View style={styles.card}>
                 <View style={styles.heroCenterSlot}>
@@ -565,5 +588,27 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: 24,
+  },
+  recoverBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: STREAK_CARD_RADIUS,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  recoverBannerIconWrap: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recoverBannerText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
 });

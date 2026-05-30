@@ -17,6 +17,7 @@ export type NotificationType =
   | 'follow'
   | 'follow_request'
   | 'comment'
+  | 'comment_reply'
   | 'upvote_comment';
 
 export type AppNotification = {

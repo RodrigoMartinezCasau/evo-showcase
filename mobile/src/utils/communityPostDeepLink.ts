@@ -3,10 +3,13 @@
  * Persiste el intent si expo-router pierde query params en cold start.
  */
 import type { WidgetPostDeepLink } from './widgetDeepLink';
-import { parseCommunityPostDeepLink } from './widgetDeepLink';
+import { parseCommunityPostDeepLink, parseProfileDeepLink } from './widgetDeepLink';
 
 let pending: WidgetPostDeepLink | null = null;
 let navigationEpoch = 0;
+
+/** Perfil compartido pendiente de abrir (cold start: sobrevive hasta que haya sesión + tabs). */
+let pendingProfileId: string | null = null;
 
 type NavigationListener = () => void;
 const navigationListeners: NavigationListener[] = [];
@@ -62,4 +65,41 @@ export function primeCommunityPostDeepLinkFromUrl(
   if (!link) return null;
   scheduleCommunityPostDeepLink(link);
   return link;
+}
+
+// ── Perfil compartido ────────────────────────────────────────────────────────
+
+export function scheduleProfileDeepLink(userId: string): void {
+  pendingProfileId = userId;
+}
+
+export function peekProfileDeepLink(): string | null {
+  return pendingProfileId;
+}
+
+/** Devuelve el userId pendiente y lo borra (un solo consumo por apertura). */
+export function consumeProfileDeepLink(): string | null {
+  const id = pendingProfileId;
+  pendingProfileId = null;
+  return id;
+}
+
+/**
+ * Prime unificado para cold start: detecta si la URL es de post o de perfil y
+ * deja el intent correspondiente pendiente. Devuelve 'post' | 'profile' | null.
+ */
+export function primeAppDeepLinkFromUrl(
+  url: string | null | undefined,
+): 'post' | 'profile' | null {
+  const post = parseCommunityPostDeepLink(url);
+  if (post) {
+    scheduleCommunityPostDeepLink(post);
+    return 'post';
+  }
+  const profileId = parseProfileDeepLink(url);
+  if (profileId) {
+    scheduleProfileDeepLink(profileId);
+    return 'profile';
+  }
+  return null;
 }

@@ -66,6 +66,40 @@ export function parseWidgetPostDeepLink(url: string | null | undefined): WidgetP
   return parseCommunityPostDeepLink(url);
 }
 
+/**
+ * Enlace de PERFIL compartido → `/profile/[id]`.
+ * Soporta `evo://profile/{id}` y `https://(www.)evoconn.com/profile/{id}`.
+ * Devuelve el userId limpio o null si la URL no es de perfil.
+ */
+export function parseProfileDeepLink(url: string | null | undefined): string | null {
+  if (!url) return null;
+
+  const parsed = Linking.parse(url);
+  const path = (parsed.path ?? '').replace(/^\//, '');
+  const host = (parsed.hostname ?? '').toLowerCase();
+
+  // evo://profile/{id}
+  if (host === 'profile') {
+    const id = postIdFromPathSegment(path || undefined);
+    if (id) return id;
+  }
+  if (path.startsWith('profile/')) {
+    const id = postIdFromPathSegment(path.slice('profile/'.length).split('/')[0]);
+    if (id) return id;
+  }
+
+  // https://www.evoconn.com/profile/{id}
+  const isWeb =
+    host.includes('evoconn.com') ||
+    (parsed.scheme === 'https' && path.startsWith('profile/'));
+  if (isWeb && path.startsWith('profile/')) {
+    const id = postIdFromPathSegment(path.slice('profile/'.length).split('/')[0]);
+    if (id) return id;
+  }
+
+  return null;
+}
+
 /** Normaliza un route/query param y limpia caracteres no-id (texto del share
  * que un parser permisivo de chat pega al URL). Devuelve `undefined` si tras
  * limpiar no queda un id válido. */

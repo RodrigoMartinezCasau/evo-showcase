@@ -35,13 +35,16 @@ import {
   defaultUserStats,
   applyDailyRollover,
   applyStreakActivation,
+  applyStreakRecovery,
   applyDecrementUses,
   reconcileStreakOnLoad,
   mergeStatsFromRemote,
+  getStreakRecovery,
   getLocalDayKey,
   DAILY_USES_LIMIT,
   type UserStats,
   type StatsDatabase,
+  type StreakRecovery,
 } from '@evoconn/services/userStatsStorage';
 import { fetchStreak } from '@evoconn/services/streakApi';
 import { isRealUserId } from '@evoconn/services/supabaseSocial';
@@ -72,6 +75,22 @@ type DebugStatsContextValue = {
    */
   streakTrigger: number;
 
+  /**
+   * Si el usuario perdió una racha de >2 días y está en la ventana de 24 h para
+   * recuperarla (el día siguiente al día saltado), aquí van los días perdidos a
+   * mostrar en la animación. null = no hay nada que recuperar / fuera de ventana
+   * / ya reconocido hoy.
+   */
+  lostStreakPrompt: number | null;
+  /** Marca la animación de racha perdida como ya mostrada hoy (no reaparece). */
+  acknowledgeLostStreak: () => void;
+  /**
+   * Elegibilidad cruda de recuperación (ventana de 24 h), SIN tener en cuenta si
+   * ya se mostró la animación. Úsalo para banners persistentes (p. ej. el aviso
+   * en la pantalla de racha) que deben verse durante toda la ventana.
+   */
+  streakRecovery: StreakRecovery;
+
   // ── Mutation helpers ──────────────────────────────────────────────────────
   /** Call after a successful reflection or phrase send (not publish). */
   markStreakActivated: () => void;
@@ -100,6 +119,9 @@ const Ctx = createContext<DebugStatsContextValue>({
   hasSentToday: false,
   statsLoaded: false,
   streakTrigger: 0,
+  lostStreakPrompt: null,
+  acknowledgeLostStreak: () => {},
+  streakRecovery: { eligible: false, lostValue: 0 },
   markStreakActivated: () => {},
   decrementUses: () => {},
   realStreakDays: 0,
@@ -346,6 +368,26 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
   const streakDays = activeSlice.currentStreak;
   const remainingUses = activeSlice.dailyUsesRemaining;
 
+  // ── Recuperación de racha perdida ──────────────────────────────────────────
+  // Solo elegible el día siguiente al día saltado (ventana 24 h) y si todavía no
+  // se ha mostrado hoy la animación.
+  const streakRecovery = useMemo<StreakRecovery>(
+    () => getStreakRecovery(activeSlice, currentDay),
+    [activeSlice, currentDay],
+  );
+  const lostStreakPrompt = useMemo<number | null>(() => {
+    if (!streakRecovery.eligible) return null;
+    if (activeSlice.lostStreakAckDate === currentDay) return null;
+    return streakRecovery.lostValue;
+  }, [streakRecovery, activeSlice.lostStreakAckDate, currentDay]);
+
+  const acknowledgeLostStreak = useCallback(() => {
+    const today = getLocalDayKey();
+    mutateActiveSlice((s) =>
+      s.lostStreakAckDate === today ? s : { ...s, lostStreakAckDate: today },
+    );
+  }, [mutateActiveSlice]);
+
   // Phrase count = KB phrases unlocked by this user via reflections (QuotesContext).
   const unlockedPhrases = quotesTotalUnlocked;
 
@@ -357,15 +399,20 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
 
   const markStreakActivated = useCallback(() => {
     console.log('[USERSTATS] markStreakActivated() for user', activeUserId);
-    const isFirstSendToday = activeSlice.hasSentTodayDate !== getLocalDayKey();
+    const today = getLocalDayKey();
+    const isFirstSendToday = activeSlice.hasSentTodayDate !== today;
     mutateActiveSlice((s) => {
-      const next = applyStreakActivation(s);
+      // Si está dentro de la ventana de recuperación, restablecemos la racha
+      // perdida (días perdidos + hoy) en vez de empezar de 1. La animación de
+      // aumento de racha la dispara streakTrigger igual que en una activación.
+      const recovery = getStreakRecovery(s, today);
+      const next = recovery.eligible ? applyStreakRecovery(s) : applyStreakActivation(s);
       if (authProfile?.id) {
         void syncProfileStats(
           authProfile.id,
           next.currentStreak,
           next.dailyUsesRemaining,
-          getLocalDayKey(),
+          today,
         );
       }
       return next;
@@ -414,6 +461,9 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
       streakDays,
       remainingUses,
       streakTrigger,
+      lostStreakPrompt,
+      acknowledgeLostStreak,
+      streakRecovery,
       unlockedPhrases,
       hasSentToday,
       statsLoaded,
@@ -435,6 +485,9 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
       streakDays,
       remainingUses,
       streakTrigger,
+      lostStreakPrompt,
+      acknowledgeLostStreak,
+      streakRecovery,
       unlockedPhrases,
       hasSentToday,
       statsLoaded,

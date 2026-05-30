@@ -266,7 +266,7 @@ export default function CommunityScreen() {
   const { thoughts } = useThoughts();
   const { posts: allPosts, getPostById } = useFeedStore();
   const { blockedIds } = useBlockedUsers();
-  const { refreshSocialFromSupabase, activeUserId } = useSimulation();
+  const { refreshSocialFromSupabase, ingestPostsByIds, activeUserId } = useSimulation();
   const { getBoost, revision: tasteRevision, recordDwell } = useRecommendationTaste();
   const { seenIds: paratiSeenIds, markParatiPostSeen } = useParatiSeenPosts();
   const { triggerHaptic } = useEvoPreferences();
@@ -303,6 +303,8 @@ export default function CommunityScreen() {
   const pendingWidgetPostIdRef = useRef<string | null>(null);
   /** Comentario a centrar tras abrir el post (notificaciones). */
   const pendingCommentIdRef = useRef<string | null>(null);
+  /** postId que ya pedimos por ID a Supabase (evita reintentos en bucle). */
+  const deepLinkFetchRef = useRef<string | null>(null);
   const [focusPostId, setFocusPostId] = useState<string | null>(null);
   const [focusCommentId, setFocusCommentId] = useState<string | null>(null);
   const [postNavigationTick, setPostNavigationTick] = useState(0);
@@ -683,12 +685,30 @@ export default function CommunityScreen() {
     const pid = pendingWidgetPostIdRef.current;
     if (!pid) return;
     if (!getPostById(pid)) {
-      void refreshSocialFromSupabase();
+      // El post del widget / compartido puede no estar en el feed local
+      // (autor no seguido, fuera del top global). Lo traemos por ID y lo
+      // inyectamos; cuando `allPosts` cambie, este efecto vuelve a correr.
+      if (deepLinkFetchRef.current !== pid) {
+        deepLinkFetchRef.current = pid;
+        void (async () => {
+          const ok = await ingestPostsByIds([pid]);
+          if (!ok) void refreshSocialFromSupabase();
+        })();
+      }
       return;
     }
+    deepLinkFetchRef.current = null;
     pendingWidgetPostIdRef.current = null;
     openDetailFeed('foryou', pid, true);
-  }, [entryAnimPlaying, allPosts, getPostById, openDetailFeed, refreshSocialFromSupabase]);
+  }, [
+    entryAnimPlaying,
+    allPosts,
+    getPostById,
+    openDetailFeed,
+    refreshSocialFromSupabase,
+    ingestPostsByIds,
+    postNavigationTick,
+  ]);
 
   useEffect(() => {
     if (!paratiPanelVisible) {
@@ -703,6 +723,7 @@ export default function CommunityScreen() {
     consumedDeepLinkRef.current = undefined;
     pendingWidgetPostIdRef.current = null;
     pendingCommentIdRef.current = null;
+    deepLinkFetchRef.current = null;
     setFocusPostId(null);
     setFocusCommentId(null);
   }, [slideAnim]);

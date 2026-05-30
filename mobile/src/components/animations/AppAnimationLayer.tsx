@@ -20,6 +20,7 @@
  */
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useRouter } from 'expo-router';
 import { EvoAnimationWebView, ensureAnimationAssets, prewarmClanEntryHtml } from './EvoAnimationWebView';
 import {
   isClanRevealSuppressed,
@@ -97,7 +98,8 @@ export function requestNoUsesAnimation() {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function AppAnimationLayer() {
-  const { streakDays, statsLoaded, streakTrigger } = useDebugStats();
+  const { streakDays, statsLoaded, streakTrigger, lostStreakPrompt, acknowledgeLostStreak } = useDebugStats();
+  const router = useRouter();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const clanId = (activeClan ?? 'none') as string;
   const clanIdRef = useRef(clanId);
@@ -281,6 +283,26 @@ export default function AppAnimationLayer() {
     return () => clearTimeout(t);
   }, [showNoUses]);
 
+  // ── Lost-streak recovery prompt ──────────────────────────────────────────
+  //
+  // Aparece al abrir la app el día siguiente al día saltado (ventana 24 h),
+  // solo si la racha perdida era >2 días. Se difiere detrás de la animación de
+  // entrada y de la cola social, y se marca como reconocida en cuanto se muestra
+  // para que no reaparezca. El botón "Publicar una frase" lleva al compositor:
+  // al enviar la frase, DebugStatsContext restablece la racha y dispara la
+  // animación de aumento de racha.
+  const [lostStreakValue, setLostStreakValue] = useState<number | null>(null);
+  const lostStreakShownRef = useRef(false);
+
+  useEffect(() => {
+    if (!assetsReady || lostStreakPrompt == null) return;
+    if (showEntry || activeAnim || showNoUses) return;
+    if (lostStreakShownRef.current) return;
+    lostStreakShownRef.current = true;
+    setLostStreakValue(lostStreakPrompt);
+    acknowledgeLostStreak();
+  }, [assetsReady, lostStreakPrompt, showEntry, activeAnim, showNoUses, acknowledgeLostStreak]);
+
   // ── Streak detection → enqueue ───────────────────────────────────────────
   const prevTriggerRef = useRef(0);
 
@@ -452,6 +474,18 @@ export default function AppAnimationLayer() {
         params={{ clanId }}
         onComplete={() => setShowNoUses(false)}
         onClose={() => setShowNoUses(false)}
+      />
+
+      {/* ── Racha perdida (recuperable) ── */}
+      <EvoAnimationWebView
+        visible={lostStreakValue !== null}
+        name="lostStreak"
+        params={{ clanId, streakCount: lostStreakValue ?? 0 }}
+        onComplete={() => {
+          setLostStreakValue(null);
+          router.push('/phrase');
+        }}
+        onClose={() => setLostStreakValue(null)}
       />
     </>
   );

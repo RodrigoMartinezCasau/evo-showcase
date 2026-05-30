@@ -392,15 +392,36 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
         setExpandedThreads(prev => ({ ...prev, [parentForThis]: true }));
       }
       setReplyingTo(null);
-      void addNotification({
-        recipientUserId: post.author.id,
-        type: 'comment',
-        fromUserId: authorId,
-        fromUsername: authorUsername,
-        targetPostId: post.id,
-        targetCommentId: newId,
-        textPreview: text.trim().slice(0, 80),
-      });
+
+      const preview = text.trim().slice(0, 80);
+      if (parentForThis) {
+        // Respuesta a un comentario → avisar al autor del comentario padre.
+        const parentAuthorId = (commentsMap[post.id] ?? []).find(
+          (c) => c.id === parentForThis,
+        )?.authorId;
+        if (parentAuthorId && parentAuthorId !== authorId) {
+          void addNotification({
+            recipientUserId: parentAuthorId,
+            type: 'comment_reply',
+            fromUserId: authorId,
+            fromUsername: authorUsername,
+            targetPostId: post.id,
+            targetCommentId: newId,
+            textPreview: preview,
+          });
+        }
+      } else if (post.author.id !== authorId) {
+        // Comentario raíz → avisar al autor de la publicación.
+        void addNotification({
+          recipientUserId: post.author.id,
+          type: 'comment',
+          fromUserId: authorId,
+          fromUsername: authorUsername,
+          targetPostId: post.id,
+          targetCommentId: newId,
+          textPreview: preview,
+        });
+      }
     },
     [
       addSimComment,
@@ -414,6 +435,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
       authProfile?.clan_id,
       authProfile?.rank,
       replyingTo,
+      commentsMap,
     ],
   );
 

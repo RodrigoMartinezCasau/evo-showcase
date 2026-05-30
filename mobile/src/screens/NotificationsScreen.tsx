@@ -66,6 +66,10 @@ function actionLabel(n: AppNotification): string {
       return n.textPreview
         ? `ha comentado: "${n.textPreview.length > 60 ? n.textPreview.slice(0, 60) + '…' : n.textPreview}"`
         : 'ha comentado en tu publicación';
+    case 'comment_reply':
+      return n.textPreview
+        ? `ha respondido a tu comentario: "${n.textPreview.length > 60 ? n.textPreview.slice(0, 60) + '…' : n.textPreview}"`
+        : 'ha respondido a tu comentario';
     case 'upvote_comment':
       return 'ha dado upvote a tu comentario';
     default:
