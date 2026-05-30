@@ -15,8 +15,9 @@
  *   - scores accumulate per user, percentages always sum to 100%
  *   - all users start visibly as "Sin clan"
  *   - clan is revealed only when ALL of:
- *       totalReflectionsSent >= REVEAL_MIN_REFLECTIONS (10)
- *       (totalReflectionsSent + totalPhrasesSent) >= REVEAL_TOTAL_INPUTS_THRESHOLD (30)
+ *       totalReflectionsSent >= REVEAL_MIN_REFLECTIONS (3)
+ *       totalPhrasesSent >= REVEAL_MIN_PHRASES (5)
+ *       (totalReflectionsSent + totalPhrasesSent) >= REVEAL_TOTAL_INPUTS_THRESHOLD (8)
  *       AND the top clan has ≥ REVEAL_PCT_THRESHOLD (25%)
  *       AND leads the runner-up by ≥ REVEAL_LEAD_OVER_SECOND_PP (5 pp)
  *   - phrases use the same hybrid scoring (semantic + ML + Claude) as reflections
@@ -110,13 +111,15 @@ async function _fetchClaudeScores(text: string): Promise<ClanScores | null> {
 // ─── Tunable rules ──────────────────────────────────────────────────────────
 
 /** Minimum reflections before any clan can be revealed. */
-export const REVEAL_MIN_REFLECTIONS = 4;
+export const REVEAL_MIN_REFLECTIONS = 3;
 
 /** Minimum phrases (quotes) before any clan can be revealed. */
-export const REVEAL_MIN_PHRASES = 6;
+export const REVEAL_MIN_PHRASES = 5;
 
-/** Reflections + phrases must reach this total for reveal (with the mins above). */
-export const REVEAL_TOTAL_INPUTS_THRESHOLD = 10;
+/** Reflections + phrases must reach this total for reveal (with the mins above).
+ *  Igual a la suma de los mínimos (3 + 5) para que ambos mínimos sean el único
+ *  límite y no haya un tercer gate combinado más alto que los bloquee. */
+export const REVEAL_TOTAL_INPUTS_THRESHOLD = 8;
 
 /** Minimum percentage for the leading clan (reveal + switch). */
 export const REVEAL_PCT_THRESHOLD = 25;
