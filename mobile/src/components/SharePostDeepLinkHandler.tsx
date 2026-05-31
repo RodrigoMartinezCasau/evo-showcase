@@ -6,6 +6,7 @@
  *    → navega a /profile/[id] en cuanto hay sesión + tabs montados.
  */
 import React, { useCallback, useEffect, useRef } from 'react';
+import { AppState } from 'react-native';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../mobile/lib/AuthContext';
@@ -27,7 +28,8 @@ export function SharePostDeepLinkHandler() {
   const { session, loading } = useAuth();
   const linkingUrl = Linking.useURL();
 
-  const lastWarmUrlRef = useRef<string | null>(null);
+  /** Última URL ya navegada (compartida entre listener `url`, useURL y AppState). */
+  const lastHandledUrlRef = useRef<string | null>(null);
   const lastProfileNavRef = useRef<string | null>(null);
 
   /** Push diferido para que /(tabs) termine de montar antes de abrir el perfil. */
@@ -43,23 +45,32 @@ export function SharePostDeepLinkHandler() {
   const openFromUrl = useCallback(
     (url: string | null | undefined, source: 'event' | 'url-hook' = 'event') => {
       if (!url) return;
-      if (source === 'url-hook' && lastWarmUrlRef.current === url) return;
+      if (source === 'url-hook' && lastHandledUrlRef.current === url) return;
 
       const post = parseCommunityPostDeepLink(url);
       if (post) {
-        lastWarmUrlRef.current = url;
+        lastHandledUrlRef.current = url;
         navigateToCommunityPost(router, post.postId, post.commentId);
         return;
       }
 
       const profileId = parseProfileDeepLink(url);
       if (profileId) {
-        lastWarmUrlRef.current = url;
+        lastHandledUrlRef.current = url;
         openProfile(profileId);
       }
     },
     [router, openProfile],
   );
+
+  // La URL inicial (cold start) ya la navega el prime/AuthGate; la marcamos como
+  // gestionada para que el respaldo por AppState no la reabra en el primer resume.
+  // OJO: usamos `getLinkingURL()` (valor que expo-linking actualiza en onNewIntent),
+  // no `getInitialURL()` (RN core: solo el intent de arranque, no cambia en warm).
+  useEffect(() => {
+    const url = Linking.getLinkingURL();
+    if (url && lastHandledUrlRef.current == null) lastHandledUrlRef.current = url;
+  }, []);
 
   // App en caliente: useURL (Safari / universal) + listener (botón «Abrir en EVO»).
   useEffect(() => {
@@ -70,7 +81,24 @@ export function SharePostDeepLinkHandler() {
   useEffect(() => {
     if (loading || !session) return;
     const sub = Linking.addEventListener('url', ({ url }) => {
-      lastWarmUrlRef.current = null;
+      lastHandledUrlRef.current = null;
+      lastProfileNavRef.current = null;
+      openFromUrl(url, 'event');
+    });
+    return () => sub.remove();
+  }, [loading, session, openFromUrl]);
+
+  // Respaldo WARM START (widget con la app ya abierta): el evento `url` de
+  // expo-linking puede perderse al volver del segundo plano (sobre todo en New
+  // Architecture). Al pasar a primer plano releemos `getLinkingURL()` —que
+  // expo-linking actualiza en `onNewIntent`— y abrimos el destino. Dedupe contra
+  // `lastHandledUrlRef`: en un resume normal la URL no cambia y no se reabre nada.
+  useEffect(() => {
+    if (loading || !session) return;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') return;
+      const url = Linking.getLinkingURL();
+      if (!url || url === lastHandledUrlRef.current) return;
       lastProfileNavRef.current = null;
       openFromUrl(url, 'event');
     });

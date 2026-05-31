@@ -345,6 +345,8 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     postsRef.current = posts;
   }, [posts]);
+  // Espejo de los guardados por usuario (para reflejar "mi guardado" al inyectar posts).
+  const savedMapArrRef = useRef<Record<string, string[]>>({});
 
   // Hydration guards — prevent saves from overwriting storage before loading completes.
   const postsHydrated  = useRef(false);
@@ -920,6 +922,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
 
   // Persist saved map on every change after initial hydration.
   useEffect(() => {
+    savedMapArrRef.current = savedMapArr;
     if (!savedHydrated.current) return;
     AsyncStorage.setItem(SIM_SAVED_STORAGE_KEY, JSON.stringify(savedMapArr)).catch(console.error);
   }, [savedMapArr]);
@@ -1280,12 +1283,42 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
         return ids.every((id) => postsRef.current.some((p) => p.id === id));
       }
 
+      // `dbRowToSimPost` deja los votos/guardados a 0; sin esto la publicación
+      // del widget / compartida se abriría con 0 likes, 0 dislikes, 0 guardados.
+      // Reconstruimos los recuentos reales (igual que la hidratación normal).
+      const fetchedIds = fetched.map((p) => p.id);
+      const voteRows = await fetchVotesForPosts(fetchedIds);
+      const me = activeUserIdRef.current;
+      const myVotesFromRows: Record<string, 'up' | 'down'> = {};
+      for (const row of voteRows) {
+        const post = fetched.find((p) => p.id === row.post_id);
+        if (!post) continue;
+        if (row.vote === 'up') post.upvoterIds = [...post.upvoterIds, row.user_id];
+        if (row.vote === 'down') post.downvoterIds = [...post.downvoterIds, row.user_id];
+        if (row.user_id === me) myVotesFromRows[row.post_id] = row.vote;
+      }
+      // Reflejar MI guardado (el modelo de saverIds replica al de la hidratación).
+      const mySaves = savedMapArrRef.current[me] ?? [];
+      for (const post of fetched) {
+        if (mySaves.includes(post.id) && !post.saverIds.includes(me)) {
+          post.saverIds = [...post.saverIds, me];
+        }
+      }
+
       setPosts((prev) => {
         const known = new Set(prev.map((p) => p.id));
         const additions = fetched.filter((p) => !known.has(p.id));
         if (additions.length === 0) return prev;
         return [...additions, ...prev];
       });
+
+      // Mi voto en estas publicaciones, para que el botón salga marcado.
+      if (Object.keys(myVotesFromRows).length > 0) {
+        setVoteMapRaw((prev) => ({
+          ...prev,
+          [me]: { ...(prev[me] ?? {}), ...myVotesFromRows },
+        }));
+      }
 
       const known = new Set([
         ...postsRef.current.map((p) => p.id),

@@ -1,25 +1,23 @@
 import React, { useCallback, useState, useRef, useMemo, useEffect, useLayoutEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet, Animated, Easing, useWindowDimensions, Alert, Share } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter, usePathname, useFocusEffect } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter, usePathname, useFocusEffect } from 'expo-router';
 import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { sanitizeRouteId } from '@evoconn/utils/sanitizeRouteId';
 import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
-import { mockCurrentUser, mockUserStats } from '@evoconn/data/mockUser';
+import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { getOtherUserProfile } from '@evoconn/data/mockOtherUsers';
 import type { OtherUserProfile } from '@evoconn/data/mockOtherUsers';
 import { supabase } from '../../mobile/lib/supabase';
 import { isPublishedSimPostType } from '@evoconn/data/simulation/simulatedNetwork';
 import { fetchFollowCounts, fetchPostsByUser, isRealUserId } from '@evoconn/services/supabaseSocial';
-import { AppTopBar, AppShellBottomTabsWrap, RankBadge, ClanBanner, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
+import { AppTopBar, AppShellBottomTabsWrap, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
-import { getClanCardColor } from '@evoconn/theme/theme';
-import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
 import { useDeferredRender } from '@evoconn/hooks/useDeferredRender';
 import { ClanLoadingDot } from '@evoconn/components/shared/ClanLoadingDot';
@@ -63,61 +61,14 @@ export default function ProfileScreen() {
   const router = useRouter();
   const isOwn = !id || id === mockCurrentUser.id;
 
+  // Perfil propio (incluye enlaces compartidos a tu propio perfil): el display
+  // bueno es el personal `/my-profile`, no el antiguo OwnProfileView. Es justo
+  // lo que pasa al pulsar tu propio nombre de usuario en Para ti.
   if (isOwn) {
-    return <OwnProfileView />;
+    return <Redirect href="/my-profile" />;
   }
 
   return <OtherUserProfileView userId={id} router={router} initialUsername={initialUsername} />;
-}
-
-function OwnProfileView() {
-  const activeClan = useActiveClan(mockCurrentUser.clanId);
-  const user = { ...mockCurrentUser, clanId: activeClan };
-  const stats = mockUserStats;
-  const clanColor = getClanCardColor(user.clanId);
-
-  return (
-    <View style={styles.container}>
-      <AppTopBar onMenuPress={() => {}} />
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.username}>{user.username}</Text>
-          <View style={styles.badges}>
-            {user.clanId ? (
-              <ClanBanner clanId={user.clanId} shortLabel={user.clanId.toUpperCase()} />
-            ) : (
-              <Text style={styles.unassigned}>??</Text>
-            )}
-            <RankBadge rank={user.rank} />
-          </View>
-        </View>
-        <View style={styles.stats}>
-          <View style={styles.stat}>
-            <Text style={styles.statValue}>{stats.dailyUsesLeft}</Text>
-            <Text style={styles.statLabel}>Usos hoy</Text>
-          </View>
-          <View style={styles.stat}>
-            <Text style={styles.statValue}>{stats.streak}</Text>
-            <Text style={styles.statLabel}>Racha</Text>
-          </View>
-          <View style={styles.stat}>
-            <Text style={styles.statValue}>{stats.unlockedPhrases}/{stats.unlockedPhrasesTotal}</Text>
-            <Text style={styles.statLabel}>Frases</Text>
-          </View>
-        </View>
-        <View style={styles.quote}>
-          <Text style={styles.quoteLabel}>Cita</Text>
-          <Text style={styles.quoteText}>"La vida es lo que pasa mientras diseñas tu reflexión."</Text>
-        </View>
-        <View style={[styles.parchment, { borderColor: clanColor }]}>
-          <Text style={styles.parchmentTitle}>
-            {user.clanId ? `Clan ${user.clanId}` : 'Sin clan'}
-          </Text>
-          <Text style={styles.parchmentBody}>Contenido del clan y filosofía.</Text>
-        </View>
-      </ScrollView>
-    </View>
-  );
 }
 
 function OtherUserProfileView({ userId, router, initialUsername }: { userId: string; router: ReturnType<typeof useRouter>; initialUsername?: string }) {
