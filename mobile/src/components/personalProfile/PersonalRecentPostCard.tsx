@@ -1,27 +1,20 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, LayoutChangeEvent } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
   EvoActionSheetModal,
   EvoConfirmModal,
 } from '@evoconn/components/shared/EvoActionSheetModal';
 import type { CommunityPost } from '@evoconn/types';
-import { PROFILE_POST_PREVIEW_LAYOUT as L } from '@evoconn/constants/postPreviewLayout';
 import {
   PERSONAL_POST_MENU_DOTS_OFFSET_X,
   PERSONAL_POST_MENU_DOTS_OFFSET_Y,
   PERSONAL_POST_MENU_DOTS_SCALE,
 } from '@evoconn/constants/personalProfileLayout';
-
-// Active (colored) versions — same assets as "Para ti" active state
-import UpvoteIcon from '../../assets/detailActions/32.svg';
-import DownvoteIcon from '../../assets/detailActions/30.svg';
-import {
-  VOTE_RATIO_HIGH_COLOR,
-  VOTE_RATIO_LOW_COLOR,
-} from '@evoconn/constants/voteButtonAppearance';
-import SavedIcon from '../../assets/detailActions/34.svg';    // yellow #ffde59
-import FlechaIcon from '../../assets/detailActions/flecha.svg'; // currentColor → computed from %
+import { PanelStarField, PANEL_STAR_SURFACE_DEFAULT } from '@evoconn/components/animations/StarFieldBackground';
+import { ClanCardFeedRimOverlay } from '../ClanCardFeedRimOverlay';
+import { getClanColor } from '@evoconn/constants/clanColors';
+import { formatPhraseBodyForDisplay } from '@evoconn/utils/phrasePublish';
 
 type MenuAction = 'hide' | 'delete' | 'unsave';
 
@@ -36,10 +29,8 @@ type Props = {
   /** Remove the right margin (use in grid layouts instead of sliders). */
   noMarginRight?: boolean;
   /**
-   * Extra scale multiplier for the stats bar (icons + numbers).
-   * Applied ON TOP of the base profilePreviewStatsBarScale.
-   * Use PERSONAL_POSTS_GRID_STATS_SCALE from personalProfileLayout.ts.
-   * Defaults to 1 (no change). Only pass this from the grid screen.
+   * Kept for API compatibility with the grid screen. The redesigned card no
+   * longer renders a stats bar, so this is intentionally unused.
    */
   gridStatsScale?: number;
   /**
@@ -50,45 +41,10 @@ type Props = {
   menuMode?: 'own' | 'saved';
 };
 
-function voteRatioPct(up: number, down: number): number {
-  return Math.round((up / Math.max(1, up + down)) * 100);
-}
-
-/** Color for the flecha/percentage icon, mirroring the "Para ti" active palette. */
-function flechaColor(pct: number): string {
-  if (pct >= 90) return VOTE_RATIO_HIGH_COLOR;
-  if (pct >= 50) return '#ffde59';
-  return VOTE_RATIO_LOW_COLOR;
-}
-
-/**
- * Compact count formatter — max 4 visible characters.
- * 0–999 → exact · 1 000–999 999 → "Xk" · ≥1 000 000 → "XM"
- */
-function compactCount(n: number): string {
-  if (n >= 1_000_000) return `${Math.floor(n / 1_000_000)}M`;
-  if (n >= 1_000) return `${Math.floor(n / 1_000)}k`;
-  return String(n);
-}
-
-/**
- * Time since publication in compact Spanish.
- * Rules: min → h → meses → años
- */
-function timeSince(isoDate: string): string {
-  const diffMs = Date.now() - new Date(isoDate).getTime();
-  const mins   = Math.floor(diffMs / 60_000);
-  if (mins < 1)    return 'ahora';
-  if (mins < 60)   return `${mins} min`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24)  return `${hours} h`;
-  const days  = Math.floor(hours / 24);
-  const months = Math.floor(days / 30);
-  if (months < 1)  return `${days} d`;
-  if (months < 12) return `${months} ${months === 1 ? 'mes' : 'meses'}`;
-  const years = Math.floor(months / 12);
-  return `${years} ${years === 1 ? 'año' : 'años'}`;
-}
+/** Outer rounded-square radius — kept identical to the previous preview card. */
+const CARD_RADIUS = 14;
+/** Glowing-rim arm length (pt). Shorter than the full feed cards (52) to fit the smaller square. */
+const RIM_ARM = 44;
 
 export const PersonalRecentPostCard = React.memo(function PersonalRecentPostCard({
   post,
@@ -97,21 +53,27 @@ export const PersonalRecentPostCard = React.memo(function PersonalRecentPostCard
   onMenuAction,
   isHidden = false,
   noMarginRight = false,
-  gridStatsScale = 1,
+  gridStatsScale: _gridStatsScale = 1,
   menuMode = 'own',
 }: Props) {
   const isPhrase = post.type === 'phrase';
-  const typeLabel = isPhrase ? 'FRASE' : 'REFLEXIÓN';
+  // Frases → frase completa · Reflexiones → solo el título.
   const mainText = isPhrase
-    ? post.body
-    : (post.title ?? post.body.slice(0, 80));
+    ? formatPhraseBodyForDisplay(post.body)
+    : (post.title ?? post.body);
 
-  const pct         = voteRatioPct(post.voteStats.up, post.voteStats.down);
-  const pctColor    = flechaColor(pct);
-  const timeStr     = timeSince(post.createdAt);
+  const clanColor = getClanColor(post.author.clanId);
 
   const [menuVisible, setMenuVisible] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
+  const [dims, setDims] = useState<{ width: number; height: number } | null>(null);
+  const onCardLayout = useCallback((e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    setDims((prev) =>
+      prev?.width === width && prev?.height === height ? prev : { width, height },
+    );
+  }, []);
 
   const handleDotsPress = useCallback(() => {
     setMenuVisible(true);
@@ -148,19 +110,12 @@ export const PersonalRecentPostCard = React.memo(function PersonalRecentPostCard
     onMenuAction?.('delete', post.id);
   }, [onMenuAction, post.id]);
 
-  // ── Derived stats-bar dimensions — all scale from ONE constant ──────────
-  // gridStatsScale is 1 in the slider, and PERSONAL_POSTS_GRID_STATS_SCALE in the grid.
-  const barScale    = L.profilePreviewStatsBarScale * gridStatsScale;
-  const iconPx      = Math.round(L.profilePreviewStatsIconBaseSize * barScale);
-  const countFontSz = Math.round(L.profilePreviewStatsCountBaseFontSize * barScale);
-  const colGap      = Math.round(3 * barScale);
-  const rowGap      = Math.round(L.profilePreviewStatsColSpacing * barScale);
-
   return (
     <>
       <TouchableOpacity
-        activeOpacity={0.8}
+        activeOpacity={0.85}
         onPress={() => onPress(post)}
+        onLayout={onCardLayout}
         style={[
           styles.card,
           { width: cardWidth },
@@ -168,209 +123,59 @@ export const PersonalRecentPostCard = React.memo(function PersonalRecentPostCard
           isHidden && styles.cardHidden,
         ]}
       >
-        {/* ── Whole internal content wrapper ── */}
+        {/* Fondo de estrellas (mismo que las tarjetas de "Siguiendo"). */}
         <View
-          style={[
-            styles.innerContent,
-            {
-              transform: [
-                { translateX: L.profilePreviewContentOffsetX },
-                { translateY: L.profilePreviewContentOffsetY },
-                { scale: L.profilePreviewContentScale },
-              ],
-            },
-          ]}
+          style={[StyleSheet.absoluteFill, { borderRadius: CARD_RADIUS, overflow: 'hidden' }]}
+          pointerEvents="none"
         >
-          {/* ── Top: type label + time + dots ── */}
-          <View style={styles.topSection}>
+          <PanelStarField surfaceColor={PANEL_STAR_SURFACE_DEFAULT} />
+        </View>
 
-            {/* Meta row: type label | time | spacer | dots */}
-            <View style={styles.metaRowOuter}>
-              <View style={styles.metaRow}>
-                <View
-                  style={{
-                    transform: [
-                      { translateX: L.profilePreviewTypeLabelOffsetX },
-                      { translateY: L.profilePreviewTypeLabelOffsetY },
-                      { scale: L.profilePreviewTypeLabelScale },
-                    ],
-                  }}
-                >
-                  <Text style={[styles.typeLabel, { color: L.profilePreviewTypeLabelColor }]}>
-                    {typeLabel}
-                  </Text>
-                </View>
-                <View
-                  style={{
-                    transform: [
-                      { translateX: L.profilePreviewTimeLabelOffsetX },
-                      { translateY: L.profilePreviewTimeLabelOffsetY },
-                      { scale: L.profilePreviewTimeLabelScale },
-                    ],
-                  }}
-                >
-                  <Text style={[styles.timeLabel, { color: L.profilePreviewTimeLabelColor }]}>
-                    · {timeStr}
-                  </Text>
-                </View>
-              </View>
+        {/* Reborde con glow estilo Apple en color de clan (blanco en el centro). */}
+        {dims ? (
+          <ClanCardFeedRimOverlay
+            width={dims.width}
+            height={dims.height}
+            borderRadius={CARD_RADIUS}
+            clanColor={clanColor}
+            rimArm={RIM_ARM}
+          />
+        ) : null}
 
-              {/* Three-dots / padlock button — only shown when onMenuAction is provided.
-                  When the post is hidden (private), shows a closed padlock instead of dots.
-                  Both icons open the same action menu. */}
-              {onMenuAction && (
-                <TouchableOpacity
-                  onPress={handleDotsPress}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  style={{
-                    transform: [
-                      { translateX: PERSONAL_POST_MENU_DOTS_OFFSET_X },
-                      { translateY: PERSONAL_POST_MENU_DOTS_OFFSET_Y },
-                      { scale: PERSONAL_POST_MENU_DOTS_SCALE },
-                    ],
-                  }}
-                >
-                  <Ionicons
-                    name={isHidden ? 'lock-closed' : 'ellipsis-horizontal'}
-                    size={14}
-                    color={isHidden ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.4)'}
-                  />
-                </TouchableOpacity>
-              )}
-            </View>
+        {/* Contenido: solo el texto, centrado. */}
+        <View style={styles.content}>
+          <Text
+            style={isPhrase ? styles.phraseBody : styles.reflectionTitle}
+            numberOfLines={isPhrase ? 5 : 4}
+          >
+            {mainText}
+          </Text>
+        </View>
 
-            {/* Main content */}
-            <View
-              style={{
-                transform: [
-                  { translateX: L.profilePreviewMainTextOffsetX },
-                  { translateY: L.profilePreviewMainTextOffsetY },
-                  { scale: L.profilePreviewMainTextScale },
-                ],
-              }}
-            >
-              <Text
-                style={isPhrase ? styles.phraseBody : styles.reflectionTitle}
-                numberOfLines={isPhrase ? 4 : 2}
-              >
-                {mainText}
-              </Text>
-            </View>
-
-          </View>
-
-          {/* ── Stats block ── */}
-          <View
+        {/* Botón de tres puntos / candado — solo cuando hay onMenuAction.
+            Si el post está oculto (privado), muestra un candado en su lugar. */}
+        {onMenuAction && (
+          <TouchableOpacity
+            onPress={handleDotsPress}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={[
-              styles.statsBlock,
+              styles.menuButton,
               {
                 transform: [
-                  { translateX: L.profilePreviewStatsBlockOffsetX },
-                  { translateY: L.profilePreviewStatsBlockOffsetY },
+                  { translateX: PERSONAL_POST_MENU_DOTS_OFFSET_X },
+                  { translateY: PERSONAL_POST_MENU_DOTS_OFFSET_Y },
+                  { scale: PERSONAL_POST_MENU_DOTS_SCALE },
                 ],
               },
             ]}
           >
-            <View style={[styles.statsRow, { gap: rowGap }]}>
-
-              {/* ── Upvote column ── */}
-              <View
-                style={[
-                  styles.statCol,
-                  { gap: colGap },
-                  {
-                    transform: [
-                      { translateX: L.profilePreviewUpColOffsetX },
-                      { translateY: L.profilePreviewUpColOffsetY },
-                    ],
-                  },
-                ]}
-              >
-                <View style={{ width: iconPx, height: iconPx, overflow: 'hidden' }}>
-                  <UpvoteIcon width={iconPx} height={iconPx} />
-                </View>
-                <Text style={[styles.statCount, { fontSize: countFontSz, lineHeight: Math.ceil(countFontSz * 1.25) }]}>
-                  {compactCount(post.voteStats.up)}
-                </Text>
-              </View>
-
-              {/* ── Downvote column ── */}
-              <View
-                style={[
-                  styles.statCol,
-                  { gap: colGap },
-                  {
-                    transform: [
-                      { translateX: L.profilePreviewDownColOffsetX },
-                      { translateY: L.profilePreviewDownColOffsetY },
-                    ],
-                  },
-                ]}
-              >
-                <View style={{ width: iconPx, height: iconPx, overflow: 'hidden' }}>
-                  <DownvoteIcon width={iconPx} height={iconPx} />
-                </View>
-                <Text style={[styles.statCount, { fontSize: countFontSz, lineHeight: Math.ceil(countFontSz * 1.25) }]}>
-                  {compactCount(post.voteStats.down)}
-                </Text>
-              </View>
-
-              {/* ── Saved column ── */}
-              <View
-                style={[
-                  styles.statCol,
-                  { gap: colGap },
-                  {
-                    transform: [
-                      { translateX: L.profilePreviewSavedColOffsetX },
-                      { translateY: L.profilePreviewSavedColOffsetY },
-                    ],
-                  },
-                ]}
-              >
-                <View style={{ width: iconPx, height: iconPx, overflow: 'hidden' }}>
-                  <SavedIcon width={iconPx} height={iconPx} />
-                </View>
-                <Text style={[styles.statCount, { fontSize: countFontSz, lineHeight: Math.ceil(countFontSz * 1.25) }]}>
-                  {compactCount(post.voteStats.save)}
-                </Text>
-              </View>
-
-              {/* ── Percentage column ── */}
-              <View
-                style={[
-                  styles.statCol,
-                  { gap: colGap },
-                  {
-                    transform: [
-                      { translateX: L.profilePreviewPercentageColOffsetX },
-                      { translateY: L.profilePreviewPercentageColOffsetY },
-                    ],
-                  },
-                ]}
-              >
-                <View
-                  style={{
-                    width: iconPx,
-                    height: iconPx,
-                    overflow: 'hidden',
-                    transform: [
-                      { translateX: L.profilePreviewFlechaIconOffsetX },
-                      { translateY: L.profilePreviewFlechaIconOffsetY },
-                      { scale: L.profilePreviewFlechaIconScale },
-                    ],
-                  }}
-                >
-                  <FlechaIcon width={iconPx} height={iconPx} color={pctColor} />
-                </View>
-                <Text style={[styles.statPercentage, { fontSize: countFontSz, lineHeight: Math.ceil(countFontSz * 1.25), color: pctColor }]}>
-                  {pct}%
-                </Text>
-              </View>
-
-            </View>
-          </View>
-        </View>
+            <Ionicons
+              name={isHidden ? 'lock-closed' : 'ellipsis-horizontal'}
+              size={16}
+              color={isHidden ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.55)'}
+            />
+          </TouchableOpacity>
+        )}
       </TouchableOpacity>
 
       {onMenuAction ? (
@@ -398,87 +203,47 @@ export const PersonalRecentPostCard = React.memo(function PersonalRecentPostCard
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#000000',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    padding: 14,
+    borderRadius: CARD_RADIUS,
     marginRight: 12,
     minHeight: 170,
     overflow: 'hidden',
+    backgroundColor: PANEL_STAR_SURFACE_DEFAULT,
   },
   cardHidden: {
-    borderColor: 'rgba(255,255,255,0.05)',
     opacity: 0.65,
   },
-  innerContent: {
-    minHeight: 142,
-    justifyContent: 'space-between',
-  },
-  topSection: {
-    gap: 6,
-  },
-  metaRowOuter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    flexWrap: 'nowrap',
+  content: {
     flex: 1,
+    minHeight: 170,
+    paddingHorizontal: 20,
+    paddingVertical: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  typeLabel: {
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-    lineHeight: 12,
-  },
-  timeLabel: {
-    fontSize: 9,
-    fontWeight: '500',
-    lineHeight: 12,
+  menuButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 3,
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   reflectionTitle: {
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '800',
     letterSpacing: 0.3,
-    lineHeight: 20,
+    lineHeight: 22,
+    textAlign: 'center',
   },
   phraseBody: {
     color: '#FFFFFF',
-    fontSize: 13,
-    fontStyle: 'italic',
-    lineHeight: 19,
-  },
-  statsBlock: {
-    paddingTop: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255,255,255,0.12)',
-  },
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-  },
-  statCol: {
-    alignItems: 'center',
-  },
-  statCount: {
-    color: '#FFFFFF',
+    fontSize: 15,
     fontWeight: '600',
-    opacity: 0.8,
-    includeFontPadding: false,
-  },
-  statPercentage: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    opacity: 0.6,
-    letterSpacing: 0.2,
-    alignSelf: 'flex-end',
-    includeFontPadding: false,
+    fontStyle: 'italic',
+    lineHeight: 22,
+    textAlign: 'center',
   },
 });
