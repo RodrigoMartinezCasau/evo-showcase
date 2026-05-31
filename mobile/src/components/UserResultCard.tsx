@@ -42,6 +42,8 @@ export type UserResultCardProps = {
    */
   avatarVariant?: 'search' | 'clan';
   onPress?: () => void;
+  /** Elemento opcional al final de la fila (p. ej. botón de seguir en destacados). */
+  trailing?: React.ReactNode;
 };
 
 export function UserResultCard({
@@ -53,6 +55,7 @@ export function UserResultCard({
   clanPct,
   avatarVariant = 'search',
   onPress,
+  trailing,
 }: UserResultCardProps) {
   const clanColor  = getClanColor(clanId);
   const showPhoto = hasProfilePhoto(avatarUri);
@@ -93,6 +96,9 @@ export function UserResultCard({
       {clanPct !== undefined && (
         <Text style={[styles.pct, { color: clanColor }]}>{clanPct}%</Text>
       )}
+
+      {/* Acción opcional al final (p. ej. botón de seguir) */}
+      {trailing != null ? <View style={styles.trailing}>{trailing}</View> : null}
     </TouchableOpacity>
   );
 }
@@ -129,5 +135,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     marginLeft: 8,
+  },
+  trailing: {
+    marginLeft: 10,
+    flexShrink: 0,
+    alignSelf: 'center',
+    justifyContent: 'center',
   },
 });

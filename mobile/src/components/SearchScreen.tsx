@@ -4,11 +4,14 @@ import {
   Text,
   TextInput,
   FlatList,
+  ScrollView,
   TouchableOpacity,
   Pressable,
   StyleSheet,
   Keyboard,
+  ActivityIndicator,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { evoconnColors } from '../theme/colors';
 import { SEARCH_LAYOUT as SL } from '../constants/searchScreenLayout';
 import { mockSearchableUsers } from '../data/mockSearchUsers';
@@ -16,17 +19,44 @@ import { searchUsers, type ScoredUser } from '../utils/searchUsers';
 import { searchClans, type ScoredClan } from '../utils/searchClans';
 import { UserResultCard } from './UserResultCard';
 import { ClanResultCard } from './ClanResultCard';
-import { fetchFollowersCountsBatch, searchSupabaseUsers } from '../services/supabaseSocial';
+import { ProfileFollowButton } from './otherProfile/ProfileFollowButton';
+import {
+  fetchFollowersCountsBatch,
+  searchSupabaseUsers,
+  fetchTopUsersByFollowers,
+  type TopUser,
+} from '../services/supabaseSocial';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../mobile/lib/AuthContext';
 import { useEffectiveClanId } from '@evoconn/hooks/useEffectiveClanId';
 import { useBlockedUsers } from '@evoconn/hooks/BlockedUsersContext';
-import { getClanColor } from '@evoconn/constants/clanColors';
+import { CLAN_TO_COLOR, getClanColor, type ClanId } from '@evoconn/constants/clanColors';
+import { getClanProfile } from '@evoconn/data/mockClanProfiles';
 
 const MAX_RECENTS = 10;
 const DEBOUNCE_MS = 250;
 /** Solo mostramos las N coincidencias más relevantes (Supabase + locales). */
 const SEARCH_MAX_RESULTS = 10;
+/** Búsquedas recientes mostradas bajo la barra (en pequeño). */
+const RECENTS_SHOWN = 3;
+/** Cuentas destacadas (con más seguidores) mostradas en el feed de búsqueda. */
+const FEATURED_COUNT = 5;
+/** Persistencia de búsquedas recientes entre sesiones. */
+const RECENTS_STORAGE_KEY = '@evoconn/search_recents_v1';
+
+/** Los 8 clanes filosóficos como filas navegables (directorio fijo). */
+const ALL_CLANS: { id: ClanId; name: string }[] = (
+  Object.keys(CLAN_TO_COLOR) as ClanId[]
+).map((id) => ({ id, name: getClanProfile(id)?.name ?? id }));
+
+type FeaturedUser = {
+  id: string;
+  username: string;
+  clanId: string | null;
+  rank: string;
+  followersCount: number;
+  avatarUri: string | null;
+};
 
 // ── Search result profile icon editors ────────────────────────────────────────
 // Affect ONLY the SVG inside each result row — not the row layout.
@@ -53,11 +83,58 @@ export function SearchScreen({ onUserPress, onClanPress }: SearchScreenProps) {
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const recentsHydrated = useRef(false);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => inputRef.current?.focus(), 100);
     return () => clearTimeout(t);
+  }, []);
+
+  // Hidratar búsquedas recientes desde AsyncStorage (sobreviven a cerrar la app).
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(RECENTS_STORAGE_KEY);
+        if (cancelled || !raw) return;
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          setRecentSearches(parsed.filter((x): x is string => typeof x === 'string'));
+        }
+      } catch {
+        // ignore corrupt storage
+      } finally {
+        recentsHydrated.current = true;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Persistir recientes tras la hidratación.
+  useEffect(() => {
+    if (!recentsHydrated.current) return;
+    void AsyncStorage.setItem(RECENTS_STORAGE_KEY, JSON.stringify(recentSearches));
+  }, [recentSearches]);
+
+  // ── Cuentas destacadas (top por seguidores) ───────────────────────────────
+  const [topUsers, setTopUsers] = useState<TopUser[]>([]);
+  const [featuredLoading, setFeaturedLoading] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const top = await fetchTopUsersByFollowers(12);
+        if (!cancelled) setTopUsers(top);
+      } finally {
+        if (!cancelled) setFeaturedLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleChangeText = useCallback((text: string) => {
@@ -125,6 +202,30 @@ export function SearchScreen({ onUserPress, onClanPress }: SearchScreenProps) {
     [debouncedQuery],
   );
 
+  // Feed de cuentas destacadas: SOLO cuentas reales (top por seguidores de
+  // Supabase). No usamos los usuarios de simulación como relleno para que no
+  // parpadeen al entrar antes de cargar las reales.
+  const featuredUsers: FeaturedUser[] = useMemo(() => {
+    const seen = new Set<string>();
+    const out: FeaturedUser[] = [];
+    for (const u of topUsers) {
+      if (seen.has(u.id)) continue;
+      if (profile?.id && u.id === profile.id) continue;
+      if (isBlocked(u.id)) continue;
+      seen.add(u.id);
+      out.push({
+        id: u.id,
+        username: u.username,
+        clanId: u.clanId,
+        rank: u.rank,
+        followersCount: u.followersCount,
+        avatarUri: u.avatarUri ?? null,
+      });
+    }
+    out.sort((a, b) => b.followersCount - a.followersCount);
+    return out.slice(0, FEATURED_COUNT);
+  }, [topUsers, profile?.id, isBlocked]);
+
   const listItems: SearchListItem[] = useMemo(() => {
     const items: SearchListItem[] = [
       ...clanResults.map((clan) => ({
@@ -177,6 +278,16 @@ export function SearchScreen({ onUserPress, onClanPress }: SearchScreenProps) {
   const handleClanPress = useCallback((clan: ScoredClan) => {
     addRecent(clan.name);
     onClanPress(clan.id);
+  }, [addRecent, onClanPress]);
+
+  const handleFeaturedUserPress = useCallback((u: FeaturedUser) => {
+    addRecent(u.username);
+    onUserPress(u.id, u.username);
+  }, [addRecent, onUserPress]);
+
+  const handleClanDirectoryPress = useCallback((id: string, name: string) => {
+    addRecent(name);
+    onClanPress(id);
   }, [addRecent, onClanPress]);
 
   const showResults = debouncedQuery.trim().length > 0;
@@ -273,18 +384,65 @@ export function SearchScreen({ onUserPress, onClanPress }: SearchScreenProps) {
             <Text style={styles.emptyText}>No se encontraron usuarios ni clanes</Text>
           </View>
         )
-      ) : recentSearches.length > 0 ? (
-        <View style={styles.recentsSection}>
-          <Text style={styles.recentsTitle}>Búsquedas recientes</Text>
-          <FlatList
-            data={recentSearches}
-            keyExtractor={(item) => item}
-            renderItem={renderRecentItem}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"
-          />
-        </View>
-      ) : null}
+      ) : (
+        <ScrollView
+          style={styles.browse}
+          contentContainerStyle={styles.browseContent}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
+        >
+          {recentSearches.length > 0 ? (
+            <View style={styles.section}>
+              <Text style={styles.recentsTitle}>Búsquedas recientes</Text>
+              {recentSearches.slice(0, RECENTS_SHOWN).map((item) => (
+                <React.Fragment key={item}>{renderRecentItem({ item })}</React.Fragment>
+              ))}
+            </View>
+          ) : null}
+
+          {featuredLoading || featuredUsers.length > 0 ? (
+            <View style={styles.section}>
+              <Text style={styles.recentsTitle}>Cuentas destacadas</Text>
+              {featuredLoading ? (
+                <ActivityIndicator
+                  size="small"
+                  color={myClanColor}
+                  style={styles.featuredLoader}
+                />
+              ) : (
+                featuredUsers.map((u) => (
+                  <UserResultCard
+                    key={u.id}
+                    id={u.id}
+                    username={u.username}
+                    clanId={u.clanId}
+                    rank={u.rank}
+                    followersCount={u.followersCount}
+                    avatarUri={u.avatarUri}
+                    onPress={() => handleFeaturedUserPress(u)}
+                    trailing={
+                      <ProfileFollowButton userId={u.id} clanId={u.clanId} mini />
+                    }
+                  />
+                ))
+              )}
+            </View>
+          ) : null}
+
+          <View style={styles.section}>
+            <Text style={styles.recentsTitle}>Clanes</Text>
+            {ALL_CLANS.map((clan) => (
+              <ClanResultCard
+                key={clan.id}
+                clanId={clan.id}
+                name={clan.name}
+                onPress={() => handleClanDirectoryPress(clan.id, clan.name)}
+              />
+            ))}
+          </View>
+        </ScrollView>
+      )}
     </Pressable>
   );
 }
@@ -352,6 +510,21 @@ const styles = StyleSheet.create({
   recentsSection: {
     flex: 1,
     marginTop: 4,
+  },
+  browse: {
+    flex: 1,
+  },
+  browseContent: {
+    paddingBottom: 24,
+  },
+  section: {
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  featuredLoader: {
+    alignSelf: 'flex-start',
+    marginVertical: 16,
+    marginLeft: 4,
   },
   recentsTitle: {
     color: evoconnColors.muted,

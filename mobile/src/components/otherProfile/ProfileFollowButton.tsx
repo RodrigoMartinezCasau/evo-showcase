@@ -11,15 +11,19 @@ type Props = {
    * con Publicaciones / Seguidores / Seguidos (misma altura visual que el perfil personal).
    */
   compact?: boolean;
+  /**
+   * Variante aún más pequeña (p. ej. botón rápido en filas de "cuentas destacadas"
+   * de la búsqueda). Más pequeño que `compact`.
+   */
+  mini?: boolean;
 };
 
 /** + dibujado con vistas: grosor real, no depende del trazo de la fuente del sistema. */
-function FollowPlusMark({ color = '#FFFFFF' }: { color?: string }) {
-  const arm = 13;
-  const thick = 2.5;
+function FollowPlusMark({ color = '#FFFFFF', arm = 13 }: { color?: string; arm?: number }) {
+  const thick = arm >= 13 ? 2.5 : 2;
   const cap = thick / 2;
   return (
-    <View style={followPlusStyles.box}>
+    <View style={[followPlusStyles.box, { width: arm, height: arm }]}>
       <View
         style={[
           followPlusStyles.bar,
@@ -48,8 +52,6 @@ function FollowPlusMark({ color = '#FFFFFF' }: { color?: string }) {
 
 const followPlusStyles = StyleSheet.create({
   box: {
-    width: 13,
-    height: 13,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -64,6 +66,7 @@ export const ProfileFollowButton = React.memo(function ProfileFollowButton({
   userId,
   clanId: _clanId,
   compact = false,
+  mini = false,
 }: Props) {
   const { isFollowing, isFollowPending, toggleFollow } = useFollowState();
   const following = isFollowing(userId);
@@ -80,25 +83,45 @@ export const ProfileFollowButton = React.memo(function ProfileFollowButton({
       style={[
         styles.button,
         compact && styles.buttonCompact,
+        mini && styles.buttonMini,
         pending && styles.buttonPending,
         following && styles.buttonFollowing,
       ]}
     >
       {following ? (
-        <Text style={[styles.followingText, compact && styles.followingTextCompact]} numberOfLines={1}>
+        <Text
+          style={[
+            styles.followingText,
+            compact && styles.followingTextCompact,
+            mini && styles.followingTextMini,
+          ]}
+          numberOfLines={1}
+        >
           Siguiendo
         </Text>
       ) : pending ? (
         <Text
-          style={[styles.pendingText, compact && styles.pendingTextCompact]}
+          style={[
+            styles.pendingText,
+            compact && styles.pendingTextCompact,
+            mini && styles.pendingTextMini,
+          ]}
           numberOfLines={2}
         >
           Solicitud enviada
         </Text>
       ) : (
-        <View style={[styles.seguirRow, compact && styles.seguirRowCompact]}>
-          <FollowPlusMark />
-          <Text style={[styles.label, compact && styles.labelCompact]}>Seguir</Text>
+        <View style={[styles.seguirRow, compact && styles.seguirRowCompact, mini && styles.seguirRowMini]}>
+          <FollowPlusMark arm={mini ? 9 : 13} />
+          <Text
+            style={[
+              styles.label,
+              compact && styles.labelCompact,
+              mini && styles.labelMini,
+            ]}
+          >
+            Seguir
+          </Text>
         </View>
       )}
     </TouchableOpacity>
@@ -125,6 +148,15 @@ const styles = StyleSheet.create({
     minHeight: 40,
     maxWidth: 112,
   },
+  buttonMini: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 9,
+    borderWidth: 1.25,
+    minWidth: 0,
+    minHeight: 27,
+    maxWidth: 86,
+  },
   buttonPending: {
     borderColor: 'rgba(255,255,255,0.12)',
     backgroundColor: 'rgba(255,255,255,0.06)',
@@ -142,6 +174,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     letterSpacing: 0.35,
   },
+  followingTextMini: {
+    fontSize: 10.5,
+    letterSpacing: 0.15,
+  },
   pendingText: {
     fontSize: 14,
     fontWeight: '700',
@@ -154,6 +190,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
     lineHeight: 14,
   },
+  pendingTextMini: {
+    fontSize: 9.5,
+    letterSpacing: 0.1,
+    lineHeight: 12,
+  },
   seguirRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -162,6 +203,9 @@ const styles = StyleSheet.create({
   },
   seguirRowCompact: {
     gap: 5,
+  },
+  seguirRowMini: {
+    gap: 4,
   },
   label: {
     fontSize: 16,
@@ -173,5 +217,9 @@ const styles = StyleSheet.create({
   labelCompact: {
     fontSize: 13,
     letterSpacing: 0.4,
+  },
+  labelMini: {
+    fontSize: 10.5,
+    letterSpacing: 0.15,
   },
 });

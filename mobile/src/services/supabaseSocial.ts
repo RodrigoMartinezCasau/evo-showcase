@@ -785,6 +785,34 @@ export async function fetchFollowersCountsBatch(
   return counts;
 }
 
+/**
+ * Conteo EXACTO de seguidores por usuario (una query `head:true` con
+ * `count:'exact'` por id, en paralelo). A diferencia de fetchFollowersCountsBatch
+ * —que trae filas y cuenta en cliente, sujeto al tope de filas del servidor— este
+ * devuelve el total real aunque un usuario tenga cientos de seguidores. Úsalo para
+ * listas pequeñas (p. ej. las cuentas destacadas), no para muchos ids a la vez.
+ */
+export async function fetchFollowersCountsExact(
+  userIds: string[],
+): Promise<Record<string, number>> {
+  const ids = [...new Set(userIds.filter(isRealUserId))];
+  if (ids.length === 0) return {};
+  const entries = await Promise.all(
+    ids.map(async (id) => {
+      const { count, error } = await supabase
+        .from('follows')
+        .select('follower_id', { count: 'exact', head: true })
+        .eq('following_id', id);
+      if (error) {
+        console.error('[Social] fetchFollowersCountsExact:', error.message);
+        return [id, 0] as const;
+      }
+      return [id, count ?? 0] as const;
+    }),
+  );
+  return Object.fromEntries(entries);
+}
+
 // ─── Profiles batch fetch ─────────────────────────────────────────────────────
 
 export type BasicProfile = {
@@ -810,6 +838,79 @@ export async function fetchProfilesBatch(userIds: string[]): Promise<BasicProfil
     rank: r.rank ?? 'aprendiz',
     avatarUri: (r as { avatar_url?: string | null }).avatar_url ?? null,
   }));
+}
+
+export type TopUser = BasicProfile & { followersCount: number };
+
+/**
+ * Cuentas con más seguidores de la app (para el feed de "cuentas destacadas"
+ * de la pantalla de búsqueda). No existe una columna `followers_count`, así que
+ * agregamos la tabla `follows` en cliente: contamos cuántas veces aparece cada
+ * `following_id`, cogemos los top N y traemos sus perfiles. Suficiente para la
+ * escala actual; si la red crece mucho conviene mover esto a un RPC con GROUP BY.
+ */
+export async function fetchTopUsersByFollowers(limit = 10): Promise<TopUser[]> {
+  // 1) Descubrimiento de candidatos: una muestra de `follows` (el servidor
+  //    limita el nº de filas, así que esto es solo para saber QUIÉN aparece
+  //    mucho, no para el número final).
+  const { data, error } = await supabase
+    .from('follows')
+    .select('following_id')
+    .limit(2000);
+  if (error) {
+    console.error('[Social] fetchTopUsersByFollowers:', error.message);
+    return [];
+  }
+
+  const sample: Record<string, number> = {};
+  for (const row of data ?? []) {
+    const id = (row as { following_id: string }).following_id;
+    if (!isRealUserId(id)) continue;
+    sample[id] = (sample[id] ?? 0) + 1;
+  }
+
+  const candidateIds = Object.entries(sample)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, Math.max(limit * 3, 30))
+    .map(([id]) => id);
+  if (candidateIds.length === 0) return [];
+
+  // 2) Conteo EXACTO por candidato (no sujeto al tope de filas) → número real.
+  const exact = await fetchFollowersCountsExact(candidateIds);
+
+  // 3) Ranking final por conteo exacto.
+  const topIds = candidateIds
+    .sort((a, b) => (exact[b] ?? 0) - (exact[a] ?? 0))
+    .slice(0, limit);
+
+  const { data: profs, error: pErr } = await supabase
+    .from('profiles')
+    .select('id, username, clan_id, rank, avatar_url')
+    .in('id', topIds);
+  if (pErr) {
+    console.error('[Social] fetchTopUsersByFollowers profiles:', pErr.message);
+    return [];
+  }
+
+  const byId = new Map(
+    (profs ?? []).map((r) => [
+      r.id as string,
+      {
+        id: r.id as string,
+        username: (r.username as string) ?? (r.id as string).slice(0, 8),
+        clanId: (r.clan_id as string | null) ?? null,
+        rank: (r.rank as string) ?? 'aprendiz',
+        avatarUri: (r as { avatar_url?: string | null }).avatar_url ?? null,
+      } as BasicProfile,
+    ]),
+  );
+
+  return topIds
+    .map((id) => {
+      const p = byId.get(id);
+      return p ? { ...p, followersCount: exact[id] ?? 0 } : null;
+    })
+    .filter((u): u is TopUser => u != null);
 }
 
 /** Search users by username prefix/substring in Supabase profiles. */
