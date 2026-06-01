@@ -300,6 +300,12 @@ export function EvoAnimationWebView({
 }: Props) {
   const webRef = useRef<WebView>(null);
   const [htmlContent, setHtmlContent] = useState<string | null>(null);
+  // Desmontaje local inmediato al completar/cerrar: un Modal de RN sigue
+  // capturando toques aunque esté a opacidad 0 si permanece montado. Si el padre
+  // (cola de animaciones) tardara o fallara en poner `visible=false`, la pantalla
+  // quedaría congelada (caso del "Continuar" del aumento de rango). Con esto el
+  // Modal deja de existir en cuanto la animación termina, pase lo que pase fuera.
+  const [dismissed, setDismissed] = useState(false);
 
   // Preferences: combine prop flag with user preference
   const { hapticsEnabled: prefHaptics } = useEvoPreferences();
@@ -364,6 +370,7 @@ export function EvoAnimationWebView({
   // Reset both opacities every time the animation becomes visible.
   useEffect(() => {
     if (visible) {
+      setDismissed(false);
       rootOpacity.setValue(1);
       webOpacity.setValue(0);
       const cached = _inlinedHtmlCache.get(name);
@@ -382,6 +389,9 @@ export function EvoAnimationWebView({
     (callback?: (extra?: unknown) => void, extra?: unknown) => {
       setEntryAnimPlaying(false); // safety net if phase handler didn't fire
       rootOpacity.setValue(0);
+      // Desmonta el Modal aquí mismo (no esperamos al padre): evita que un Modal
+      // invisible siga interceptando toques y congele la pantalla.
+      setDismissed(true);
       callback?.(extra);
     },
     [rootOpacity],
@@ -527,11 +537,11 @@ export function EvoAnimationWebView({
      fadeInWebView, startClanEntrySequence, startHapticLoop, stopHapticLoop],
   );
 
-  if (!visible) return null;
+  if (!visible || dismissed) return null;
 
   return (
     <Modal
-      visible={visible}
+      visible={visible && !dismissed}
       transparent
       animationType="none"
       statusBarTranslucent

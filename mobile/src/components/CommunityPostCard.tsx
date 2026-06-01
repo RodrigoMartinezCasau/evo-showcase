@@ -160,13 +160,16 @@ function CommunityPostCardBase({
   const [cardDims, setCardDims] = useState<{ width: number; height: number } | null>(null);
   const onCardLayout = useCallback(
     (e: LayoutChangeEvent) => {
-      if (!followingFeedStyle) return;
+      // Medimos SIEMPRE (no solo en Siguiendo). Las dimensiones de la tarjeta
+      // no dependen de `followingFeedStyle`, y si una tarjeta se mide primero
+      // en Para Ti, al cambiar a Siguiendo el layout no vuelve a dispararse
+      // (mismo tamaño) y `cardDims` quedaría null → el reborde no aparecería.
       const { width, height } = e.nativeEvent.layout;
       setCardDims((prev) =>
         prev?.width === width && prev?.height === height ? prev : { width, height },
       );
     },
-    [followingFeedStyle],
+    [],
   );
 
   const textContentBottomY = useMemo(

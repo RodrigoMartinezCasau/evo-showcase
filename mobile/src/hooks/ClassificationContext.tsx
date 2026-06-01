@@ -383,6 +383,22 @@ function deriveVisibleClan(
   };
 }
 
+/**
+ * True cuando un estado local no tiene NADA que mostrar: ni clan revelado,
+ * ni reflexiones/frases, ni masa de totales. Un registro así (o su ausencia)
+ * debe poder restaurarse desde el respaldo público de Supabase.
+ */
+function isEmptyClassificationState(s: UserClassificationState | undefined): boolean {
+  if (!s) return true;
+  const mass = ALL_CLAN_IDS.reduce((acc, c) => acc + (s.totals[c] ?? 0), 0);
+  return (
+    s.visibleClanId == null &&
+    s.totalReflectionsSent === 0 &&
+    s.totalPhrasesSent === 0 &&
+    mass === 0
+  );
+}
+
 // ─── Provider ────────────────────────────────────────────────────────────────
 
 export function ClassificationProvider({ children }: { children: ReactNode }) {
@@ -431,7 +447,14 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
     if (!hydratedRef.current) return;
     const uid = profile?.id;
     if (!uid || !isRealUserId(uid)) return;
-    if (db[uid]) return;
+    // Restaurar desde Supabase no solo cuando NO existe registro local, sino
+    // también cuando el local existe pero está VACÍO (p. ej. AsyncStorage se
+    // leyó vacío tras actualizar la app). Antes `if (db[uid]) return;` saltaba
+    // la recuperación si había un registro local vacío, y el PERFIL PERSONAL
+    // (que lee del store local) mostraba "Sin clan"/0% aunque Supabase tuviera
+    // la distribución real. El perfil ajeno no se veía afectado porque lee
+    // directo de `profiles.clan_percentages`.
+    if (!isEmptyClassificationState(db[uid])) return;
     if (hydratedFromSupabaseRef.current.has(uid)) return;
     hydratedFromSupabaseRef.current.add(uid);
 
@@ -439,8 +462,16 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
     void (async () => {
       const snapshot = await fetchPublishedClassification(uid);
       if (cancelled || !snapshot) return;
-      // Race guard: if a write happened in the meantime, don't clobber.
-      setDb((prev) => (prev[uid] ? prev : { ...prev, [uid]: snapshot.state }));
+      // Nunca pisamos el local con un respaldo vacío: solo restauramos cuando
+      // Supabase trae datos reales.
+      if (isEmptyClassificationState(snapshot.state)) return;
+      setDb((prev) =>
+        // Race guard: si entretanto se escribió un estado local NO vacío
+        // (p. ej. el usuario acaba de reflexionar), respetamos ese.
+        isEmptyClassificationState(prev[uid])
+          ? { ...prev, [uid]: snapshot.state }
+          : prev,
+      );
     })();
     return () => {
       cancelled = true;
