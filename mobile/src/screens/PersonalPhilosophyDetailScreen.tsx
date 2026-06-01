@@ -114,16 +114,33 @@ export default function PersonalPhilosophyDetailScreen() {
   const classification = useClassification();
   const localPercentages = classification.getPercentages(baseProfile.id);
   const localVisibleClanId = classification.getVisibleClanId(baseProfile.id);
+  const localDisplayRank = classification.getDisplayRank(baseProfile.id);
   // Fallback robusto: si el store local está vacío (build nuevo / storage
-  // limpio), usamos el `clan_percentages` publicado en Supabase.
-  const { percentages: realPercentages } = usePublishedPercentages(
+  // limpio), usamos el `clan_percentages` / `clan_id` / `rank` publicados en
+  // Supabase.
+  const {
+    percentages: realPercentages,
+    clanId: publishedClanId,
+    rank: publishedRank,
+  } = usePublishedPercentages(
     authProfile?.id ?? baseProfile.id,
     localPercentages,
     localVisibleClanId,
+    localDisplayRank,
   );
+  const localRankHistory = classification.getClanRankHistory(baseProfile.id);
+  // Medallas: si el historial local está vacío (el `classification_state` de
+  // Supabase trae los totales borrados y `healState` lo vacía, perdiendo el
+  // `clanRankHistory`), reconstruimos al menos la medalla del clan actual con
+  // su rango publicado. Es la única fuente fiable cuando el historial completo
+  // no es recuperable.
   const clanRankHistory = isPreviewActive
     ? previewBadgeHistory
-    : classification.getClanRankHistory(baseProfile.id);
+    : Object.keys(localRankHistory).length > 0
+      ? localRankHistory
+      : publishedClanId
+        ? { [publishedClanId]: publishedRank }
+        : {};
   const profile = {
     ...baseProfile,
     philosophyPercentages: realPercentages,
