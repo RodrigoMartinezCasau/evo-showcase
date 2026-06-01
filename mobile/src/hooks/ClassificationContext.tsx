@@ -388,15 +388,13 @@ function deriveVisibleClan(
  * ni reflexiones/frases, ni masa de totales. Un registro así (o su ausencia)
  * debe poder restaurarse desde el respaldo público de Supabase.
  */
-function isEmptyClassificationState(s: UserClassificationState | undefined): boolean {
-  if (!s) return true;
-  const mass = ALL_CLAN_IDS.reduce((acc, c) => acc + (s.totals[c] ?? 0), 0);
-  return (
-    s.visibleClanId == null &&
-    s.totalReflectionsSent === 0 &&
-    s.totalPhrasesSent === 0 &&
-    mass === 0
-  );
+/**
+ * True cuando el estado local NO tiene un clan revelado (falta el registro o
+ * su `visibleClanId` es null). Es la señal para intentar restaurar desde
+ * Supabase: si allí hay un clan publicado, el perfil personal debe mostrarlo.
+ */
+function hasNoRevealedClan(s: UserClassificationState | undefined): boolean {
+  return !s || s.visibleClanId == null;
 }
 
 // ─── Provider ────────────────────────────────────────────────────────────────
@@ -447,14 +445,16 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
     if (!hydratedRef.current) return;
     const uid = profile?.id;
     if (!uid || !isRealUserId(uid)) return;
-    // Restaurar desde Supabase no solo cuando NO existe registro local, sino
-    // también cuando el local existe pero está VACÍO (p. ej. AsyncStorage se
-    // leyó vacío tras actualizar la app). Antes `if (db[uid]) return;` saltaba
-    // la recuperación si había un registro local vacío, y el PERFIL PERSONAL
-    // (que lee del store local) mostraba "Sin clan"/0% aunque Supabase tuviera
-    // la distribución real. El perfil ajeno no se veía afectado porque lee
-    // directo de `profiles.clan_percentages`.
-    if (!isEmptyClassificationState(db[uid])) return;
+    // Restaurar desde Supabase cuando el local NO TIENE CLAN REVELADO. Esto
+    // cubre tres casos que antes fallaban y dejaban el PERFIL PERSONAL (que lee
+    // del store local) en "Sin clan"/0% aunque Supabase tuviera la distribución:
+    //   1. No existe registro local (instalación nueva / AsyncStorage borrado).
+    //   2. Registro local totalmente vacío.
+    //   3. Registro local con datos parciales pero visibleClanId == null
+    //      (build nuevo con storage propio, hidratación a medias, etc.).
+    // El perfil ajeno no se veía afectado porque lee directo de
+    // `profiles.clan_percentages`.
+    if (!hasNoRevealedClan(db[uid])) return;
     if (hydratedFromSupabaseRef.current.has(uid)) return;
     hydratedFromSupabaseRef.current.add(uid);
 
@@ -462,13 +462,14 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
     void (async () => {
       const snapshot = await fetchPublishedClassification(uid);
       if (cancelled || !snapshot) return;
-      // Nunca pisamos el local con un respaldo vacío: solo restauramos cuando
-      // Supabase trae datos reales.
-      if (isEmptyClassificationState(snapshot.state)) return;
+      // Solo restauramos si Supabase trae un clan REVELADO de verdad. Si allí
+      // tampoco hay clan, respetamos el local (p. ej. usuario aún "Sin clan"
+      // acumulando reflexiones sin haber cruzado el umbral).
+      if (snapshot.state.visibleClanId == null) return;
       setDb((prev) =>
-        // Race guard: si entretanto se escribió un estado local NO vacío
-        // (p. ej. el usuario acaba de reflexionar), respetamos ese.
-        isEmptyClassificationState(prev[uid])
+        // Race guard: si entretanto el local ya reveló un clan (p. ej. el
+        // usuario acaba de reflexionar y cruzó el umbral), respetamos ese.
+        hasNoRevealedClan(prev[uid])
           ? { ...prev, [uid]: snapshot.state }
           : prev,
       );

@@ -30,6 +30,7 @@ import { AppTopBar, AppShellBottomTabsWrap, BottomCommunityTabs, SidebarDrawer }
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
+import { usePublishedPercentages } from '@evoconn/hooks/usePublishedPercentages';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { usePreviewMode } from '@evoconn/debug/PreviewModeContext';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
@@ -111,7 +112,15 @@ export default function PersonalPhilosophyDetailScreen() {
   const baseProfile = getPersonalProfile();
   // Use real philosophical-classification data instead of seed mock values.
   const classification = useClassification();
-  const realPercentages = classification.getPercentages(baseProfile.id);
+  const localPercentages = classification.getPercentages(baseProfile.id);
+  const localVisibleClanId = classification.getVisibleClanId(baseProfile.id);
+  // Fallback robusto: si el store local está vacío (build nuevo / storage
+  // limpio), usamos el `clan_percentages` publicado en Supabase.
+  const { percentages: realPercentages } = usePublishedPercentages(
+    authProfile?.id ?? baseProfile.id,
+    localPercentages,
+    localVisibleClanId,
+  );
   const clanRankHistory = isPreviewActive
     ? previewBadgeHistory
     : classification.getClanRankHistory(baseProfile.id);

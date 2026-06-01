@@ -25,6 +25,7 @@ import { AppTopBar, AppShellBottomTabsWrap, BottomCommunityTabs, SidebarDrawer }
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
+import { usePublishedPercentages } from '@evoconn/hooks/usePublishedPercentages';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { usePreviewMode } from '@evoconn/debug/PreviewModeContext';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
@@ -102,9 +103,21 @@ export default function PersonalProfileScreen() {
   ]);
 
   // Real per-user philosophical percentages from the classification engine.
-  const realPercentages = useMemo(
+  const localPercentages = useMemo(
     () => classification.getPercentages(profile.id),
     [classification, profile.id],
+  );
+  const localVisibleClanId = useMemo(
+    () => classification.getVisibleClanId(profile.id),
+    [classification, profile.id],
+  );
+  // Fallback robusto: si el store local está vacío (build nuevo / storage
+  // limpio), usamos el `clan_percentages` publicado en Supabase — la misma
+  // fuente que ya muestra correctamente el perfil ajeno.
+  const { percentages: realPercentages } = usePublishedPercentages(
+    authProfile?.id ?? session?.user?.id ?? profile.id,
+    localPercentages,
+    localVisibleClanId,
   );
   const displayRank = useMemo(
     () => classification.getDisplayRank(profile.id),

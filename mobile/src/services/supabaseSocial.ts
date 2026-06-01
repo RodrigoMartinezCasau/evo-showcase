@@ -454,12 +454,39 @@ export async function recordPostView(userId: string, postId: string): Promise<vo
 /** Fetches all votes for a list of post IDs (to reconstruct upvoterIds/downvoterIds). */
 export async function fetchVotesForPosts(postIds: string[]): Promise<DbVoteRow[]> {
   if (postIds.length === 0) return [];
-  const { data, error } = await supabase
-    .from('votes')
-    .select('user_id, post_id, vote')
-    .in('post_id', postIds);
-  if (error) { console.error('[Social] fetchVotes:', error.message); return []; }
-  return (data ?? []) as DbVoteRow[];
+
+  // IMPORTANTE: una sola query `.in(...)` choca con el límite por defecto de
+  // Supabase (1000 filas). Con la red ya grande, el total de votos del feed
+  // supera 1000 y los que caen fuera del corte se perdían → publicaciones (a
+  // menudo las propias del perfil) mostraban 0 votos aunque sí tuvieran. Para
+  // evitarlo: (1) troceamos los postIds y (2) paginamos cada lote con range()
+  // hasta agotar las filas.
+  const POST_CHUNK = 150;
+  const PAGE = 1000;
+  const all: DbVoteRow[] = [];
+
+  for (let i = 0; i < postIds.length; i += POST_CHUNK) {
+    const chunk = postIds.slice(i, i + POST_CHUNK);
+    let from = 0;
+    // Bucle de paginación: pedimos páginas de 1000 hasta recibir menos de 1000.
+    for (;;) {
+      const { data, error } = await supabase
+        .from('votes')
+        .select('user_id, post_id, vote')
+        .in('post_id', chunk)
+        .range(from, from + PAGE - 1);
+      if (error) {
+        console.error('[Social] fetchVotes:', error.message);
+        break;
+      }
+      const rows = (data ?? []) as DbVoteRow[];
+      all.push(...rows);
+      if (rows.length < PAGE) break;
+      from += PAGE;
+    }
+  }
+
+  return all;
 }
 
 /** Fetches my votes only (for restoring my voteMap). */
