@@ -344,8 +344,8 @@ const styles = StyleSheet.create({
   audioBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: '#0b0b0f',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.55)',
+    borderColor: '#FFFFFF',
   },
 });

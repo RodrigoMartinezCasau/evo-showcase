@@ -18,12 +18,13 @@
  *       totalReflectionsSent >= REVEAL_MIN_REFLECTIONS (3)
  *       totalPhrasesSent >= REVEAL_MIN_PHRASES (5)
  *       (totalReflectionsSent + totalPhrasesSent) >= REVEAL_TOTAL_INPUTS_THRESHOLD (8)
- *       AND the top clan has ≥ REVEAL_PCT_THRESHOLD (25%)
+ *       AND the top clan has ≥ REVEAL_PCT_THRESHOLD (22%)
  *       AND leads the runner-up by ≥ REVEAL_LEAD_OVER_SECOND_PP (3 pp)
  *   - phrases use the same hybrid scoring (semantic + ML + Claude) as reflections
  *   - after reveal, new inputs are dampened (POST_REVEAL_WEIGHT)
- *   - clan switches use the same clarity rule: new #1 must be ≥25% and ≥5 pp
- *     ahead of #2 (not “vs previous visible clan”).
+ *   - clan switches use the same clarity rule: new #1 must be ≥ REVEAL_PCT_THRESHOLD
+ *     (22%) and ≥ REVEAL_LEAD_OVER_SECOND_PP (3 pp) ahead of #2 (not “vs previous
+ *     visible clan”).
  *   - rank badges do not downgrade inside the same clan once Maestro/Filósofo
  *     has been reached; a clan switch resets the badge path for the new clan.
  *   - after 7 inactive days (no reflection or phrase), the visible badge is
@@ -122,7 +123,7 @@ export const REVEAL_MIN_PHRASES = 5;
 export const REVEAL_TOTAL_INPUTS_THRESHOLD = 8;
 
 /** Minimum percentage for the leading clan (reveal + switch). */
-export const REVEAL_PCT_THRESHOLD = 25;
+export const REVEAL_PCT_THRESHOLD = 22;
 
 /** Leader must lead the second-place clan by at least this many percentage points.
  *  Aplica TANTO al primer revelado como al cambio de clan (un clan solo
