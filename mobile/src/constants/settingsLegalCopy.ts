@@ -42,3 +42,6 @@ Para dudas sobre estos términos: hello@evoconn.com
 export const PRIVACY_POLICY_ES = PRIVACY_POLICY_FULL_ES;
 
 export const SUPPORT_EMAIL = 'hello@evoconn.com';
+
+/** Invitación al servidor de Discord para soporte personalizado. */
+export const DISCORD_INVITE_URL = 'https://discord.gg/4yJqaGxjA8';
