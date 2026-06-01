@@ -200,28 +200,77 @@ export type ClanMemberSummary = {
   avatarUri: string | null;
 };
 
-/** Miembros publicados por clan (para ranking: posts / miembros). */
+/** Miembros publicados por clan (para ranking: posts / miembros).
+ *
+ * IMPORTANTE: NO usamos `select('clan_id')` + conteo en cliente. Esa consulta
+ * trae una fila por perfil y choca con el límite por defecto de Supabase
+ * (1000 filas): con >1000 miembros totales, los clanes que caen tras el corte
+ * salían a 0 (era la causa de "realista/racionalista: 0 miembros"). En su lugar
+ * pedimos solo el COUNT por clan (head: true, sin filas) → exacto y sin tope. */
 export async function fetchClanMemberCountsByClan(): Promise<Record<string, number>> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('clan_id')
-    .not('clan_id', 'is', null)
-    .in('clan_id', [...ALL_CLAN_IDS]);
-
-  if (error) {
-    console.warn('[ClassificationSync] fetchClanMemberCountsByClan failed', error.message);
-    return {};
-  }
-
   const counts: Record<string, number> = {};
   for (const clan of ALL_CLAN_IDS) {
     counts[clan] = 0;
   }
-  for (const row of data ?? []) {
-    const cid = row.clan_id as string | null;
-    if (cid && cid in counts) {
-      counts[cid]++;
-    }
+
+  const results = await Promise.all(
+    ALL_CLAN_IDS.map(async (clan) => {
+      const { count, error } = await supabase
+        .from('profiles')
+        .select('id', { count: 'exact', head: true })
+        .eq('clan_id', clan);
+      if (error) {
+        console.warn(
+          `[ClassificationSync] fetchClanMemberCountsByClan(${clan}) failed`,
+          error.message,
+        );
+        return { clan, count: null as number | null };
+      }
+      return { clan, count: count ?? 0 };
+    }),
+  );
+
+  for (const r of results) {
+    if (r.count != null) counts[r.clan] = r.count;
+  }
+  return counts;
+}
+
+/** Publicaciones (reflexión + frase) por clan desde `periodStartIso`.
+ *
+ * Conteo GLOBAL server-side (head: true, sin traer filas → sin tope de 1000):
+ * imprescindible para que la competición sea igual en todos los dispositivos.
+ * El clan de cada post se resuelve en vivo en la vista `posts_with_author_clan`
+ * (live_author_clan_id = clan ACTUAL del autor). */
+export async function fetchClanPostCountsByClan(
+  periodStartIso: string,
+): Promise<Record<string, number>> {
+  const counts: Record<string, number> = {};
+  for (const clan of ALL_CLAN_IDS) {
+    counts[clan] = 0;
+  }
+
+  const results = await Promise.all(
+    ALL_CLAN_IDS.map(async (clan) => {
+      const { count, error } = await supabase
+        .from('posts_with_author_clan')
+        .select('id', { count: 'exact', head: true })
+        .eq('live_author_clan_id', clan)
+        .in('type', ['reflection', 'phrase'])
+        .gte('created_at', periodStartIso);
+      if (error) {
+        console.warn(
+          `[ClassificationSync] fetchClanPostCountsByClan(${clan}) failed`,
+          error.message,
+        );
+        return { clan, count: null as number | null };
+      }
+      return { clan, count: count ?? 0 };
+    }),
+  );
+
+  for (const r of results) {
+    if (r.count != null) counts[r.clan] = r.count;
   }
   return counts;
 }

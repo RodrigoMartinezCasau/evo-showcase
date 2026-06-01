@@ -80,9 +80,13 @@ import { useEffectiveClanId } from '@evoconn/hooks/useEffectiveClanId';
 import {
   fetchClanMembers,
   fetchClanMemberCountsByClan,
+  fetchClanPostCountsByClan,
   type ClanMemberSummary,
 } from '@evoconn/services/classificationSync';
-import { computeAllClanRankings } from '@evoconn/utils/clanRanking';
+import {
+  computeAllClanRankings,
+  computeClanRankingsFromCounts,
+} from '@evoconn/utils/clanRanking';
 import { getClanCompetitionPeriod } from '@evoconn/utils/clanCompetitionPeriod';
 import { ALL_CLAN_IDS } from '@evoconn/services/clanClassifier';
 import { isRealUserId } from '@evoconn/services/supabaseSocial';
@@ -168,12 +172,27 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
 
   const [remoteMembers, setRemoteMembers] = useState<ClanMemberSummary[]>([]);
   const [dbMemberCounts, setDbMemberCounts] = useState<Record<string, number>>({});
+  // Conteo GLOBAL de publicaciones del período por clan (server-side). Es el
+  // numerador fiable de la competición; el feed local solo carga una parte.
+  const [dbPostCounts, setDbPostCounts] = useState<Record<string, number> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       const counts = await fetchClanMemberCountsByClan();
       if (!cancelled) setDbMemberCounts(counts);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const periodStartIso = new Date(getClanCompetitionPeriod().periodStartMs).toISOString();
+      const counts = await fetchClanPostCountsByClan(periodStartIso);
+      if (!cancelled) setDbPostCounts(counts);
     })();
     return () => {
       cancelled = true;
@@ -343,8 +362,13 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
   );
   const competitionPeriod = useMemo(() => getClanCompetitionPeriod(), []);
   const allRankings = useMemo(
-    () => computeAllClanRankings(allPosts, memberCounts),
-    [allPosts, memberCounts],
+    () =>
+      dbPostCounts
+        // Conteo global (fiable, igual en todos los dispositivos).
+        ? computeClanRankingsFromCounts(dbPostCounts, memberCounts)
+        // Respaldo mientras llega el conteo global: feed local.
+        : computeAllClanRankings(allPosts, memberCounts),
+    [dbPostCounts, allPosts, memberCounts],
   );
   const clanRanking = allRankings[clanId] ?? {
     rank: 1,
