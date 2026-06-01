@@ -84,6 +84,7 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
     activeUserId: viewerId,
     posts: allSimPosts,
     users: simUsers,
+    recordPostView,
   } = useSimulation();
   const followGraphRef = useRef(followGraph);
   followGraphRef.current = followGraph;
@@ -417,9 +418,10 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
 
   const handlePostPress = useCallback(
     (post: CommunityPost) => {
+      recordPostView(post.id);
       openDetailFeed(livePosts, post.id);
     },
-    [openDetailFeed, livePosts],
+    [openDetailFeed, livePosts, recordPostView],
   );
 
   const handleSeeMoreRecentPosts = useCallback(() => {

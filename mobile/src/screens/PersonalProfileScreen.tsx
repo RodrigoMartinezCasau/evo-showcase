@@ -60,7 +60,7 @@ export default function PersonalProfileScreen() {
   const safeFrame = useSafeAreaFrame();
   const { width: screenW, height: screenH } = useWindowDimensions();
   const { profile: authProfile, session, refreshProfile } = useAuth();
-  const { activeFollowersCount, activeFollowingCount } = useSimulation();
+  const { activeFollowersCount, activeFollowingCount, recordPostView } = useSimulation();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const ready = useDeferredRender();
@@ -266,12 +266,13 @@ export default function PersonalProfileScreen() {
 
   const handleRecentPostPress = useCallback(
     (post: CommunityPost) => {
+      recordPostView(post.id);
       router.push({
         pathname: '/latest-posts',
         params: { postId: post.id, userId: profileWithClan.id },
       });
     },
-    [router, profileWithClan.id],
+    [router, profileWithClan.id, recordPostView],
   );
 
   const handleSeeMoreRecentPosts = useCallback(() => {

@@ -81,7 +81,9 @@ function loadIds(raw: string | null): string[] {
 }
 
 export function ParatiSeenPostsProvider({ children }: { children: React.ReactNode }) {
-  const { activeUserId } = useSimulation();
+  const { activeUserId, recordPostView } = useSimulation();
+  const recordPostViewRef = useRef(recordPostView);
+  recordPostViewRef.current = recordPostView;
   const [state, dispatch] = useReducer(reducer, { order: [], revision: 0 });
   const [storageReady, setStorageReady] = useState(false);
   const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -123,6 +125,9 @@ export function ParatiSeenPostsProvider({ children }: { children: React.ReactNod
 
   const markParatiPostSeen = useCallback((postId: string) => {
     dispatch({ type: 'mark', postId });
+    // Una impresión en "Para ti" cuenta como visualización (dedup por sesión en
+    // SimulationContext + PK (usuario,post) en Supabase).
+    recordPostViewRef.current(postId);
   }, []);
 
   const seenIds = useMemo(() => new Set(state.order), [state.order]);

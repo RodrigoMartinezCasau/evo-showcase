@@ -52,6 +52,11 @@ import {
   deleteVote as dbDeleteVote,
   insertSave,
   deleteSave as dbDeleteSave,
+  fetchMyReposts,
+  fetchRepostsByUsers,
+  insertRepost,
+  deleteRepost as dbDeleteRepost,
+  fetchProfilesBatch,
   insertFollow,
   deleteFollow as dbDeleteFollow,
   insertComment,
@@ -59,6 +64,8 @@ import {
   upsertCommentVote,
   deleteCommentVote as dbDeleteCommentVote,
   fetchMyCommentVotes,
+  fetchPostViewCounts,
+  recordPostView as dbRecordPostView,
   adminDeletePost,
   adminDeleteComment,
   dbRowToSimPost,
@@ -78,6 +85,7 @@ const SIM_COMMENTS_STORAGE_KEY = '@physicscopilot/sim_comments_v3';
 const SIM_COMMENT_VOTES_STORAGE_KEY = '@physicscopilot/sim_comment_votes_v1';
 const SIM_SAVED_STORAGE_KEY    = '@physicscopilot/sim_saved_v1';
 const SIM_HIDDEN_STORAGE_KEY   = '@physicscopilot/sim_hidden_v1';
+const SIM_REPOSTS_STORAGE_KEY  = '@physicscopilot/sim_reposts_v1';
 
 /** Shared fetch for real-user Supabase hydration + manual “Para ti” feed refresh. */
 async function loadSupabaseHydrationPayload(hydrateFor: string): Promise<{
@@ -232,6 +240,9 @@ export type SimulationContextValue = {
   /** userId → { commentId → true } : comentarios que el usuario ha votado. */
   commentVoteMap: Record<string, Record<string, true>>;
 
+  /** postId → nº de visualizaciones únicas (cargado bajo demanda). */
+  postViewCounts: Record<string, number>;
+
   // ── Actions ──────────────────────────────────────────────────────────────
   follow: (fromId: string, toId: string) => void;
   unfollow: (fromId: string, toId: string) => void;
@@ -239,7 +250,22 @@ export type SimulationContextValue = {
   castVote: (userId: string, postId: string, newVote: 'up' | 'down' | null) => void;
   /** Alterna el upvote de un comentario (persiste como castVote para posts). */
   castCommentVote: (userId: string, postId: string, commentId: string) => void;
+  /** Registra (1 vez por sesión) que el usuario activo ha visto este post. */
+  recordPostView: (postId: string) => void;
+  /** Carga el recuento de visualizaciones de estos posts (perezoso, idempotente). */
+  ensurePostViewCounts: (postIds: string[]) => void;
   toggleSave: (userId: string, postId: string) => void;
+  /** ¿He republicado yo (usuario activo) este post? */
+  isReposted: (postId: string) => boolean;
+  /** Alterna mi republicación de un post (write-through a Supabase). */
+  toggleRepost: (postId: string) => void;
+  /**
+   * Atribución de republicación por post para el lector activo (solo Para Ti):
+   * - `isSelf: true`  → "Republicado por ti" (yo lo republiqué).
+   * - en otro caso     → primer republicador entre la gente que sigo.
+   * Si nadie relevante lo republicó, el post no está en el mapa.
+   */
+  repostAttributionByPost: Record<string, { isSelf: boolean; username: string | null; userId: string | null }>;
   deletePost: (authorId: string, postId: string, options?: { admin?: boolean }) => void;
   toggleHidePost: (userId: string, postId: string) => void;
   publishPost: (post: SimPost) => void;
@@ -889,6 +915,49 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     AsyncStorage.setItem(SIM_COMMENT_VOTES_STORAGE_KEY, JSON.stringify(commentVoteMap)).catch(console.error);
   }, [commentVoteMap]);
 
+  // ── Post views (visualizaciones) ───────────────────────────────────────────
+  // `postViewCounts`: postId → nº de espectadores únicos (de Supabase).
+  // `recordedViewsRef`: posts que ya he registrado en esta sesión (dedup local
+  // para no spamear upserts; el PK (user,post) deduplica en el servidor).
+  // `viewCountsInFlightRef`: posts cuyo recuento ya estamos pidiendo.
+  const [postViewCounts, setPostViewCounts] = useState<Record<string, number>>({});
+  const recordedViewsRef = useRef<Set<string>>(new Set());
+  const viewCountsInFlightRef = useRef<Set<string>>(new Set());
+
+  // Al cambiar de usuario, olvidamos lo registrado en esta sesión.
+  useEffect(() => {
+    recordedViewsRef.current = new Set();
+  }, [activeUserId]);
+
+  const recordPostView = useCallback((postId: string) => {
+    const me = activeUserIdRef.current;
+    if (!postId || !isRealUserId(me)) return;
+    if (recordedViewsRef.current.has(postId)) return;
+    recordedViewsRef.current.add(postId);
+    void dbRecordPostView(me, postId);
+  }, []);
+
+  const ensurePostViewCounts = useCallback((postIds: string[]) => {
+    const wanted = postIds.filter(
+      (id) => id && !viewCountsInFlightRef.current.has(id),
+    );
+    if (wanted.length === 0) return;
+    for (const id of wanted) viewCountsInFlightRef.current.add(id);
+    void (async () => {
+      try {
+        const counts = await fetchPostViewCounts(wanted);
+        setPostViewCounts((prev) => {
+          const next = { ...prev };
+          // Los ids sin filas devuelven 0 (no aparecen en `counts`).
+          for (const id of wanted) next[id] = counts[id] ?? 0;
+          return next;
+        });
+      } finally {
+        for (const id of wanted) viewCountsInFlightRef.current.delete(id);
+      }
+    })();
+  }, []);
+
   // ── Saved map ─────────────────────────────────────────────────────────────
   const [savedMapArr, setSavedMapArr] = useState<Record<string, string[]>>(() => {
     const m: Record<string, string[]> = {};
@@ -926,6 +995,41 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     if (!savedHydrated.current) return;
     AsyncStorage.setItem(SIM_SAVED_STORAGE_KEY, JSON.stringify(savedMapArr)).catch(console.error);
   }, [savedMapArr]);
+
+  // ── Reposts (republicar) ──────────────────────────────────────────────────
+  // `myRepostIds`: posts que YO he republicado (fuente de verdad para el botón
+  // y la etiqueta "Republicado por ti"); persiste local + write-through Supabase.
+  // `followedRepostRows`: republicaciones de la gente a la que sigo (para inyectar
+  // esos posts en mi Para Ti y mostrar "Republicado por @usuario", primer
+  // republicador en caso de empate).
+  const [myRepostIds, setMyRepostIds] = useState<string[]>([]);
+  const myRepostIdsRef = useRef<string[]>([]);
+  const [followedRepostRows, setFollowedRepostRows] =
+    useState<Array<{ userId: string; postId: string; createdAt: string }>>([]);
+  const [repostUsernameById, setRepostUsernameById] = useState<Record<string, string>>({});
+  const repostsHydrated = useRef(false);
+
+  // Carga local de mis reposts (arranque offline / sim users).
+  useEffect(() => {
+    AsyncStorage.getItem(SIM_REPOSTS_STORAGE_KEY)
+      .then((raw) => {
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) setMyRepostIds(parsed.filter((x) => typeof x === 'string'));
+          } catch { /* ignore */ }
+        }
+        repostsHydrated.current = true;
+      })
+      .catch(() => { repostsHydrated.current = true; });
+  }, []);
+
+  useEffect(() => {
+    myRepostIdsRef.current = myRepostIds;
+    if (!repostsHydrated.current) return;
+    AsyncStorage.setItem(SIM_REPOSTS_STORAGE_KEY, JSON.stringify(myRepostIds)).catch(console.error);
+  }, [myRepostIds]);
+
   const hiddenHydrated = useRef(false);
   const [hiddenMapArr, setHiddenMapArr] = useState<Record<string, string[]>>({});
 
@@ -1329,6 +1433,91 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  // ── Hidratación de reposts (mis reposts + reposts de a quién sigo) ──────────
+  // Clave estable de la gente a la que sigo: re-dispara la carga al seguir/dejar
+  // de seguir o al cambiar de usuario.
+  const followedKey = useMemo(
+    () => [...(followGraph[activeUserId] ?? [])].filter(isRealUserId).sort().join(','),
+    [followGraph, activeUserId],
+  );
+
+  useEffect(() => {
+    const me = activeUserIdRef.current;
+    if (!isRealUserId(me)) {
+      setFollowedRepostRows([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const followedIds = followedKey ? followedKey.split(',') : [];
+      const [mine, rows] = await Promise.all([
+        fetchMyReposts(me),
+        followedIds.length > 0 ? fetchRepostsByUsers(followedIds) : Promise.resolve([]),
+      ]);
+      if (cancelled || activeUserIdRef.current !== me) return;
+
+      // Mis reposts del servidor son la fuente de verdad para usuarios reales.
+      setMyRepostIds(mine);
+      setFollowedRepostRows(rows.map((r) => ({ userId: r.user_id, postId: r.post_id, createdAt: r.created_at })));
+
+      // Resolver usernames de los republicadores que sigo (para la etiqueta).
+      const reposterIds = [...new Set(rows.map((r) => r.user_id))];
+      if (reposterIds.length > 0) {
+        const profiles = await fetchProfilesBatch(reposterIds).catch(() => []);
+        if (!cancelled && activeUserIdRef.current === me) {
+          setRepostUsernameById((prev) => {
+            const next = { ...prev };
+            for (const p of profiles) if (p.username) next[p.id] = p.username;
+            return next;
+          });
+        }
+      }
+
+      // Asegurar que los posts republicados estén en el feed (para que aparezcan
+      // en Para Ti aunque no estuvieran en el top global).
+      const repostPostIds = [...new Set([...mine, ...rows.map((r) => r.post_id)])];
+      const missing = repostPostIds.filter((id) => !postsRef.current.some((p) => p.id === id));
+      if (missing.length > 0) void ingestPostsByIds(missing);
+    })();
+    return () => { cancelled = true; };
+  // ingestPostsByIds es estable (useCallback []).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeUserId, followedKey]);
+
+  /** "Republicado por ti" gana sobre cualquier seguido; si no, primer republicador seguido. */
+  const repostAttributionByPost = useMemo<Record<string, { isSelf: boolean; username: string | null; userId: string | null }>>(() => {
+    const map: Record<string, { isSelf: boolean; username: string | null; userId: string | null }> = {};
+    const earliestByPost = new Map<string, { userId: string; createdAt: string }>();
+    for (const r of followedRepostRows) {
+      const cur = earliestByPost.get(r.postId);
+      if (!cur || r.createdAt < cur.createdAt) {
+        earliestByPost.set(r.postId, { userId: r.userId, createdAt: r.createdAt });
+      }
+    }
+    for (const [postId, r] of earliestByPost) {
+      map[postId] = { isSelf: false, username: repostUsernameById[r.userId] ?? null, userId: r.userId };
+    }
+    for (const pid of myRepostIds) {
+      map[pid] = { isSelf: true, username: null, userId: activeUserId };
+    }
+    return map;
+  }, [followedRepostRows, repostUsernameById, myRepostIds, activeUserId]);
+
+  const isReposted = useCallback(
+    (postId: string) => myRepostIdsRef.current.includes(postId),
+    [],
+  );
+
+  const toggleRepost = useCallback((postId: string) => {
+    const me = activeUserIdRef.current;
+    setMyRepostIds((prev) => {
+      const has = prev.includes(postId);
+      if (has) void dbDeleteRepost(me, postId);
+      else void insertRepost(me, postId);
+      return has ? prev.filter((id) => id !== postId) : [...prev, postId];
+    });
+  }, []);
+
   const refreshSocialFromSupabase = useCallback(async (): Promise<SimPost[]> => {
     if (!isRealUserId(activeUserId)) {
       const seed = SIM_POSTS.map(p => ({ ...p }));
@@ -1388,6 +1577,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       hiddenMap,
       commentsMap,
       commentVoteMap,
+      postViewCounts,
       activeUser,
       activeFollowersCount,
       activeFollowingCount,
@@ -1396,7 +1586,12 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       toggleFollow,
       castVote,
       castCommentVote,
+      recordPostView,
+      ensurePostViewCounts,
       toggleSave,
+      isReposted,
+      toggleRepost,
+      repostAttributionByPost,
       deletePost,
       toggleHidePost,
       publishPost,
@@ -1409,9 +1604,11 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     [
       activeUserId, setActiveUserId, users, posts,
       followGraph_sets, savedMap, voteMapRaw, hiddenMap,
-      commentsMap, commentVoteMap,
+      commentsMap, commentVoteMap, postViewCounts,
       activeUser, activeFollowersCount, activeFollowingCount,
-      follow, unfollow, toggleFollow, castVote, castCommentVote, toggleSave,
+      follow, unfollow, toggleFollow, castVote, castCommentVote,
+      recordPostView, ensurePostViewCounts, toggleSave,
+      isReposted, toggleRepost, repostAttributionByPost,
       deletePost, toggleHidePost, publishPost, addComment, deleteCommentById, ensureCommentsForPost,
       refreshSocialFromSupabase, ingestPostsByIds,
     ],

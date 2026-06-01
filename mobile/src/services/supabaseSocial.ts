@@ -415,6 +415,40 @@ async function applyCommentVoteCounts(comments: SimComment[]): Promise<SimCommen
   return comments.map((c) => ({ ...c, upCount: counts[c.id] ?? 0 }));
 }
 
+// ─── Post views (visualizaciones) ────────────────────────────────────────────
+
+/** Recuento de visualizaciones únicas por post (agregado de todos los usuarios). */
+export async function fetchPostViewCounts(
+  postIds: string[],
+): Promise<Record<string, number>> {
+  if (postIds.length === 0) return {};
+  const { data, error } = await supabase
+    .from('post_views')
+    .select('post_id')
+    .in('post_id', postIds);
+  if (error) {
+    // La tabla puede no existir aún (migración sin aplicar): degradar a 0.
+    console.warn('[Social] fetchPostViewCounts:', error.message);
+    return {};
+  }
+  const counts: Record<string, number> = {};
+  for (const row of data ?? []) {
+    const id = (row as { post_id: string }).post_id;
+    counts[id] = (counts[id] ?? 0) + 1;
+  }
+  return counts;
+}
+
+/** Registra (idempotente) que `userId` ha visto `postId`. Solo usuarios reales. */
+export async function recordPostView(userId: string, postId: string): Promise<void> {
+  if (!isRealUserId(userId) || !postId) return;
+  const { error } = await supabase
+    .from('post_views')
+    .upsert({ user_id: userId, post_id: postId }, { onConflict: 'user_id,post_id' });
+  // Silencioso: una vista perdida no debe romper la navegación.
+  if (error) console.warn('[Social] recordPostView:', error.message);
+}
+
 // ─── Votes ────────────────────────────────────────────────────────────────────
 
 /** Fetches all votes for a list of post IDs (to reconstruct upvoterIds/downvoterIds). */
@@ -479,6 +513,53 @@ export async function deleteSave(userId: string, postId: string): Promise<void> 
   const { error } = await supabase.from('saves').delete()
     .eq('user_id', userId).eq('post_id', postId);
   if (error) console.error('[Social] deleteSave:', error.message);
+}
+
+// ─── Reposts (republicar) ───────────────────────────────────────────────────────
+
+export type DbRepostRow = { user_id: string; post_id: string; created_at: string };
+
+/** Post IDs republicados por `userId` (los míos). */
+export async function fetchMyReposts(userId: string): Promise<string[]> {
+  if (!isRealUserId(userId)) return [];
+  const { data, error } = await supabase
+    .from('reposts')
+    .select('post_id')
+    .eq('user_id', userId);
+  if (error) { console.error('[Social] fetchMyReposts:', error.message); return []; }
+  return (data ?? []).map(r => r.post_id);
+}
+
+/**
+ * Republicaciones hechas por un conjunto de usuarios (los que sigue el lector).
+ * Devuelve user_id + post_id + created_at para poder elegir al PRIMER republicador
+ * (dedup) y mostrar la etiqueta "Republicado por @usuario".
+ */
+export async function fetchRepostsByUsers(userIds: string[]): Promise<DbRepostRow[]> {
+  const ids = userIds.filter(isRealUserId);
+  if (ids.length === 0) return [];
+  const { data, error } = await supabase
+    .from('reposts')
+    .select('user_id, post_id, created_at')
+    .in('user_id', ids);
+  if (error) { console.error('[Social] fetchRepostsByUsers:', error.message); return []; }
+  return (data ?? []) as DbRepostRow[];
+}
+
+export async function insertRepost(userId: string, postId: string): Promise<void> {
+  if (!isRealUserId(userId)) return;
+  const { error } = await supabase.from('reposts').upsert(
+    { user_id: userId, post_id: postId },
+    { onConflict: 'user_id,post_id' },
+  );
+  if (error) console.error('[Social] insertRepost:', error.message);
+}
+
+export async function deleteRepost(userId: string, postId: string): Promise<void> {
+  if (!isRealUserId(userId)) return;
+  const { error } = await supabase.from('reposts').delete()
+    .eq('user_id', userId).eq('post_id', postId);
+  if (error) console.error('[Social] deleteRepost:', error.message);
 }
 
 // ─── Follows ──────────────────────────────────────────────────────────────────

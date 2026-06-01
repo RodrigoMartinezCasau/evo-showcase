@@ -71,6 +71,7 @@ import { ClanPhilosopherSlot } from './ClanPhilosopherSlot';
 import { UserResultCard } from '@evoconn/components/UserResultCard';
 import { PersonalRecentPostCard } from '@evoconn/components/personalProfile/PersonalRecentPostCard';
 import { useFeedStore } from '@evoconn/hooks/useFeedStore';
+import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { SIM_USERS } from '@evoconn/data/simulation/simulatedNetwork';
 import { ClanRankingCard } from './ClanRankingCard';
 import { useAuth } from '../../../mobile/lib/AuthContext';
@@ -254,6 +255,7 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
   // ── Top posts en vivo — publicaciones del clan con ≥1 voto en las últimas 24h ──
   // Para 'indefinido', los autores sin clan asignado tienen clanId: null.
   const { posts: allPosts } = useFeedStore();
+  const { postViewCounts, ensurePostViewCounts, recordPostView } = useSimulation();
 
   // Todas las publicaciones del clan, de más votadas a menos. Sin tope.
   const rankedPosts = useMemo(() => {
@@ -286,6 +288,11 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
     () => rankedPosts.slice(postWindow.start, postWindow.end),
     [rankedPosts, postWindow],
   );
+
+  const livePostIdsKey = useMemo(() => livePosts.map((p) => p.id).join(','), [livePosts]);
+  useEffect(() => {
+    if (livePostIdsKey) ensurePostViewCounts(livePostIdsKey.split(','));
+  }, [livePostIdsKey, ensurePostViewCounts]);
 
   const loadPostsForward = useCallback(() => {
     if (postLoadingRef.current) return;
@@ -380,8 +387,11 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
   }, [slideAnim]);
 
   const handlePostPress = useCallback(
-    (post: CommunityPost) => openDetailFeed(livePosts, post.id),
-    [openDetailFeed, livePosts],
+    (post: CommunityPost) => {
+      recordPostView(post.id);
+      openDetailFeed(livePosts, post.id);
+    },
+    [openDetailFeed, livePosts, recordPostView],
   );
 
   const handleDetailAuthorPress = useCallback(
@@ -413,9 +423,10 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
         post={item}
         cardWidth={cardW}
         onPress={handlePostPress}
+        viewCount={postViewCounts[item.id] ?? 0}
       />
     ),
-    [cardW, handlePostPress],
+    [cardW, handlePostPress, postViewCounts],
   );
 
   // ── Render: member row (Section 3) ────────────────────────────────────────

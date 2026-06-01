@@ -1,7 +1,8 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { View, Text, FlatList, StyleSheet, useWindowDimensions, TouchableOpacity } from 'react-native';
 import type { CommunityPost } from '@evoconn/types';
 import { RecentPostCard } from './RecentPostCard';
+import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { OTHER_LATEST_POSTS_SPACING } from '@evoconn/constants/otherProfileLayout';
 import { PROFILE_RECENT_POSTS_SLIDER_MAX } from '@evoconn/constants/profileRecentPosts';
 
@@ -43,6 +44,15 @@ export const RecentPostsSlider = React.memo(function RecentPostsSlider({
   const showSeeMore =
     onSeeMorePress != null && sortedAll.length > PROFILE_RECENT_POSTS_SLIDER_MAX;
 
+  const { postViewCounts, ensurePostViewCounts } = useSimulation();
+  const previewIdsKey = useMemo(
+    () => previewPosts.map((p) => p.id).join(','),
+    [previewPosts],
+  );
+  useEffect(() => {
+    if (previewIdsKey) ensurePostViewCounts(previewIdsKey.split(','));
+  }, [previewIdsKey, ensurePostViewCounts]);
+
   const carouselData = useMemo((): CarouselItem[] => {
     const rows: CarouselItem[] = previewPosts.map((post) => ({ kind: 'post', post }));
     if (showSeeMore) rows.push({ kind: 'see-more' });
@@ -62,9 +72,16 @@ export const RecentPostsSlider = React.memo(function RecentPostsSlider({
           </TouchableOpacity>
         );
       }
-      return <RecentPostCard post={item.post} cardWidth={cardW} onPress={onPostPress} />;
+      return (
+        <RecentPostCard
+          post={item.post}
+          cardWidth={cardW}
+          onPress={onPostPress}
+          viewCount={postViewCounts[item.post.id] ?? 0}
+        />
+      );
     },
-    [cardW, onPostPress, onSeeMorePress],
+    [cardW, onPostPress, onSeeMorePress, postViewCounts],
   );
 
   const keyExtractor = useCallback((item: CarouselItem) => {
@@ -121,7 +138,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
     marginRight: CARD_GAP,
-    minHeight: 170,
+    minHeight: 136,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 14,

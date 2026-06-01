@@ -1,7 +1,8 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { View, Text, FlatList, StyleSheet, useWindowDimensions, TouchableOpacity } from 'react-native';
 import type { CommunityPost } from '@evoconn/types';
 import { PersonalRecentPostCard } from './PersonalRecentPostCard';
+import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import {
   POSTS_SECTION_PADDING_TOP,
   PERSONAL_LATEST_POSTS_SPACING,
@@ -54,6 +55,15 @@ export const PersonalRecentPostsSlider = React.memo(function PersonalRecentPosts
   const showSeeMore =
     onSeeMorePress != null && sortedAll.length > PROFILE_RECENT_POSTS_SLIDER_MAX;
 
+  const { postViewCounts, ensurePostViewCounts } = useSimulation();
+  const previewIdsKey = useMemo(
+    () => previewPosts.map((p) => p.id).join(','),
+    [previewPosts],
+  );
+  useEffect(() => {
+    if (previewIdsKey) ensurePostViewCounts(previewIdsKey.split(','));
+  }, [previewIdsKey, ensurePostViewCounts]);
+
   const carouselData = useMemo((): CarouselItem[] => {
     const rows: CarouselItem[] = previewPosts.map((post) => ({ kind: 'post', post }));
     if (showSeeMore) rows.push({ kind: 'see-more' });
@@ -80,10 +90,11 @@ export const PersonalRecentPostsSlider = React.memo(function PersonalRecentPosts
           onPress={onPostPress}
           onMenuAction={onMenuAction}
           isHidden={isHiddenFn?.(item.post.id)}
+          viewCount={postViewCounts[item.post.id] ?? 0}
         />
       );
     },
-    [cardW, onPostPress, onMenuAction, isHiddenFn, onSeeMorePress],
+    [cardW, onPostPress, onMenuAction, isHiddenFn, onSeeMorePress, postViewCounts],
   );
 
   const keyExtractor = useCallback((item: CarouselItem) => {
@@ -140,7 +151,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
     marginRight: CARD_GAP,
-    minHeight: 170,
+    minHeight: 136,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 14,

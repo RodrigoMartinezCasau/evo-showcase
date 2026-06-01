@@ -282,7 +282,7 @@ export default function CommunityScreen() {
   const { thoughts } = useThoughts();
   const { posts: allPosts, getPostById } = useFeedStore();
   const { blockedIds } = useBlockedUsers();
-  const { refreshSocialFromSupabase, ingestPostsByIds, activeUserId } = useSimulation();
+  const { refreshSocialFromSupabase, ingestPostsByIds, activeUserId, recordPostView } = useSimulation();
   const { getBoost, revision: tasteRevision, recordDwell } = useRecommendationTaste();
   const { seenIds: paratiSeenIds, markParatiPostSeen } = useParatiSeenPosts();
   const { triggerHaptic } = useEvoPreferences();
@@ -594,6 +594,8 @@ export default function CommunityScreen() {
 
   const openDetailFeed = useCallback(
     (mode: FeedMode, postId?: string, skipAnimation?: boolean) => {
+      // Abrir un post concreto (desde cualquier superficie) cuenta como vista.
+      if (postId) recordPostView(postId);
       // Para Ti uses the persistent panel — switching to it is a visibility
       // toggle, not a remount. We only re-hydrate when a specific postId is
       // requested (deep-link / widget) so that post is centered.
@@ -640,6 +642,7 @@ export default function CommunityScreen() {
       followingFeedOrdered,
       paratiSeenIds,
       hydrateParatiPanel,
+      recordPostView,
     ],
   );
 
@@ -1139,6 +1142,33 @@ export default function CommunityScreen() {
     ],
   );
 
+  /** Igual que `renderFeedItem` pero muestra la etiqueta "Republicado por …" (solo Para Ti). */
+  const renderParatiItem = useCallback(
+    ({ item }: { item: CommunityPost }) => (
+      <ReflectionDetailItem
+        post={item}
+        itemHeight={feedItemHeight}
+        onAuthorPress={handleAuthorPress}
+        onClanPress={handleClanPress}
+        onReadingModeChange={handleReadingModeChange}
+        communityVerticalFeed
+        showRepostLabel
+        highlightCommentId={
+          focusPostId === item.id ? (focusCommentId ?? undefined) : undefined
+        }
+        reflectionStarSurfaceColor={evoconnColors.background}
+      />
+    ),
+    [
+      feedItemHeight,
+      handleAuthorPress,
+      handleClanPress,
+      handleReadingModeChange,
+      focusPostId,
+      focusCommentId,
+    ],
+  );
+
   const getFeedItemLayout = useCallback(
     (_: unknown, index: number) => ({
       length: feedItemHeight,
@@ -1542,7 +1572,7 @@ export default function CommunityScreen() {
                   key={`parati-panel-${paratiPanelKey}`}
                   ref={paratiPanelListRef}
                   data={paratiPanelDisplayData}
-                  renderItem={renderFeedItem}
+                  renderItem={renderParatiItem}
                   keyExtractor={(item) => item.id}
                   pagingEnabled
                   nestedScrollEnabled
@@ -1611,7 +1641,7 @@ export default function CommunityScreen() {
                     key={`parati-${paratiDetailFeedKey}`}
                     ref={detailFeedListRef}
                     data={detailFeed?.data ?? []}
-                    renderItem={renderFeedItem}
+                    renderItem={renderParatiItem}
                     keyExtractor={(item) => item.id}
                     pagingEnabled
                     nestedScrollEnabled

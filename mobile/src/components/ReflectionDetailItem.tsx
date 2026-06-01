@@ -74,6 +74,12 @@ import {
 } from '@evoconn/components/shared/EvoActionSheetModal';
 import type { EvoActionOption } from '@evoconn/components/shared/EvoActionSheetModal';
 import { PanelStarField } from '@evoconn/components/animations/StarFieldBackground';
+import { ClanCardFeedRimOverlay } from './ClanCardFeedRimOverlay';
+import { getClanColor } from '@evoconn/constants/clanColors';
+import {
+  NEW_COMMENT_BOX_LAYOUT as INBOX,
+  NEW_COMMENT_SEND_BUTTON_LAYOUT as SEND_BTN,
+} from '@evoconn/constants/newCommentBoxLayout';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 /** “Ver más” / lectura: mismo tamaño aprox. que el título escalado, sin `transform: scale` (evita recorte por `overflow: hidden` del panel). */
@@ -135,6 +141,11 @@ type ReflectionDetailItemProps = {
   reflectionStarSurfaceColor?: string;
   /** Centrar y resaltar un comentario concreto (p. ej. notificación de comentario). */
   highlightCommentId?: string;
+  /**
+   * Muestra la etiqueta "Republicado por @X / por ti" entre la publicación y los
+   * comentarios. SOLO en el feed de Para Ti (no en Siguiendo ni otras pantallas).
+   */
+  showRepostLabel?: boolean;
 };
 
 /** Comentarios raíz mostrados por bloque (se cargan más al hacer scroll). */
@@ -164,6 +175,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   communityVerticalFeed = false,
   reflectionStarSurfaceColor,
   highlightCommentId,
+  showRepostLabel = false,
 }: ReflectionDetailItemProps) {
   const isNoClanAuthor =
     post.author.clanId == null || String(post.author.clanId).trim() === '';
@@ -190,6 +202,8 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     width: number;
     height: number;
   } | null>(null);
+  /** Ancho medido del pill "Republicado por …" para dibujar el reborde de clan. */
+  const [repostPillWidth, setRepostPillWidth] = useState(0);
   const handleReflPanelLayout = useCallback((e: LayoutChangeEvent) => {
     const { y, width, height } = e.nativeEvent.layout;
     setReflPanelLayout(prev => {
@@ -239,6 +253,8 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     commentVoteMap,
     castCommentVote,
     activeUserId,
+    toggleRepost,
+    repostAttributionByPost,
   } = useSimulation();
 
   const [commentAuthorCache, setCommentAuthorCache] = useState<Record<string, BasicProfile>>({});
@@ -547,7 +563,18 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
 
   const postMoreOptions = useMemo((): EvoActionOption[] => {
     const following = checkFollowing(post.author.id);
+    // Estado reactivo (cambia con `myRepostIds`); `isReposted()` lee un ref estable
+    // y NO recalcularía este memo, dejando la etiqueta del menú obsoleta.
+    const reposted = !!repostAttributionByPost[post.id]?.isSelf;
     return [
+      // "Republicar" como PRIMERA opción — solo en el feed de Para Ti.
+      ...(showRepostLabel
+        ? [{
+            key: 'repost',
+            label: reposted ? 'Quitar republicación' : 'Republicar',
+            onPress: () => toggleRepost(post.id),
+          }]
+        : []),
       {
         key: 'share',
         label: 'Compartir',
@@ -594,7 +621,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
           }]
         : []),
     ];
-  }, [post, livePost, checkFollowing, toggleFollow, isAdmin]);
+  }, [post, livePost, checkFollowing, toggleFollow, isAdmin, repostAttributionByPost, toggleRepost, showRepostLabel]);
 
   const confirmAdminDeletePost = useCallback(() => {
     deletePost(post.author.id, post.id, { admin: true });
@@ -1177,6 +1204,24 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
 
   const reflectionTitleUsesLongLayout = isLongText || readingMode;
 
+  // ── Etiqueta "Republicado por …" (solo Para Ti) ───────────────────────────
+  const repostAttribution = showRepostLabel ? repostAttributionByPost[post.id] : undefined;
+  const repostLabelText = repostAttribution
+    ? repostAttribution.isSelf
+      ? 'Republicado por ti'
+      : repostAttribution.username
+        ? `Republicado por ${repostAttribution.username}`
+        : null
+    : null;
+  const REPOST_PILL_HEIGHT = 26;
+  const REPOST_PILL_RADIUS = 13;
+  const repostRimColor = getClanColor(post.author.clanId);
+  const repostUserId = repostAttribution?.userId ?? null;
+  const repostLabelTop =
+    repostLabelText && reflPanelLayout
+      ? reflPanelLayout.y + reflPanelLayout.height + (PANELS_GAP - REPOST_PILL_HEIGHT) / 2
+      : null;
+
   return (
     <>
     <View
@@ -1530,6 +1575,44 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
         </View>
       </ReflectionBackground>
 
+      {/* ── Etiqueta "Republicado por …" (flota sobre el divisor entre paneles) ── */}
+      {repostLabelText && repostLabelTop != null ? (
+        <View
+          pointerEvents="box-none"
+          style={[styles.repostLabelOverlay, { top: repostLabelTop, height: REPOST_PILL_HEIGHT }]}
+        >
+          <TouchableOpacity
+            activeOpacity={0.85}
+            disabled={!repostUserId}
+            onPress={() => {
+              if (repostUserId) onAuthorPress(repostUserId);
+            }}
+            style={[
+              styles.repostLabelPill,
+              { height: REPOST_PILL_HEIGHT, borderRadius: REPOST_PILL_RADIUS },
+            ]}
+            onLayout={(e) => {
+              const w = e.nativeEvent.layout.width;
+              setRepostPillWidth((prev) => (Math.abs(prev - w) < 1 ? prev : w));
+            }}
+          >
+            <Text style={styles.repostLabelText} numberOfLines={1}>
+              {repostLabelText}
+            </Text>
+            {repostPillWidth > 0 ? (
+              <ClanCardFeedRimOverlay
+                width={repostPillWidth}
+                height={REPOST_PILL_HEIGHT}
+                borderRadius={REPOST_PILL_RADIUS}
+                clanColor={repostRimColor}
+                rimArmX={Math.min(16, Math.max(6, (repostPillWidth - 2 * REPOST_PILL_RADIUS) / 2))}
+                rimArmY={1}
+              />
+            ) : null}
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
       {/* ── Action column (pixel-pinned, independent of any layout) ── */}
       <View
         pointerEvents="box-none"
@@ -1728,6 +1811,36 @@ const styles = StyleSheet.create({
   },
   newCommentRow: {
     paddingTop: 6,
+  },
+  /** Contenedor del pill "Republicado por …": centrado horizontalmente sobre el divisor. */
+  /**
+   * El pill ocupa el mismo ancho que el RECUADRO de un comentario (no toda la fila):
+   * empieza en el borde izquierdo del contenido de comentarios (16 + CP.paddingHorizontal)
+   * y termina donde acaba la caja del comentario, es decir, ANTES del botón de upvote
+   * (gap INBOX.gap + ancho SEND_BTN.size). El texto va a la izquierda aunque no llene la caja.
+   */
+  repostLabelOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'stretch',
+    justifyContent: 'center',
+    paddingLeft: REFLECTION_DETAIL_CONTENT_PAD_H + CP.paddingHorizontal,
+    paddingRight: REFLECTION_DETAIL_CONTENT_PAD_H + CP.paddingHorizontal + INBOX.gap + SEND_BTN.size,
+    zIndex: 12,
+  },
+  repostLabelPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    backgroundColor: evoconnColors.background,
+  },
+  repostLabelText: {
+    color: evoconnColors.text,
+    fontSize: 11.5,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
 });
 
