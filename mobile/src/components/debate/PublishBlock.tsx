@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { View, Text, TextInput, StyleSheet, LayoutChangeEvent, TouchableOpacity, type View as RNView } from 'react-native';
 import type { FC } from 'react';
 import type { SvgProps } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { EvoConfirmModal } from '@evoconn/components/shared/EvoActionSheetModal';
+import { PublishAudioPickerModal } from '@evoconn/components/publish/PublishAudioPickerModal';
+import type { PublishAudioChoice } from '@evoconn/types/publishAudio';
 import {
   AI_SPECIAL_BLOCK_LAYOUT as SB,
   DEBATE_CARD_LAYOUT as CARD,
@@ -12,7 +14,7 @@ import {
   PHRASE_PUBLISH_FORMAT_HINT,
   PHRASE_PUBLISH_HINT_LAYOUT as PHRASE_HINT,
 } from '@evoconn/constants/phrasePublishHintLayout';
-import { PublishActionBar } from './PublishActionBar';
+import { PublishActionBar, type PublishActionBarHandle } from './PublishActionBar';
 
 const PI = SB.publishInput;
 const PUBLISH_TITLE_MAX_LEN = 21;
@@ -27,7 +29,9 @@ type Props = {
   unifiedHeight?: number;
   onMeasure?: (h: number) => void;
   onTitleChange?: (title: string) => void;
-  onPublish?: () => Promise<void> | void;
+  onPublish?: (audio: PublishAudioChoice) => Promise<void> | void;
+  /** Clan del autor — color del picker de audio y botón continuar. */
+  clanId?: string | null;
   /** Por defecto título de reflexión; en frases = autor citado. */
   inputPlaceholder?: string;
   inputMaxLength?: number;
@@ -72,6 +76,7 @@ export const PublishBlock = React.memo(function PublishBlock({
   onMeasure,
   onTitleChange,
   onPublish,
+  clanId = null,
   inputPlaceholder = 'AÑADE UN TITULO INTERESANTE...',
   inputMaxLength = PUBLISH_TITLE_MAX_LEN,
   published = false,
@@ -89,7 +94,23 @@ export const PublishBlock = React.memo(function PublishBlock({
     published && initialAuthorValue ? initialAuthorValue : '',
   );
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [audioPickerOpen, setAudioPickerOpen] = useState(false);
+  const actionBarRef = useRef<PublishActionBarHandle>(null);
   const title = isAuthorControlled ? authorValue : internalTitle;
+
+  const handleAudioConfirm = useCallback(
+    (choice: PublishAudioChoice) => {
+      setAudioPickerOpen(false);
+      if (!onPublish) return;
+      void actionBarRef.current?.runPublish(() => onPublish(choice));
+    },
+    [onPublish],
+  );
+
+  const handlePublishIntent = useCallback(() => {
+    if (published || !onPublish) return;
+    setAudioPickerOpen(true);
+  }, [published, onPublish]);
 
   const handleChange = (t: string) => {
     if (published) return;
@@ -174,6 +195,7 @@ export const PublishBlock = React.memo(function PublishBlock({
       </View>
 
       <PublishActionBar
+        ref={actionBarRef}
         barColor={actionBarColor ?? borderColor}
         disabled={
           published ||
@@ -181,9 +203,16 @@ export const PublishBlock = React.memo(function PublishBlock({
           title.trim().length === 0 ||
           !!phraseHintOverride?.blockPublish
         }
-        onPublish={published ? undefined : onPublish}
+        onPublishIntent={published || !onPublish ? undefined : handlePublishIntent}
         externallyPublished={published}
         innerPaddingHorizontal={actionBarInnerPaddingHorizontal}
+      />
+
+      <PublishAudioPickerModal
+        visible={audioPickerOpen}
+        clanId={clanId}
+        onClose={() => setAudioPickerOpen(false)}
+        onConfirm={handleAudioConfirm}
       />
 
       {published && onDeletePublication ? (

@@ -19,7 +19,7 @@
  *       totalPhrasesSent >= REVEAL_MIN_PHRASES (5)
  *       (totalReflectionsSent + totalPhrasesSent) >= REVEAL_TOTAL_INPUTS_THRESHOLD (8)
  *       AND the top clan has ≥ REVEAL_PCT_THRESHOLD (25%)
- *       AND leads the runner-up by ≥ REVEAL_LEAD_OVER_SECOND_PP (5 pp)
+ *       AND leads the runner-up by ≥ REVEAL_LEAD_OVER_SECOND_PP (3 pp)
  *   - phrases use the same hybrid scoring (semantic + ML + Claude) as reflections
  *   - after reveal, new inputs are dampened (POST_REVEAL_WEIGHT)
  *   - clan switches use the same clarity rule: new #1 must be ≥25% and ≥5 pp
@@ -124,8 +124,10 @@ export const REVEAL_TOTAL_INPUTS_THRESHOLD = 8;
 /** Minimum percentage for the leading clan (reveal + switch). */
 export const REVEAL_PCT_THRESHOLD = 25;
 
-/** Leader must lead the second-place clan by at least this many percentage points. */
-export const REVEAL_LEAD_OVER_SECOND_PP = 5;
+/** Leader must lead the second-place clan by at least this many percentage points.
+ *  Aplica TANTO al primer revelado como al cambio de clan (un clan solo
+ *  desplaza al actual si supera al 2.º por este margen). */
+export const REVEAL_LEAD_OVER_SECOND_PP = 3;
 
 /** Score weight for a new input BEFORE the user has a revealed clan. */
 const PRE_REVEAL_WEIGHT = 1.0;
@@ -162,6 +164,18 @@ const INERTIA_OUT   = 0.3;
 // ─── Public types ───────────────────────────────────────────────────────────
 
 export type ClanPct = { clanId: string; label: string; pct: number };
+
+/**
+ * A clan reveal/switch that became true at app launch (because the user's
+ * already-accumulated totals now cross the reveal threshold) but has NOT been
+ * committed to the visible state yet. It is held back so the launch sequence
+ * can play the entry "Sin clan" animation first and only THEN reveal the clan.
+ */
+export type PendingLaunchReveal = {
+  clanId: ClanScoreId;
+  previousClanId: ClanScoreId | null;
+  isChange: boolean;
+};
 
 export type ClassificationContextValue = {
   /** True until the initial AsyncStorage load resolves. */
@@ -200,6 +214,20 @@ export type ClassificationContextValue = {
 
   /** True if a Supabase publish for this user failed and is pending retry. */
   isDirty: (userId?: string) => boolean;
+
+  /**
+   * A reveal/switch detected at launch from already-stored totals, deliberately
+   * NOT yet applied to the visible state. null when there is nothing pending.
+   * The animation layer reads this to play the reveal AFTER the entry anim.
+   */
+  pendingLaunchReveal: PendingLaunchReveal | null;
+
+  /**
+   * Commit the pending launch reveal into the visible state (and publish to
+   * Supabase). Idempotent: a no-op when there is nothing pending. Called by the
+   * animation layer right before it plays the reveal animation.
+   */
+  commitLaunchReveal: () => void;
 };
 
 const ClassificationContext = createContext<ClassificationContextValue | null>(null);
@@ -416,6 +444,20 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
   // EffectiveClanSync drains this set on every render as a retry safety net.
   const dirtyUsersRef = useRef<Set<string>>(new Set());
 
+  // ── Launch-time reveal (threshold migration) ───────────────────────────────
+  // A reveal/switch that became true from already-stored totals at launch, held
+  // back until the entry animation finishes. `pendingLaunchReveal` is the public
+  // payload the animation layer watches; the precomputed next state to commit is
+  // kept in a ref so the commit is a cheap, deterministic write.
+  const [pendingLaunchReveal, setPendingLaunchReveal] = useState<PendingLaunchReveal | null>(null);
+  const pendingLaunchStateRef = useRef<{
+    userId: string;
+    state: UserClassificationState;
+    rank: Rank;
+  } | null>(null);
+  // Users we have already evaluated for a launch reveal (once per session).
+  const launchRecalcDoneRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -478,6 +520,97 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, [profile?.id, db]);
+
+  // ── Launch-time reveal recalculation ───────────────────────────────────────
+  // Reveal rules are normally only evaluated when a new input is recorded. That
+  // means a threshold change (e.g. lowering REVEAL_LEAD_OVER_SECOND_PP) does NOT
+  // retroactively reveal a clan for users who already crossed it — they'd only
+  // see it on their next reflection/phrase.
+  //
+  // To roll the new threshold out "on app open", we re-run deriveVisibleClan
+  // against the user's CURRENT stored totals once per session. If it would
+  // reveal a new clan (or switch to one), we DO NOT mutate the visible state
+  // yet — we stash it as `pendingLaunchReveal`. The animation layer plays the
+  // entry "Sin clan" crown first and then calls commitLaunchReveal() to apply
+  // it together with the reveal animation.
+  //
+  // deriveVisibleClan is deterministic on unchanged totals, so this is
+  // idempotent: a user who already revealed/switched on their last input yields
+  // "no change" and nothing pending. In practice it only fires for the one-time
+  // migration of users whose totals already crossed the new (looser) threshold.
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    const uid = profile?.id;
+    if (!uid || !isRealUserId(uid)) return;
+    if (launchRecalcDoneRef.current.has(uid)) return;
+
+    const state = db[uid];
+    // Wait until this user's state has actually been loaded/restored.
+    if (!state) return;
+
+    const nowIso = new Date().toISOString();
+    const reveal = deriveVisibleClan(
+      state,
+      state.totals,
+      state.totalReflectionsSent,
+      state.totalPhrasesSent,
+      nowIso,
+    );
+
+    // Mark evaluated for this session regardless of outcome.
+    launchRecalcDoneRef.current.add(uid);
+
+    // No new reveal/switch from current totals → nothing to animate.
+    if (reveal.visibleClanId == null || reveal.visibleClanId === state.visibleClanId) {
+      return;
+    }
+
+    const isChange = state.visibleClanId != null;
+    const pcts = totalsToPercentages(state.totals);
+    const achievedRank = getRankFromPct(pcts[reveal.visibleClanId] ?? 0);
+    const clanRankHistory = isChange
+      ? setClanRankRecord(state.clanRankHistory ?? {}, reveal.visibleClanId, 'aprendiz')
+      : mergeClanRankRecord(state.clanRankHistory ?? {}, reveal.visibleClanId, achievedRank);
+
+    const nextState: UserClassificationState = {
+      ...state,
+      visibleClanId: reveal.visibleClanId,
+      revealedAt: reveal.revealedAt,
+      lastSwitchAt: reveal.lastSwitchAt,
+      clanRankHistory,
+    };
+
+    pendingLaunchStateRef.current = {
+      userId: uid,
+      state: nextState,
+      rank: getDisplayRankForState(nextState),
+    };
+    setPendingLaunchReveal({
+      clanId: reveal.visibleClanId,
+      previousClanId: state.visibleClanId,
+      isChange,
+    });
+  }, [db, profile?.id]);
+
+  const commitLaunchReveal = useCallback(() => {
+    const pending = pendingLaunchStateRef.current;
+    if (!pending) return;
+    pendingLaunchStateRef.current = null;
+    setPendingLaunchReveal(null);
+
+    setDb((prev) => ({ ...prev, [pending.userId]: pending.state }));
+
+    if (isRealUserId(pending.userId)) {
+      void (async () => {
+        try {
+          await pushClassificationSnapshot(pending.userId, pending.state, pending.rank);
+          dirtyUsersRef.current.delete(pending.userId);
+        } catch {
+          dirtyUsersRef.current.add(pending.userId);
+        }
+      })();
+    }
+  }, []);
 
   // ── Helpers that read state ───────────────────────────────────────────
   const getUserStateInternal = useCallback(
@@ -743,6 +876,8 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
       getUserState: getUserStateInternal,
       publishNow,
       isDirty,
+      pendingLaunchReveal,
+      commitLaunchReveal,
     }),
     [
       loading,
@@ -756,6 +891,8 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
       getUserStateInternal,
       publishNow,
       isDirty,
+      pendingLaunchReveal,
+      commitLaunchReveal,
     ],
   );
 

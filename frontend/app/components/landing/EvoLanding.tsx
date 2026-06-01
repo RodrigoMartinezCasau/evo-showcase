@@ -333,7 +333,7 @@ function Hero() {
           <a href={ANDROID_URL} target="_blank" rel="noopener noreferrer">
             {dict.nav.android}
           </a>
-          <a href="#clans">{dict.nav.info}</a>
+          <a href="/tutoriales">{dict.nav.info}</a>
           <a href="#footer">{dict.nav.contact}</a>
           <LangToggle />
         </nav>

@@ -1,5 +1,7 @@
 import React, { useRef, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { View, Text, TouchableOpacity, Animated, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useFeedAudioPlayback } from '@evoconn/hooks/useFeedAudio';
 import {
   DETAIL_ACTION_COLUMN_LAYOUT as COL,
   DETAIL_CLAN_BUTTON_LAYOUT as CLAN_L,
@@ -41,6 +43,36 @@ function formatCount(n: number): string {
   if (n >= 10_000) return `${(n / 1_000).toFixed(0)}K`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return String(n);
+}
+
+/**
+ * Botón circular de pausa/play del audio del feed. Muestra el icono de pausa
+ * (dos barras) cuando el audio suena y el de play cuando está pausado. Solo se
+ * re-renderiza al cambiar el estado de reproducción (suscripción puntual).
+ */
+function AudioToggleButton({ diameter }: { diameter: number }) {
+  const { paused, toggle } = useFeedAudioPlayback();
+  const iconSz = Math.round(diameter * 0.52);
+  return (
+    <TouchableOpacity
+      onPress={toggle}
+      activeOpacity={0.7}
+      hitSlop={8}
+      accessibilityRole="button"
+      accessibilityLabel={paused ? 'Reanudar audio' : 'Pausar audio'}
+      style={[
+        styles.audioBtn,
+        { width: diameter, height: diameter, borderRadius: diameter / 2 },
+      ]}
+    >
+      <Ionicons
+        name={paused ? 'play' : 'pause'}
+        size={iconSz}
+        color="#FFFFFF"
+        style={paused ? { marginLeft: iconSz * 0.12 } : undefined}
+      />
+    </TouchableOpacity>
+  );
 }
 
 /** Same vertical gap: up (count→icon) and down (icon→count). */
@@ -93,6 +125,8 @@ type DetailActionColumnProps = {
   showClanBadge?: boolean;
   /** Author rank — required when showClanBadge is true to pick the correct badge tier. */
   authorRank?: Rank;
+  /** El post tiene audio adjunto → mostrar el botón circular de pausa/play. */
+  hasAudio?: boolean;
 };
 
 export type DetailActionColumnHandle = {
@@ -116,6 +150,7 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
       containerHeight,
       showClanBadge = false,
       authorRank,
+      hasAudio = false,
     },
     ref,
   ) {
@@ -245,10 +280,18 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
           </Animated.View>
         </TouchableOpacity>
 
-        {/* 6. More (three dots) */}
-        <TouchableOpacity onPress={onMorePress} activeOpacity={0.7} hitSlop={8}>
-          <Text style={[styles.moreDots, { fontSize: dotsFontSz }]}>···</Text>
-        </TouchableOpacity>
+        {/* 6. More (three dots) + audio pausa/play debajo (mismo slot para no
+            alterar el reparto vertical de los 6 elementos). */}
+        <View style={styles.moreGroup}>
+          <TouchableOpacity onPress={onMorePress} activeOpacity={0.7} hitSlop={8}>
+            <Text style={[styles.moreDots, { fontSize: dotsFontSz }]}>···</Text>
+          </TouchableOpacity>
+          {hasAudio ? (
+            <View style={styles.audioBtnWrap}>
+              <AudioToggleButton diameter={Math.max(28, saveSz * 0.78)} />
+            </View>
+          ) : null}
+        </View>
 
       </View>
     </View>
@@ -290,5 +333,19 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
     letterSpacing: 2,
+  },
+  moreGroup: {
+    alignItems: 'center',
+  },
+  audioBtnWrap: {
+    marginTop: 8,
+    alignItems: 'center',
+  },
+  audioBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.55)',
   },
 });

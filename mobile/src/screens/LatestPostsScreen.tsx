@@ -25,6 +25,7 @@ import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
 import { getMainColumnHeightForFloatingBottomBar } from '@evoconn/constants/appShellLayout';
 import { useFeedStore } from '@evoconn/hooks/useFeedStore';
+import { useFeedAudio } from '@evoconn/hooks/useFeedAudio';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { usePersonalProfile } from '@evoconn/hooks/PersonalProfileContext';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
@@ -134,6 +135,8 @@ export default function LatestPostsScreen() {
           title: p.title,
           body: p.body,
           quoteAuthor: p.quoteAuthor,
+          audioTrackId: p.audioTrackId ?? null,
+          audioVolume: p.audioVolume ?? null,
           voteStats: {
             up: p.upvoterIds.length,
             down: p.downvoterIds.length,
@@ -248,19 +251,41 @@ export default function LatestPostsScreen() {
 
   const keyExtractor = useCallback((item: CommunityPost) => item.id, []);
 
+  const feedAudio = useFeedAudio();
+  const feedAudioRef = useRef(feedAudio);
+  feedAudioRef.current = feedAudio;
+
   const verticalFeedVisiblePostIdRef = useRef<string | null>(null);
   const verticalFeedViewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
   const onVerticalFeedViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: Array<{ item?: CommunityPost }> }) => {
-      const id = viewableItems[0]?.item?.id;
-      if (!id) return;
+      const post = viewableItems[0]?.item;
+      if (!post?.id) return;
       const prev = verticalFeedVisiblePostIdRef.current;
-      verticalFeedVisiblePostIdRef.current = id;
-      if (prev !== null && prev !== id) {
+      verticalFeedVisiblePostIdRef.current = post.id;
+      if (prev !== null && prev !== post.id) {
         Keyboard.dismiss();
       }
+      // Audio adjunto del post visible (volumen elegido al publicar).
+      feedAudioRef.current.playForPost(post);
     },
   ).current;
+
+  // Arrancar el audio del post inicial (onViewableItemsChanged no siempre
+  // dispara para el primer item ya visible en el montaje).
+  const initialAudioPlayedRef = useRef(false);
+  useEffect(() => {
+    if (initialAudioPlayedRef.current) return;
+    if (!data || data.length === 0) return;
+    const post = data[Math.min(initialIndex, data.length - 1)];
+    if (post) {
+      initialAudioPlayedRef.current = true;
+      feedAudioRef.current.playForPost(post);
+    }
+  }, [data, initialIndex]);
+
+  // Detener el audio al salir del visor (desmontar la pantalla).
+  useEffect(() => () => feedAudioRef.current.stop(), []);
 
   return (
     <View style={styles.container}>

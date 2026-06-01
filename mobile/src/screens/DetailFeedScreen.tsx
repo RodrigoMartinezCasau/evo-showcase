@@ -21,6 +21,7 @@ import { ReflectionDetailItem } from '@evoconn/components/ReflectionDetailItem';
 import { AppTopBar, AppShellBottomTabsWrap, SidebarDrawer, BottomCommunityTabs } from '@evoconn/components';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useFeedStore } from '@evoconn/hooks/useFeedStore';
+import { useFeedAudio } from '@evoconn/hooks/useFeedAudio';
 import { getBottomBarEdgeGestureBottomOffset } from '@evoconn/constants/bottomBarLayout';
 import { getAppShellScrollableBodyHeight } from '@evoconn/constants/appShellLayout';
 import { getAppTopBarLayoutHeight } from '@evoconn/constants/topBarLayout';
@@ -183,19 +184,41 @@ export default function DetailFeedScreen() {
     [itemHeight, handleAuthorPress, handleClanPress, handleReadingModeChange],
   );
 
+  const feedAudio = useFeedAudio();
+  const feedAudioRef = useRef(feedAudio);
+  feedAudioRef.current = feedAudio;
+
   const detailPagerVisiblePostIdRef = useRef<string | null>(null);
   const detailPagerViewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
   const onDetailPagerViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: Array<{ item?: CommunityPost }> }) => {
-      const id = viewableItems[0]?.item?.id;
-      if (!id) return;
+      const post = viewableItems[0]?.item;
+      if (!post?.id) return;
       const prev = detailPagerVisiblePostIdRef.current;
-      detailPagerVisiblePostIdRef.current = id;
-      if (prev !== null && prev !== id) {
+      detailPagerVisiblePostIdRef.current = post.id;
+      if (prev !== null && prev !== post.id) {
         Keyboard.dismiss();
       }
+      // Audio adjunto del post visible (volumen elegido al publicar).
+      feedAudioRef.current.playForPost(post);
     },
   ).current;
+
+  // Arrancar el audio del post inicial (onViewableItemsChanged no siempre
+  // dispara para el primer item ya visible en el montaje).
+  const initialAudioPlayedRef = useRef(false);
+  useEffect(() => {
+    if (initialAudioPlayedRef.current) return;
+    if (data.length === 0) return;
+    const post = data[Math.min(initialIndex, data.length - 1)];
+    if (post) {
+      initialAudioPlayedRef.current = true;
+      feedAudioRef.current.playForPost(post);
+    }
+  }, [data, initialIndex]);
+
+  // Detener el audio al salir del visor (desmontar la pantalla).
+  useEffect(() => () => feedAudioRef.current.stop(), []);
 
   const handleTabChange = useCallback(
     (tab: string) => {

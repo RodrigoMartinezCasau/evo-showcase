@@ -50,8 +50,9 @@ import {
 } from '@evoconn/constants/debateResponseLayout';
 import { getPublishStarByClan } from '@evoconn/utils/getDebateStarByClan';
 import type { DebateMessage } from '@evoconn/types/debate';
-import { useFeedStore, createPhrasePost } from '@evoconn/hooks/useFeedStore';
+import type { PublishAudioChoice } from '@evoconn/types/publishAudio';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
+import { useFeedStore, createPhrasePost } from '@evoconn/hooks/useFeedStore';
 import { userForPublish } from '@evoconn/utils/publishAuthor';
 import { useDebugStreak } from '../debug/DebugStreakContext';
 import { useDebugStats } from '../debug/DebugStatsContext';
@@ -205,6 +206,9 @@ export default function PhraseCreationScreen() {
   const { profile: authProfile } = useAuth();
   const apiUserId = authProfile?.id ?? mockCurrentUser.id;
   const activeClan = useActiveClan(mockCurrentUser.clanId);
+  // Clan REAL del autor (el que tendrá la publicación). El picker de audio usa
+  // este — no `activeClan`, que es el clan "revelado" y puede ser null.
+  const publishClanId = authProfile?.clan_id ?? activeClan;
   const clanColor = getChatUserAccentColor(activeClan);
   const phraseCursorColor = getClanSecondaryColor(activeClan);
 
@@ -428,7 +432,12 @@ export default function PhraseCreationScreen() {
   );
 
   const handlePhrasePublish = useCallback(
-    async (threadId: string, rawPhraseFromUser: string, assistantMessageIndex: number) => {
+    async (
+      threadId: string,
+      rawPhraseFromUser: string,
+      assistantMessageIndex: number,
+      audio: PublishAudioChoice,
+    ) => {
       if (rawPhraseFromUser.length > PHRASE_MAX_PUBLISH_CHARS) return;
       const authorName = (authorDraftByIndexRef.current[assistantMessageIndex] ?? '').trim();
       if (!authorName) return;
@@ -437,7 +446,7 @@ export default function PhraseCreationScreen() {
       publishedRef.current.add(sourceId);
 
       const phraseInner = normalizePhraseInnerForPublish(rawPhraseFromUser);
-      const post = createPhrasePost(userForPublish(authProfile), phraseInner, authorName);
+      const post = createPhrasePost(userForPublish(authProfile), phraseInner, authorName, audio);
       (post as { id: string }).id = sourceId;
       publishPost(post);
       router.replace({ pathname: '/latest-posts', params: { postId: sourceId } });
@@ -1004,6 +1013,7 @@ export default function PhraseCreationScreen() {
                       starIcon={PublishStar}
                       titleOutlineColor={getPublishTitleOutlineColor(activeClan)}
                       actionBarColor={getClanSecondaryColor(activeClan)}
+                      clanId={publishClanId}
                       showPhraseFormatHint
                       phraseHintOverride={phraseHintOverride}
                       onAuthorFocusChange={
@@ -1026,7 +1036,8 @@ export default function PhraseCreationScreen() {
                       onPublish={
                         published
                           ? undefined
-                          : () => handlePhrasePublish(effectiveThreadId, userPhrase, i)
+                          : (audio) =>
+                              handlePhrasePublish(effectiveThreadId, userPhrase, i, audio)
                       }
                       onDeletePublication={
                         published

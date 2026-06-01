@@ -126,10 +126,14 @@ export default function AppAnimationLayer() {
   const pendingEntryRef = useRef(_entryQueued);
   const showEntryRef = useRef(false);
   const entryCooldownUntilRef = useRef(0);
+  // True once the entry ("Sin clan" crown) animation has actually started this
+  // session — gates the launch reveal so it can only fire AFTER the entry anim.
+  const entryPlayedRef = useRef(false);
 
   useEffect(() => {
     showEntryRef.current = showEntry;
     setEntryAnimPlaying(showEntry);
+    if (showEntry) entryPlayedRef.current = true;
   }, [showEntry]);
 
   // ── Social animation queue ───────────────────────────────────────────────
@@ -404,6 +408,53 @@ export default function AppAnimationLayer() {
       isChange: !wasNone,
     });
   }, [clanId, assetsReady, enqueue, profileSettled]);
+
+  // ── Launch reveal (threshold migration) → enqueue after entry ─────────────
+  //
+  // ClassificationContext may detect, at launch, that the user's already-stored
+  // totals now cross the reveal threshold (e.g. after lowering the clan-lead
+  // margin). It holds that reveal back as `pendingLaunchReveal` instead of
+  // mutating the visible clan, so the entry "Sin clan" crown plays untouched.
+  //
+  // Here we wait until the entry animation has played AND finished, then commit
+  // the reveal into the classification state and enqueue the reveal animation.
+  // We deliberately BYPASS the entry suppression/cooldown that normally blocks
+  // launch reveals, because this reveal IS the intended launch behaviour. We
+  // also seed prevClanRef so the generic change-detection effect (which fires
+  // once the committed clan flips clanId) treats it as already-known and does
+  // not double-enqueue.
+  const pendingLaunchReveal = classification.pendingLaunchReveal;
+  const commitLaunchReveal = classification.commitLaunchReveal;
+  const launchRevealHandledRef = useRef(false);
+
+  useEffect(() => {
+    if (!assetsReady) return;
+    if (!pendingLaunchReveal) return;
+    if (launchRevealHandledRef.current) return;
+    // Must come AFTER the entry crown: require it to have played and ended.
+    // We intentionally ignore the entry suppression/cooldown here — this reveal
+    // is the intended post-entry behaviour, not an incidental clan change.
+    if (!entryPlayedRef.current) return;
+    if (showEntry) return;
+
+    launchRevealHandledRef.current = true;
+    const reveal = pendingLaunchReveal;
+
+    // Apply the clan to the visible state (and publish) as we reveal it.
+    commitLaunchReveal();
+
+    // Prevent the generic change-detection effect from re-enqueueing once the
+    // committed clan changes `clanId`.
+    clanSeededRef.current = true;
+    prevClanRef.current = reveal.clanId;
+
+    enqueue({
+      kind: 'clanReveal',
+      clanId: reveal.clanId,
+      previousClanId: reveal.previousClanId,
+      isChange: reveal.isChange,
+    });
+  }, [pendingLaunchReveal, commitLaunchReveal, showEntry, assetsReady, enqueue]);
 
   // ── Render ───────────────────────────────────────────────────────────────
 

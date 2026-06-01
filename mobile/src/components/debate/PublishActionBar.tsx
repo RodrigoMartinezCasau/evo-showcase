@@ -1,4 +1,11 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, {
+  useState,
+  useRef,
+  useCallback,
+  useEffect,
+  forwardRef,
+  useImperativeHandle,
+} from 'react';
 import {
   View,
   Text,
@@ -16,10 +23,17 @@ const ICO = SB.publishActionBarIcon;
 
 type PublishState = 'idle' | 'publishing' | 'published';
 
+export type PublishActionBarHandle = {
+  /** Ejecuta la animación PUBLICANDO… y luego `work`. */
+  runPublish: (work: () => Promise<void> | void) => Promise<void>;
+};
+
 type Props = {
   barColor: string;
   disabled?: boolean;
   onPublish?: () => Promise<void> | void;
+  /** Si se define, PUBLICAR abre el picker (u otra UI) sin animar todavía. */
+  onPublishIntent?: () => void;
   /** Frases/reapertura: el padre marca publicado sin desmontar el bloque. */
   externallyPublished?: boolean;
   /**
@@ -29,78 +43,152 @@ type Props = {
   innerPaddingHorizontal?: number;
 };
 
-export const PublishActionBar = React.memo(function PublishActionBar({
-  barColor,
-  disabled,
-  onPublish,
-  externallyPublished,
-  innerPaddingHorizontal = 0,
-}: Props) {
-  const [state, setState] = useState<PublishState>(() =>
-    externallyPublished ? 'published' : 'idle',
-  );
-  const [percent, setPercent] = useState(0);
-  const progressAnim = useRef(new Animated.Value(0)).current;
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const { triggerHaptic } = useEvoPreferences();
+export const PublishActionBar = forwardRef<PublishActionBarHandle, Props>(
+  function PublishActionBar(
+    {
+      barColor,
+      disabled,
+      onPublish,
+      onPublishIntent,
+      externallyPublished,
+      innerPaddingHorizontal = 0,
+    },
+    ref,
+  ) {
+    const [state, setState] = useState<PublishState>(() =>
+      externallyPublished ? 'published' : 'idle',
+    );
+    const [percent, setPercent] = useState(0);
+    const stateRef = useRef(state);
+    stateRef.current = state;
 
-  const cleanup = useCallback(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-  }, []);
+    const progressAnim = useRef(new Animated.Value(0)).current;
+    const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const { triggerHaptic } = useEvoPreferences();
 
-  useEffect(() => cleanup, [cleanup]);
+    const cleanup = useCallback(() => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }, []);
 
-  useEffect(() => {
-    if (externallyPublished) {
-      setState('published');
-      return;
-    }
-    setState((prev) => (prev === 'publishing' ? prev : 'idle'));
-  }, [externallyPublished]);
+    useEffect(() => cleanup, [cleanup]);
 
-  const handlePress = useCallback(async () => {
-    if (state !== 'idle' || disabled) return;
+    useEffect(() => {
+      if (externallyPublished) {
+        setState('published');
+        return;
+      }
+      setState((prev) => (prev === 'publishing' ? prev : 'idle'));
+    }, [externallyPublished]);
 
-    setState('publishing');
-    setPercent(0);
-    progressAnim.setValue(0);
+    const runPublish = useCallback(
+      async (work: () => Promise<void> | void) => {
+        if (stateRef.current !== 'idle') return;
 
-    let current = 0;
-    await new Promise<void>((resolve) => {
-      timerRef.current = setInterval(() => {
-        current += Math.random() * 12 + 4;
-        if (current >= 100) {
-          current = 100;
-          cleanup();
-          resolve();
+        setState('publishing');
+        setPercent(0);
+        progressAnim.setValue(0);
+
+        let current = 0;
+        await new Promise<void>((resolve) => {
+          timerRef.current = setInterval(() => {
+            current += Math.random() * 12 + 4;
+            if (current >= 100) {
+              current = 100;
+              cleanup();
+              resolve();
+            }
+            setPercent(Math.min(Math.round(current), 100));
+            Animated.timing(progressAnim, {
+              toValue: Math.min(current / 100, 1),
+              duration: 120,
+              easing: Easing.linear,
+              useNativeDriver: false,
+            }).start();
+          }, 180);
+        });
+
+        try {
+          await work();
+        } catch {
+          /* silent */
         }
-        setPercent(Math.min(Math.round(current), 100));
-        Animated.timing(progressAnim, {
-          toValue: Math.min(current / 100, 1),
-          duration: 120,
-          easing: Easing.linear,
-          useNativeDriver: false,
-        }).start();
-      }, 180);
-    });
 
-    try {
-      await onPublish?.();
-    } catch {
-      /* silent */
-    }
+        setState('published');
+        triggerHaptic('success');
+      },
+      [progressAnim, cleanup, triggerHaptic],
+    );
 
-    setState('published');
-    triggerHaptic('success');
-  }, [state, disabled, onPublish, progressAnim, cleanup, triggerHaptic]);
+    useImperativeHandle(ref, () => ({ runPublish }), [runPublish]);
 
-  const iconSize = ICO.size * ICO.scale;
+    const handlePress = useCallback(() => {
+      if (stateRef.current !== 'idle' || disabled) return;
+      if (onPublishIntent) {
+        onPublishIntent();
+        return;
+      }
+      void runPublish(() => onPublish?.());
+    }, [disabled, onPublishIntent, runPublish, onPublish]);
 
-  const renderContent = () => {
-    if (state === 'published') {
+    const iconSize = ICO.size * ICO.scale;
+    const isDisabled = state !== 'idle' || !!disabled;
+
+    const renderContent = () => {
+      if (state === 'published') {
+        return (
+          <View style={styles.row}>
+            <Text
+              style={[
+                styles.icon,
+                {
+                  fontSize: iconSize,
+                  marginLeft: ICO.offsetX,
+                  marginTop: ICO.offsetY,
+                },
+              ]}
+            >
+              ✓
+            </Text>
+            <Text
+              style={[
+                styles.label,
+                {
+                  fontSize: TXT.fontSize,
+                  ...(TXT.lineHeight > 0 ? { lineHeight: TXT.lineHeight } : {}),
+                  letterSpacing: TXT.letterSpacing,
+                  marginLeft: 6 + TXT.offsetX,
+                  marginTop: TXT.offsetY,
+                },
+              ]}
+            >
+              PUBLICADO
+            </Text>
+          </View>
+        );
+      }
+
+      if (state === 'publishing') {
+        return (
+          <Text
+            style={[
+              styles.label,
+              {
+                fontSize: TXT.fontSize,
+                ...(TXT.lineHeight > 0 ? { lineHeight: TXT.lineHeight } : {}),
+                letterSpacing: TXT.letterSpacing,
+                marginLeft: TXT.offsetX,
+                marginTop: TXT.offsetY,
+              },
+            ]}
+          >
+            PUBLICANDO… {percent}%
+          </Text>
+        );
+      }
+
       return (
         <View style={styles.row}>
           <Text
@@ -113,7 +201,7 @@ export const PublishActionBar = React.memo(function PublishActionBar({
               },
             ]}
           >
-            ✓
+            ▲
           </Text>
           <Text
             style={[
@@ -127,103 +215,55 @@ export const PublishActionBar = React.memo(function PublishActionBar({
               },
             ]}
           >
-            PUBLICADO
+            PUBLICAR
           </Text>
         </View>
       );
-    }
+    };
 
-    if (state === 'publishing') {
-      return (
-        <Text
-          style={[
-            styles.label,
-            {
-              fontSize: TXT.fontSize,
-              ...(TXT.lineHeight > 0 ? { lineHeight: TXT.lineHeight } : {}),
-              letterSpacing: TXT.letterSpacing,
-              marginLeft: TXT.offsetX,
-              marginTop: TXT.offsetY,
-            },
-          ]}
-        >
-          PUBLICANDO… {percent}%
-        </Text>
-      );
-    }
+    const progressWidth = progressAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0%', '100%'],
+    });
 
     return (
-      <View style={styles.row}>
-        <Text
-          style={[
-            styles.icon,
-            {
-              fontSize: iconSize,
-              marginLeft: ICO.offsetX,
-              marginTop: ICO.offsetY,
-            },
-          ]}
-        >
-          ▲
-        </Text>
-        <Text
-          style={[
-            styles.label,
-            {
-              fontSize: TXT.fontSize,
-              ...(TXT.lineHeight > 0 ? { lineHeight: TXT.lineHeight } : {}),
-              letterSpacing: TXT.letterSpacing,
-              marginLeft: 6 + TXT.offsetX,
-              marginTop: TXT.offsetY,
-            },
-          ]}
-        >
-          PUBLICAR
-        </Text>
-      </View>
+      <TouchableOpacity
+        activeOpacity={!isDisabled ? 0.75 : 1}
+        onPress={handlePress}
+        disabled={isDisabled}
+        hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+        style={[
+          styles.bar,
+          {
+            height: BAR.height,
+            borderRadius: BAR.borderRadius,
+            marginLeft: BAR.offsetX,
+            marginTop: BAR.offsetY,
+            paddingHorizontal: innerPaddingHorizontal,
+            width: BAR.widthScale < 1 ? (`${BAR.widthScale * 100}%` as unknown as number) : '100%',
+            backgroundColor: state === 'published' ? barColor : '#2A2A30',
+            opacity: disabled && state === 'idle' ? 0.45 : 1,
+          },
+        ]}
+      >
+        {state === 'publishing' ? (
+          <Animated.View
+            style={[
+              styles.progressFill,
+              {
+                width: progressWidth,
+                backgroundColor: barColor,
+                borderRadius: BAR.borderRadius,
+              },
+            ]}
+          />
+        ) : null}
+
+        <View style={styles.content}>{renderContent()}</View>
+      </TouchableOpacity>
     );
-  };
-
-  const progressWidth = progressAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0%', '100%'],
-  });
-
-  return (
-    <TouchableOpacity
-      activeOpacity={state === 'idle' && !disabled ? 0.75 : 1}
-      onPress={handlePress}
-      disabled={state !== 'idle' || disabled}
-      style={[
-        styles.bar,
-        {
-          height: BAR.height,
-          borderRadius: BAR.borderRadius,
-          marginLeft: BAR.offsetX,
-          marginTop: BAR.offsetY,
-          paddingHorizontal: innerPaddingHorizontal,
-          width: BAR.widthScale < 1 ? `${BAR.widthScale * 100}%` as unknown as number : '100%',
-          backgroundColor: state === 'published' ? barColor : '#2A2A30',
-        },
-      ]}
-    >
-      {state === 'publishing' ? (
-        <Animated.View
-          style={[
-            styles.progressFill,
-            {
-              width: progressWidth,
-              backgroundColor: barColor,
-              borderRadius: BAR.borderRadius,
-            },
-          ]}
-        />
-      ) : null}
-
-      <View style={styles.content}>{renderContent()}</View>
-    </TouchableOpacity>
-  );
-});
+  },
+);
 
 const styles = StyleSheet.create({
   bar: {

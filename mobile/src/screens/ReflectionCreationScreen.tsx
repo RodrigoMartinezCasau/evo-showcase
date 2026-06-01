@@ -104,6 +104,7 @@ import { REFLECTION_EMPTY_WELCOME_LAYOUT as EMPTY_WELCOME } from '@evoconn/const
 import { EMPTY_WELCOME_TRIPLE_STARS_LAYOUT as EMPTY_WELCOME_TRIPLE_STARS } from '@evoconn/constants/reflectionEmptyWelcomeTripleStarsLayout';
 import { getReflectionTripleStarsByHouse } from '@evoconn/utils/getReflectionTripleStarsByHouse';
 import { DebateResponseDisplay, PublishBlock } from '@evoconn/components/debate';
+import type { PublishAudioChoice } from '@evoconn/types/publishAudio';
 import { useFeedStore, createReflectionPost } from '@evoconn/hooks/useFeedStore';
 import { userForPublish } from '@evoconn/utils/publishAuthor';
 import {
@@ -138,6 +139,9 @@ export default function ReflectionCreationScreen() {
   const { profile: authProfile } = useAuth();
   const apiUserId = authProfile?.id ?? mockCurrentUser.id;
   const activeClan = useActiveClan(mockCurrentUser.clanId);
+  // Clan REAL del autor (el que tendrá la publicación). El picker de audio usa
+  // este — no `activeClan`, que es el clan "revelado" y puede ser null.
+  const publishClanId = authProfile?.clan_id ?? activeClan;
   const clanColor = getChatUserAccentColor(activeClan);
   const { triggerHaptic } = useEvoPreferences();
   // Island: each clan uses its primary color; Sin clan uses neon lime with dark text
@@ -163,12 +167,12 @@ export default function ReflectionCreationScreen() {
 
   const doPublish = useCallback(
     (messageId: string | undefined, userText: string) =>
-      async (title: string, body: string) => {
+      async (title: string, body: string, audio: PublishAudioChoice) => {
         const sourceId = `${messageId ?? 'msg'}_pub`;
         if (publishedRef.current.has(sourceId)) return;
         publishedRef.current.add(sourceId);
-        const post = createReflectionPost(userForPublish(authProfile), title, body);
-        (post as any).id = sourceId;
+        const post = createReflectionPost(userForPublish(authProfile), title, body, audio);
+        (post as { id: string }).id = sourceId;
         publishPost(post);
         router.replace({ pathname: '/latest-posts', params: { postId: sourceId } });
       },
@@ -636,7 +640,7 @@ export default function ReflectionCreationScreen() {
                   <MessageBubble
                     message={msg}
                     clanColor={clanColor}
-                    clanId={activeClan}
+                    clanId={publishClanId}
                     publishHandlerBelow={publishHandlerBelow}
                     onPublishAuthorFocusChange={
                       publishHandlerBelow
@@ -809,16 +813,19 @@ const PublishBlockConnected = React.memo(function PublishBlockConnected({
 }: {
   clanId: string | null | undefined;
   userReflectionText: string;
-  onPublish: (title: string, body: string) => Promise<void> | void;
+  onPublish: (title: string, body: string, audio: PublishAudioChoice) => Promise<void> | void;
   onPublishAuthorFocusChange?: (focused: boolean) => void;
   registerPublishAuthorAnchor?: (node: View | null) => void;
 }) {
   const PublishStar = useMemo(() => getPublishStarByClan(clanId), [clanId]);
   const publishTitleRef = useRef('');
   const handleTitleChange = useCallback((t: string) => { publishTitleRef.current = t; }, []);
-  const handlePublish = useCallback(async () => {
-    await onPublish(publishTitleRef.current, userReflectionText);
-  }, [onPublish, userReflectionText]);
+  const handlePublish = useCallback(
+    async (audio: PublishAudioChoice) => {
+      await onPublish(publishTitleRef.current, userReflectionText, audio);
+    },
+    [onPublish, userReflectionText],
+  );
 
   return (
     <PublishBlock
@@ -828,6 +835,7 @@ const PublishBlockConnected = React.memo(function PublishBlockConnected({
       starIcon={PublishStar}
       titleOutlineColor={getPublishTitleOutlineColor(clanId)}
       actionBarColor={getClanSecondaryColor(clanId)}
+      clanId={clanId}
       onTitleChange={handleTitleChange}
       onPublish={handlePublish}
       onAuthorFocusChange={onPublishAuthorFocusChange}
@@ -849,7 +857,11 @@ const MessageBubble = React.memo(function MessageBubble({
   clanColor: string;
   clanId: string | null | undefined;
   /** When set, a PublishBlock is rendered below the user bubble in the same container. */
-  publishHandlerBelow?: (title: string, body: string) => Promise<void> | void;
+  publishHandlerBelow?: (
+    title: string,
+    body: string,
+    audio: PublishAudioChoice,
+  ) => Promise<void> | void;
   onPublishAuthorFocusChange?: (focused: boolean) => void;
   registerPublishAuthorAnchor?: (node: View | null) => void;
 }) {

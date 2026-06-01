@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react';
 import {
   Animated,
   FlatList,
@@ -10,6 +10,7 @@ import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-g
 import { runOnJS } from 'react-native-reanimated';
 import type { CommunityPost } from '@evoconn/types';
 import { ReflectionDetailItem } from '@evoconn/components/ReflectionDetailItem';
+import { useFeedAudio } from '@evoconn/hooks/useFeedAudio';
 import { evoconnColors } from '@evoconn/theme/colors';
 import {
   COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE,
@@ -115,19 +116,41 @@ export function ProfileDetailPanel({
     [itemHeight, onAuthorPress, onClanPress, handleReadingModeChange],
   );
 
+  const feedAudio = useFeedAudio();
+  const feedAudioRef = useRef(feedAudio);
+  feedAudioRef.current = feedAudio;
+
   const verticalFeedVisiblePostIdRef = useRef<string | null>(null);
   const verticalFeedViewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
   const onVerticalFeedViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: Array<{ item?: CommunityPost }> }) => {
-      const id = viewableItems[0]?.item?.id;
-      if (!id) return;
+      const post = viewableItems[0]?.item;
+      if (!post?.id) return;
       const prev = verticalFeedVisiblePostIdRef.current;
-      verticalFeedVisiblePostIdRef.current = id;
-      if (prev !== null && prev !== id) {
+      verticalFeedVisiblePostIdRef.current = post.id;
+      if (prev !== null && prev !== post.id) {
         Keyboard.dismiss();
       }
+      // Audio adjunto del post visible (volumen elegido al publicar).
+      feedAudioRef.current.playForPost(post);
     },
   ).current;
+
+  // Arrancar el audio del post inicial (onViewableItemsChanged no siempre
+  // dispara para el primer item ya visible en el montaje).
+  const initialAudioPlayedRef = useRef(false);
+  useEffect(() => {
+    if (initialAudioPlayedRef.current) return;
+    if (data.length === 0) return;
+    const post = data[Math.min(initialIndex, data.length - 1)];
+    if (post) {
+      initialAudioPlayedRef.current = true;
+      feedAudioRef.current.playForPost(post);
+    }
+  }, [data, initialIndex]);
+
+  // Detener el audio al cerrar el panel (desmontar).
+  useEffect(() => () => feedAudioRef.current.stop(), []);
 
   return (
     <GestureHandlerRootView style={StyleSheet.absoluteFillObject}>

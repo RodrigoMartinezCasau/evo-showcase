@@ -115,6 +115,8 @@ function simPostToCommunityPost(
     title: p.title,
     body: p.body,
     quoteAuthor: p.quoteAuthor,
+    audioTrackId: p.audioTrackId ?? null,
+    audioVolume: p.audioVolume ?? null,
     voteStats: {
       up:   p.upvoterIds.length,
       down: p.downvoterIds.length,

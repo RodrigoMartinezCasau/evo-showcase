@@ -44,6 +44,10 @@ export type SimPost = {
   body: string;
   quoteAuthor?: string;
   createdAt: string;
+  /** Pista de audio adjunta (biblioteca `audio_tracks`). Suena solo en "Para ti". */
+  audioTrackId?: string | null;
+  /** Volumen elegido por el autor para su publicación (0 = mudo … 1 = máx). */
+  audioVolume?: number | null;
   /** User IDs that upvoted — max combined with downvoterIds ≤ 8, author excluded. */
   upvoterIds: string[];
   downvoterIds: string[];

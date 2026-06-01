@@ -41,6 +41,10 @@ export type CommunityPost = {
   quoteAuthor?: string
   voteStats: VoteStats
   createdAt: string
+  /** Pista de audio adjunta (biblioteca `audio_tracks`). Suena solo en "Para ti". */
+  audioTrackId?: string | null
+  /** Volumen elegido por el autor para su publicación (0 = mudo … 1 = máx). */
+  audioVolume?: number | null
 }
 
 export type ReflectionPost = CommunityPost & { type: 'reflection'; title: string }

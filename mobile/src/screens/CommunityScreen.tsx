@@ -36,6 +36,7 @@ import { isPublishedSimPostType, type SimPost } from '@evoconn/data/simulation/s
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
 import { useParatiSeenPosts } from '@evoconn/hooks/ParatiSeenPostsContext';
+import { useFeedAudio } from '@evoconn/hooks/useFeedAudio';
 import type { CommunityPost } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
 import {
@@ -398,6 +399,9 @@ export default function CommunityScreen() {
   markParatiSeenRef.current = markParatiPostSeen;
   const triggerHapticRef = useRef(triggerHaptic);
   triggerHapticRef.current = triggerHaptic;
+  const feedAudio = useFeedAudio();
+  const feedAudioRef = useRef(feedAudio);
+  feedAudioRef.current = feedAudio;
 
   // Quitar al instante posts de autores bloqueados del panel Para Ti ya montado.
   useEffect(() => {
@@ -1353,6 +1357,9 @@ export default function CommunityScreen() {
         if (mode === 'foryou') {
           markParatiSeenRef.current(post.id);
         }
+        // Audio adjunto del post visible en cualquier visor ampliado (Para ti
+        // y Siguiendo), al volumen elegido al publicar.
+        feedAudioRef.current.playForPost(post);
 
         const id = post.author.id;
         visibleAuthorIdRef.current = id;
@@ -1414,6 +1421,12 @@ export default function CommunityScreen() {
 
   /** Revealing the profile overlay works in both: detailFeed AND persistent Para Ti panel. */
   const verticalViewerVisible = detailMounted || paratiPanelVisible;
+
+  // Detener el audio del feed al salir del visor vertical (volver a la lista,
+  // abrir perfil a pantalla completa, etc.).
+  useEffect(() => {
+    if (!verticalViewerVisible) feedAudio.stop();
+  }, [verticalViewerVisible, feedAudio]);
   const profileRevealGesture = useMemo(
     () =>
       Gesture.Pan()

@@ -15,6 +15,7 @@ import React, {
   useState,
 } from 'react';
 import type { CommunityPost, PhrasePost, Rank, User, VoteStats } from '../types';
+import type { PublishAudioChoice } from '../types/publishAudio';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { SIM_USERS_BY_ID, isPublishedSimPostType, type SimPost } from '@evoconn/data/simulation/simulatedNetwork';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
@@ -110,6 +111,8 @@ export function simPostToCommunityPost(
     title: p.title,
     body: p.body,
     quoteAuthor: p.quoteAuthor,
+    audioTrackId: p.audioTrackId ?? null,
+    audioVolume: p.audioVolume ?? null,
     voteStats: {
       up:   p.upvoterIds.length,
       down: p.downvoterIds.length,
@@ -279,6 +282,8 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
         title: post.title,
         body: post.body,
         quoteAuthor: post.quoteAuthor,
+        audioTrackId: post.audioTrackId ?? null,
+        audioVolume: post.audioVolume ?? null,
         createdAt: post.createdAt,
         upvoterIds: [],
         downvoterIds: [],
@@ -381,6 +386,7 @@ export function createReflectionPost(
   author: User,
   title: string,
   body: string,
+  audio?: PublishAudioChoice,
 ): CommunityPost {
   return {
     id: `pub_${++_nextId}_${Date.now()}`,
@@ -388,6 +394,8 @@ export function createReflectionPost(
     author,
     title,
     body,
+    audioTrackId: audio?.audioTrackId ?? null,
+    audioVolume: audio?.audioVolume ?? null,
     voteStats: { up: 0, down: 0, save: 0 },
     createdAt: new Date().toISOString(),
   };
@@ -397,6 +405,7 @@ export function createPhrasePost(
   author: User,
   phraseInnerNormalized: string,
   quoteAuthor: string,
+  audio?: PublishAudioChoice,
 ): PhrasePost {
   return {
     id: `pub_phrase_${++_nextId}_${Date.now()}`,
@@ -404,6 +413,8 @@ export function createPhrasePost(
     author,
     body: phraseInnerNormalized,
     quoteAuthor: quoteAuthor.trim(),
+    audioTrackId: audio?.audioTrackId ?? null,
+    audioVolume: audio?.audioVolume ?? null,
     voteStats: { up: 0, down: 0, save: 0 },
     createdAt: new Date().toISOString(),
   };

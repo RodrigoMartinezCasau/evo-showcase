@@ -1233,6 +1233,8 @@ function simPostToDbRow(p: SimPost) {
     title:           p.title         ?? null,
     body:            p.body,
     quote_author:    p.quoteAuthor   ?? null,
+    audio_track_id:  p.audioTrackId  ?? null,
+    audio_volume:    p.audioVolume   ?? 1,
     created_at:      p.createdAt,
   };
 }
@@ -1254,6 +1256,8 @@ export function dbRowToSimPost(row: Record<string, unknown>): SimPost {
     title:          row.title           as string | undefined,
     body:           row.body            as string,
     quoteAuthor:    row.quote_author    as string | undefined,
+    audioTrackId:   (row.audio_track_id as string | null | undefined) ?? null,
+    audioVolume:    (row.audio_volume   as number | null | undefined) ?? null,
     createdAt:      row.created_at      as string,
     upvoterIds:   [],
     downvoterIds: [],

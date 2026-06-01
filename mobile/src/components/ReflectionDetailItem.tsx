@@ -1650,6 +1650,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
           containerHeight={reflPanelLayout ? reflPanelLayout.height * 1.05 * COL.verticalFillRatio : undefined}
           showClanBadge={communityVerticalFeed}
           authorRank={post.author.rank}
+          hasAudio={!!post.audioTrackId}
         />
       </View>
     </View>
