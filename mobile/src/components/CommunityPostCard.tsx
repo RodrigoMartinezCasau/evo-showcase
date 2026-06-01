@@ -38,6 +38,7 @@ import { getClanColor } from '@evoconn/constants/clanColors';
 import { COMMUNITY_FOLLOW_BUTTON_LAYOUT } from '@evoconn/constants/followButtonLayout';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { PanelStarField, PANEL_STAR_SURFACE_DEFAULT } from '@evoconn/components/animations/StarFieldBackground';
+import { PARA_TI_STAR_BRIGHTNESS } from '@evoconn/constants/starFieldLayout';
 
 const V = SVG_CARD_VISUAL;
 
@@ -273,6 +274,9 @@ function CommunityPostCardBase({
             surfaceColor={
               followingFeedStyle ? PANEL_STAR_SURFACE_DEFAULT : evoconnColors.background
             }
+            // Solo en Para Ti las estrellas se ven un poco más brillantes.
+            // Ajustable en starFieldLayout.ts (PARA_TI_STAR_BRIGHTNESS).
+            opacityScale={followingFeedStyle ? 1 : PARA_TI_STAR_BRIGHTNESS}
           />
         </View>
 
