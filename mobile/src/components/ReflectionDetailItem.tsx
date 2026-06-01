@@ -390,6 +390,22 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     commentAuthorCache,
   ]);
 
+  // Avatar del autor del post ampliado. Los registros de SimulationContext no
+  // guardan avatar, así que un post propio puede llegar sin foto a esta vista
+  // (cabecera con icono por defecto pese a tener foto). Si es propio, caemos a
+  // la foto publicada en Supabase del usuario logueado.
+  const resolvedAuthorAvatar = useMemo(() => {
+    const fromPost = post.author.avatarUri?.trim();
+    if (fromPost) return fromPost;
+    const isSelfPost =
+      (session?.user?.id != null && post.author.id === session.user.id) ||
+      post.author.id === mockCurrentUser.id;
+    if (isSelfPost) {
+      return authProfile?.avatar_url?.trim() || mockCurrentUser.avatarUri || undefined;
+    }
+    return undefined;
+  }, [post.author.avatarUri, post.author.id, session?.user?.id, authProfile?.avatar_url]);
+
   const [postMoreSheetOpen, setPostMoreSheetOpen] = useState(false);
   const [reportReasonPickerOpen, setReportReasonPickerOpen] = useState(false);
   const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
@@ -1621,7 +1637,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
         <DetailActionColumn
           ref={actionColRef}
           clanId={post.author.clanId}
-          avatarUri={post.author.avatarUri}
+          avatarUri={resolvedAuthorAvatar}
           upCount={livePost.voteStats.up}
           downCount={livePost.voteStats.down}
           saved={saved}
