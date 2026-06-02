@@ -3,11 +3,14 @@ import {
   View,
   Text,
   ScrollView,
+  FlatList,
   TouchableOpacity,
+  Pressable,
   StyleSheet,
   Share,
   Keyboard,
   Platform,
+  PixelRatio,
   Animated,
   Easing,
   useWindowDimensions,
@@ -15,13 +18,15 @@ import {
   type LayoutChangeEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
+import { FlatList as GHFlatList } from 'react-native-gesture-handler';
 import type { CommunityPost, Comment } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { ReflectionBackground } from './ReflectionBackground';
 import { DETAIL_HEADER_ROW_OFFSET_Y, DETAIL_HEADER_ROW_OFFSET_X } from '@evoconn/constants/reflectionDetailRankBadgeLayout';
 import { DetailActionColumn } from './DetailActionColumn';
 import type { DetailActionColumnHandle } from './DetailActionColumn';
-import { CommentCard } from './CommentCard';
+import { CommentThreadBlock } from './CommentThreadBlock';
+import { CommentsSheet, type CommentsSheetHandle } from './CommentsSheet';
 import { NewCommentBox } from './NewCommentBox';
 import {
   REFLECTION_PANEL_LAYOUT as RP,
@@ -29,12 +34,15 @@ import {
   PANELS_GAP,
   PANELS_BOTTOM_RESERVE,
   COMMENTS_CONTENT_INSETS,
+  COMMENTS_PREVIEW_SECTION_GAP,
+  COMMENTS_PREVIEW_SEE_MORE_MIN_HEIGHT,
   REFLECTION_TEXT_RIGHT_INSET,
   DETAIL_TITLE_LAYOUT as TL,
 } from '@evoconn/constants/reflectionPanelsLayout';
 import {
   DETAIL_ACTION_COLUMN_LAYOUT as COL,
   DETAIL_CLAN_BUTTON_LAYOUT as CLAN_L,
+  computeDetailActionUpvoteTopY,
 } from '@evoconn/constants/detailActionColumnLayout';
 import {
   DETAIL_QUOTE_LAYOUT as QL,
@@ -128,6 +136,10 @@ type ReflectionDetailItemProps = {
   itemHeight: number;
   onAuthorPress: (userId: string) => void;
   onClanPress: (clanId: string) => void;
+  /**
+   * Bloquea el scroll del feed padre cuando `active` es true (lectura "Ver más"
+   * o caja de comentarios expandida).
+   */
   onReadingModeChange?: (active: boolean) => void;
   /**
    * Community vertical pager (Para ti / Siguiendo): don’t capture the root responder so the
@@ -149,7 +161,10 @@ type ReflectionDetailItemProps = {
 };
 
 /** Comentarios raíz mostrados por bloque (se cargan más al hacer scroll). */
-const COMMENTS_PAGE_SIZE = 8;
+const COMMENTS_PAGE_SIZE = 6;
+const EMPTY_COMMENTS: Comment[] = [];
+/** Respuestas de un hilo reveladas por cada pulsación en "Ver más respuestas". */
+const THREAD_REPLIES_PAGE_SIZE = 5;
 
 function findCommentThreadRoot(comments: Comment[], targetId: string): string | undefined {
   const byId = new Map(comments.map((c) => [c.id, c]));
@@ -422,13 +437,105 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
 
   // ── Hilos de respuestas (estado declarado ANTES de handleAddComment) ──
   const [expandedThreads, setExpandedThreads] = useState<Record<string, boolean>>({});
+  const [threadRepliesVisibleCount, setThreadRepliesVisibleCount] = useState<
+    Record<string, number>
+  >({});
   const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null);
-  const commentsScrollRef = useRef<ScrollView>(null);
+  const commentsScrollRef = useRef<FlatList<Comment>>(null);
+  const commentsLoadMoreLock = useRef(false);
   const commentOffsetsRef = useRef<Map<string, number>>(new Map());
   const registerCommentOffset = useCallback((commentId: string, y: number) => {
     commentOffsetsRef.current.set(commentId, y);
   }, []);
   const [replyingTo, setReplyingTo] = useState<{ commentId: string; username: string } | null>(null);
+  /**
+   * Altura del bloque inferior anclado (huecos + ver más + compositor).
+   * El compositor no se mueve: el resto se construye hacia arriba desde aquí.
+   */
+  const [previewBottomStackH, setPreviewBottomStackH] = useState(
+    INBOX.minHeight +
+      6 +
+      COMMENTS_PREVIEW_SECTION_GAP +
+      COMMENTS_PREVIEW_SEE_MORE_MIN_HEIGHT +
+      COMMENTS_PREVIEW_SECTION_GAP,
+  );
+
+  // ── Caja de comentarios (Fase 1 · prototipo) ──────────────────────────────
+  // Preview colapsado: solo el comentario principal + "Ver más comentarios · N".
+  // Al pulsar el enlace se despliega hacia arriba una hoja con TODOS los
+  // Hoja expandida: `sheetTranslateY` 0 = abierta, commentsSheetHeight = cerrada.
+  const [commentsExpanded, setCommentsExpanded] = useState(false);
+  const commentsExpandedRef = useRef(false);
+  /** Hoja montada tras el primer abrir (evita coste de remontar en cada apertura). */
+  const [commentsSheetMounted, setCommentsSheetMounted] = useState(false);
+  /** Lista completa diferida 1 frame para no bloquear el tap. */
+  const [commentsSheetListReady, setCommentsSheetListReady] = useState(false);
+  const commentsSheetListReadyRef = useRef(false);
+  const [commentComposerKbOpen, setCommentComposerKbOpen] = useState(false);
+  const [commentComposerFocused, setCommentComposerFocused] = useState(false);
+  const commentComposerKbOpenRef = useRef(false);
+  const commentComposerFocusedRef = useRef(false);
+  const commentsSheetRef = useRef<CommentsSheetHandle>(null);
+
+  const notifyParentFeedScrollLock = useCallback(() => {
+    onReadingModeChange?.(
+      readingModeRef.current ||
+        commentsExpandedRef.current ||
+        commentComposerKbOpenRef.current ||
+        commentComposerFocusedRef.current,
+    );
+  }, [onReadingModeChange]);
+
+  useEffect(() => {
+    commentsExpandedRef.current = commentsExpanded;
+    if (!commentsExpanded) notifyParentFeedScrollLock();
+  }, [commentsExpanded, notifyParentFeedScrollLock]);
+
+  const finishSheetClose = useCallback(() => {
+    Keyboard.dismiss();
+    setCommentComposerKbOpen(false);
+    commentComposerKbOpenRef.current = false;
+    setCommentComposerFocused(false);
+    commentComposerFocusedRef.current = false;
+    commentsExpandedRef.current = false;
+    setCommentsSheetListReady(false);
+    commentsSheetListReadyRef.current = false;
+    setCommentsExpanded(false);
+    onReadingModeChange?.(readingModeRef.current);
+  }, [onReadingModeChange]);
+
+  const openComments = useCallback(() => {
+    commentsExpandedRef.current = true;
+    setCommentsSheetMounted(true);
+    setCommentsExpanded(true);
+    onReadingModeChange?.(readingModeRef.current || true);
+    if (!commentsSheetListReadyRef.current) {
+      requestAnimationFrame(() => {
+        commentsSheetListReadyRef.current = true;
+        setCommentsSheetListReady(true);
+      });
+    }
+  }, [onReadingModeChange]);
+
+  const closeComments = useCallback(() => {
+    commentsSheetRef.current?.close();
+  }, []);
+
+  // Al cambiar de publicación, vuelve siempre al preview colapsado.
+  useEffect(() => {
+    commentsExpandedRef.current = false;
+    setCommentsExpanded(false);
+    setCommentsSheetMounted(false);
+    setCommentsSheetListReady(false);
+    commentsSheetListReadyRef.current = false;
+    setCommentComposerKbOpen(false);
+    commentComposerKbOpenRef.current = false;
+    setCommentComposerFocused(false);
+    commentComposerFocusedRef.current = false;
+    setExpandedThreads({});
+    setThreadRepliesVisibleCount({});
+    onReadingModeChange?.(readingModeRef.current);
+  }, [post.id, onReadingModeChange]);
 
   const handleAddComment = useCallback(
     async (text: string) => {
@@ -458,7 +565,13 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
       recordComment(post);
       // Auto-expandir el hilo destino para que el autor vea su respuesta.
       if (parentForThis) {
-        setExpandedThreads(prev => ({ ...prev, [parentForThis]: true }));
+        const rootId =
+          findCommentThreadRoot(contextComments, parentForThis) ?? parentForThis;
+        setExpandedThreads((prev) => ({ ...prev, [rootId]: true }));
+        setThreadRepliesVisibleCount((prev) => ({
+          ...prev,
+          [rootId]: Math.max(prev[rootId] ?? THREAD_REPLIES_PAGE_SIZE, (prev[rootId] ?? 0) + 1),
+        }));
       }
       setReplyingTo(null);
 
@@ -505,13 +618,9 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
       authProfile?.rank,
       replyingTo,
       commentsMap,
+      contextComments,
     ],
   );
-
-  // ── Acciones de hilo (callbacks) ───────────────────────────────────────
-  const toggleThread = useCallback((rootId: string) => {
-    setExpandedThreads(prev => ({ ...prev, [rootId]: !prev[rootId] }));
-  }, []);
 
   const startReply = useCallback((commentId: string, username: string) => {
     setReplyingTo({ commentId, username });
@@ -682,7 +791,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
         const next = !readingModeRef.current;
         readingModeRef.current = next;
         setReadingMode(next);
-        onReadingModeChange?.(next);
+        onReadingModeChange?.(next || commentsExpandedRef.current);
       }, 300);
     }
   }, [handleUpvote, onReadingModeChange]);
@@ -750,9 +859,15 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   const headerHeight = 52;
   const panelsAvailable =
     itemHeight - headerHeight - PANELS_BOTTOM_RESERVE - PANELS_GAP - 16;
-  const commentsH = CP.height != null
-    ? CP.height
-    : Math.max(80, panelsAvailable * (1 - RP.heightRatio));
+  const commentPanelFontBoost =
+    CP.height == null
+      ? Math.round(20 * Math.min(Math.max(PixelRatio.getFontScale() - 1, 0), 0.35))
+      : 0;
+  const commentsH =
+    (CP.height != null
+      ? CP.height
+      : Math.max(80, panelsAvailable * (1 - RP.heightRatio))) + commentPanelFontBoost;
+  const commentsPanelInnerH = commentsH - 2 * CP.paddingVertical;
   const reflectionH = Math.max(80, panelsAvailable - commentsH);
 
   const isPhrase = post.type === 'phrase';
@@ -1057,6 +1172,52 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     resetCommentsPaging();
   }, [post.id, resetCommentsPaging]);
 
+  const toggleThread = useCallback(
+    (rootId: string) => {
+      setExpandedThreads((prev) => {
+        const opening = !prev[rootId];
+        if (!opening) {
+          setThreadRepliesVisibleCount((counts) => {
+            const next = { ...counts };
+            delete next[rootId];
+            return next;
+          });
+          return { ...prev, [rootId]: false };
+        }
+        const total = descendantsByRoot.get(rootId)?.length ?? 0;
+        setThreadRepliesVisibleCount((counts) => ({
+          ...counts,
+          [rootId]: Math.min(THREAD_REPLIES_PAGE_SIZE, total),
+        }));
+        return { ...prev, [rootId]: true };
+      });
+    },
+    [descendantsByRoot],
+  );
+
+  const loadMoreThreadReplies = useCallback(
+    (rootId: string) => {
+      setThreadRepliesVisibleCount((prev) => {
+        const total = descendantsByRoot.get(rootId)?.length ?? 0;
+        const cur = prev[rootId] ?? 0;
+        return {
+          ...prev,
+          [rootId]: Math.min(cur + THREAD_REPLIES_PAGE_SIZE, total),
+        };
+      });
+    },
+    [descendantsByRoot],
+  );
+
+  const collapseThread = useCallback((rootId: string) => {
+    setExpandedThreads((prev) => ({ ...prev, [rootId]: false }));
+    setThreadRepliesVisibleCount((prev) => {
+      const next = { ...prev };
+      delete next[rootId];
+      return next;
+    });
+  }, []);
+
   // Deep link / notificación a un comentario concreto: si su raíz cae más allá
   // del bloque visible, revela hasta ahí para que el scroll-to funcione.
   useEffect(() => {
@@ -1077,18 +1238,43 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     const rootId = findCommentThreadRoot(visibleComments, highlightCommentId);
     if (!rootId) return;
     setExpandedThreads((prev) => (prev[rootId] ? prev : { ...prev, [rootId]: true }));
-  }, [highlightCommentId, commentsReady, visibleComments, post.id, ensureCommentsForPost]);
+    const descendants = descendantsByRoot.get(rootId) ?? [];
+    const idx = descendants.findIndex((d) => d.id === highlightCommentId);
+    if (idx >= 0) {
+      const needVisible = Math.min(
+        Math.ceil((idx + 1) / THREAD_REPLIES_PAGE_SIZE) * THREAD_REPLIES_PAGE_SIZE,
+        descendants.length,
+      );
+      setThreadRepliesVisibleCount((prev) => ({
+        ...prev,
+        [rootId]: Math.max(prev[rootId] ?? 0, needVisible),
+      }));
+    }
+  }, [
+    highlightCommentId,
+    commentsReady,
+    visibleComments,
+    post.id,
+    ensureCommentsForPost,
+    descendantsByRoot,
+  ]);
 
   // Scroll + flash visual al comentario objetivo.
   useEffect(() => {
     if (!highlightCommentId || !commentsReady) return;
     if (!visibleComments.some((c) => c.id === highlightCommentId)) return;
 
+    // Deep link / notificación a un comentario → abre la hoja expandida para
+    // que se pueda ver y desplazar hasta él.
+    openComments();
     setHighlightedCommentId(highlightCommentId);
     const scrollToTarget = () => {
       const y = commentOffsetsRef.current.get(highlightCommentId);
       if (y != null) {
-        commentsScrollRef.current?.scrollTo({ y: Math.max(0, y - 12), animated: true });
+        commentsScrollRef.current?.scrollToOffset({
+          offset: Math.max(0, y - 12),
+          animated: true,
+        });
       }
     };
     const t1 = setTimeout(scrollToTarget, 120);
@@ -1150,10 +1336,6 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     onAuthorPress(post.author.id);
   }, [post.author.id, onAuthorPress]);
 
-  const dismissKeyboard = useCallback(() => {
-    Keyboard.dismiss();
-  }, []);
-
   const kbOffset = useRef(new Animated.Value(0)).current;
   const newCommentMeasureRef = useRef<View>(null);
 
@@ -1165,6 +1347,9 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
       endCoordinates: { screenY: number; height?: number };
       duration?: number;
     }) => {
+      setCommentComposerKbOpen(true);
+      commentComposerKbOpenRef.current = true;
+      notifyParentFeedScrollLock();
       const kbTopY =
         Platform.OS === 'android'
           ? androidKeyboardTopY(e.endCoordinates, windowHeight)
@@ -1201,6 +1386,9 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     };
 
     const onHide = (e: { duration?: number }) => {
+      setCommentComposerKbOpen(false);
+      commentComposerKbOpenRef.current = false;
+      notifyParentFeedScrollLock();
       kbOffset.stopAnimation();
       Animated.timing(kbOffset, {
         toValue: 0,
@@ -1216,7 +1404,19 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
       showSub.remove();
       hideSub.remove();
     };
-  }, [kbOffset, windowHeight, insets.bottom]);
+  }, [kbOffset, windowHeight, insets.bottom, notifyParentFeedScrollLock]);
+
+  const handleCommentComposerFocus = useCallback(() => {
+    setCommentComposerFocused(true);
+    commentComposerFocusedRef.current = true;
+    notifyParentFeedScrollLock();
+  }, [notifyParentFeedScrollLock]);
+
+  const handleCommentComposerBlur = useCallback(() => {
+    setCommentComposerFocused(false);
+    commentComposerFocusedRef.current = false;
+    notifyParentFeedScrollLock();
+  }, [notifyParentFeedScrollLock]);
 
   const reflectionTitleUsesLongLayout = isLongText || readingMode;
 
@@ -1231,19 +1431,203 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     : null;
   const REPOST_PILL_HEIGHT = 26;
   const REPOST_PILL_RADIUS = 13;
-  const repostRimColor = getClanColor(post.author.clanId);
+  const repostRimColor = getClanColor(repostAttribution?.clanId ?? null);
   const repostUserId = repostAttribution?.userId ?? null;
   const repostLabelTop =
     repostLabelText && reflPanelLayout
       ? reflPanelLayout.y + reflPanelLayout.height + (PANELS_GAP - REPOST_PILL_HEIGHT) / 2
       : null;
 
+  // Altura de la hoja expandida: el borde superior llega hasta el bloque de
+  // upvotes (contador), no hasta el badge de clan.
+  const commentsSheetHeight = useMemo(() => {
+    if (reflPanelLayout) {
+      const upvoteTop = computeDetailActionUpvoteTopY(
+        reflPanelLayout.y,
+        reflPanelLayout.height,
+        { hasAudio: !!post.audioTrackId },
+      );
+      return Math.max(160, itemHeight - upvoteTop);
+    }
+    return Math.max(160, itemHeight * 0.55);
+  }, [reflPanelLayout, itemHeight, post.audioTrackId]);
+
+  // ── Comentarios: nº total y comentario principal (preview) ────────────────
+  const totalCommentsCount = visibleComments.length;
+  const topComment = commentRoots[0];
+  const topCommentDescendants = topComment
+    ? descendantsByRoot.get(topComment.id) ?? EMPTY_COMMENTS
+    : EMPTY_COMMENTS;
+
+  const previewShowsSeeMore =
+    totalCommentsCount > 1 || topCommentDescendants.length > 0;
+
+  const previewCommentMaxHeight = useMemo(
+    () =>
+      Math.max(
+        24,
+        commentsPanelInnerH - previewBottomStackH,
+      ),
+    [commentsPanelInnerH, previewBottomStackH],
+  );
+
+  const previewMaxPillHeight = useMemo(() => {
+    // Derivado de la ALTURA DEL PANEL (no del propio stack, que sería circular):
+    // dejamos sitio para «ver más», los huecos y una línea del comentario destacado.
+    const chrome =
+      (previewShowsSeeMore
+        ? COMMENTS_PREVIEW_SEE_MORE_MIN_HEIGHT + COMMENTS_PREVIEW_SECTION_GAP
+        : 0) +
+      (topComment || previewShowsSeeMore ? COMMENTS_PREVIEW_SECTION_GAP : 0) +
+      6; /* newCommentRow paddingTop */
+    const minCommentClip = topComment ? 28 : 0;
+    return Math.max(
+      INBOX.minHeight,
+      commentsPanelInnerH - chrome - minCommentClip,
+    );
+  }, [commentsPanelInnerH, previewShowsSeeMore, topComment]);
+
+  const handlePreviewBottomStackLayout = useCallback((e: LayoutChangeEvent) => {
+    const h = Math.ceil(e.nativeEvent.layout.height);
+    setPreviewBottomStackH((prev) => (Math.abs(prev - h) < 1 ? prev : h));
+  }, []);
+
+  const trackCommentOffsets = !!highlightCommentId;
+
+  const isCommentUpvoted = useCallback(
+    (commentId: string) => !!myCommentVotes[commentId],
+    [myCommentVotes],
+  );
+
+  const commentsSheetExtraData = useMemo(
+    () => ({
+      expandedThreads,
+      threadRepliesVisibleCount,
+      myCommentVotes,
+      highlightedCommentId,
+      trackCommentOffsets,
+    }),
+    [
+      expandedThreads,
+      threadRepliesVisibleCount,
+      myCommentVotes,
+      highlightedCommentId,
+      trackCommentOffsets,
+    ],
+  );
+
+  const handleCommentsEndReached = useCallback(() => {
+    if (!hasMoreComments || commentsLoadMoreLock.current) return;
+    commentsLoadMoreLock.current = true;
+    loadMoreComments();
+    requestAnimationFrame(() => {
+      commentsLoadMoreLock.current = false;
+    });
+  }, [hasMoreComments, loadMoreComments]);
+
+  const renderCommentRoot = useCallback(
+    ({ item: c }: { item: Comment }) => (
+      <CommentThreadBlock
+        root={c}
+        descendants={descendantsByRoot.get(c.id) ?? EMPTY_COMMENTS}
+        commentById={commentById}
+        expanded={!!expandedThreads[c.id]}
+        visibleReplyCount={threadRepliesVisibleCount[c.id] ?? 0}
+        isUpvotedRoot={!!myCommentVotes[c.id]}
+        isUpvoted={isCommentUpvoted}
+        highlightedId={highlightedCommentId}
+        isPostAuthor={isPostAuthor}
+        isAdmin={isAdmin}
+        myId={myId}
+        trackOffsets={trackCommentOffsets}
+        withThreadControls
+        onRegisterOffset={registerCommentOffset}
+        onUpvote={toggleCommentVote}
+        onReply={startReply}
+        onDelete={handleDeleteComment}
+        onAuthorPress={onAuthorPress}
+        onBlockUser={handleBlockUser}
+        onToggleThread={toggleThread}
+        onLoadMoreReplies={loadMoreThreadReplies}
+        onCollapseThread={collapseThread}
+      />
+    ),
+    [
+      descendantsByRoot,
+      commentById,
+      expandedThreads,
+      threadRepliesVisibleCount,
+      myCommentVotes,
+      isCommentUpvoted,
+      highlightedCommentId,
+      isPostAuthor,
+      isAdmin,
+      myId,
+      trackCommentOffsets,
+      registerCommentOffset,
+      toggleCommentVote,
+      startReply,
+      handleDeleteComment,
+      onAuthorPress,
+      handleBlockUser,
+      toggleThread,
+      loadMoreThreadReplies,
+      collapseThread,
+    ],
+  );
+
+  const commentRootKeyExtractor = useCallback((c: Comment) => c.id, []);
+
+  const commentsSheetListFooter = useMemo(
+    () => (hasMoreComments ? <ClanLoadingDot inline /> : null),
+    [hasMoreComments],
+  );
+
+  // Composer (input "Añadir comentario") + banner de respuesta. Reutilizado en
+  // el preview colapsado y en la hoja expandida.
+  const renderComposer = (
+    measure: boolean,
+    options?: { maxPillHeight?: number },
+  ) => {
+    const inner = (
+      <Animated.View
+        style={[
+          styles.newCommentRow,
+          { zIndex: 30, transform: [{ translateY: kbOffset }] },
+        ]}
+      >
+        {replyingTo ? (
+          <View style={threadStyles.replyBanner}>
+            <Text style={threadStyles.replyBannerText}>
+              Respondiendo a @{replyingTo.username.replace(/^@/, '')}
+            </Text>
+            <TouchableOpacity onPress={cancelReply} hitSlop={8}>
+              <Text style={threadStyles.replyBannerCancel}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+        <NewCommentBox
+          onSend={handleAddComment}
+          clanId={post.author.clanId}
+          maxPillHeight={options?.maxPillHeight}
+          onFocus={handleCommentComposerFocus}
+          onBlur={handleCommentComposerBlur}
+        />
+      </Animated.View>
+    );
+    if (!measure) return inner;
+    return (
+      <View ref={newCommentMeasureRef} collapsable={false}>
+        {inner}
+      </View>
+    );
+  };
+
   return (
     <>
     <View
       style={[styles.container, { height: itemHeight }]}
-      onStartShouldSetResponder={() => (communityVerticalFeed ? false : !readingMode)}
-      onResponderRelease={dismissKeyboard}
+      onStartShouldSetResponder={() => false}
     >
       <ReflectionBackground clan={post.author.clanId}>
         <View style={styles.content}>
@@ -1439,152 +1823,75 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
             ]}
           >
             {commentsReady ? (
-              <>
-                <View style={[styles.commentsClip, { borderRadius: CP.borderRadius }]}>
-                  <ScrollView
-                    ref={commentsScrollRef}
-                    showsVerticalScrollIndicator={false}
-                    nestedScrollEnabled
-                    keyboardShouldPersistTaps="handled"
-                    keyboardDismissMode="on-drag"
-                    scrollEventThrottle={16}
-                    onScroll={(e) => {
-                      if (!hasMoreComments) return;
-                      const { contentOffset, contentSize, layoutMeasurement } =
-                        e.nativeEvent;
-                      const distanceFromBottom =
-                        contentSize.height -
-                        (contentOffset.y + layoutMeasurement.height);
-                      if (distanceFromBottom < 400) loadMoreComments();
-                    }}
-                    style={styles.commentsScroll}
-                    contentContainerStyle={{
-                      paddingTop: COMMENTS_CONTENT_INSETS.top,
-                      paddingBottom: COMMENTS_CONTENT_INSETS.bottom,
-                      paddingLeft: COMMENTS_CONTENT_INSETS.left,
-                      paddingRight: COMMENTS_CONTENT_INSETS.right,
-                    }}
-                  >
-                    {(() => {
-                      // Hilos:
-                      // - parent_comment_id en DB conserva el padre inmediato.
-                      // - En UI, todos los descendientes de una raíz se
-                      //   muestran como una lista plana bajo la raíz, con un
-                      //   único nivel de sangría (no se anida más profundo).
-                      // - El agrupamiento se calcula en `useMemo` (arriba) y las
-                      //   raíces se revelan por bloques (`visibleRoots`).
-                      return visibleRoots.map((c) => {
-                        const descendants = descendantsByRoot.get(c.id) ?? [];
-                        const expanded = !!expandedThreads[c.id];
-                        const isOwnerDelete = isPostAuthor || c.author.id === myId;
-                        const canDelete = isOwnerDelete || isAdmin;
-                        return (
-                          <React.Fragment key={c.id}>
-                            <View
-                              onLayout={(e) =>
-                                registerCommentOffset(c.id, e.nativeEvent.layout.y)
-                              }
-                            >
-                            <CommentCard
-                              authorId={c.author.id}
-                              username={c.author.username}
-                              avatarUri={c.author.avatarUri}
-                              text={c.body}
-                              clanId={c.author.clanId}
-                              upvotes={c.upCount}
-                              isUpvoted={!!myCommentVotes[c.id]}
-                              createdAt={c.createdAt}
-                              highlighted={highlightedCommentId === c.id}
-                              onUpvote={() => toggleCommentVote(c.id, c.author.id)}
-                              onReport={() => console.log(`Reported comment ${c.id}`)}
-                              onBlockUser={() => handleBlockUser(c.author.id)}
-                              onAuthorPress={() => onAuthorPress(c.author.id)}
-                              onReply={() => startReply(c.id, c.author.username)}
-                              onDelete={canDelete ? () => handleDeleteComment(c.id, !isOwnerDelete) : undefined}
-                              replyCount={descendants.length}
-                              threadExpanded={expanded}
-                              onToggleThread={descendants.length > 0 ? () => toggleThread(c.id) : undefined}
-                            />
-                            </View>
-                            {expanded
-                              ? descendants.map((child) => {
-                                  const childIsOwnerDelete = isPostAuthor || child.author.id === myId;
-                                  const childCanDelete = childIsOwnerDelete || isAdmin;
-                                  // Si el padre real NO es la raíz del hilo,
-                                  // mostramos "→ @padre" para indicar a quién
-                                  // se está respondiendo dentro del hilo.
-                                  const parent = child.parentId
-                                    ? commentById.get(child.parentId)
-                                    : undefined;
-                                  const replyingToUsername =
-                                    parent && parent.id !== c.id
-                                      ? parent.author.username
-                                      : undefined;
-                                  return (
-                                    <View
-                                      key={child.id}
-                                      onLayout={(e) =>
-                                        registerCommentOffset(child.id, e.nativeEvent.layout.y)
-                                      }
-                                    >
-                                    <CommentCard
-                                      authorId={child.author.id}
-                                      username={child.author.username}
-                                      avatarUri={child.author.avatarUri}
-                                      text={child.body}
-                                      clanId={child.author.clanId}
-                                      upvotes={child.upCount}
-                                      isUpvoted={!!myCommentVotes[child.id]}
-                                      createdAt={child.createdAt}
-                                      indented
-                                      highlighted={highlightedCommentId === child.id}
-                                      replyingToUsername={replyingToUsername}
-                                      onUpvote={() => toggleCommentVote(child.id, child.author.id)}
-                                      onReport={() => console.log(`Reported comment ${child.id}`)}
-                                      onBlockUser={() => handleBlockUser(child.author.id)}
-                                      onAuthorPress={() => onAuthorPress(child.author.id)}
-                                      onReply={() => startReply(child.id, child.author.username)}
-                                      onDelete={
-                                        childCanDelete
-                                          ? () => handleDeleteComment(child.id, !childIsOwnerDelete)
-                                          : undefined
-                                      }
-                                    />
-                                    </View>
-                                  );
-                                })
-                              : null}
-                          </React.Fragment>
-                        );
-                      });
-                    })()}
-                    {hasMoreComments ? <ClanLoadingDot inline /> : null}
-                  </ScrollView>
-                </View>
-                <View ref={newCommentMeasureRef} collapsable={false}>
-                  <Animated.View
+              <View style={styles.commentsPanelBody}>
+                {topComment ? (
+                  <View
                     style={[
-                      styles.newCommentRow,
+                      styles.commentsClip,
                       {
-                        zIndex: 30,
-                        transform: [{ translateY: kbOffset }],
+                        borderRadius: CP.borderRadius,
+                        maxHeight: previewCommentMaxHeight,
                       },
                     ]}
                   >
-                    {replyingTo ? (
-                      <View style={threadStyles.replyBanner}>
-                        <Text style={threadStyles.replyBannerText}>
-                          Respondiendo a @{replyingTo.username.replace(/^@/, '')}
-                        </Text>
-                        <TouchableOpacity onPress={cancelReply} hitSlop={8}>
-                          <Text style={threadStyles.replyBannerCancel}>Cancelar</Text>
-                        </TouchableOpacity>
-                      </View>
-                    ) : null}
-                    <NewCommentBox onSend={handleAddComment} clanId={post.author.clanId} />
-                  </Animated.View>
+                    <View style={styles.previewComment}>
+                      <CommentThreadBlock
+                        root={topComment}
+                        descendants={topCommentDescendants}
+                        commentById={commentById}
+                        expanded={false}
+                        visibleReplyCount={0}
+                        isUpvotedRoot={!!myCommentVotes[topComment.id]}
+                        isUpvoted={isCommentUpvoted}
+                        highlightedId={highlightedCommentId}
+                        isPostAuthor={isPostAuthor}
+                        isAdmin={isAdmin}
+                        myId={myId}
+                        trackOffsets={false}
+                        withThreadControls={false}
+                        onRegisterOffset={registerCommentOffset}
+                        onUpvote={toggleCommentVote}
+                        onReply={startReply}
+                        onDelete={handleDeleteComment}
+                        onAuthorPress={onAuthorPress}
+                        onBlockUser={handleBlockUser}
+                        onToggleThread={toggleThread}
+                        onLoadMoreReplies={loadMoreThreadReplies}
+                        onCollapseThread={collapseThread}
+                      />
+                    </View>
+                  </View>
+                ) : null}
+                {/* Anclado al fondo del panel: compositor fijo; ver más y huecos encima. */}
+                <View
+                  style={styles.commentsBottomStack}
+                  onLayout={handlePreviewBottomStackLayout}
+                >
+                  {topComment && previewShowsSeeMore ? (
+                    <View style={styles.previewSectionGap} />
+                  ) : null}
+                  {previewShowsSeeMore ? (
+                    <Pressable
+                      onPress={openComments}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      style={({ pressed }) => [
+                        styles.seeMoreRow,
+                        pressed && styles.seeMoreRowPressed,
+                      ]}
+                    >
+                      <Text style={styles.seeMoreText} numberOfLines={1}>
+                        Ver más comentarios · {totalCommentsCount}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                  {topComment || previewShowsSeeMore ? (
+                    <View style={styles.previewSectionGap} />
+                  ) : null}
+                  <View style={styles.commentsComposerSlot}>
+                    {renderComposer(true, { maxPillHeight: previewMaxPillHeight })}
+                  </View>
                 </View>
-              </>
+              </View>
             ) : null}
           </View>
 
@@ -1653,6 +1960,57 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
           hasAudio={!!post.audioTrackId}
         />
       </View>
+
+      <CommentsSheet
+        ref={commentsSheetRef}
+        mounted={commentsSheetMounted}
+        active={commentsExpanded}
+        sheetHeight={commentsSheetHeight}
+        containerHeight={itemHeight}
+        onClose={finishSheetClose}
+        header={
+          <>
+            <View style={styles.sheetHandle} />
+            {!commentComposerKbOpen ? (
+              <View style={styles.sheetHeaderMinimal}>
+                <TouchableOpacity onPress={closeComments} hitSlop={10} activeOpacity={0.7}>
+                  <Text style={styles.sheetClose}>Cerrar</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+          </>
+        }
+        list={
+          commentsExpanded && commentsSheetListReady ? (
+            <GHFlatList
+              ref={commentsScrollRef as any}
+              data={visibleRoots}
+              renderItem={renderCommentRoot}
+              keyExtractor={commentRootKeyExtractor}
+              extraData={commentsSheetExtraData}
+              showsVerticalScrollIndicator={false}
+              nestedScrollEnabled
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              onEndReached={handleCommentsEndReached}
+              onEndReachedThreshold={0.35}
+              initialNumToRender={5}
+              maxToRenderPerBatch={4}
+              windowSize={5}
+              updateCellsBatchingPeriod={50}
+              removeClippedSubviews={Platform.OS === 'android'}
+              style={styles.commentsScroll}
+              contentContainerStyle={{ paddingTop: 8, paddingBottom: 16 }}
+              ListFooterComponent={commentsSheetListFooter}
+            />
+          ) : commentsSheetListReady ? null : (
+            <View style={styles.commentsScroll}>
+              <ClanLoadingDot inline />
+            </View>
+          )
+        }
+        footer={renderComposer(false)}
+      />
     </View>
 
       <EvoActionSheetModal
@@ -1818,16 +2176,127 @@ const styles = StyleSheet.create({
   },
 
   commentsPanel: {
+    overflow: 'hidden',
+  },
+  commentsPanelBody: {
+    flex: 1,
+    minHeight: 0,
+    flexDirection: 'column',
+    justifyContent: 'flex-end',
   },
   commentsClip: {
-    flex: 1,
+    flexGrow: 0,
+    flexShrink: 1,
+    minHeight: 0,
     overflow: 'hidden',
+  },
+  /** Compositor + ver más anclados al borde inferior del panel. */
+  commentsBottomStack: {
+    flexShrink: 0,
+  },
+  previewSectionGap: {
+    height: COMMENTS_PREVIEW_SECTION_GAP,
+    flexShrink: 0,
+  },
+  commentsComposerSlot: {
+    flexShrink: 0,
   },
   commentsScroll: {
     flex: 1,
   },
   newCommentRow: {
+    flexShrink: 0,
     paddingTop: 6,
+  },
+  /** Preview colapsado: comentario principal único. */
+  previewComment: {
+    paddingTop: COMMENTS_CONTENT_INSETS.top,
+    paddingLeft: COMMENTS_CONTENT_INSETS.left,
+    paddingRight: COMMENTS_CONTENT_INSETS.right,
+  },
+  /** "Ver más comentarios · N" — centrado con la caja de comentar. */
+  seeMoreRow: {
+    flexShrink: 0,
+    minHeight: COMMENTS_PREVIEW_SEE_MORE_MIN_HEIGHT,
+    justifyContent: 'center',
+    paddingLeft: COMMENTS_CONTENT_INSETS.left,
+    paddingRight: COMMENTS_CONTENT_INSETS.right + INBOX.gap + SEND_BTN.size,
+    alignItems: 'center',
+  },
+  seeMoreRowPressed: {
+    opacity: 0.45,
+  },
+  seeMoreText: {
+    color: '#CCCCCC',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+    width: '100%',
+  },
+  threadMoreRepliesRow: {
+    paddingLeft: 20,
+    paddingTop: 2,
+    paddingBottom: 8,
+  },
+  threadMoreRepliesText: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  /** Hoja de comentarios expandida (overlay deslizable hacia arriba). */
+  commentsSheetRoot: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 50,
+    flexDirection: 'column',
+    justifyContent: 'flex-end',
+  },
+  /** Zona sobre la hoja (hasta el badge/upvote): tocar cierra comentarios. */
+  commentsSheetDismissZone: {
+    flex: 1,
+    width: '100%',
+  },
+  commentsBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  sheetDragArea: {
+    paddingBottom: 4,
+  },
+  commentsSheet: {
+    backgroundColor: evoconnColors.background,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.10)',
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    marginBottom: 8,
+  },
+  sheetHeaderMinimal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginBottom: 6,
+  },
+  sheetClose: {
+    color: '#CCCCCC',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  sheetListClip: {
+    flex: 1,
+    overflow: 'hidden',
   },
   /** Contenedor del pill "Republicado por …": centrado horizontalmente sobre el divisor. */
   /**

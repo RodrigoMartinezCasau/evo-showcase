@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import type { Philosopher } from '@evoconn/constants/clanConfig';
-import { getPhilosopherSvg } from '@evoconn/utils/getPhilosopherSvg';
+import { getPhilosopherImage } from '@evoconn/utils/getPhilosopherSvg';
 
 type Props = {
   philosopher: Philosopher;
@@ -11,13 +12,18 @@ type Props = {
 const PHOTO_SIZE = 68;
 
 export function ClanPhilosopherSlot({ philosopher, accentColor }: Props) {
-  const SvgIcon = philosopher.svgKey ? getPhilosopherSvg(philosopher.svgKey) : null;
+  const portrait = philosopher.svgKey ? getPhilosopherImage(philosopher.svgKey) : null;
 
   return (
     <View style={styles.slot}>
       <View style={styles.photoWrap}>
-        {SvgIcon != null ? (
-          <SvgIcon width={PHOTO_SIZE} height={PHOTO_SIZE} />
+        {portrait != null ? (
+          <ExpoImage
+            source={portrait}
+            style={{ width: PHOTO_SIZE, height: PHOTO_SIZE }}
+            contentFit="contain"
+            cachePolicy="memory-disk"
+          />
         ) : philosopher.imageUri ? (
           <Image
             source={{ uri: philosopher.imageUri }}

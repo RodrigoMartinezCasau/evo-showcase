@@ -72,7 +72,6 @@ import { UserResultCard } from '@evoconn/components/UserResultCard';
 import { PersonalRecentPostCard } from '@evoconn/components/personalProfile/PersonalRecentPostCard';
 import { useFeedStore } from '@evoconn/hooks/useFeedStore';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
-import { SIM_USERS } from '@evoconn/data/simulation/simulatedNetwork';
 import { ClanRankingCard } from './ClanRankingCard';
 import { useAuth } from '../../../mobile/lib/AuthContext';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
@@ -86,32 +85,14 @@ import {
 import {
   computeAllClanRankings,
   computeClanRankingsFromCounts,
+  mergeClanMemberCountsWithSim,
 } from '@evoconn/utils/clanRanking';
 import { getClanCompetitionPeriod } from '@evoconn/utils/clanCompetitionPeriod';
-import { ALL_CLAN_IDS } from '@evoconn/services/clanClassifier';
 import { isRealUserId } from '@evoconn/services/supabaseSocial';
 import type { CommunityPost } from '@evoconn/types';
 import type { ClanMember } from '@evoconn/data/mockClanProfiles';
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
 const ANIM_DURATION = 200;
-
-/** Combina miembros reales (Supabase) con usuarios simulados del grafo demo. */
-function mergeClanMemberCounts(
-  dbCounts: Record<string, number>,
-): Record<string, number> {
-  const counts: Record<string, number> = {};
-  for (const clan of ALL_CLAN_IDS) {
-    counts[clan] = dbCounts[clan] ?? 0;
-  }
-  for (const user of SIM_USERS) {
-    if (user.clanId && user.clanId in counts) {
-      counts[user.clanId]++;
-    }
-  }
-  return counts;
-}
 
 /** Genera un % de clan simulado a partir del rank para el display de miembros */
 function mockClanPct(rank: string, index: number): string {
@@ -357,7 +338,7 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
 
   // ── Ranking del clan ──────────────────────────────────────────────────────
   const memberCounts = useMemo(
-    () => mergeClanMemberCounts(dbMemberCounts),
+    () => mergeClanMemberCountsWithSim(dbMemberCounts),
     [dbMemberCounts],
   );
   const competitionPeriod = useMemo(() => getClanCompetitionPeriod(), []);

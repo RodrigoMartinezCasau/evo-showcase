@@ -57,6 +57,13 @@ function shuffled<T>(arr: T[]): T[] {
   return copy;
 }
 
+/**
+ * Tope de tarjetas del feed "Para ti" (igual que en CommunityScreen): el visor
+ * a pantalla completa acumula bitmaps pesados (fondo + badge SVG) al escrollar;
+ * sin tope, una sesión larga provoca OOM en gama baja.
+ */
+const PARATI_FEED_MAX = 100;
+
 function getDataForMode(
   mode: FeedMode,
   allPosts: CommunityPost[],
@@ -73,8 +80,10 @@ function getDataForMode(
           : allPosts;
       return sortFollowingPosts(pool, followingSort);
     }
-    case 'foryou':
-      return shuffled(allPosts);
+    case 'foryou': {
+      const deck = shuffled(allPosts);
+      return deck.length > PARATI_FEED_MAX ? deck.slice(0, PARATI_FEED_MAX) : deck;
+    }
   }
 }
 

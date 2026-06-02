@@ -80,3 +80,46 @@ export const DETAIL_MORE_BUTTON_LAYOUT = {
   scale: _FB_OTHER_SCALE * 0.92,
 };
 
+/** Mismo gap vertical que `DetailActionColumn` (count↔icon en up/down). */
+export const DETAIL_ACTION_VOTE_STAT_ICON_GAP = 2;
+
+const _ACTION_ICON_RATIO_SUM = 2.2 + 1 + 1 + 0.92 + 0.6;
+const _ACTION_FIXED_TEXT_H = 3 * 18 + 2 * DETAIL_ACTION_VOTE_STAT_ICON_GAP;
+
+/**
+ * Y absoluta (coords. del ítem de feed) donde empieza el bloque de upvote
+ * (contador + icono), replicando el reparto `space-between` de DetailActionColumn.
+ */
+export function computeDetailActionUpvoteTopY(
+  reflectionPanelY: number,
+  reflectionPanelHeight: number,
+  options?: { hasAudio?: boolean },
+): number {
+  const col = DETAIL_ACTION_COLUMN_LAYOUT;
+  const overhang = reflectionPanelHeight * 0.05;
+  const fullH = reflectionPanelHeight * 1.05;
+  const verticalShift = (fullH * (1 - col.verticalFillRatio)) / 2;
+  const columnTop = reflectionPanelY - overhang + verticalShift;
+
+  const containerHeight = reflectionPanelHeight * 1.05 * col.verticalFillRatio;
+  const derivedSz = Math.max(1, (containerHeight - _ACTION_FIXED_TEXT_H) / _ACTION_ICON_RATIO_SUM);
+  const rawClanH = derivedSz * 2.2;
+  const clanSz = Math.min(rawClanH, col.maxClanW) * col.sizeScale;
+  const effSz = clanSz / 2.2;
+  const otherSz = effSz;
+  const saveSz = effSz * 0.92;
+  const dotsFontSz = Math.max(10, effSz * 0.6);
+
+  const clanH = clanSz;
+  const upvoteH = 18 + DETAIL_ACTION_VOTE_STAT_ICON_GAP + otherSz;
+  const approvalH = 18;
+  const downvoteH = otherSz + DETAIL_ACTION_VOTE_STAT_ICON_GAP + 18;
+  const saveH = saveSz;
+  const audioBtn = Math.max(28, saveSz * 0.78);
+  const moreH = dotsFontSz * 1.35 + (options?.hasAudio ? 8 + audioBtn : 0);
+
+  const contentH = clanH + upvoteH + approvalH + downvoteH + saveH + moreH;
+  const gap = Math.max(0, (containerHeight - contentH) / 5);
+
+  return columnTop + clanH + gap;
+}

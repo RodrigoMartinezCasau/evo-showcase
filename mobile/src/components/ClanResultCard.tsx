@@ -10,13 +10,18 @@ const ICON_SCALE = 1.2;
 export type ClanResultCardProps = {
   clanId: string;
   name: string;
+  /** Posición en la competición de clanes (1 = líder). */
+  rank?: number;
   onPress?: () => void;
 };
 
-export function ClanResultCard({ clanId, name, onPress }: ClanResultCardProps) {
+const RANK_ORDINAL = ['', '1°', '2°', '3°', '4°', '5°', '6°', '7°', '8°'];
+
+export function ClanResultCard({ clanId, name, rank, onPress }: ClanResultCardProps) {
   const clanColor = getClanColor(clanId);
   const ClanBadge = useMemo(() => getTopBarInsigniaByHouse(clanId), [clanId]);
   const iconSide = ICON_SIZE * ICON_SCALE;
+  const rankLabel = rank != null ? (RANK_ORDINAL[rank] ?? `${rank}°`) : null;
 
   return (
     <TouchableOpacity
@@ -32,7 +37,9 @@ export function ClanResultCard({ clanId, name, onPress }: ClanResultCardProps) {
         <Text style={styles.name} numberOfLines={1}>
           {name}
         </Text>
-        <Text style={[styles.meta, { color: clanColor }]}>Clan filosófico</Text>
+        <Text style={[styles.meta, { color: clanColor }]}>
+          {rankLabel ? `${rankLabel} en la competición` : 'Clan filosófico'}
+        </Text>
       </View>
     </TouchableOpacity>
   );

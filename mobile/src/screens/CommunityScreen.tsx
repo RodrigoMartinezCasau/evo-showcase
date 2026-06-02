@@ -156,6 +156,15 @@ function scorePostForYou(
   return net * recency * clanBoost * membershipBoost * tasteBoost(post);
 }
 
+/**
+ * Tope de tarjetas que sirve el feed "Para ti" por sesión/recarga. El visor es
+ * un pager a pantalla completa con tarjetas pesadas (fondo + audio + badge de
+ * clan SVG); sin tope, escrollar mucho acumula bitmaps en memoria y crashea en
+ * gama baja. La rotación por "vistos" hace que cada recarga traiga las
+ * siguientes publicaciones no vistas, así que no se pierde contenido.
+ */
+const PARATI_FEED_MAX = 100;
+
 function getDataForMode(
   mode: FeedMode,
   allPosts: CommunityPost[],
@@ -188,10 +197,21 @@ function getDataForMode(
           scorePostForYou(b, viewerClanId ?? null, tasteBoost) -
           scorePostForYou(a, viewerClanId ?? null, tasteBoost),
       );
-      if (!paratiSeenIds || paratiSeenIds.size === 0) return sorted;
-      const unseen = sorted.filter((p) => !paratiSeenIds.has(p.id));
-      const seen = sorted.filter((p) => paratiSeenIds.has(p.id));
-      return [...unseen, ...seen];
+      const ordered =
+        !paratiSeenIds || paratiSeenIds.size === 0
+          ? sorted
+          : [
+              ...sorted.filter((p) => !paratiSeenIds.has(p.id)),
+              ...sorted.filter((p) => paratiSeenIds.has(p.id)),
+            ];
+      // Acotar la longitud del feed: el visor a pantalla completa virtualiza,
+      // pero la caché de imágenes/SVG (fondos + badge de clan por tarjeta) crece
+      // con cada tarjeta nueva que se monta al escrollar. Sin tope, una sesión
+      // larga de scroll acumula cientos de bitmaps pesados → presión de memoria
+      // → la app crashea. Cada recarga vuelve a traer las siguientes no vistas.
+      return ordered.length > PARATI_FEED_MAX
+        ? ordered.slice(0, PARATI_FEED_MAX)
+        : ordered;
     }
   }
 }
@@ -858,7 +878,10 @@ export default function CommunityScreen() {
                 .filter((p) => isPublishedSimPostType(p.type))
                 .filter((p) => !blockedIds.has(p.authorId))
                 .map((p) => simPostToCommunityPost(p, profileCache));
-              const emptySeen = new Set<string>();
+              // Respetar los posts ya vistos: van al final del ranking para que
+              // cada recarga muestre contenido fresco en vez de repetir siempre
+              // las publicaciones más votadas (orden de score determinista).
+              const seenSnapshot = new Set(paratiSeenIdsRef.current);
               const data = getDataForMode(
                 'foryou',
                 freshAll,
@@ -867,7 +890,7 @@ export default function CommunityScreen() {
                 mockCurrentUser.id,
                 followingSort,
                 getBoost,
-                emptySeen,
+                seenSnapshot,
               );
               paratiPanelHydratedRef.current = true;
               setParatiPanelData(data);
@@ -1614,6 +1637,7 @@ export default function CommunityScreen() {
                   pagingEnabled
                   nestedScrollEnabled
                   scrollEnabled={feedScrollEnabled && !profileOverlayActive && paratiPanelVisible}
+                  keyboardShouldPersistTaps="handled"
                   decelerationRate={
                     Platform.OS === 'ios' ? COMMUNITY_DETAIL_DECELERATION_RATE_IOS : 'fast'
                   }
@@ -1683,6 +1707,7 @@ export default function CommunityScreen() {
                     pagingEnabled
                     nestedScrollEnabled
                     scrollEnabled={feedScrollEnabled && !profileOverlayActive}
+                    keyboardShouldPersistTaps="handled"
                     decelerationRate={
                       Platform.OS === 'ios' ? COMMUNITY_DETAIL_DECELERATION_RATE_IOS : 'fast'
                     }
@@ -1714,6 +1739,7 @@ export default function CommunityScreen() {
                 pagingEnabled
                 nestedScrollEnabled
                 scrollEnabled={feedScrollEnabled && !profileOverlayActive}
+                keyboardShouldPersistTaps="handled"
                 decelerationRate={
                   Platform.OS === 'ios' ? COMMUNITY_DETAIL_DECELERATION_RATE_IOS : 'fast'
                 }

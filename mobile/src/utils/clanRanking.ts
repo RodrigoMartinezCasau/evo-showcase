@@ -1,10 +1,27 @@
 import { ALL_CLAN_IDS, type ClanScoreId } from '@evoconn/services/clanClassifier';
+import { SIM_USERS } from '@evoconn/data/simulation/simulatedNetwork';
 import type { CommunityPost } from '@evoconn/types';
 import { getClanCompetitionPeriod } from './clanCompetitionPeriod';
 
 export type ClanRankInfo = { rank: number; points: number; daysLeft: number };
 
 const REAL_CLANS = ALL_CLAN_IDS;
+
+/** Miembros reales (Supabase) + usuarios sim del grafo demo, por clan. */
+export function mergeClanMemberCountsWithSim(
+  dbCounts: Record<string, number>,
+): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const clan of ALL_CLAN_IDS) {
+    counts[clan] = dbCounts[clan] ?? 0;
+  }
+  for (const user of SIM_USERS) {
+    if (user.clanId && user.clanId in counts) {
+      counts[user.clanId]++;
+    }
+  }
+  return counts;
+}
 
 /**
  * Calcula puntos y ranking a partir de conteos YA agregados por clan.

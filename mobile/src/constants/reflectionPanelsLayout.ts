@@ -64,3 +64,11 @@ export const COMMENTS_CONTENT_INSETS = {
   left: 0,
   right: 0,
 } as const;
+
+/**
+ * Preview colapsado del panel de comentarios: mismo hueco entre
+ * comentario destacado ↔ «Ver más» ↔ barra de escribir (todos los dispositivos).
+ */
+export const COMMENTS_PREVIEW_SECTION_GAP = 8;
+/** Altura mínima de la fila «Ver más comentarios». */
+export const COMMENTS_PREVIEW_SEE_MORE_MIN_HEIGHT = 28;

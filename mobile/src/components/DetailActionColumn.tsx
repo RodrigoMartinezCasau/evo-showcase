@@ -11,7 +11,6 @@ import {
   DETAIL_MORE_BUTTON_LAYOUT as MORE_L,
 } from '@evoconn/constants/detailActionColumnLayout';
 import { UserAvatarFrame } from './shared/UserAvatarFrame';
-import { PhilosophyClanBadge } from '@evoconn/components/philosophyProfile/PhilosophyClanBadge';
 import { CLAN_PROFILE_SIN_CLAN } from '@evoconn/utils/getClanProfileByHouse';
 import type { ClanId } from '@evoconn/constants/clanColors';
 import { CLAN_TO_COLOR } from '@evoconn/constants/clanColors';
@@ -140,7 +139,6 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
       onMorePress,
       containerHeight,
       showClanBadge = false,
-      authorRank,
       hasAudio = false,
     },
     ref,
@@ -198,11 +196,17 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
         <UserAvatarFrame clanId={clanId} avatarUri={avatarUri!.trim()} size={clanSz} />
       );
     } else if (isValidClanId(clanId)) {
+      // Antes: PhilosophyClanBadge (SVG ~737 KB con base64 + filtros) por CADA
+      // tarjeta sin foto del feed → coste de decodificación enorme al escrollar.
+      // Ahora: personita del clan (`by-clan` → getClanProfileByHouse, SVG
+      // vectorial ~59 KB con el color de cada clan). El badge del animal de clan
+      // se mantiene intacto en la pantalla de perfil, donde se pinta una vez.
       TopIcon = (
-        <PhilosophyClanBadge
+        <UserAvatarFrame
           clanId={clanId}
-          rank={authorRank ?? 'aprendiz'}
+          avatarUri={null}
           size={clanSz}
+          noPhotoFallback="by-clan"
         />
       );
     } else {

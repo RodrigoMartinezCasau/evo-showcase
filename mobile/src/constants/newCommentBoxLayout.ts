@@ -6,14 +6,21 @@
 export const NEW_COMMENT_BOX_LAYOUT = {
   offsetX: 0,
   offsetY: 2,
-  /** Fixed height of the input pill (px). */
+  /** Altura mínima del pill (una línea). */
+  minHeight: 40,
+  /** @deprecated Use minHeight — kept for callers that read .height */
   height: 40,
   borderRadius: 14,
   backgroundColor: '#15151A',
   fontSize: 14,
+  lineHeight: 20,
+  /** Mismo tope que ChatInputBar (reflexión / frase). */
+  maxInputLines: 11,
   placeholderColor: '#888888',
-  /** Horizontal padding inside the text input pill. */
   paddingHorizontal: 14,
+  paddingVertical: 8,
+  /** Espacio extra bajo la última línea para que no se corten ascendentes/descendentes. */
+  textBottomInset: 4,
   /** Gap between the input pill and the send button — same on every device. */
   gap: 8,
 } as const;

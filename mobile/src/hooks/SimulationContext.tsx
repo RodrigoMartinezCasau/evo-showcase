@@ -265,7 +265,7 @@ export type SimulationContextValue = {
    * - en otro caso     → primer republicador entre la gente que sigo.
    * Si nadie relevante lo republicó, el post no está en el mapa.
    */
-  repostAttributionByPost: Record<string, { isSelf: boolean; username: string | null; userId: string | null }>;
+  repostAttributionByPost: Record<string, { isSelf: boolean; username: string | null; userId: string | null; clanId: string | null }>;
   deletePost: (authorId: string, postId: string, options?: { admin?: boolean }) => void;
   toggleHidePost: (userId: string, postId: string) => void;
   publishPost: (post: SimPost) => void;
@@ -1007,6 +1007,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   const [followedRepostRows, setFollowedRepostRows] =
     useState<Array<{ userId: string; postId: string; createdAt: string }>>([]);
   const [repostUsernameById, setRepostUsernameById] = useState<Record<string, string>>({});
+  const [repostClanById, setRepostClanById] = useState<Record<string, string | null>>({});
   const repostsHydrated = useRef(false);
 
   // Carga local de mis reposts (arranque offline / sim users).
@@ -1460,14 +1461,19 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       setMyRepostIds(mine);
       setFollowedRepostRows(rows.map((r) => ({ userId: r.user_id, postId: r.post_id, createdAt: r.created_at })));
 
-      // Resolver usernames de los republicadores que sigo (para la etiqueta).
-      const reposterIds = [...new Set(rows.map((r) => r.user_id))];
+      // Resolver username + clan de los republicadores (incl. yo, para "Republicado por ti").
+      const reposterIds = [...new Set([me, ...rows.map((r) => r.user_id)])];
       if (reposterIds.length > 0) {
         const profiles = await fetchProfilesBatch(reposterIds).catch(() => []);
         if (!cancelled && activeUserIdRef.current === me) {
           setRepostUsernameById((prev) => {
             const next = { ...prev };
             for (const p of profiles) if (p.username) next[p.id] = p.username;
+            return next;
+          });
+          setRepostClanById((prev) => {
+            const next = { ...prev };
+            for (const p of profiles) next[p.id] = p.clanId ?? null;
             return next;
           });
         }
@@ -1485,8 +1491,16 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   }, [activeUserId, followedKey]);
 
   /** "Republicado por ti" gana sobre cualquier seguido; si no, primer republicador seguido. */
-  const repostAttributionByPost = useMemo<Record<string, { isSelf: boolean; username: string | null; userId: string | null }>>(() => {
-    const map: Record<string, { isSelf: boolean; username: string | null; userId: string | null }> = {};
+  const repostAttributionByPost = useMemo<Record<string, { isSelf: boolean; username: string | null; userId: string | null; clanId: string | null }>>(() => {
+    const resolveReposterClan = (userId: string): string | null => {
+      if (userId in repostClanById) return repostClanById[userId];
+      const sim = SIM_USERS_BY_ID[userId];
+      if (sim?.clanId) return sim.clanId;
+      if (userId === activeUserId) return mockCurrentUser.clanId ?? null;
+      return null;
+    };
+
+    const map: Record<string, { isSelf: boolean; username: string | null; userId: string | null; clanId: string | null }> = {};
     const earliestByPost = new Map<string, { userId: string; createdAt: string }>();
     for (const r of followedRepostRows) {
       const cur = earliestByPost.get(r.postId);
@@ -1495,13 +1509,23 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       }
     }
     for (const [postId, r] of earliestByPost) {
-      map[postId] = { isSelf: false, username: repostUsernameById[r.userId] ?? null, userId: r.userId };
+      map[postId] = {
+        isSelf: false,
+        username: repostUsernameById[r.userId] ?? null,
+        userId: r.userId,
+        clanId: resolveReposterClan(r.userId),
+      };
     }
     for (const pid of myRepostIds) {
-      map[pid] = { isSelf: true, username: null, userId: activeUserId };
+      map[pid] = {
+        isSelf: true,
+        username: null,
+        userId: activeUserId,
+        clanId: resolveReposterClan(activeUserId),
+      };
     }
     return map;
-  }, [followedRepostRows, repostUsernameById, myRepostIds, activeUserId]);
+  }, [followedRepostRows, repostUsernameById, repostClanById, myRepostIds, activeUserId]);
 
   const isReposted = useCallback(
     (postId: string) => myRepostIdsRef.current.includes(postId),

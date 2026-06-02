@@ -30,8 +30,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../mobile/lib/AuthContext';
 import { useEffectiveClanId } from '@evoconn/hooks/useEffectiveClanId';
 import { useBlockedUsers } from '@evoconn/hooks/BlockedUsersContext';
-import { CLAN_TO_COLOR, getClanColor, type ClanId } from '@evoconn/constants/clanColors';
-import { getClanProfile } from '@evoconn/data/mockClanProfiles';
+import { getClanColor } from '@evoconn/constants/clanColors';
+import { useClanRankings } from '@evoconn/hooks/useClanRankings';
 
 const MAX_RECENTS = 10;
 const DEBOUNCE_MS = 250;
@@ -43,11 +43,6 @@ const RECENTS_SHOWN = 3;
 const FEATURED_COUNT = 5;
 /** Persistencia de búsquedas recientes entre sesiones. */
 const RECENTS_STORAGE_KEY = '@evoconn/search_recents_v1';
-
-/** Los 8 clanes filosóficos como filas navegables (directorio fijo). */
-const ALL_CLANS: { id: ClanId; name: string }[] = (
-  Object.keys(CLAN_TO_COLOR) as ClanId[]
-).map((id) => ({ id, name: getClanProfile(id)?.name ?? id }));
 
 type FeaturedUser = {
   id: string;
@@ -79,6 +74,7 @@ export function SearchScreen({ onUserPress, onClanPress }: SearchScreenProps) {
   const { isBlocked } = useBlockedUsers();
   const myEffectiveClanId = useEffectiveClanId();
   const myClanColor = getClanColor(myEffectiveClanId);
+  const { rankedClans } = useClanRankings();
   const inputRef = useRef<TextInput>(null);
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -432,11 +428,12 @@ export function SearchScreen({ onUserPress, onClanPress }: SearchScreenProps) {
 
           <View style={styles.section}>
             <Text style={styles.recentsTitle}>Clanes</Text>
-            {ALL_CLANS.map((clan) => (
+            {rankedClans.map((clan) => (
               <ClanResultCard
                 key={clan.id}
                 clanId={clan.id}
                 name={clan.name}
+                rank={clan.rank}
                 onPress={() => handleClanDirectoryPress(clan.id, clan.name)}
               />
             ))}
