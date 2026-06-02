@@ -31,6 +31,7 @@ import {
   totalsToPercentages,
 } from './clanClassifier';
 import type { Rank } from '@evoconn/types';
+import { getRankFromPct } from '@evoconn/utils/getRankFromPct';
 
 const KEY = '@physicscopilot/classification_v1';
 
@@ -78,6 +79,64 @@ export function makeEmptyUserState(): UserClassificationState {
     revealedAt: null,
     lastSwitchAt: null,
   };
+}
+
+const RANK_VALUE: Record<Rank, number> = { aprendiz: 1, maestro: 2, filosofo: 3 };
+
+/** Keep the highest rank ever reached per clan (medals never downgrade). */
+export function mergeClanRankRecord(
+  history: Partial<Record<ClanScoreId, Rank>>,
+  clanId: ClanScoreId | null,
+  rank: Rank | null,
+): Partial<Record<ClanScoreId, Rank>> {
+  if (!clanId || !rank) return history;
+  const previous = history[clanId];
+  if (previous && RANK_VALUE[previous] >= RANK_VALUE[rank]) return history;
+  return { ...history, [clanId]: rank };
+}
+
+export function setClanRankRecord(
+  history: Partial<Record<ClanScoreId, Rank>>,
+  clanId: ClanScoreId,
+  rank: Rank,
+): Partial<Record<ClanScoreId, Rank>> {
+  return { ...history, [clanId]: rank };
+}
+
+/** Merge two medal records, keeping the higher rank per clan. */
+export function mergeClanRankHistories(
+  a: Partial<Record<ClanScoreId, Rank>>,
+  b: Partial<Record<ClanScoreId, Rank>>,
+): Partial<Record<ClanScoreId, Rank>> {
+  let out = { ...a };
+  for (const c of ALL_CLAN_IDS) {
+    const rb = b[c];
+    if (rb) out = mergeClanRankRecord(out, c, rb);
+  }
+  return out;
+}
+
+/**
+ * Update medal history after a reveal, rank gain, or clan switch.
+ * On switch: freeze the leaving clan's rank, start the new clan at aprendiz.
+ */
+export function applyClanRankHistoryUpdate(
+  prevHistory: Partial<Record<ClanScoreId, Rank>>,
+  prevVisibleClanId: ClanScoreId | null,
+  nextVisibleClanId: ClanScoreId | null,
+  pcts: Record<ClanScoreId, number>,
+  switchedClan: boolean,
+): Partial<Record<ClanScoreId, Rank>> {
+  let history = prevHistory;
+  if (switchedClan && nextVisibleClanId && prevVisibleClanId) {
+    const leavingRank = getRankFromPct(pcts[prevVisibleClanId] ?? 0);
+    history = mergeClanRankRecord(history, prevVisibleClanId, leavingRank);
+    return setClanRankRecord(history, nextVisibleClanId, 'aprendiz');
+  }
+  const achievedRank = nextVisibleClanId
+    ? getRankFromPct(pcts[nextVisibleClanId] ?? 0)
+    : null;
+  return mergeClanRankRecord(history, nextVisibleClanId, achievedRank);
 }
 
 // ─── Sanitisation ────────────────────────────────────────────────────────────
@@ -197,6 +256,8 @@ export function healState(state: UserClassificationState): UserClassificationSta
   const totalMass = ALL_CLAN_IDS.reduce((s, c) => s + (state.totals[c] ?? 0), 0);
 
   // ── Mode A: zero inputs / zero totals → no clan should survive ─────────────
+  // Medals (clanRankHistory) are permanent achievements — never wipe them even
+  // when totals/counters got corrupted or reset (ghost-clan recovery).
   if (totalInputs === 0 && totalMass === 0) {
     if (
       state.visibleClanId === null &&
@@ -206,7 +267,10 @@ export function healState(state: UserClassificationState): UserClassificationSta
     ) {
       return state; // already a clean empty state
     }
-    return makeEmptyUserState();
+    return {
+      ...makeEmptyUserState(),
+      clanRankHistory: state.clanRankHistory ?? {},
+    };
   }
 
   if (state.visibleClanId === null) {

@@ -19,6 +19,7 @@ const SHARE_LINE_HEIGHT = Math.ceil(PROFILE_SHARE_ARROW_FONT_SIZE * 1.25);
 type Props = {
   username: string;
   userId: string;
+  usernameMaxWidth: number;
   rowStyle?: ViewStyle;
   hideShareButton?: boolean;
   onSharePress: () => void;
@@ -26,13 +27,11 @@ type Props = {
 
 /**
  * Fila: @username · flecha compartir · insignia 100 primeros (si aplica).
- *
- * Layout: el username se encoge con elipsis; compartir + insignia tienen
- * flexShrink: 0 para que no se corten en pantallas estrechas o con texto grande.
  */
 export function ProfileUsernameRow({
   username,
   userId,
+  usernameMaxWidth,
   rowStyle,
   hideShareButton = false,
   onSharePress,
@@ -45,29 +44,25 @@ export function ProfileUsernameRow({
           {
             fontSize: USERNAME_FONT_SIZE,
             lineHeight: USERNAME_LINE_HEIGHT,
+            maxWidth: usernameMaxWidth,
           },
         ]}
         numberOfLines={1}
         ellipsizeMode="tail"
-        allowFontScaling={false}
       >
         {username}
       </Text>
-      <View style={styles.trailing}>
-        {!hideShareButton ? (
-          <TouchableOpacity
-            onPress={onSharePress}
-            hitSlop={8}
-            activeOpacity={0.6}
-            accessibilityLabel="Compartir perfil"
-          >
-            <Text style={styles.shareInline} allowFontScaling={false}>
-              ↗
-            </Text>
-          </TouchableOpacity>
-        ) : null}
-        <FirstUsersTesterBadge userId={userId} />
-      </View>
+      {!hideShareButton ? (
+        <TouchableOpacity
+          onPress={onSharePress}
+          hitSlop={8}
+          activeOpacity={0.6}
+          accessibilityLabel="Compartir perfil"
+        >
+          <Text style={styles.shareInline}>↗</Text>
+        </TouchableOpacity>
+      ) : null}
+      <FirstUsersTesterBadge userId={userId} />
     </View>
   );
 }
@@ -76,23 +71,15 @@ const styles = StyleSheet.create({
   usernameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    width: '100%',
-    minWidth: 0,
+    overflow: 'visible',
     zIndex: 3,
   },
   username: {
-    flex: 1,
-    flexShrink: 1,
-    minWidth: 0,
     color: '#FFFFFF',
     fontWeight: '800',
     letterSpacing: 0.6,
+    flexShrink: 1,
     ...Platform.select({ android: { includeFontPadding: false } }),
-  },
-  trailing: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexShrink: 0,
   },
   shareInline: {
     fontSize: PROFILE_SHARE_ARROW_FONT_SIZE,
@@ -100,6 +87,9 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.85)',
     fontWeight: '500',
     marginLeft: 5,
+    flexShrink: 0,
+    zIndex: 10,
+    elevation: 10,
     ...Platform.select({ android: { includeFontPadding: false } }),
   },
 });

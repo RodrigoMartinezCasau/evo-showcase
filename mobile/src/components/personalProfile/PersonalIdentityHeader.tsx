@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { buildProfileShareMessage } from '@evoconn/utils/appShareLinks';
 import { getTopBarInsigniaByHouse } from '@evoconn/utils/getTopBarInsigniaByHouse';
+import { ClanBadgeWithAnimal } from '@evoconn/components/shared/ClanBadgeWithAnimal';
 import type { Rank } from '@evoconn/types';
 import {
   SHIELD_OFFSET_X,
@@ -29,6 +30,9 @@ import {
   CLAN_ROW_SCALE,
   CLAN_ROW_OFFSET_X,
   CLAN_ROW_MARGIN_BOTTOM,
+  SHARE_BUTTON_SIZE,
+  PROFILE_SHARE_ARROW_FONT_SIZE,
+  PROFILE_TESTER_BADGE_RESERVE,
 } from '@evoconn/constants/personalProfileLayout';
 import { ProfileUsernameRow } from '@evoconn/components/shared/ProfileUsernameRow';
 
@@ -105,6 +109,11 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
     MIN_RESERVED_RIGHT_SPACE,
     shieldDisplaySize + TEXT_BADGE_SAFE_GAP + Math.max(0, -clampedShieldOffsetX),
   );
+  const shareReserve =
+    Math.max(SHARE_BUTTON_SIZE, PROFILE_SHARE_ARROW_FONT_SIZE) +
+    PROFILE_TESTER_BADGE_RESERVE +
+    14;
+  const usernameMaxWidth = Math.max(120, screenW - 20 * 2 - shareReserve);
   // Container height is always TEXT-ONLY height. The badge is absolute and
   // overflows visually without pushing sibling components down — so we must
   // NOT expand containerHeight to accommodate the badge size.
@@ -127,11 +136,12 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
   return (
     <View style={[styles.container, { height: containerHeight }]}>
       {/* Text column — username + clan+rank row */}
-      <View style={[styles.textBlock, { paddingRight: reservedRightSpace }]}>
+      <View style={styles.textBlock}>
         {/* Username row */}
         <ProfileUsernameRow
           username={username}
           userId={userId}
+          usernameMaxWidth={usernameMaxWidth}
           hideShareButton={hideShareButton}
           onSharePress={handleShare}
           rowStyle={{
@@ -164,7 +174,6 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
             numberOfLines={1}
             adjustsFontSizeToFit
             minimumFontScale={0.7}
-            allowFontScaling={false}
           >
             {clanLabel}
             {'  '}
@@ -193,7 +202,12 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
           },
         ]}
       >
-        <ShieldSvg width={shieldDisplaySize} height={shieldDisplaySize} />
+        <ClanBadgeWithAnimal
+          FrameSvg={ShieldSvg}
+          clanId={clanId}
+          size={shieldDisplaySize}
+          showAnimal={!!clanId}
+        />
       </TouchableOpacity>
     </View>
   );

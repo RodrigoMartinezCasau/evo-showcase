@@ -60,6 +60,8 @@ import {
   saveClassificationDb,
   makeEmptyUserState,
   trimInputs,
+  applyClanRankHistoryUpdate,
+  mergeClanRankHistories,
   type ClassificationDatabase,
   type UserClassificationState,
 } from '@evoconn/services/classificationStorage';
@@ -304,31 +306,6 @@ function pickTopTwo(pcts: Record<ClanScoreId, number>): {
   return { first: sorted[0], second: sorted[1] };
 }
 
-const RANK_VALUE: Record<Rank, number> = {
-  aprendiz: 1,
-  maestro: 2,
-  filosofo: 3,
-};
-
-function mergeClanRankRecord(
-  history: Partial<Record<ClanScoreId, Rank>>,
-  clanId: ClanScoreId | null,
-  rank: Rank | null,
-): Partial<Record<ClanScoreId, Rank>> {
-  if (!clanId || !rank) return history;
-  const previous = history[clanId];
-  if (previous && RANK_VALUE[previous] >= RANK_VALUE[rank]) return history;
-  return { ...history, [clanId]: rank };
-}
-
-function setClanRankRecord(
-  history: Partial<Record<ClanScoreId, Rank>>,
-  clanId: ClanScoreId,
-  rank: Rank,
-): Partial<Record<ClanScoreId, Rank>> {
-  return { ...history, [clanId]: rank };
-}
-
 function isTemporarilyInactive(state: UserClassificationState, nowMs = Date.now()): boolean {
   if (!state.lastActivityAt) return false;
   const lastMs = Date.parse(state.lastActivityAt);
@@ -458,6 +435,8 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
   } | null>(null);
   // Users we have already evaluated for a launch reveal (once per session).
   const launchRecalcDoneRef = useRef<Set<string>>(new Set());
+  // Users whose medal history has been merged from Supabase this session.
+  const rankHistoryHydratedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -522,6 +501,40 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
     };
   }, [profile?.id, db]);
 
+  // ── Medal history recovery (cross-device / post-heal) ─────────────────────
+  // clanRankHistory is permanent: each clan visited keeps its highest rank
+  // badge. Merge the Supabase backup into local when local is missing entries
+  // (e.g. healState wiped counters but we now preserve medals, or an older
+  // build never persisted history).
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    const uid = profile?.id;
+    if (!uid || !isRealUserId(uid)) return;
+    if (rankHistoryHydratedRef.current.has(uid)) return;
+    rankHistoryHydratedRef.current.add(uid);
+
+    let cancelled = false;
+    void (async () => {
+      const snapshot = await fetchPublishedClassification(uid);
+      if (cancelled || !snapshot) return;
+      const remoteHistory = snapshot.state.clanRankHistory ?? {};
+      if (Object.keys(remoteHistory).length === 0) return;
+
+      setDb((prev) => {
+        const local = prev[uid] ?? makeEmptyUserState();
+        const merged = mergeClanRankHistories(local.clanRankHistory ?? {}, remoteHistory);
+        const prevJson = JSON.stringify(local.clanRankHistory ?? {});
+        const mergedJson = JSON.stringify(merged);
+        if (prevJson === mergedJson) return prev;
+        dirtyUsersRef.current.add(uid);
+        return { ...prev, [uid]: { ...local, clanRankHistory: merged } };
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.id]);
+
   // ── Launch-time reveal recalculation ───────────────────────────────────────
   // Reveal rules are normally only evaluated when a new input is recorded. That
   // means a threshold change (e.g. lowering REVEAL_LEAD_OVER_SECOND_PP) does NOT
@@ -568,10 +581,17 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
 
     const isChange = state.visibleClanId != null;
     const pcts = totalsToPercentages(state.totals);
-    const achievedRank = getRankFromPct(pcts[reveal.visibleClanId] ?? 0);
-    const clanRankHistory = isChange
-      ? setClanRankRecord(state.clanRankHistory ?? {}, reveal.visibleClanId, 'aprendiz')
-      : mergeClanRankRecord(state.clanRankHistory ?? {}, reveal.visibleClanId, achievedRank);
+    const switchedClan =
+      state.visibleClanId != null &&
+      reveal.visibleClanId !== null &&
+      reveal.visibleClanId !== state.visibleClanId;
+    const clanRankHistory = applyClanRankHistoryUpdate(
+      state.clanRankHistory ?? {},
+      state.visibleClanId,
+      reveal.visibleClanId,
+      pcts,
+      switchedClan,
+    );
 
     const nextState: UserClassificationState = {
       ...state,
@@ -775,17 +795,13 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
           prevState.visibleClanId !== null &&
           reveal.visibleClanId !== null &&
           reveal.visibleClanId !== prevState.visibleClanId;
-        const achievedRank = reveal.visibleClanId
-          ? getRankFromPct(pcts[reveal.visibleClanId] ?? 0)
-          : null;
-        const clanRankHistory =
-          switchedClan && reveal.visibleClanId
-            ? setClanRankRecord(prevState.clanRankHistory ?? {}, reveal.visibleClanId, 'aprendiz')
-            : mergeClanRankRecord(
-                prevState.clanRankHistory ?? {},
-                reveal.visibleClanId,
-                achievedRank,
-              );
+        const clanRankHistory = applyClanRankHistoryUpdate(
+          prevState.clanRankHistory ?? {},
+          prevState.visibleClanId,
+          reveal.visibleClanId,
+          pcts,
+          switchedClan,
+        );
 
         const nextRecord = {
           inputId: generatedId,

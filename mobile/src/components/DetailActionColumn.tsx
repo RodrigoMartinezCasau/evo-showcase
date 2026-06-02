@@ -11,7 +11,7 @@ import {
   DETAIL_MORE_BUTTON_LAYOUT as MORE_L,
 } from '@evoconn/constants/detailActionColumnLayout';
 import { UserAvatarFrame } from './shared/UserAvatarFrame';
-import { getPhilosophyClanBadgeIcon } from '@evoconn/utils/getPhilosophyClanBadgeIcon';
+import { PhilosophyClanBadge } from '@evoconn/components/philosophyProfile/PhilosophyClanBadge';
 import { CLAN_PROFILE_SIN_CLAN } from '@evoconn/utils/getClanProfileByHouse';
 import type { ClanId } from '@evoconn/constants/clanColors';
 import { CLAN_TO_COLOR } from '@evoconn/constants/clanColors';
@@ -91,17 +91,8 @@ function hasProfilePhoto(avatarUri?: string | null): boolean {
   return /^https?:\/\//i.test(u) || u.startsWith('file://');
 }
 
-function philosophyBadgeForAuthor(
-  clanId: string | null | undefined,
-  authorRank?: Rank,
-) {
-  if (isValidClanId(clanId)) {
-    return getPhilosophyClanBadgeIcon(clanId, authorRank ?? 'aprendiz');
-  }
-  return CLAN_PROFILE_SIN_CLAN;
-}
-
 type DetailActionColumnProps = {
+  // ── Top icon (Para ti) ─────────────────────────────────────────────────────
   clanId: string | null | undefined;
   avatarUri?: string | null;
   upCount: number;
@@ -206,9 +197,17 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
       TopIcon = (
         <UserAvatarFrame clanId={clanId} avatarUri={avatarUri!.trim()} size={clanSz} />
       );
+    } else if (isValidClanId(clanId)) {
+      TopIcon = (
+        <PhilosophyClanBadge
+          clanId={clanId}
+          rank={authorRank ?? 'aprendiz'}
+          size={clanSz}
+        />
+      );
     } else {
-      const BadgeSvg = philosophyBadgeForAuthor(clanId, authorRank);
-      TopIcon = <BadgeSvg width={clanSz} height={clanSz} />;
+      const SinClanSvg = CLAN_PROFILE_SIN_CLAN;
+      TopIcon = <SinClanSvg width={clanSz} height={clanSz} />;
     }
   } else {
     TopIcon = <UserAvatarFrame clanId={clanId} avatarUri={avatarUri} size={clanSz} />;

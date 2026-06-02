@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, useWindowDimensions } from 'react-native';
 import type { ClanId } from '@evoconn/constants/clanColors';
 import type { Rank } from '@evoconn/types';
-import { getPhilosophyClanBadgeIcon } from '@evoconn/utils/getPhilosophyClanBadgeIcon';
+import { PhilosophyClanBadge } from '@evoconn/components/philosophyProfile/PhilosophyClanBadge';
 
 type BadgeEntry = {
   clanId: ClanId;
@@ -45,7 +45,6 @@ export const ClanBadgesRecordCard = React.memo(function ClanBadgesRecordCard({
         {BADGE_ROWS.map((row, rowIndex) => (
           <View key={`row-${rowIndex}`} style={styles.badgeRow}>
             {row.map(({ clanId, label }) => {
-              const BadgeIcon = getPhilosophyClanBadgeIcon(clanId, rankHistory[clanId]);
               const Slot = onBadgePress ? TouchableOpacity : View;
               return (
                 <Slot
@@ -56,7 +55,11 @@ export const ClanBadgesRecordCard = React.memo(function ClanBadgesRecordCard({
                     ? { activeOpacity: 0.72, onPress: () => onBadgePress(clanId) }
                     : {})}
                 >
-                  <BadgeIcon width={badgeSize} height={badgeSize} />
+                  <PhilosophyClanBadge
+                    clanId={clanId}
+                    rank={rankHistory[clanId]}
+                    size={badgeSize}
+                  />
                 </Slot>
               );
             })}

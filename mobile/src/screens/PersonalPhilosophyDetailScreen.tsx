@@ -46,6 +46,7 @@ import { SimilarPhilosophersCard } from '@evoconn/components/philosophyProfile/S
 import { BookRecommendationsCard } from '@evoconn/components/philosophyProfile/BookRecommendationsCard';
 import { StudyRecommendationsCard } from '@evoconn/components/philosophyProfile/StudyRecommendationsCard';
 import type { AiBlockState } from '@evoconn/components/philosophyProfile/AiBlockCard';
+import type { Rank } from '@evoconn/types';
 import { useDailyUsesGate } from '@evoconn/hooks/useDailyUsesGate';
 
 import {
@@ -66,6 +67,8 @@ import { getBookRecommendations } from '@evoconn/logic/books/getBookRecommendati
 import type { BookRecord } from '@evoconn/data/books/bookDatabase';
 import { useDebugStats } from '../debug/DebugStatsContext';
 import { requestNoUsesAnimation } from '@evoconn/components/animations/AppAnimationLayer';
+import { mergeClanRankHistories } from '@evoconn/services/classificationStorage';
+import type { ClanScoreId } from '@evoconn/services/clanClassifier';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -128,19 +131,23 @@ export default function PersonalPhilosophyDetailScreen() {
     localVisibleClanId,
     localDisplayRank,
   );
-  const localRankHistory = classification.getClanRankHistory(baseProfile.id);
-  // Medallas: si el historial local está vacío (el `classification_state` de
-  // Supabase trae los totales borrados y `healState` lo vacía, perdiendo el
-  // `clanRankHistory`), reconstruimos al menos la medalla del clan actual con
-  // su rango publicado. Es la única fuente fiable cuando el historial completo
-  // no es recuperable.
+  const localRankHistory = classification.getClanRankHistory(
+    authProfile?.id ?? baseProfile.id,
+  );
+  // Medallas permanentes por clan visitado. Si el historial local está incompleto
+  // (storage borrado, heal previo, build antiguo), fusionamos al menos la medalla
+  // del clan publicado actual — sin sustituir otras entradas que vengan del merge
+  // con Supabase en ClassificationContext.
   const clanRankHistory = isPreviewActive
     ? previewBadgeHistory
-    : Object.keys(localRankHistory).length > 0
-      ? localRankHistory
-      : publishedClanId
-        ? { [publishedClanId]: publishedRank }
-        : {};
+    : mergeClanRankHistories(
+        localRankHistory,
+        publishedClanId
+          ? ({ [publishedClanId as ClanScoreId]: publishedRank } as Partial<
+              Record<ClanScoreId, Rank>
+            >)
+          : {},
+      );
   const profile = {
     ...baseProfile,
     philosophyPercentages: realPercentages,
