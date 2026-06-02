@@ -308,6 +308,8 @@ function CommunityPostCardBase({
                   },
                 ]}
                 numberOfLines={1}
+                ellipsizeMode="tail"
+                allowFontScaling={false}
               >
                 {post.author.username}
               </Text>
@@ -443,6 +445,7 @@ const styles = StyleSheet.create({
   usernameHit: {
     // Solo ocupa el ancho del nombre (se encoge con elipsis si es largo) para
     // que la insignia y el botón "+" queden pegados al username, no al borde.
+    flex: 1,
     flexShrink: 1,
     minWidth: 0,
   },

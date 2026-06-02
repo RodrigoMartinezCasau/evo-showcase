@@ -21,6 +21,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { EvoAnimationWebView, ensureAnimationAssets, prewarmClanEntryHtml } from './EvoAnimationWebView';
 import {
   isClanRevealSuppressed,
@@ -36,6 +37,32 @@ import type { Rank } from '@evoconn/types';
 
 const RANK_ORDER: Record<Rank, number> = { aprendiz: 0, maestro: 1, filosofo: 2 };
 const ENTRY_SOCIAL_ANIM_COOLDOWN_MS = 8_000;
+
+/**
+ * Último rango anunciado por la animación de subida de rango, persistido por
+ * usuario. Sin esto, al hidratar la clasificación al abrir la app `displayRank`
+ * transiciona de `aprendiz` (estado inicial mientras `visibleClanId === null`)
+ * a `maestro` / `filosofo` (estado real una vez cargado), lo que el detector
+ * confundía con una subida y provocaba que la animación de rango se mostrara
+ * en cada arranque (en vez de la de bienvenida).
+ */
+const LAST_ANNOUNCED_RANK_KEY = (uid: string) => `evo_last_announced_rank_v1_${uid}`;
+async function readLastAnnouncedRank(uid: string): Promise<Rank | null> {
+  try {
+    const v = await AsyncStorage.getItem(LAST_ANNOUNCED_RANK_KEY(uid));
+    if (v === 'aprendiz' || v === 'maestro' || v === 'filosofo') return v;
+    return null;
+  } catch {
+    return null;
+  }
+}
+async function writeLastAnnouncedRank(uid: string, rank: Rank): Promise<void> {
+  try {
+    await AsyncStorage.setItem(LAST_ANNOUNCED_RANK_KEY(uid), rank);
+  } catch {
+    /* noop */
+  }
+}
 
 // ── Queue types ───────────────────────────────────────────────────────────────
 
@@ -105,7 +132,8 @@ export default function AppAnimationLayer() {
   const clanIdRef = useRef(clanId);
   clanIdRef.current = clanId;
   const classification = useClassification();
-  const { loading: authLoading, fetching: authFetching } = useAuth();
+  const { session, loading: authLoading, fetching: authFetching } = useAuth();
+  const userId = session?.user?.id ?? null;
   const profileSettled = !authLoading && !authFetching;
 
   const [assetsReady, setAssetsReady] = useState(false);
@@ -248,6 +276,15 @@ export default function AppAnimationLayer() {
       return;
     }
     advanceQueue();
+    // Safety net: si al cerrarse la animación social no hay ya otra activa
+    // ni una de entrada en curso, asegurar que el flag global de "entry
+    // playing" queda limpio. Sin esto, una rank-up que se hubiera mostrado
+    // mientras `_isEntryPlaying = true` (puesto por requestEntryAnimation)
+    // dejaba el starfield overlay colgado tras pulsar "Continuar" → pantalla
+    // bloqueada hasta el failsafe de 14 s.
+    if (!showEntryRef.current && queueRef.current.length === 0) {
+      setEntryAnimPlaying(false);
+    }
   }, [advanceQueue]);
 
   // Safety net: if a WebView never sends 'complete', auto-close after 90 s.
@@ -323,26 +360,75 @@ export default function AppAnimationLayer() {
   }, [streakTrigger, streakDays, statsLoaded, assetsReady, enqueue]);
 
   // ── Rank-up detection → enqueue ──────────────────────────────────────────
+  //
+  // SEEDING: la primera vez que tenemos un rango estable (assetsReady +
+  // profileSettled + clanId real) hidratamos `prevRankRef` desde AsyncStorage
+  // (último rango anunciado a este usuario). Si no hay valor persistido,
+  // usamos el `displayRank` actual como baseline. De este modo la transición
+  // de hidratación `aprendiz → maestro` que ocurre al abrir la app NO se
+  // confunde con una subida real.
+  //
+  // FIRING: solo encolamos cuando `displayRank` supera estrictamente al
+  // baseline. Tras encolar, persistimos el nuevo rango para que en el próximo
+  // arranque no se vuelva a anunciar.
   const prevRankRef = useRef<Rank | null>(null);
+  const rankSeededRef = useRef(false);
   const displayRank = classification.getDisplayRank();
 
   useEffect(() => {
-    if (!assetsReady || clanId === 'none') return;
-    const prev = prevRankRef.current;
-    prevRankRef.current = displayRank;
-    if (prev === null) return;
-    if (RANK_ORDER[displayRank] <= RANK_ORDER[prev]) return;
-    if (Date.now() < entryCooldownUntilRef.current) return;
+    if (!assetsReady) return;
+    if (!profileSettled) return;
+    if (clanId === 'none') return;
+    if (!userId) return;
 
-    const percentages = classification.getPercentages();
-    const dominantPct = percentages.find((p) => p.clanId === clanId)?.pct ?? 0;
-    enqueue({
-      kind: 'rankUp',
-      previous: prev,
-      current: displayRank,
-      percentage: Math.round(dominantPct),
-    });
-  }, [displayRank, clanId, assetsReady, classification, enqueue]);
+    let cancelled = false;
+
+    const run = async () => {
+      // Seed la primera vez que tenemos contexto fiable.
+      if (!rankSeededRef.current) {
+        const stored = await readLastAnnouncedRank(userId);
+        if (cancelled) return;
+        prevRankRef.current = stored ?? displayRank;
+        rankSeededRef.current = true;
+        // Si nunca habíamos persistido nada, dejamos en disco el rango actual
+        // como baseline para futuros arranques.
+        if (stored === null) {
+          void writeLastAnnouncedRank(userId, displayRank);
+        }
+        return;
+      }
+
+      const prev = prevRankRef.current;
+      if (prev === null) return;
+      if (RANK_ORDER[displayRank] <= RANK_ORDER[prev]) return;
+      if (Date.now() < entryCooldownUntilRef.current) return;
+      // No solapar con la animación de entrada.
+      if (showEntryRef.current) return;
+
+      const percentages = classification.getPercentages();
+      const dominantPct = percentages.find((p) => p.clanId === clanId)?.pct ?? 0;
+      prevRankRef.current = displayRank;
+      void writeLastAnnouncedRank(userId, displayRank);
+      enqueue({
+        kind: 'rankUp',
+        previous: prev,
+        current: displayRank,
+        percentage: Math.round(dominantPct),
+      });
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [displayRank, clanId, assetsReady, profileSettled, userId, classification, enqueue]);
+
+  // Reset del seed cuando cambia el usuario (logout / login otra cuenta) para
+  // que el siguiente perfil hidrate su propio baseline desde storage.
+  useEffect(() => {
+    rankSeededRef.current = false;
+    prevRankRef.current = null;
+  }, [userId]);
 
   // ── Clan reveal detection → enqueue ─────────────────────────────────────
   //

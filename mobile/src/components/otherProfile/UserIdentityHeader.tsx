@@ -27,9 +27,6 @@ import {
   CLAN_ROW_SCALE,
   CLAN_ROW_OFFSET_X,
   CLAN_ROW_MARGIN_BOTTOM,
-  SHARE_BUTTON_SIZE,
-  PROFILE_SHARE_ARROW_FONT_SIZE,
-  PROFILE_TESTER_BADGE_RESERVE,
 } from '@evoconn/constants/personalProfileLayout';
 import { ProfileUsernameRow } from '@evoconn/components/shared/ProfileUsernameRow';
 
@@ -91,11 +88,6 @@ export const UserIdentityHeader = React.memo(function UserIdentityHeader({
     MIN_RESERVED_RIGHT_SPACE,
     shieldDisplaySize + TEXT_BADGE_SAFE_GAP + Math.max(0, -clampedShieldOffsetX),
   );
-  const shareReserve =
-    Math.max(SHARE_BUTTON_SIZE, PROFILE_SHARE_ARROW_FONT_SIZE) +
-    PROFILE_TESTER_BADGE_RESERVE +
-    14;
-  const usernameMaxWidth = Math.max(120, screenW - 20 * 2 - shareReserve);
   const containerHeight = CONTAINER_HEIGHT;
   const clanLabel = clanId
     ? `Clan ${clanId.charAt(0).toUpperCase() + clanId.slice(1)}`
@@ -113,11 +105,10 @@ export const UserIdentityHeader = React.memo(function UserIdentityHeader({
 
   return (
     <View style={[styles.container, { height: containerHeight }]}>
-      <View style={styles.textBlock}>
+      <View style={[styles.textBlock, { paddingRight: reservedRightSpace }]}>
         <ProfileUsernameRow
           username={username}
           userId={userId}
-          usernameMaxWidth={usernameMaxWidth}
           onSharePress={handleShare}
           rowStyle={{
             height: USERNAME_ROW_HEIGHT,
@@ -148,6 +139,7 @@ export const UserIdentityHeader = React.memo(function UserIdentityHeader({
             numberOfLines={1}
             adjustsFontSizeToFit
             minimumFontScale={0.7}
+            allowFontScaling={false}
           >
             {clanLabel}
             {'  '}

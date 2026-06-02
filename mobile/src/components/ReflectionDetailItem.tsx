@@ -1250,8 +1250,14 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
           {/* ── Header ── */}
           <View style={[styles.headerRow, { transform: [{ translateX: DETAIL_HEADER_ROW_OFFSET_X }, { translateY: DETAIL_HEADER_ROW_OFFSET_Y }] }]}>
             <View style={styles.usernameFollowRow}>
-              <TouchableOpacity onPress={handleAuthorPressAction}>
-                <Text style={styles.username}>{post.author.username}</Text>
+              <TouchableOpacity
+                onPress={handleAuthorPressAction}
+                style={styles.usernameHit}
+                activeOpacity={0.6}
+              >
+                <Text style={styles.username} numberOfLines={1} ellipsizeMode="tail" allowFontScaling={false}>
+                  {post.author.username}
+                </Text>
               </TouchableOpacity>
               <FirstUsersTesterBadge
                 userId={post.author.id}
@@ -1716,6 +1722,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
+    minWidth: 0,
+  },
+  usernameHit: {
+    flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
   },
   username: {
     color: evoconnColors.text,
