@@ -27,6 +27,31 @@ export const FOLLOWING_SORT_TAB_LABELS: Record<FollowingSortOption, string> = {
 
 const MS_DAY = 86_400_000;
 
+export type TopVotedFeedPeriod = '24h' | '30d';
+
+/** Ventana en ms para ranking global (24 h exactas vs 30 días). */
+export function getTopVotedWindowMs(period: TopVotedFeedPeriod): number {
+  return period === '24h' ? MS_DAY : 30 * MS_DAY;
+}
+
+export function followingSortToTopVotedPeriod(
+  sort: FollowingSortOption,
+): TopVotedFeedPeriod | null {
+  if (sort === 'votadas_24h') return '24h';
+  if (sort === 'votadas_mes') return '30d';
+  return null;
+}
+
+export function isPostInTopVotedWindow(
+  createdAt: string,
+  period: TopVotedFeedPeriod,
+  nowMs: number = Date.now(),
+): boolean {
+  const ts = Date.parse(createdAt);
+  if (!Number.isFinite(ts)) return false;
+  return ts >= nowMs - getTopVotedWindowMs(period);
+}
+
 export function isFollowingSortOption(v: string): v is FollowingSortOption {
   return v === 'recientes' || v === 'votadas_mes' || v === 'votadas_24h';
 }

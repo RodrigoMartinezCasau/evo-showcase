@@ -71,6 +71,7 @@ import { useEffectiveClanId } from '@evoconn/hooks/useEffectiveClanId';
 import { useBlockedUsers } from '@evoconn/hooks/BlockedUsersContext';
 import { getClanColor } from '@evoconn/constants/clanColors';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
+import { useGlobalFollowingVotedFeed } from '@evoconn/hooks/useGlobalFollowingVotedFeed';
 import { useIncrementalList } from '@evoconn/hooks/useIncrementalList';
 import { ClanLoadingDot } from '@evoconn/components/shared/ClanLoadingDot';
 import { ProfileRevealPanel } from '@evoconn/components/otherProfile';
@@ -428,17 +429,31 @@ export default function CommunityScreen() {
   // and is still used by the spinner reset effect.
   void tasteRevision;
 
+  const { posts: globalVotedFeedPosts, loading: globalVotedFeedLoading } =
+    useGlobalFollowingVotedFeed(followingSort, allPosts, blockedIds);
+
   const followingFeedOrdered = useMemo(
-    () =>
-      getDataForMode(
+    () => {
+      if (followingSort !== 'recientes') {
+        return globalVotedFeedPosts;
+      }
+      return getDataForMode(
         'following',
         allPosts,
         followingSet,
         viewerClanId,
         mockCurrentUser.id,
-        followingSort,
-      ),
-    [allPosts, followingSet, viewerClanId, mockCurrentUser.id, followingSort],
+        'recientes',
+      );
+    },
+    [
+      allPosts,
+      followingSet,
+      viewerClanId,
+      mockCurrentUser.id,
+      followingSort,
+      globalVotedFeedPosts,
+    ],
   );
 
   // #3 Prefetch (caché en disco) de los avatares de los primeros posts de cada
@@ -1028,6 +1043,7 @@ export default function CommunityScreen() {
     visibleData: listData,
     hasMore: hasMoreFollowing,
     loadMore: loadMoreFollowing,
+    reset: resetFollowingPagination,
   } = useIncrementalList(followingFeedOrdered, 10);
 
   // Ventana de montaje anclada a lo visible. `onViewableItemsChanged` y
@@ -1061,7 +1077,8 @@ export default function CommunityScreen() {
   useEffect(() => {
     followingWindowStartRef.current = 0;
     setFollowingWindowStart(0);
-  }, [followingSort]);
+    resetFollowingPagination();
+  }, [followingSort, resetFollowingPagination]);
 
   const communityFeedUsableWidth =
     screenW - SVG_CARD_VISUAL.CARD_HORIZONTAL_MARGIN * 2;
@@ -1537,6 +1554,13 @@ export default function CommunityScreen() {
               // montadas a la vez por mucho que sigas bajando.
               windowSize={5}
               removeClippedSubviews
+              ListEmptyComponent={
+                globalVotedFeedLoading && followingSort !== 'recientes' ? (
+                  <View style={styles.followingVotedFeedLoading}>
+                    <ClanLoadingDot inline clanId={viewerClanId} />
+                  </View>
+                ) : null
+              }
               ListFooterComponent={hasMoreFollowing ? <ClanLoadingDot inline /> : null}
               contentContainerStyle={[
                 styles.list,
@@ -1859,4 +1883,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   list: { paddingTop: 8 },
+  followingVotedFeedLoading: {
+    paddingTop: 48,
+    alignItems: 'center',
+  },
 });

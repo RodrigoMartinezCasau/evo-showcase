@@ -39,6 +39,8 @@ import {
   COMMUNITY_DRAWER_GESTURE_RANGE_X,
 } from '@evoconn/constants/communityDrawerGesture';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
+import { useGlobalFollowingVotedFeed } from '@evoconn/hooks/useGlobalFollowingVotedFeed';
+import { useBlockedUsers } from '@evoconn/hooks/BlockedUsersContext';
 import {
   sortFollowingPosts,
   parseFollowingSortParam,
@@ -65,7 +67,10 @@ function getDataForMode(
   switch (mode) {
     case 'following': {
       const ids = followingSet ?? new Set<string>();
-      const pool = allPosts.filter((p) => ids.has(p.author.id));
+      const pool =
+        followingSort === 'recientes'
+          ? allPosts.filter((p) => ids.has(p.author.id))
+          : allPosts;
       return sortFollowingPosts(pool, followingSort);
     }
     case 'foryou':
@@ -105,8 +110,15 @@ export default function DetailFeedScreen() {
   const followingSortParam = params.followingSort;
 
   const { followingSet } = useFollowState();
+  const { blockedIds } = useBlockedUsers();
   const { thoughts } = useThoughts();
   const { posts: allPosts } = useFeedStore();
+  const followingSort = parseFollowingSortParam(followingSortParam);
+  const { posts: globalVotedFeedPosts } = useGlobalFollowingVotedFeed(
+    followingSort,
+    allPosts,
+    blockedIds,
+  );
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const drawerOpenProgress = useRef(new Animated.Value(0)).current;
   const gestureCommittingRef = useRef(false);
@@ -114,7 +126,12 @@ export default function DetailFeedScreen() {
 
   // When a specific postId is requested, put that post first so initialIndex=0 lands on it.
   const data = useMemo(() => {
-    const base = getDataForMode(mode, allPosts, followingSet, followingSortParam);
+    let base: CommunityPost[];
+    if (mode === 'following' && followingSort !== 'recientes') {
+      base = globalVotedFeedPosts;
+    } else {
+      base = getDataForMode(mode, allPosts, followingSet, followingSortParam);
+    }
     if (!postId) return base;
     const targetIdx = base.findIndex((p) => p.id === postId);
     if (targetIdx <= 0) return base;
@@ -122,7 +139,7 @@ export default function DetailFeedScreen() {
     const [target] = reordered.splice(targetIdx, 1);
     reordered.unshift(target);
     return reordered;
-  }, [mode, allPosts, followingSet, postId, followingSortParam]);
+  }, [mode, allPosts, followingSet, postId, followingSortParam, followingSort, globalVotedFeedPosts]);
 
   // If postId was passed via params, always start at index 0 (target is first).
   // Otherwise honour the explicit initialIndex param.

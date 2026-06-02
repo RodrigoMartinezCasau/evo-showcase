@@ -14,6 +14,10 @@ import {
   type SimComment,
 } from '../data/simulation/simulatedNetwork';
 import type { Rank } from '../types';
+import {
+  getTopVotedWindowMs,
+  type TopVotedFeedPeriod,
+} from '../constants/followingFeedSort';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -88,6 +92,123 @@ export async function fetchAllPosts(limit: number = DEFAULT_GLOBAL_FEED_LIMIT): 
       (row) => row['is_hidden'] !== true && isPublishedSimPostType(row['type']),
     )
     .map(dbRowToSimPost);
+}
+
+type TopVotedPostIdRow = { post_id: string; upvote_count: number };
+
+function orderSimPostsByIds(posts: SimPost[], orderedIds: string[]): SimPost[] {
+  const byId = new Map(posts.map((p) => [p.id, p]));
+  const ordered: SimPost[] = [];
+  for (const id of orderedIds) {
+    const post = byId.get(id);
+    if (post) ordered.push(post);
+  }
+  return ordered;
+}
+
+async function hydrateSimPostVotes(posts: SimPost[]): Promise<void> {
+  if (posts.length === 0) return;
+  const voteRows = await fetchVotesForPosts(posts.map((p) => p.id));
+  for (const row of voteRows) {
+    const post = posts.find((p) => p.id === row.post_id);
+    if (!post) continue;
+    if (row.vote === 'up') post.upvoterIds = [...post.upvoterIds, row.user_id];
+    if (row.vote === 'down') post.downvoterIds = [...post.downvoterIds, row.user_id];
+  }
+}
+
+/** Escaneo completo del periodo (fallback si la RPC no está desplegada). */
+async function fetchGloballyTopVotedPostsScanFallback(options: {
+  period: TopVotedFeedPeriod;
+  resultLimit: number;
+}): Promise<SimPost[]> {
+  const { period, resultLimit } = options;
+  const cutoff = new Date(Date.now() - getTopVotedWindowMs(period)).toISOString();
+  const PAGE = 500;
+  const rows: Record<string, unknown>[] = [];
+  let from = 0;
+
+  for (;;) {
+    const primary = await supabase
+      .from('posts_with_author_clan')
+      .select('*')
+      .in('type', ['reflection', 'phrase'])
+      .gte('created_at', cutoff)
+      .order('created_at', { ascending: false })
+      .range(from, from + PAGE - 1);
+
+    let batch: Record<string, unknown>[] = [];
+    if (primary.error) {
+      const fallback = await supabase
+        .from('posts')
+        .select('*')
+        .in('type', ['reflection', 'phrase'])
+        .gte('created_at', cutoff)
+        .order('created_at', { ascending: false })
+        .range(from, from + PAGE - 1);
+      if (fallback.error) break;
+      batch = (fallback.data ?? []) as Record<string, unknown>[];
+    } else {
+      batch = (primary.data ?? []) as Record<string, unknown>[];
+    }
+
+    const filtered = batch.filter(
+      (row) => row['is_hidden'] !== true && isPublishedSimPostType(row['type']),
+    );
+    rows.push(...filtered);
+    if (batch.length < PAGE) break;
+    from += PAGE;
+  }
+
+  const posts = rows.map(dbRowToSimPost);
+  await hydrateSimPostVotes(posts);
+
+  return posts
+    .filter((p) => p.upvoterIds.length >= 1)
+    .sort((a, b) => {
+      const upDiff = b.upvoterIds.length - a.upvoterIds.length;
+      if (upDiff !== 0) return upDiff;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    })
+    .slice(0, resultLimit);
+}
+
+/**
+ * Ranking global de posts más votados en un periodo (toda la app, no solo seguidos).
+ * Usa RPC `get_top_voted_post_ids` (ver supabase_top_voted_posts.sql).
+ */
+export async function fetchGloballyTopVotedPosts(options: {
+  period: TopVotedFeedPeriod;
+  resultLimit?: number;
+}): Promise<SimPost[]> {
+  const { period, resultLimit = 80 } = options;
+  const cutoff = new Date(Date.now() - getTopVotedWindowMs(period)).toISOString();
+
+  const { data, error } = await supabase.rpc('get_top_voted_post_ids', {
+    p_since: cutoff,
+    p_result_limit: resultLimit,
+  });
+
+  if (error) {
+    console.warn(
+      '[Social] get_top_voted_post_ids RPC unavailable, using client scan fallback:',
+      error.message,
+    );
+    return fetchGloballyTopVotedPostsScanFallback({ period, resultLimit });
+  }
+
+  const ranked = (data ?? []) as TopVotedPostIdRow[];
+  if (ranked.length === 0) return [];
+
+  const orderedIds = ranked.map((row) => row.post_id);
+  const posts = await fetchPostsByIds(orderedIds);
+  await hydrateSimPostVotes(posts);
+  const ordered = orderSimPostsByIds(posts, orderedIds);
+  const windowMs = getTopVotedWindowMs(period);
+  const minCreatedAt = Date.now() - windowMs;
+  return ordered.filter(
+    (p) => new Date(p.createdAt).getTime() >= minCreatedAt,
+  );
 }
 
 /**
