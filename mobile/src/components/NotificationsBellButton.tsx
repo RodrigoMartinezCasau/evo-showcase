@@ -13,6 +13,7 @@ import { getClanSecondaryColor } from '@evoconn/constants/clanColors';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { NOTIFICATIONS_ICON_SCALE } from '@evoconn/constants/personalProfileLayout';
+import { formatNotificationBadgeCount } from '@evoconn/utils/formatNotificationBadgeCount';
 
 const BASE_SIZE = 28;
 
@@ -58,7 +59,7 @@ export const NotificationsBellButton = React.memo(function NotificationsBellButt
       {unreadCount > 0 && (
         <View style={[styles.badge, { backgroundColor: badgeColor }]}>
           <Text style={styles.badgeText}>
-            {unreadCount > 99 ? '+99' : String(unreadCount)}
+            {formatNotificationBadgeCount(unreadCount)}
           </Text>
         </View>
       )}

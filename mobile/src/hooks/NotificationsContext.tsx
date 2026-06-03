@@ -35,6 +35,7 @@ import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import {
   isRealUserId,
   fetchMyNotifications,
+  fetchUnreadNotificationsCount,
   insertNotification,
   markNotificationsRead,
 } from '@evoconn/services/supabaseSocial';
@@ -92,6 +93,8 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const { isBlocked } = useBlockedUsers();
 
   const [db, setDb] = useState<NotificationsDatabase>({});
+  /** Conteo exacto en Supabase (sin tope de 50/99 del listado). */
+  const [exactUnreadCount, setExactUnreadCount] = useState<number | null>(null);
   const dbRef = useRef<NotificationsDatabase>({});
 
   useLayoutEffect(() => {
@@ -100,10 +103,15 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
   const refreshNotifications = useCallback((): Promise<void> => {
     if (isRealUserId(activeUserId)) {
-      return fetchMyNotifications(activeUserId).then((rows) => {
+      return Promise.all([
+        fetchMyNotifications(activeUserId),
+        fetchUnreadNotificationsCount(activeUserId),
+      ]).then(([rows, unreadTotal]) => {
         setDb((prev) => ({ ...prev, [activeUserId]: mapDbRowsToAppNotifications(rows) }));
+        setExactUnreadCount(unreadTotal);
       });
     }
+    setExactUnreadCount(null);
     return loadNotificationsDB()
       .then((loaded) => setDb(loaded))
       .catch(() => {});
@@ -180,6 +188,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
             }
             return { ...prev, [activeUserId]: [notif, ...slice] };
           });
+          setExactUnreadCount((c) => (c ?? 0) + 1);
           // Burbujas del sistema: trigger en Supabase → Expo Push (supabase_push_remote.sql).
           // Aquí solo actualizamos la campana in-app vía Realtime.
         },
@@ -246,6 +255,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
   const markAllRead = useCallback(() => {
     markNotificationsRead(activeUserId); // update Supabase for real users
+    setExactUnreadCount(0);
     mutateSlice(activeUserId, (prev) =>
       prev.every((n) => n.read) ? prev : prev.map((n) => ({ ...n, read: true })),
     );
@@ -257,10 +267,16 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     () => (db[activeUserId] ?? []).filter((n) => !isBlocked(n.fromUserId)),
     [db, activeUserId, isBlocked],
   );
-  const unreadCount = useMemo(
+  const unreadFromLoaded = useMemo(
     () => notifications.filter((n) => !n.read).length,
     [notifications],
   );
+  const unreadCount = useMemo(() => {
+    if (isRealUserId(activeUserId) && exactUnreadCount != null) {
+      return exactUnreadCount;
+    }
+    return unreadFromLoaded;
+  }, [activeUserId, exactUnreadCount, unreadFromLoaded]);
 
   const value = useMemo<NotificationsContextValue>(
     () => ({ notifications, unreadCount, addNotification, markAllRead, refreshNotifications }),

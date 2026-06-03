@@ -1177,6 +1177,9 @@ export async function incrementProfileStat(
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 
+/** Máximo de filas en el feed de notificaciones (la campana puede mostrar +99 vía conteo exacto). */
+export const NOTIFICATIONS_FEED_FETCH_LIMIT = 99;
+
 export async function fetchMyNotifications(userId: string): Promise<DbNotification[]> {
   if (!isRealUserId(userId)) return [];
   const { data, error } = await supabase
@@ -1184,9 +1187,24 @@ export async function fetchMyNotifications(userId: string): Promise<DbNotificati
     .select('*')
     .eq('recipient_id', userId)
     .order('created_at', { ascending: false })
-    .limit(50);
+    .limit(NOTIFICATIONS_FEED_FETCH_LIMIT);
   if (error) { console.error('[Social] fetchNotifications:', error.message); return []; }
   return (data ?? []) as DbNotification[];
+}
+
+/** Total real de notificaciones sin leer (no limitado por el fetch del feed). */
+export async function fetchUnreadNotificationsCount(userId: string): Promise<number> {
+  if (!isRealUserId(userId)) return 0;
+  const { count, error } = await supabase
+    .from('notifications')
+    .select('id', { count: 'exact', head: true })
+    .eq('recipient_id', userId)
+    .eq('read', false);
+  if (error) {
+    console.error('[Social] fetchUnreadNotificationsCount:', error.message);
+    return 0;
+  }
+  return count ?? 0;
 }
 
 export async function insertNotification(n: DbNotificationInsert): Promise<boolean> {

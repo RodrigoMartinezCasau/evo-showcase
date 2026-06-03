@@ -4,7 +4,7 @@
  * Las solicitudes pendientes vienen de `follow_requests` (una fila por usuario).
  * El bloque plegable bajo el título muestra el contador y, al pulsar, todas las solicitudes.
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -36,6 +36,9 @@ import type { AppNotification } from '@evoconn/services/notificationsStorage';
 import {
   acceptFollowRequestRpc,
   rejectFollowRequestRpc,
+  fetchProfilesBatch,
+  isRealUserId,
+  type BasicProfile,
 } from '@evoconn/services/supabaseSocial';
 import {
   navigateToCommunityPost,
@@ -152,6 +155,7 @@ export default function NotificationsScreen() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const ready = useDeferredRender();
   const [busyRequesterId, setBusyRequesterId] = useState<string | null>(null);
+  const [notifierProfiles, setNotifierProfiles] = useState<Record<string, BasicProfile>>({});
 
   const feedNotifications = useMemo(
     () => notifications.filter((n) => n.type !== 'follow_request'),
@@ -163,6 +167,32 @@ export default function NotificationsScreen() {
     hasMore: hasMoreNotifications,
     loadMore: loadMoreNotifications,
   } = useIncrementalList(feedNotifications, 15);
+
+  const notifierUserIdsKey = useMemo(
+    () =>
+      [...new Set(feedNotifications.map((n) => n.fromUserId).filter(isRealUserId))]
+        .sort()
+        .join(','),
+    [feedNotifications],
+  );
+
+  useEffect(() => {
+    const ids = notifierUserIdsKey ? notifierUserIdsKey.split(',') : [];
+    if (ids.length === 0) {
+      setNotifierProfiles({});
+      return;
+    }
+    let cancelled = false;
+    void fetchProfilesBatch(ids).then((profiles) => {
+      if (cancelled) return;
+      const map: Record<string, BasicProfile> = {};
+      for (const p of profiles) map[p.id] = p;
+      setNotifierProfiles(map);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [notifierUserIdsKey]);
 
   const handleTabChange = useCallback(
     (tab: TabId) => {
@@ -264,17 +294,19 @@ export default function NotificationsScreen() {
 
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<AppNotification>) => {
-      const user = users[item.fromUserId];
+      const profile = notifierProfiles[item.fromUserId];
+      const simUser = users[item.fromUserId];
       return (
         <NotificationRow
           notification={item}
-          clanId={user?.clanId ?? null}
+          clanId={profile?.clanId ?? simUser?.clanId ?? null}
+          avatarUri={profile?.avatarUri ?? null}
           onPressProfile={handlePressProfile}
           onPressContent={handlePressContent}
         />
       );
     },
-    [users, handlePressProfile, handlePressContent],
+    [notifierProfiles, users, handlePressProfile, handlePressContent],
   );
 
   const keyExtractor = useCallback((item: AppNotification) => item.id, []);

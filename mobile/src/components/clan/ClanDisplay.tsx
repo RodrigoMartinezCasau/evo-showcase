@@ -88,7 +88,7 @@ import {
   mergeClanMemberCountsWithSim,
 } from '@evoconn/utils/clanRanking';
 import { getClanCompetitionPeriod } from '@evoconn/utils/clanCompetitionPeriod';
-import { isRealUserId } from '@evoconn/services/supabaseSocial';
+import { isRealUserId, fetchFollowersCountsExact } from '@evoconn/services/supabaseSocial';
 import type { CommunityPost } from '@evoconn/types';
 import type { ClanMember } from '@evoconn/data/mockClanProfiles';
 
@@ -251,6 +251,30 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
     remoteMembers,
     SIM_IDS,
   ]);
+
+  // Conteo real de seguidores para los miembros mostrados (los hardcodeados a 0
+  // y los reales). Clave estable por ids para no relanzar la query en cada render.
+  const [dbFollowerCounts, setDbFollowerCounts] = useState<Record<string, number>>({});
+  const topMemberIdsKey = useMemo(
+    () => topMembers.map((m) => m.id).filter(isRealUserId).join(','),
+    [topMembers],
+  );
+
+  useEffect(() => {
+    const ids = topMemberIdsKey ? topMemberIdsKey.split(',') : [];
+    if (ids.length === 0) {
+      setDbFollowerCounts({});
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const counts = await fetchFollowersCountsExact(ids);
+      if (!cancelled) setDbFollowerCounts(counts);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [topMemberIdsKey]);
 
   // ── Top posts en vivo — publicaciones del clan con ≥1 voto en las últimas 24h ──
   // Para 'indefinido', los autores sin clan asignado tienen clanId: null.
@@ -445,7 +469,7 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
           username={item.username}
           clanId={item.clanId}
           rank={item.rank}
-          followersCount={item.followersCount ?? 0}
+          followersCount={dbFollowerCounts[item.id] ?? item.followersCount ?? 0}
           clanPct={pct}
           avatarUri={extItem._avatarUri}
           avatarVariant="clan"
@@ -453,7 +477,7 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
         />
       );
     },
-    [handleMemberPress],
+    [handleMemberPress, dbFollowerCounts],
   );
 
   // ── Render ────────────────────────────────────────────────────────────────

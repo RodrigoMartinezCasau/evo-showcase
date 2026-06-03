@@ -537,17 +537,20 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
 
       // Guardados fuera del feed global: traer cuerpos para perfil / lista guardados.
       const missingSavedIds = mySavedPostIds.filter((id) => !postById.has(id));
+      const voteRows = [...allVoteRows];
       if (missingSavedIds.length > 0) {
         const savedPosts = await fetchPostsByIds(missingSavedIds);
         for (const p of savedPosts) {
           postById.set(p.id, p);
         }
+        // `dbRowToSimPost` deja up/down en 0; hay que pedir votos como en Siguiendo.
+        const savedVoteRows = await fetchVotesForPosts(missingSavedIds);
+        voteRows.push(...savedVoteRows);
       }
 
       // Posts antiguos de la gente a la que sigues (fuera del top global de 200)
       // → que sigan apareciendo en "Siguiendo". Traemos sus cuerpos y, para los
       // que no estaban ya, sus votos (allVoteRows solo cubría el top global).
-      const voteRows = [...allVoteRows];
       if (following.length > 0) {
         const followedPosts = await fetchPostsByAuthors(following);
         const newFollowedIds: string[] = [];

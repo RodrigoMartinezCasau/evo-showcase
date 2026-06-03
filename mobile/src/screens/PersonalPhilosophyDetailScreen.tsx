@@ -44,7 +44,6 @@ import { DetailedRankCard } from '@evoconn/components/philosophyProfile/Detailed
 import { ClanPercentagesTable } from '@evoconn/components/philosophyProfile/ClanPercentagesTable';
 import { SimilarPhilosophersCard } from '@evoconn/components/philosophyProfile/SimilarPhilosophersCard';
 import { BookRecommendationsCard } from '@evoconn/components/philosophyProfile/BookRecommendationsCard';
-import { StudyRecommendationsCard } from '@evoconn/components/philosophyProfile/StudyRecommendationsCard';
 import type { AiBlockState } from '@evoconn/components/philosophyProfile/AiBlockCard';
 import type { Rank } from '@evoconn/types';
 import { useDailyUsesGate } from '@evoconn/hooks/useDailyUsesGate';
@@ -53,9 +52,7 @@ import {
   fetchPhilosophyProfile,
   generateSummary,
   generatePhilosophers,
-  generateJobs,
   type PhilosopherEntry,
-  type JobEntry,
   type PhilosophyContext,
 } from '@evoconn/services/philosophyProfileApi';
 import { recordUsesLog } from '@evoconn/services/streakApi';
@@ -193,10 +190,6 @@ export default function PersonalPhilosophyDetailScreen() {
   /** Ids of all books that have been shown in this session — prevents repeats. */
   const [shownBookIds, setShownBookIds] = useState<string[]>([]);
 
-  const [jobs, setJobs] = useState<JobEntry[] | null>(null);
-  const [jobsState, setJobsState] = useState<AiBlockState>('idle');
-  const [jobsError, setJobsError] = useState<string | undefined>();
-
   // ─── Load stored results on mount ───────────────────────────────────────
   useEffect(() => {
     (async () => {
@@ -212,10 +205,6 @@ export default function PersonalPhilosophyDetailScreen() {
         if (data.philosophers) {
           setPhilosophers(data.philosophers);
           setPhilosophersState('success');
-        }
-        if (data.jobs) {
-          setJobs(data.jobs);
-          setJobsState('success');
         }
         if (localBooks) {
           setShownBookIds(localBooks.shownBookIds);
@@ -316,22 +305,6 @@ export default function PersonalPhilosophyDetailScreen() {
     consumeAiUse,
   ]);
 
-  const handleJobsReload = useCallback(async () => {
-    if (blockIfNoUses()) return;
-    setJobsState('loading');
-    setJobsError(undefined);
-    try {
-      const res = await generateJobs(apiUserId, ctx);
-      setJobs(res.jobs);
-      setJobsState('success');
-      consumeAiUse();
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Error';
-      setJobsState(isNoUsesError(msg) ? 'no_uses' : 'error');
-      setJobsError(msg);
-    }
-  }, [apiUserId, ctx, blockIfNoUses, consumeAiUse]);
-
   // ─── Navigation ─────────────────────────────────────────────────────────
   const handleBottomTabChange = useCallback(
     (tab: TabId) => {
@@ -409,27 +382,14 @@ export default function PersonalPhilosophyDetailScreen() {
 
             <View style={styles.gap} />
 
-            {/* 6. Two small side-by-side AI blocks */}
-            <View style={styles.bottomRow}>
-              <View style={styles.halfCard}>
-                <BookRecommendationsCard
-                  books={books}
-                  exhausted={booksExhausted}
-                  state={booksState}
-                  onReload={handleBooksReload}
-                  usesAvailable={hasAiUses}
-                />
-              </View>
-              <View style={styles.halfCard}>
-                <StudyRecommendationsCard
-                  jobs={jobs}
-                  state={jobsState}
-                  errorMessage={jobsError}
-                  onReload={handleJobsReload}
-                  usesAvailable={hasAiUses}
-                />
-              </View>
-            </View>
+            {/* 6. Book recommendations — full width */}
+            <BookRecommendationsCard
+              books={books}
+              exhausted={booksExhausted}
+              state={booksState}
+              onReload={handleBooksReload}
+              usesAvailable={hasAiUses}
+            />
 
             <View style={styles.bottomSpacer} />
           </ScrollView>
@@ -468,13 +428,6 @@ const styles = StyleSheet.create({
   },
   gap: {
     height: 14,
-  },
-  bottomRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  halfCard: {
-    flex: 1,
   },
   bottomSpacer: {
     height: 24,
