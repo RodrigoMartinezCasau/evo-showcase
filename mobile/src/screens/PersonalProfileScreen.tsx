@@ -103,13 +103,17 @@ export default function PersonalProfileScreen() {
   ]);
 
   // Real per-user philosophical percentages from the classification engine.
+  // Diferidas tras `ready`: estos getters recorren el estado de clasificación y,
+  // si se ejecutan en el primer render, bloquean el hilo JS y retrasan el pintado
+  // del spinner. Mientras `!ready` el cuerpo no se muestra, así que devolvemos
+  // valores neutros y calculamos los reales cuando la transición ha terminado.
   const localPercentages = useMemo(
-    () => classification.getPercentages(profile.id),
-    [classification, profile.id],
+    () => (ready ? classification.getPercentages(profile.id) : []),
+    [ready, classification, profile.id],
   );
   const localVisibleClanId = useMemo(
-    () => classification.getVisibleClanId(profile.id),
-    [classification, profile.id],
+    () => (ready ? classification.getVisibleClanId(profile.id) : null),
+    [ready, classification, profile.id],
   );
   // Fallback robusto: si el store local está vacío (build nuevo / storage
   // limpio), usamos el `clan_percentages` publicado en Supabase — la misma
@@ -120,16 +124,16 @@ export default function PersonalProfileScreen() {
     localVisibleClanId,
   );
   const displayRank = useMemo(
-    () => classification.getDisplayRank(profile.id),
-    [classification, profile.id],
+    () => (ready ? classification.getDisplayRank(profile.id) : 'aprendiz'),
+    [ready, classification, profile.id],
   );
   const reflectionCount = useMemo(
-    () => classification.getReflectionCount(profile.id),
-    [classification, profile.id],
+    () => (ready ? classification.getReflectionCount(profile.id) : 0),
+    [ready, classification, profile.id],
   );
   const phraseCount = useMemo(
-    () => classification.getPhraseCount(profile.id),
-    [classification, profile.id],
+    () => (ready ? classification.getPhraseCount(profile.id) : 0),
+    [ready, classification, profile.id],
   );
 
   // Overlay Supabase identity fields so real users see their own data,

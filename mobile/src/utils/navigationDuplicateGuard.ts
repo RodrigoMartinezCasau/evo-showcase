@@ -24,6 +24,53 @@
 import { router } from 'expo-router';
 import type { Href } from 'expo-router';
 
+// ─── Overlay de carga instantáneo (ver NavLoadingContext) ──────────────────────
+// El provider registra aquí su `show` para que la navegación a pantallas
+// principales pueda mostrar el spinner ANTES de montar el destino pesado, sin
+// que cada call site dependa del contexto.
+type NavLoadingShowOpts = { clanId?: string | null; hold?: boolean };
+type NavLoadingShow = (opts?: NavLoadingShowOpts) => void;
+let navLoadingShow: NavLoadingShow | null = null;
+
+export function registerNavLoadingShow(fn: NavLoadingShow | null): void {
+  navLoadingShow = fn;
+}
+
+/**
+ * Dispara el overlay de carga global. El COLOR del spinner lo decide el propio
+ * overlay (siempre el clan del usuario), así que no hace falta pasar clan aquí.
+ * Se auto-oculta al cambiar la ruta (relevo con el spinner del destino).
+ */
+export function showNavLoadingOverlay(): void {
+  navLoadingShow?.({ hold: false });
+}
+
+/**
+ * Variante para Comunidad (Para Ti / Siguiendo): el overlay permanece hasta que
+ * la pantalla esté interactiva, NO hasta que cambie la ruta. La ruta cambia al
+ * instante pero el feed tarda en hidratarse, así que sin esto el usuario ve la
+ * app "congelada" cargando en silencio. Lo cierra CommunityScreen al enfocarse.
+ */
+export function showNavLoadingOverlayHold(): void {
+  navLoadingShow?.({ hold: true });
+}
+
+/**
+ * Difiere `fn` un par de frames para que el overlay de carga se pinte antes de
+ * arrancar el montaje (síncrono y pesado) del destino. Sin esto, el push y el
+ * primer render del destino bloquearían el hilo JS en el mismo frame y el
+ * spinner no llegaría a verse.
+ */
+function deferTwoFrames(fn: () => void): void {
+  const raf =
+    typeof requestAnimationFrame === 'function' ? requestAnimationFrame : null;
+  if (raf) {
+    raf(() => raf(fn));
+  } else {
+    setTimeout(fn, 16);
+  }
+}
+
 function normalizeRoutePath(path: string | undefined | null): string {
   if (path == null || path === '') return '/';
   let p = path.split('?')[0].replace(/\/$/, '');
@@ -120,9 +167,15 @@ export function navigateUnlessCurrent(
     return;
   }
 
-  if (toMain && !fromHome) {
-    collapseToHome();
-    router.push(targetHref as Href);
+  if (toMain) {
+    // Pantallas principales = montaje pesado. Mostramos el overlay de carga al
+    // instante (sobre la pantalla actual ya pintada) y diferimos la navegación
+    // un par de frames para que el spinner se pinte antes del montaje.
+    showNavLoadingOverlay();
+    deferTwoFrames(() => {
+      if (!fromHome) collapseToHome();
+      router.push(targetHref as Href);
+    });
     return;
   }
 

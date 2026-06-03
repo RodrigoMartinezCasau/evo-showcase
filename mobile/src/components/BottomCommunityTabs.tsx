@@ -13,7 +13,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { useRouter, usePathname } from 'expo-router';
-import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
+import {
+  navigateUnlessCurrent,
+  showNavLoadingOverlayHold,
+} from '@evoconn/utils/navigationDuplicateGuard';
 import { requestCommunityTab } from '@evoconn/utils/communityPostDeepLink';
 import { Ionicons } from '@expo/vector-icons';
 import { evoconnColors } from '@evoconn/theme/colors';
@@ -192,7 +195,25 @@ export function BottomCommunityTabs({
   // cambio es interno y no debe emitir la señal.
   const emitTabChange = useCallback(
     (id: TabId) => {
-      if (activeTab === null) requestCommunityTab(id);
+      // Entrada a Comunidad desde fuera (perfil, clan, etc.). El bloqueo de JS
+      // que congela la app durante la carga SOLO ocurre en Android de gama baja;
+      // en iPhone la transición es instantánea. Por eso el overlay de Para Ti/
+      // Siguiendo es exclusivo de Android: mostramos el spinner AL INSTANTE
+      // (modo hold) y diferimos la navegación un par de frames para que se pinte
+      // antes del montaje pesado. En iPhone navegamos directo, sin overlay, para
+      // no añadir latencia percibida.
+      if (activeTab === null) {
+        requestCommunityTab(id);
+        if (Platform.OS === 'android') {
+          showNavLoadingOverlayHold();
+          requestAnimationFrame(() => requestAnimationFrame(() => onTabChange(id)));
+          return;
+        }
+        onTabChange(id);
+        return;
+      }
+      // Cambio interno entre pestañas (ya en Comunidad): es instantáneo, sin
+      // overlay para no añadir latencia percibida.
       onTabChange(id);
     },
     [activeTab, onTabChange],

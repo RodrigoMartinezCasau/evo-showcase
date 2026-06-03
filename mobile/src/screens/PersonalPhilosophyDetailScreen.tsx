@@ -115,9 +115,12 @@ export default function PersonalPhilosophyDetailScreen() {
   const baseProfile = getPersonalProfile();
   // Use real philosophical-classification data instead of seed mock values.
   const classification = useClassification();
-  const localPercentages = classification.getPercentages(baseProfile.id);
-  const localVisibleClanId = classification.getVisibleClanId(baseProfile.id);
-  const localDisplayRank = classification.getDisplayRank(baseProfile.id);
+  // Diferidos tras `ready`: estos getters recorren el estado de clasificación y,
+  // en el primer render, bloquean el hilo JS retrasando el pintado del spinner.
+  // Mientras `!ready` el cuerpo no se muestra, así que devolvemos valores neutros.
+  const localPercentages = ready ? classification.getPercentages(baseProfile.id) : [];
+  const localVisibleClanId = ready ? classification.getVisibleClanId(baseProfile.id) : null;
+  const localDisplayRank = ready ? classification.getDisplayRank(baseProfile.id) : 'aprendiz';
   // Fallback robusto: si el store local está vacío (build nuevo / storage
   // limpio), usamos el `clan_percentages` / `clan_id` / `rank` publicados en
   // Supabase.
@@ -131,9 +134,9 @@ export default function PersonalPhilosophyDetailScreen() {
     localVisibleClanId,
     localDisplayRank,
   );
-  const localRankHistory = classification.getClanRankHistory(
-    authProfile?.id ?? baseProfile.id,
-  );
+  const localRankHistory = ready
+    ? classification.getClanRankHistory(authProfile?.id ?? baseProfile.id)
+    : {};
   // Medallas permanentes por clan visitado. Si el historial local está incompleto
   // (storage borrado, heal previo, build antiguo), fusionamos al menos la medalla
   // del clan publicado actual — sin sustituir otras entradas que vengan del merge
@@ -151,7 +154,7 @@ export default function PersonalPhilosophyDetailScreen() {
   const profile = {
     ...baseProfile,
     philosophyPercentages: realPercentages,
-    rank: classification.getDisplayRank(baseProfile.id),
+    rank: ready ? classification.getDisplayRank(baseProfile.id) : 'aprendiz',
   };
   /** Misma regla que racha/usos: Supabase cuando hay sesión, si no el perfil activo. */
   const apiUserId = authProfile?.id ?? profile.id;

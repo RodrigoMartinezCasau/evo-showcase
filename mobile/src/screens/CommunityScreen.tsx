@@ -14,8 +14,9 @@ import {
 import { Image as ExpoImage } from 'expo-image';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
-import { useRouter, useLocalSearchParams, usePathname } from 'expo-router';
+import { useRouter, useLocalSearchParams, usePathname, useFocusEffect } from 'expo-router';
 import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
+import { useNavLoading } from '@evoconn/hooks/NavLoadingContext';
 import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import {
   AppTopBar,
@@ -337,6 +338,26 @@ export default function CommunityScreen() {
   );
   const gestureCommittingRef = useRef(false);
   const entryAnimPlaying = useEntryAnimPlaying();
+  // Overlay de carga GLOBAL (modo hold): lo dispara BottomCommunityTabs sobre la
+  // pantalla anterior (perfil, etc.) ANTES de navegar, para cubrir el bloqueo de
+  // JS previo al montaje de Comunidad (el `arrivalLoading` local no puede pintar
+  // en ese hueco). En cuanto Comunidad pinta su PRIMER frame lo soltamos: el
+  // relevo lo toma el `arrivalLoading` local (mismo spinner) si la hidratación
+  // del feed aún tarda. Por eso ocultamos en 2 rAF (primer frame visible) y NO
+  // con runAfterInteractions, que esperaba a TODO el feed → se sentía más lento.
+  const { hide: hideNavLoading } = useNavLoading();
+  useFocusEffect(
+    useCallback(() => {
+      let raf2 = 0;
+      const raf1 = requestAnimationFrame(() => {
+        raf2 = requestAnimationFrame(() => hideNavLoading());
+      });
+      return () => {
+        cancelAnimationFrame(raf1);
+        if (raf2) cancelAnimationFrame(raf2);
+      };
+    }, [hideNavLoading]),
+  );
   const [activeTab, setActiveTab] = useState<TabId>(() =>
     peekCommunityPostId() ? 'para-ti' : 'siguiendo',
   );
