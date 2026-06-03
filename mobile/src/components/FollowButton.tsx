@@ -1,7 +1,6 @@
 import React, { useRef, useCallback, useEffect } from 'react';
 import { View, TouchableOpacity, Animated, StyleSheet } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { getClanSecondaryColor } from '@evoconn/constants/clanColors';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import {
@@ -29,7 +28,10 @@ const LAYOUT_BY_CONTEXT: Record<FollowButtonContext, { offsetX: number; offsetY:
 
 const BASE_SIZE = 28;
 
-function FollowPlusSvg({ borderColor, size }: { borderColor: string; size: number }) {
+const FOLLOW_PLUS_RIM_COLOR = '#000000';
+const FOLLOW_PLUS_FILL_COLOR = '#ffffff';
+
+function FollowPlusSvg({ size }: { size: number }) {
   const O = FOLLOW_OUTLINE_PX;
   // Colored plus arm inner corners (original path)
   const C1 = 241.8, C2 = 358.2;
@@ -45,15 +47,15 @@ function FollowPlusSvg({ borderColor, size }: { borderColor: string; size: numbe
         d={`M${bMax} ${b1} H${b2} V${-O} H${b1} V${b1} H${-O} V${b2} H${b1} V${bMax} H${b2} V${b2} H${bMax} Z`}
         fill="#000000"
       />
-      {/* Colored plus (clan secondary color) */}
+      {/* Reborde negro */}
       <Path
         d="M600 241.8 H358.2 V0 H241.8 V241.8 H0 V358.2 H241.8 V600 H358.2 V358.2 H600 Z"
-        fill={borderColor}
+        fill={FOLLOW_PLUS_RIM_COLOR}
       />
-      {/* White inner plus */}
+      {/* Interior blanco */}
       <Path
         d="M584.2 235.5 H348.8 V0 H235.5 V235.5 H0 V348.8 H235.5 V584.2 H348.8 V348.8 H584.2 Z"
-        fill="#ffffff"
+        fill={FOLLOW_PLUS_FILL_COLOR}
       />
     </Svg>
   );
@@ -131,7 +133,6 @@ export const FollowButton = React.memo(function FollowButton({
   if (pending) {
     const layout = LAYOUT_BY_CONTEXT[context];
     const sz = BASE_SIZE * layout.scale;
-    const borderColor = getClanSecondaryColor(authorClanId);
     return (
       <View
         style={[
@@ -146,7 +147,7 @@ export const FollowButton = React.memo(function FollowButton({
         ]}
       >
         <TouchableOpacity onPress={handlePress} activeOpacity={0.7} hitSlop={6}>
-          <FollowPlusSvg borderColor={borderColor} size={sz} />
+          <FollowPlusSvg size={sz} />
         </TouchableOpacity>
       </View>
     );
@@ -154,8 +155,6 @@ export const FollowButton = React.memo(function FollowButton({
 
   const layout = LAYOUT_BY_CONTEXT[context];
   const sz = BASE_SIZE * layout.scale;
-  const borderColor = getClanSecondaryColor(authorClanId);
-
   return (
     <Animated.View
       pointerEvents={following ? 'none' : 'auto'}
@@ -172,7 +171,7 @@ export const FollowButton = React.memo(function FollowButton({
       ]}
     >
       <TouchableOpacity onPress={handlePress} activeOpacity={0.7} hitSlop={6}>
-        <FollowPlusSvg borderColor={borderColor} size={sz} />
+        <FollowPlusSvg size={sz} />
       </TouchableOpacity>
     </Animated.View>
   );
