@@ -1477,7 +1477,7 @@ class ClanPctItem(BaseModel):
 
 
 class PhilosophyContextPayload(BaseModel):
-    username: str
+    username: str = ""
     clan_percentages: list[ClanPctItem]
     rank: str
     total_reflections: int = 0
@@ -1489,7 +1489,6 @@ class PhilosophyContextPayload(BaseModel):
 
 def _philosophy_context_str(ctx: PhilosophyContextPayload) -> str:
     lines = [
-        f"Usuario: {ctx.username}",
         f"Rango filosófico: {ctx.rank}",
         f"Clan dominante: {ctx.dominant_clan}",
         f"Total reflexiones publicadas: {ctx.total_reflections}",
@@ -1549,17 +1548,33 @@ def generate_philosophy_summary(user_id: str, payload: PhilosophyContextPayload)
     from llm import OpenAIClient
     ctx_str = _philosophy_context_str(payload)
     system = (
-        "Eres un sistema de análisis filosófico. Genera un perfil filosófico preciso, insightful y personal del usuario.\n"
-        "REGLAS:\n"
-        "- Tono: preciso, filosófico pero accesible. No excesivamente técnico.\n"
+        "Eres un observador muy perspicaz de personalidad. Traduce el perfil filosófico "
+        "del lector a rasgos humanos concretos con los que pueda identificarse.\n"
+        "REGLAS DE ESTILO:\n"
+        "- Redacta SIEMPRE en segunda persona del singular (tú, te, tu, sueles, tiendes a…).\n"
+        "- Habla directamente al lector; nunca en tercera persona.\n"
+        "- Enfócate en CÓMO ES como persona: carácter, maneras de pensar, actitudes, "
+        "hábitos, reacciones emocionales, formas de relacionarse con la vida.\n"
+        "- Describe cosas que podría hacer, sentir o valorar en el día a día; que suene "
+        "como alguien que te conoce bien y te ve con claridad.\n"
+        "- Usa la filosofía solo como lente interna para inferir la personalidad; "
+        "NO redactes como ensayo filosófico ni como académico.\n"
+        "- EVITA jerga filosófica, nombres de escuelas, citas, términos técnicos "
+        "(existencialismo, nihilismo, epistemología, etc.) salvo que sea imprescindible "
+        "y en ese caso dilo con palabras cotidianas.\n"
+        "- Tono: cálido, humano, directo, íntimo pero no cursi. Como un espejo honesto.\n"
+        "- PROHIBIDO mencionar nombres, usernames, arrobas (@) o identificadores.\n"
+        "- PROHIBIDO: '@invitado', 'el usuario', 'esta persona', etc.\n"
         "- Longitud: 3-4 oraciones densas. No más.\n"
-        "- Debe sentirse personal basado en los datos reales del usuario.\n"
+        "- Debe basarse en los datos reales proporcionados (clanes, reflexiones, frases).\n"
         "- Solo genera el texto del perfil, nada más.\n"
         "- Responde EN ESPAÑOL."
     )
     user_prompt = (
-        f"Genera el perfil filosófico de este usuario basado en sus datos:\n\n{ctx_str}\n\n"
-        "Escribe un perfil filosófico breve (3-4 oraciones) que capture la esencia de su pensamiento."
+        f"A partir de estos datos, describe al lector como PERSONA (rasgos, actitudes, "
+        f"formas de ser) con las que pueda sentirse identificado:\n\n{ctx_str}\n\n"
+        "Escribe 3-4 oraciones en segunda persona. Que suene a retrato de personalidad, "
+        "no a texto filosófico. Sin nombres ni usernames."
     )
     try:
         llm = OpenAIClient()

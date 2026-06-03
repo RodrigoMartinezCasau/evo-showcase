@@ -49,7 +49,6 @@ import {
   DETAIL_QUOTE_AUTHOR_LAYOUT as QAL,
 } from '@evoconn/constants/detailQuoteLayout';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
-import { FollowButton } from './FollowButton';
 import { FirstUsersTesterBadge } from './shared/FirstUsersTesterBadge';
 import { PROFILE_TESTER_BADGE_SIZE } from '@evoconn/constants/personalProfileLayout';
 import { useFollowState } from '@evoconn/hooks/useFollowState';
@@ -1641,11 +1640,6 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                 userId={post.author.id}
                 iconSize={PROFILE_TESTER_BADGE_SIZE}
               />
-              <FollowButton
-                authorId={post.author.id}
-                authorClanId={post.author.clanId}
-                context="detail"
-              />
             </View>
           </View>
 
@@ -1958,6 +1952,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
           showClanBadge={communityVerticalFeed}
           authorRank={post.author.rank}
           hasAudio={!!post.audioTrackId}
+          authorId={post.author.id}
         />
       </View>
 

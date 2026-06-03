@@ -35,7 +35,12 @@ const BADGE_INNER_PATH =
   'C 193.421875 95.808594 247.03125 93.308594 299.476562 93.949219 ' +
   'L 299.96875 93.957031 Z';
 
-
+/** ViewBox del escudo de perfil (todos los clanes). */
+export const CLAN_PROFILE_BADGE_VIEWBOX = 600;
+/** Punta inferior del escudo (centro), en coordenadas del viewBox. */
+export const CLAN_PROFILE_BADGE_BOTTOM_TIP_Y = 583.292969;
+export const CLAN_PROFILE_BADGE_BOTTOM_TIP_Y_RATIO =
+  CLAN_PROFILE_BADGE_BOTTOM_TIP_Y / CLAN_PROFILE_BADGE_VIEWBOX;
 
 // ─── Component ────────────────────────────────────────────────────────────────
 

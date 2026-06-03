@@ -33,7 +33,7 @@ export const AiSummaryCard = React.memo(function AiSummaryCard({
         <Text style={styles.body}>{summary}</Text>
       ) : (
         <Text style={styles.placeholder}>
-          Pulsa ↻ para conocer detalles de tu pensamiento filosófico. 
+          Pulsa ↻ para descubrir rasgos de tu personalidad según tu forma de pensar.
         </Text>
       )}
     </AiBlockCard>

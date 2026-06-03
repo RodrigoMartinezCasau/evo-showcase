@@ -73,12 +73,20 @@ function isNoUsesError(msg: string): boolean {
   return msg.toLowerCase().includes('sin usos') || msg.toLowerCase().includes('quota') || msg.includes('429');
 }
 
+function isPlaceholderUsername(username: string | null | undefined): boolean {
+  const normalized = (username ?? '').trim().replace(/^@/, '').toLowerCase();
+  return !normalized || normalized === 'invitado' || normalized === 'guest';
+}
+
 function buildContext(
   profile: ReturnType<typeof getPersonalProfile>,
   dominantClan: string,
+  authUsername?: string | null,
 ): PhilosophyContext {
+  const rawUsername = (authUsername?.trim() || profile.username?.trim() || '');
   return {
-    username: profile.username,
+    // El resumen habla en segunda persona; no enviamos placeholders tipo @invitado.
+    username: isPlaceholderUsername(rawUsername) ? '' : rawUsername,
     clan_percentages: profile.philosophyPercentages,
     rank: profile.rank,
     total_reflections: profile.totalReflections,
@@ -172,7 +180,7 @@ export default function PersonalPhilosophyDetailScreen() {
   // Dominant clan (highest pct)
   const sorted = [...profile.philosophyPercentages].sort((a, b) => b.pct - a.pct);
   const dominant = sorted[0] ?? { label: '', pct: 0 };
-  const ctx = buildContext(profile, dominant.label);
+  const ctx = buildContext(profile, dominant.label, authProfile?.username);
 
   // ─── AI block state ──────────────────────────────────────────────────────
   const [summaryText, setSummaryText] = useState<string | null>(null);
