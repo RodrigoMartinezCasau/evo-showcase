@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { getOtherUserProfileOrFallback } from '@evoconn/data/mockOtherUsers';
@@ -13,6 +13,7 @@ import { UserTotalsStats } from './UserTotalsStats';
 import { RecentPostsSlider } from './RecentPostsSlider';
 import type { CommunityPost } from '@evoconn/types';
 import { navigateToCommunityPost } from '@evoconn/utils/notificationNavigation';
+import { fetchProfilesBatch, isRealUserId } from '@evoconn/services/supabaseSocial';
 
 type Props = {
   authorId: string;
@@ -23,6 +24,25 @@ export const ProfileRevealPanel = React.memo(function ProfileRevealPanel({ autho
   const router = useRouter();
   const profile = getOtherUserProfileOrFallback(authorId);
   const { posts: allSimPosts, users: simUsers } = useSimulation();
+  const [remoteAvatarUri, setRemoteAvatarUri] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isRealUserId(authorId)) {
+      setRemoteAvatarUri(null);
+      return;
+    }
+    let cancelled = false;
+    void fetchProfilesBatch([authorId]).then((rows) => {
+      if (cancelled) return;
+      setRemoteAvatarUri(rows[0]?.avatarUri?.trim() || null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [authorId]);
+
+  const displayAvatarUri =
+    profile.avatarUri?.trim() || remoteAvatarUri?.trim() || undefined;
 
   // Build live posts for this user so the panel always reflects real published content.
   const livePosts = useMemo<CommunityPost[]>(
@@ -87,13 +107,14 @@ export const ProfileRevealPanel = React.memo(function ProfileRevealPanel({ autho
             followersCount={profile.followersCount}
             followingCount={profile.followingCount}
             postsCount={liveReflectionCount + liveQuoteCount}
-            avatarUri={profile.avatarUri}
+            avatarUri={displayAvatarUri}
           />
           <UserIdentityHeader
             userId={profile.id}
             username={profile.username}
             clanId={profile.clanId}
             rank={profile.rank}
+            avatarUri={displayAvatarUri}
           />
           <UserInsigniaPhrase phrase={profile.insigniaPhrase} />
           <PhilosophyPercentagesPanel percentages={profile.philosophyPercentages} />

@@ -27,6 +27,16 @@ const TEXT = '#F4F4F5';
 const DESTRUCTIVE = '#F87171';
 const ACCENT = '#c7ff02';
 
+function accentBorderColor(hex: string): string {
+  const clean = hex.replace('#', '').trim();
+  if (clean.length === 6) return `#${clean}59`;
+  if (clean.length === 3) {
+    const [r, g, b] = clean.split('');
+    return `#${r}${r}${g}${g}${b}${b}59`;
+  }
+  return 'rgba(199,255,2,0.35)';
+}
+
 export type EvoActionOption = {
   key: string;
   label: string;
@@ -39,9 +49,19 @@ type ActionSheetProps = {
   onClose: () => void;
   title?: string;
   options: EvoActionOption[];
+  /** Color del botón Cancelar (p. ej. color del clan). Por defecto verde lima. */
+  accentColor?: string;
 };
 
-export function EvoActionSheetModal({ visible, onClose, title, options }: ActionSheetProps) {
+export function EvoActionSheetModal({
+  visible,
+  onClose,
+  title,
+  options,
+  accentColor,
+}: ActionSheetProps) {
+  const cancelAccent = accentColor?.trim() || ACCENT;
+  const cancelBorder = accentBorderColor(cancelAccent);
   const insets = useSafeAreaInsets();
   const { runGuarded, reset } = useSinglePressGate();
 
@@ -89,8 +109,12 @@ export function EvoActionSheetModal({ visible, onClose, title, options }: Action
                 </TouchableOpacity>
               ))}
             </ScrollView>
-            <TouchableOpacity style={styles.cancelOuter} onPress={onClose} activeOpacity={0.8}>
-              <Text style={styles.cancelLabel}>Cancelar</Text>
+            <TouchableOpacity
+              style={[styles.cancelOuter, { borderColor: cancelBorder }]}
+              onPress={onClose}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.cancelLabel, { color: cancelAccent }]}>Cancelar</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>

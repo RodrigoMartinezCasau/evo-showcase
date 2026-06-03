@@ -115,7 +115,7 @@ export default function StreakScreen() {
   const { hasSentToday } = useDebugStreak();
 
   // ─── Debug stats (streak days / remaining uses simulation) ────────────────
-  const { streakDays, setRealStreakDays, streakRecovery } = useDebugStats();
+  const { streakDays, setRealStreakDays, streakRecovery, syncStreakFromApi } = useDebugStats();
 
   // Aviso de recuperación: visible solo durante la ventana de 24 h (el día
   // siguiente al día saltado). Desaparece solo al pasar la ventana.
@@ -137,21 +137,22 @@ export default function StreakScreen() {
 
   const today = new Date().toISOString().slice(0, 10);
 
+  const displayStreakDays = data?.streak_current ?? streakDays;
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const res = await fetchStreak(realUserId);
       setData(res);
-      // Sincroniza el contador en el contexto compartido para que la barra superior
-      // refleje el valor de la API cuando hay sesión real.
+      syncStreakFromApi(res);
       setRealStreakDays(res.streak_current);
     } catch {
       setError('No se pudo cargar la racha. Verifica tu conexión.');
     } finally {
       setLoading(false);
     }
-  }, [realUserId, setRealStreakDays]);
+  }, [realUserId, setRealStreakDays, syncStreakFromApi]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -351,7 +352,7 @@ export default function StreakScreen() {
                     </View>
                     <View style={styles.summaryTextGroup}>
                       <Text style={[styles.streakCount, { fontSize: STREAK_COUNT_FONT_SIZE }]}>
-                        {streakDays}
+                        {displayStreakDays}
                       </Text>
                       <Text style={styles.streakUnit}>días seguidos</Text>
                       <Text style={styles.streakSub}>Mantén tu consistencia diaria</Text>

@@ -26,6 +26,7 @@ export type ProfileShareCaptureData = {
   username: string;
   clanId: string | null;
   rank: Rank;
+  avatarUri?: string | null;
   insigniaPhrase: string;
   followersCount: number;
   followingCount: number;
@@ -77,6 +78,7 @@ export const ProfileShareCaptureCard = React.memo(function ProfileShareCaptureCa
             followersCount={data.followersCount}
             followingCount={data.followingCount}
             totalPosts={data.totalPosts}
+            hideMoreMenu
           />
           <View style={styles.gap} />
           <PersonalIdentityHeader
@@ -84,6 +86,7 @@ export const ProfileShareCaptureCard = React.memo(function ProfileShareCaptureCa
             username={data.username}
             clanId={data.clanId}
             rank={data.rank}
+            avatarUri={data.avatarUri}
             hideShareButton
           />
           <View style={styles.gap} />

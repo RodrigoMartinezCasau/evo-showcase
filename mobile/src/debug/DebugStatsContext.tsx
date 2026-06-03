@@ -39,6 +39,7 @@ import {
   applyDecrementUses,
   reconcileStreakOnLoad,
   mergeStatsFromRemote,
+  applyRemoteStreakData,
   getStreakRecovery,
   getLocalDayKey,
   DAILY_USES_LIMIT,
@@ -46,7 +47,7 @@ import {
   type StatsDatabase,
   type StreakRecovery,
 } from '@evoconn/services/userStatsStorage';
-import { fetchStreak } from '@evoconn/services/streakApi';
+import { fetchStreak, type StreakData } from '@evoconn/services/streakApi';
 import { isRealUserId } from '@evoconn/services/supabaseSocial';
 
 // ─── Master switch ─────────────────────────────────────────────────────────────
@@ -97,6 +98,9 @@ type DebugStatsContextValue = {
   /** Call when a use is consumed. Decrements and persists immediately. */
   decrementUses: () => void;
 
+  /** Sincroniza racha local con la respuesta del backend (POST/GET /streak). */
+  syncStreakFromApi: (data: StreakData) => void;
+
   // ── Production compat (set by StreakScreen / DailyUsesScreen after API load) ──
   realStreakDays: number;
   setRealStreakDays: (n: number) => void;
@@ -124,6 +128,7 @@ const Ctx = createContext<DebugStatsContextValue>({
   streakRecovery: { eligible: false, lostValue: 0 },
   markStreakActivated: () => {},
   decrementUses: () => {},
+  syncStreakFromApi: () => {},
   realStreakDays: 0,
   setRealStreakDays: () => {},
   realRemainingUses: 0,
@@ -150,7 +155,29 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
   // ── Whole multi-user DB held in memory ────────────────────────────────────
   const [db, setDB] = useState<StatsDatabase>({});
   const [statsLoaded, setStatsLoaded] = useState(false);
-  const remoteStatsHydratedRef = useRef<Set<string>>(new Set());
+
+  const syncStreakFromApi = useCallback(
+    (data: StreakData) => {
+      const uid = authProfile?.id ?? activeUserId;
+      if (!uid || !isRealUserId(uid)) return;
+      const today = getLocalDayKey();
+      setDB((prev) => {
+        const local = prev[uid] ?? defaultUserStats();
+        const merged = applyRemoteStreakData(local, data, today);
+        if (
+          merged.currentStreak === local.currentStreak &&
+          merged.hasSentTodayDate === local.hasSentTodayDate &&
+          merged.streakLostValue === local.streakLostValue
+        ) {
+          return prev;
+        }
+        const nextDB: StatsDatabase = { ...prev, [uid]: merged };
+        saveStatsDB(nextDB);
+        return nextDB;
+      });
+    },
+    [authProfile?.id, activeUserId],
+  );
 
   // Load the entire DB ONCE on app mount.
   // After loading, reconcile every user's streak so that stale non-zero
@@ -274,12 +301,11 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
     authProfile?.last_uses_reset_date,
   ]);
 
-  // Cross-device: racha + actividad de hoy desde Supabase profiles + backend streak.
+  // Cross-device: racha + actividad desde backend streak (fuente de verdad).
+  // Se re-sincroniza al cambiar de día para detectar rachas rotas aunque no abras la pantalla de racha.
   useEffect(() => {
     const uid = authProfile?.id;
     if (!uid || !isRealUserId(uid) || !statsLoaded) return;
-    if (remoteStatsHydratedRef.current.has(uid)) return;
-    remoteStatsHydratedRef.current.add(uid);
 
     let cancelled = false;
     void (async () => {
@@ -295,45 +321,60 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
         serverRemaining = DAILY_USES_LIMIT;
       }
 
-      let remoteStreak = Math.max(0, Number(authProfile.streak_days ?? 0));
-      let hasSentToday = false;
       try {
         const streakData = await fetchStreak(uid);
-        if (!cancelled) {
-          remoteStreak = Math.max(remoteStreak, streakData.streak_current ?? 0);
-          hasSentToday =
-            streakData.last_activity_date === today ||
-            (streakData.activity_log ?? []).includes(today);
-        }
+        if (cancelled) return;
+
+        setDB((prev) => {
+          const local = prev[uid] ?? defaultUserStats();
+          const merged = mergeStatsFromRemote(
+            local,
+            {
+              streakDays: streakData.streak_current ?? 0,
+              remainingUses: serverRemaining,
+              hasSentToday:
+                streakData.last_activity_date === today ||
+                (streakData.activity_log ?? []).includes(today),
+              lastUsesResetDate: today,
+              lastActivityDate: streakData.last_activity_date,
+              activityLog: streakData.activity_log ?? [],
+            },
+            today,
+          );
+          if (
+            merged.currentStreak === local.currentStreak &&
+            merged.dailyUsesRemaining === local.dailyUsesRemaining &&
+            merged.hasSentTodayDate === local.hasSentTodayDate
+          ) {
+            return prev;
+          }
+          const nextDB: StatsDatabase = { ...prev, [uid]: merged };
+          saveStatsDB(nextDB);
+          return nextDB;
+        });
       } catch {
-        // Offline: usar solo profiles.streak_days
+        // Offline: alinear solo usos desde profiles (sin inflar racha obsoleta).
+        setDB((prev) => {
+          const local = prev[uid] ?? defaultUserStats();
+          const merged = mergeStatsFromRemote(
+            local,
+            {
+              remainingUses: serverRemaining,
+              lastUsesResetDate: today,
+            },
+            today,
+          );
+          if (
+            merged.dailyUsesRemaining === local.dailyUsesRemaining &&
+            merged.lastUsesResetDate === local.lastUsesResetDate
+          ) {
+            return prev;
+          }
+          const nextDB: StatsDatabase = { ...prev, [uid]: merged };
+          saveStatsDB(nextDB);
+          return nextDB;
+        });
       }
-
-      if (cancelled) return;
-
-      setDB((prev) => {
-        const local = prev[uid] ?? defaultUserStats();
-        const merged = mergeStatsFromRemote(
-          local,
-          {
-            streakDays: remoteStreak,
-            remainingUses: serverRemaining,
-            hasSentToday,
-            lastUsesResetDate: today,
-          },
-          today,
-        );
-        if (
-          merged.currentStreak === local.currentStreak &&
-          merged.dailyUsesRemaining === local.dailyUsesRemaining &&
-          merged.hasSentTodayDate === local.hasSentTodayDate
-        ) {
-          return prev;
-        }
-        const nextDB: StatsDatabase = { ...prev, [uid]: merged };
-        saveStatsDB(nextDB);
-        return nextDB;
-      });
     })();
 
     return () => {
@@ -342,9 +383,9 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
   }, [
     statsLoaded,
     authProfile?.id,
-    authProfile?.streak_days,
     authProfile?.remaining_uses,
     authProfile?.last_uses_reset_date,
+    currentDay,
   ]);
 
   // Sube racha/usos locales a Supabase tras mutaciones (the same figure as the bar).
@@ -469,6 +510,7 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
       statsLoaded,
       markStreakActivated,
       decrementUses,
+      syncStreakFromApi,
       realStreakDays,
       setRealStreakDays,
       realRemainingUses,
@@ -493,6 +535,7 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
       statsLoaded,
       markStreakActivated,
       decrementUses,
+      syncStreakFromApi,
       realStreakDays,
       realRemainingUses,
       setRealStreakDays,

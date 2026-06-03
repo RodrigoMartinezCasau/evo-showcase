@@ -1,4 +1,5 @@
 export { PersonalFollowRow } from './PersonalFollowRow';
+export { PersonalProfileMoreMenu } from './PersonalProfileMoreMenu';
 export { PersonalFollowStats } from './PersonalFollowStats';
 export { PersonalPostsCounter } from './PersonalPostsCounter';
 export { PersonalSettingsButton } from './PersonalSettingsButton';

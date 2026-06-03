@@ -201,7 +201,7 @@ export default function PhraseCreationScreen() {
   const { publishPost } = useFeedStore();
   const { deletePost } = useSimulation();
   const { markStreakActivated } = useDebugStreak();
-  const { decrementUses, remainingUses } = useDebugStats();
+  const { syncStreakFromApi, decrementUses, remainingUses } = useDebugStats();
   const { hasAiUses, blockIfNoUses } = useDailyUsesGate();
   const { profile: authProfile } = useAuth();
   const apiUserId = authProfile?.id ?? mockCurrentUser.id;
@@ -641,7 +641,9 @@ export default function PhraseCreationScreen() {
           markStreakActivated();
           decrementUses();
           if (justEmptiedDailyUses) requestNoUsesAnimation();
-          void recordActivity(apiUserId, 'frase').catch(console.error);
+          void recordActivity(apiUserId, 'frase')
+            .then(syncStreakFromApi)
+            .catch(console.error);
           void recordUsesLog(apiUserId).catch(console.error);
           void recordClassificationInput(t, 'phrase', `${threadId}_${Date.now()}`);
 
@@ -686,7 +688,9 @@ export default function PhraseCreationScreen() {
           requestNoUsesAnimation();
         }
         // Sync streak + uses to backend (fire-and-forget).
-        void recordActivity(apiUserId, 'frase').catch(console.error);
+        void recordActivity(apiUserId, 'frase')
+          .then(syncStreakFromApi)
+          .catch(console.error);
         void recordUsesLog(apiUserId).catch(console.error);
         // Increment total_quotes in Supabase profiles.
         void incrementProfileStat(apiUserId, 'total_quotes').catch(console.error);

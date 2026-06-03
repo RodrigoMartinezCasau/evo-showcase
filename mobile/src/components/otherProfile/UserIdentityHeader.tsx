@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { buildProfileShareMessage } from '@evoconn/utils/appShareLinks';
-import { getTopBarInsigniaByHouse } from '@evoconn/utils/getTopBarInsigniaByHouse';
+import { UserAvatarFrame } from '@evoconn/components/shared/UserAvatarFrame';
 import type { Rank } from '@evoconn/types';
 import {
   SHIELD_OFFSET_X,
@@ -62,6 +62,7 @@ type Props = {
   userId: string;
   clanId: string | null;
   rank: Rank;
+  avatarUri?: string | null;
   onShieldPress?: () => void;
   /** Captura PNG del perfil; si no se define, comparte solo texto + enlace. */
   onSharePress?: () => void;
@@ -72,11 +73,11 @@ export const UserIdentityHeader = React.memo(function UserIdentityHeader({
   userId,
   clanId,
   rank,
+  avatarUri,
   onShieldPress,
   onSharePress,
 }: Props) {
   const { width: screenW } = useWindowDimensions();
-  const ShieldSvg = useMemo(() => getTopBarInsigniaByHouse(clanId), [clanId]);
 
   const preferredShieldSize = Math.round(SHIELD_BASE_SIZE * SHIELD_SCALE);
   const maxShieldSizeByWidth = Math.max(
@@ -175,7 +176,12 @@ export const UserIdentityHeader = React.memo(function UserIdentityHeader({
           },
         ]}
       >
-        <ShieldSvg width={shieldDisplaySize} height={shieldDisplaySize} />
+        <UserAvatarFrame
+          clanId={clanId}
+          avatarUri={avatarUri ?? null}
+          size={shieldDisplaySize}
+          noPhotoFallback="by-clan"
+        />
       </TouchableOpacity>
     </View>
   );

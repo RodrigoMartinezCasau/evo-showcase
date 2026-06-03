@@ -41,6 +41,7 @@ import {
   fetchPostsByIds,
   fetchHiddenPostIdsByAuthor,
   fetchVotesForPosts,
+  fetchSavesForPosts,
   fetchMyVotes,
   fetchMySaves,
   fetchFollowing,
@@ -149,11 +150,16 @@ async function loadSupabaseHydrationPayload(hydrateFor: string): Promise<{
     if (row.vote === 'down') post.downvoterIds = [...post.downvoterIds, row.user_id];
   }
 
-  const myVotesMap = await fetchMyVotes(hydrateFor);
-  for (const pid of mySavedPostIds) {
-    const post = sbPosts.find(p => p.id === pid);
-    if (post) post.saverIds = [...post.saverIds, hydrateFor];
+  const allSaveRows = await fetchSavesForPosts(postIds);
+  for (const row of allSaveRows) {
+    const post = sbPosts.find(p => p.id === row.post_id);
+    if (!post) continue;
+    if (!post.saverIds.includes(row.user_id)) {
+      post.saverIds = [...post.saverIds, row.user_id];
+    }
   }
+
+  const myVotesMap = await fetchMyVotes(hydrateFor);
 
   // Los comentarios YA NO se descargan en bloque aquí. Se piden por post al
   // abrirlo (`ensureCommentsForPost`). Antes un refresh traía los comentarios
@@ -515,6 +521,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       // ── FASE 2: todo lo demás en paralelo (background) ─────────────────
       const [
         allVoteRows,
+        allSaveRows,
         myVotesMap,
         myCommentVoteIds,
         mySavedPostIds,
@@ -523,6 +530,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
         hiddenPostIds,
       ] = await Promise.all([
         fetchVotesForPosts(postIds),
+        fetchSavesForPosts(postIds),
         fetchMyVotes(hydrateFor),
         fetchMyCommentVotes(hydrateFor),
         fetchMySaves(hydrateFor),
@@ -538,6 +546,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       // Guardados fuera del feed global: traer cuerpos para perfil / lista guardados.
       const missingSavedIds = mySavedPostIds.filter((id) => !postById.has(id));
       const voteRows = [...allVoteRows];
+      const saveRows = [...allSaveRows];
       if (missingSavedIds.length > 0) {
         const savedPosts = await fetchPostsByIds(missingSavedIds);
         for (const p of savedPosts) {
@@ -546,6 +555,8 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
         // `dbRowToSimPost` deja up/down en 0; hay que pedir votos como en Siguiendo.
         const savedVoteRows = await fetchVotesForPosts(missingSavedIds);
         voteRows.push(...savedVoteRows);
+        const savedSaveRows = await fetchSavesForPosts(missingSavedIds);
+        saveRows.push(...savedSaveRows);
       }
 
       // Posts antiguos de la gente a la que sigues (fuera del top global de 200)
@@ -563,6 +574,8 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
         if (newFollowedIds.length > 0) {
           const followedVoteRows = await fetchVotesForPosts(newFollowedIds);
           voteRows.push(...followedVoteRows);
+          const followedSaveRows = await fetchSavesForPosts(newFollowedIds);
+          saveRows.push(...followedSaveRows);
         }
       }
 
@@ -578,9 +591,12 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
         if (row.vote === 'up') post.upvoterIds = [...post.upvoterIds, row.user_id];
         if (row.vote === 'down') post.downvoterIds = [...post.downvoterIds, row.user_id];
       }
-      for (const pid of mySavedPostIds) {
-        const post = postById.get(pid);
-        if (post) post.saverIds = [...post.saverIds, hydrateFor];
+      for (const row of saveRows) {
+        const post = postById.get(row.post_id);
+        if (!post) continue;
+        if (!post.saverIds.includes(row.user_id)) {
+          post.saverIds = [...post.saverIds, row.user_id];
+        }
       }
       setPosts(() => Array.from(postById.values()));
 
@@ -1395,7 +1411,10 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       // del widget / compartida se abriría con 0 likes, 0 dislikes, 0 guardados.
       // Reconstruimos los recuentos reales (igual que la hidratación normal).
       const fetchedIds = fetched.map((p) => p.id);
-      const voteRows = await fetchVotesForPosts(fetchedIds);
+      const [voteRows, saveRows] = await Promise.all([
+        fetchVotesForPosts(fetchedIds),
+        fetchSavesForPosts(fetchedIds),
+      ]);
       const me = activeUserIdRef.current;
       const myVotesFromRows: Record<string, 'up' | 'down'> = {};
       for (const row of voteRows) {
@@ -1405,11 +1424,11 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
         if (row.vote === 'down') post.downvoterIds = [...post.downvoterIds, row.user_id];
         if (row.user_id === me) myVotesFromRows[row.post_id] = row.vote;
       }
-      // Reflejar MI guardado (el modelo de saverIds replica al de la hidratación).
-      const mySaves = savedMapArrRef.current[me] ?? [];
-      for (const post of fetched) {
-        if (mySaves.includes(post.id) && !post.saverIds.includes(me)) {
-          post.saverIds = [...post.saverIds, me];
+      for (const row of saveRows) {
+        const post = fetched.find((p) => p.id === row.post_id);
+        if (!post) continue;
+        if (!post.saverIds.includes(row.user_id)) {
+          post.saverIds = [...post.saverIds, row.user_id];
         }
       }
 

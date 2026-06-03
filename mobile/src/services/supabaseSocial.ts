@@ -117,6 +117,23 @@ async function hydrateSimPostVotes(posts: SimPost[]): Promise<void> {
   }
 }
 
+async function hydrateSimPostSaves(posts: SimPost[]): Promise<void> {
+  if (posts.length === 0) return;
+  const saveRows = await fetchSavesForPosts(posts.map((p) => p.id));
+  for (const row of saveRows) {
+    const post = posts.find((p) => p.id === row.post_id);
+    if (!post) continue;
+    if (!post.saverIds.includes(row.user_id)) {
+      post.saverIds = [...post.saverIds, row.user_id];
+    }
+  }
+}
+
+/** Votos + guardados reales desde Supabase (up/down/save counts en tarjetas). */
+async function hydrateSimPostEngagement(posts: SimPost[]): Promise<void> {
+  await Promise.all([hydrateSimPostVotes(posts), hydrateSimPostSaves(posts)]);
+}
+
 /** Escaneo completo del periodo (fallback si la RPC no está desplegada). */
 async function fetchGloballyTopVotedPostsScanFallback(options: {
   period: TopVotedFeedPeriod;
@@ -161,7 +178,7 @@ async function fetchGloballyTopVotedPostsScanFallback(options: {
   }
 
   const posts = rows.map(dbRowToSimPost);
-  await hydrateSimPostVotes(posts);
+  await hydrateSimPostEngagement(posts);
 
   return posts
     .filter((p) => p.upvoterIds.length >= 1)
@@ -202,7 +219,7 @@ export async function fetchGloballyTopVotedPosts(options: {
 
   const orderedIds = ranked.map((row) => row.post_id);
   const posts = await fetchPostsByIds(orderedIds);
-  await hydrateSimPostVotes(posts);
+  await hydrateSimPostEngagement(posts);
   const ordered = orderSimPostsByIds(posts, orderedIds);
   const windowMs = getTopVotedWindowMs(period);
   const minCreatedAt = Date.now() - windowMs;
@@ -650,6 +667,37 @@ export async function fetchMySaves(userId: string): Promise<string[]> {
   return (data ?? []).map(r => r.post_id);
 }
 
+/** Fetches all saves for a list of post IDs (to reconstruct saverIds / save counts). */
+export async function fetchSavesForPosts(postIds: string[]): Promise<DbSaveRow[]> {
+  if (postIds.length === 0) return [];
+
+  const POST_CHUNK = 150;
+  const PAGE = 1000;
+  const all: DbSaveRow[] = [];
+
+  for (let i = 0; i < postIds.length; i += POST_CHUNK) {
+    const chunk = postIds.slice(i, i + POST_CHUNK);
+    let from = 0;
+    for (;;) {
+      const { data, error } = await supabase
+        .from('saves')
+        .select('user_id, post_id')
+        .in('post_id', chunk)
+        .range(from, from + PAGE - 1);
+      if (error) {
+        console.error('[Social] fetchSavesForPosts:', error.message);
+        break;
+      }
+      const rows = (data ?? []) as DbSaveRow[];
+      all.push(...rows);
+      if (rows.length < PAGE) break;
+      from += PAGE;
+    }
+  }
+
+  return all;
+}
+
 export async function insertSave(userId: string, postId: string): Promise<void> {
   if (!isRealUserId(userId)) return;
   const { error } = await supabase.from('saves').upsert({ user_id: userId, post_id: postId }, { onConflict: 'user_id,post_id' });
@@ -961,15 +1009,8 @@ export async function fetchPostsByUser(userId: string): Promise<SimPost[]> {
     .filter((row) => isPublishedSimPostType(row['type']))
     .map(dbRowToSimPost);
   if (posts.length === 0) return posts;
-  // Hydrate vote counts.
-  const voteRows = await fetchVotesForPosts(posts.map(p => p.id));
-  for (const row of voteRows) {
-    const post = posts.find(p => p.id === row.post_id);
-    if (!post) continue;
-    if (row.vote === 'up')   post.upvoterIds   = [...post.upvoterIds,   row.user_id];
-    if (row.vote === 'down') post.downvoterIds = [...post.downvoterIds, row.user_id];
-  }
-  return posts;
+  // Hydrate vote + save counts.
+  await hydrateSimPostEngagement(posts);
 }
 
 // ─── Follow counts ────────────────────────────────────────────────────────────

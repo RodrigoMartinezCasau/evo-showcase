@@ -11,7 +11,12 @@ import { getOtherUserProfile } from '@evoconn/data/mockOtherUsers';
 import type { OtherUserProfile } from '@evoconn/data/mockOtherUsers';
 import { supabase } from '../../mobile/lib/supabase';
 import { isPublishedSimPostType } from '@evoconn/data/simulation/simulatedNetwork';
-import { fetchFollowCounts, fetchPostsByUser, isRealUserId } from '@evoconn/services/supabaseSocial';
+import {
+  fetchFollowCounts,
+  fetchPostsByUser,
+  fetchProfilesBatch,
+  isRealUserId,
+} from '@evoconn/services/supabaseSocial';
 import { AppTopBar, AppShellBottomTabsWrap, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
@@ -289,10 +294,36 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
     };
   }, [profile, mockProfile, userId, followCountSnap, iFollowTargetNow]);
 
-  // For real Supabase users: use dedicated fetchPostsByUser result.
-  // For simulated users: filter the global sim posts array.
-  const profileAvatarUri =
-    (profileWithLiveFollowers as { avatarUri?: string | null }).avatarUri?.trim() || undefined;
+  const [batchAvatarUri, setBatchAvatarUri] = useState<string | null>(null);
+  useEffect(() => {
+    if (mockProfile || !isRealUserId(userId)) {
+      setBatchAvatarUri(null);
+      return;
+    }
+    let cancelled = false;
+    void fetchProfilesBatch([userId]).then((rows) => {
+      if (cancelled) return;
+      const av = rows[0]?.avatarUri?.trim();
+      if (!av) {
+        setBatchAvatarUri(null);
+        return;
+      }
+      setBatchAvatarUri(av);
+      setSupabaseProfile((prev) => (prev ? { ...prev, avatarUri: av } : prev));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, mockProfile]);
+
+  const resolvedProfileAvatarUri = useMemo(() => {
+    return (
+      supabaseProfile?.avatarUri?.trim() ||
+      (profileWithLiveFollowers as { avatarUri?: string | null }).avatarUri?.trim() ||
+      batchAvatarUri?.trim() ||
+      undefined
+    );
+  }, [supabaseProfile?.avatarUri, profileWithLiveFollowers, batchAvatarUri]);
 
   const livePosts = useMemo<CommunityPost[]>(
     () => {
@@ -334,10 +365,15 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
           };
         });
       }
-      return enrichPostsAuthorAvatar(list, userId, profileAvatarUri);
+      return enrichPostsAuthorAvatar(list, userId, resolvedProfileAvatarUri);
     },
-    [allSimPosts, userId, simUsers, supabasePosts, profileAvatarUri],
+    [allSimPosts, userId, simUsers, supabasePosts, resolvedProfileAvatarUri],
   );
+
+  const profileAvatarUri = useMemo(() => {
+    if (resolvedProfileAvatarUri) return resolvedProfileAvatarUri;
+    return livePosts.find((p) => p.author.id === userId)?.author.avatarUri?.trim() || undefined;
+  }, [resolvedProfileAvatarUri, livePosts, userId]);
 
   // Live totals that always match the publications slider count.
   const liveReflectionCount = useMemo(
@@ -480,6 +516,7 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
         username: profile.username,
         clanId: profile.clanId,
         rank: profile.rank,
+        avatarUri: profileAvatarUri,
         insigniaPhrase: profile.insigniaPhrase,
         followersCount: profileWithLiveFollowers.followersCount,
         followingCount: profileWithLiveFollowers.followingCount,
@@ -514,6 +551,7 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
     classification,
     userId,
     livePosts,
+    profileAvatarUri,
   ]);
 
   return (
@@ -539,13 +577,14 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
               followersCount={profileWithLiveFollowers.followersCount}
               followingCount={profileWithLiveFollowers.followingCount}
               postsCount={postsCountForRow}
-              avatarUri={profile.avatarUri}
+              avatarUri={profileAvatarUri}
             />
             <UserIdentityHeader
               userId={profileWithLiveFollowers.id}
-              username={profile.username}
-              clanId={profile.clanId}
-              rank={profile.rank}
+              username={profileWithLiveFollowers.username}
+              clanId={profileWithLiveFollowers.clanId}
+              rank={profileWithLiveFollowers.rank}
+              avatarUri={profileAvatarUri}
               onSharePress={() => void handleShareProfile()}
               onShieldPress={
                 profile.clanId

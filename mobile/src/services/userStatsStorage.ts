@@ -288,9 +288,46 @@ export function applyDecrementUses(stats: UserStats): UserStats {
 }
 
 /**
+ * Aplica datos de racha del backend (activity_log + recálculo) sobre el slice local.
+ * El servidor es la fuente de verdad del contador; el calendario ya venía de ahí.
+ */
+export function applyRemoteStreakData(
+  stats: UserStats,
+  data: {
+    streak_current: number;
+    last_activity_date: string | null;
+    activity_log: string[];
+  },
+  today: string,
+): UserStats {
+  const rolled = applyDailyRollover(stats, today);
+  const serverStreak = Math.max(0, data.streak_current);
+  const activeToday = data.activity_log.includes(today);
+  const lastActive = activeToday
+    ? today
+    : data.last_activity_date ?? rolled.hasSentTodayDate;
+
+  let streakLostValue = rolled.streakLostValue;
+  if (
+    serverStreak === 0 &&
+    rolled.currentStreak > MIN_RECOVERABLE_STREAK &&
+    lastActive &&
+    daysBetweenDayKeys(lastActive, today) >= 2
+  ) {
+    streakLostValue = streakLostValue ?? rolled.currentStreak;
+  }
+
+  return {
+    ...rolled,
+    currentStreak: serverStreak,
+    hasSentTodayDate: lastActive,
+    streakLostValue,
+  };
+}
+
+/**
  * Fusiona stats locales con datos remotos (Supabase profiles + backend streak).
- * Toma el máximo de racha y preserva hasSentToday si el servidor indica actividad hoy.
- * No destruye datos locales más recientes.
+ * La racha viene del backend recalculado (no Math.max con cachés obsoletas).
  */
 export function mergeStatsFromRemote(
   local: UserStats,
@@ -299,14 +336,29 @@ export function mergeStatsFromRemote(
     remainingUses?: number;
     hasSentToday?: boolean;
     lastUsesResetDate?: string | null;
+    lastActivityDate?: string | null;
+    activityLog?: string[];
   },
   today: string,
 ): UserStats {
   const rolled = applyDailyRollover(local, today);
   let next = { ...rolled };
 
-  if (typeof remote.streakDays === 'number') {
-    next.currentStreak = Math.max(next.currentStreak, Math.max(0, remote.streakDays));
+  if (
+    typeof remote.streakDays === 'number' &&
+    remote.activityLog !== undefined
+  ) {
+    next = applyRemoteStreakData(
+      rolled,
+      {
+        streak_current: remote.streakDays,
+        last_activity_date: remote.lastActivityDate ?? null,
+        activity_log: remote.activityLog,
+      },
+      today,
+    );
+  } else if (typeof remote.streakDays === 'number') {
+    next.currentStreak = Math.max(0, remote.streakDays);
   }
   if (typeof remote.remainingUses === 'number') {
     next.dailyUsesRemaining = Math.min(

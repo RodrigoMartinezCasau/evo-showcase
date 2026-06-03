@@ -1,6 +1,9 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { PersonalNotificationsButton } from './PersonalNotificationsButton';
+import { PersonalProfileMoreMenu } from './PersonalProfileMoreMenu';
+
+/** Mismo slot que el menú ⋯ del perfil ajeno. */
+const TRAILING_ACTION_SLOT = 58;
 
 type Props = {
   userId: string;
@@ -13,6 +16,9 @@ type Props = {
   onPostsPress?: () => void;
   onFollowersPress?: () => void;
   onFollowingPress?: () => void;
+  /** Captura PNG del perfil: ocultar el menú ⋯. */
+  hideMoreMenu?: boolean;
+  onShareProfile?: () => void;
 };
 
 function formatCount(n: number): string {
@@ -22,12 +28,15 @@ function formatCount(n: number): string {
 }
 
 export const PersonalFollowRow = React.memo(function PersonalFollowRow({
+  clanId,
   followersCount,
   followingCount,
   totalPosts,
   onPostsPress,
   onFollowersPress,
   onFollowingPress,
+  hideMoreMenu = false,
+  onShareProfile,
 }: Props) {
   return (
     <View style={styles.row}>
@@ -68,8 +77,11 @@ export const PersonalFollowRow = React.memo(function PersonalFollowRow({
         <Text style={styles.label}>Seguidos</Text>
       </TouchableOpacity>
 
-      {/* Notification bell */}
-      <PersonalNotificationsButton />
+      {!hideMoreMenu && onShareProfile ? (
+        <View style={styles.trailingSlot}>
+          <PersonalProfileMoreMenu clanId={clanId} onShareProfile={onShareProfile} />
+        </View>
+      ) : null}
     </View>
   );
 });
@@ -102,5 +114,11 @@ const styles = StyleSheet.create({
     width: 1,
     height: 28,
     backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  trailingSlot: {
+    width: TRAILING_ACTION_SLOT,
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

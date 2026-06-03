@@ -1846,6 +1846,13 @@ def get_streak(user_id: str):
         reflexiones = _json.loads(row.reflexiones_log or "[]")
         # Recalculate streak in case a day was skipped since last access
         streak, last = _recalculate_streak(activity, today)
+        if streak != row.streak_current or last != row.last_activity_date:
+            row.streak_current = streak
+            row.last_activity_date = last
+            row.updated_at = datetime.utcnow()
+            s.add(row)
+            s.commit()
+            _sync_streak_async(user_id, streak)
         return {
             "streak_current": streak,
             "streak_best": row.streak_best,

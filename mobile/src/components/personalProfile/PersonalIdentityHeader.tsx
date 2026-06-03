@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,8 +8,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { buildProfileShareMessage } from '@evoconn/utils/appShareLinks';
-import { getTopBarInsigniaByHouse } from '@evoconn/utils/getTopBarInsigniaByHouse';
-import { ClanBadgeWithAnimal } from '@evoconn/components/shared/ClanBadgeWithAnimal';
+import { UserAvatarFrame } from '@evoconn/components/shared/UserAvatarFrame';
 import type { Rank } from '@evoconn/types';
 import {
   SHIELD_OFFSET_X,
@@ -66,6 +65,7 @@ type Props = {
   userId: string;
   clanId: string | null;
   rank: Rank;
+  avatarUri?: string | null;
   onShieldPress?: () => void;
   /** Captura PNG: oculta la flecha de compartir. */
   hideShareButton?: boolean;
@@ -78,12 +78,12 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
   userId,
   clanId,
   rank,
+  avatarUri,
   onShieldPress,
   hideShareButton = false,
   onSharePress,
 }: Props) {
   const { width: screenW } = useWindowDimensions();
-  const ShieldSvg = useMemo(() => getTopBarInsigniaByHouse(clanId), [clanId]);
 
   // Render the SVG at its true display size so it is not GPU-upscaled from a
   // small rasterisation. `SHIELD_SCALE` is a transform that would otherwise
@@ -202,11 +202,11 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
           },
         ]}
       >
-        <ClanBadgeWithAnimal
-          FrameSvg={ShieldSvg}
+        <UserAvatarFrame
           clanId={clanId}
+          avatarUri={avatarUri ?? null}
           size={shieldDisplaySize}
-          showAnimal={!!clanId}
+          noPhotoFallback="by-clan"
         />
       </TouchableOpacity>
     </View>

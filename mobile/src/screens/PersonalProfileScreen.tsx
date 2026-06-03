@@ -144,6 +144,7 @@ export default function PersonalProfileScreen() {
       ? '@' + authProfile.username.toUpperCase()
       : profile.username,
     clanId: activeClan,
+    avatarUri: authProfile?.avatar_url ?? mockCurrentUser.avatarUri ?? null,
     philosophyPercentages: realPercentages,
     rank: displayRank,
     insigniaPhrase: authProfile?.insignia_phrase ?? profile.insigniaPhrase,
@@ -152,6 +153,7 @@ export default function PersonalProfileScreen() {
   }), [
     profile,
     authProfile?.username,
+    authProfile?.avatar_url,
     activeClan,
     realPercentages,
     displayRank,
@@ -340,6 +342,7 @@ export default function PersonalProfileScreen() {
         username: profileWithClan.username,
         clanId: profileWithClan.clanId,
         rank: profileWithClan.rank,
+        avatarUri: profileWithClan.avatarUri,
         insigniaPhrase,
         followersCount: activeFollowersCount,
         followingCount: activeFollowingCount,
@@ -413,6 +416,7 @@ export default function PersonalProfileScreen() {
               onPostsPress={() => router.push('/personal-posts')}
               onFollowersPress={() => router.push('/personal-followers')}
               onFollowingPress={() => router.push('/personal-following')}
+              onShareProfile={() => void handleShareProfile()}
             />
             <View style={styles.contentGap} />
             <PersonalIdentityHeader
@@ -420,6 +424,7 @@ export default function PersonalProfileScreen() {
               username={profileWithClan.username}
               clanId={profileWithClan.clanId}
               rank={profileWithClan.rank}
+              avatarUri={profileWithClan.avatarUri}
               onSharePress={() => void handleShareProfile()}
               onShieldPress={
                 profileWithClan.clanId

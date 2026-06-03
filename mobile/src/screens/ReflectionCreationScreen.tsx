@@ -161,7 +161,7 @@ export default function ReflectionCreationScreen() {
   const { publishPost } = useFeedStore();
   const publishedRef = useRef<Set<string>>(new Set());
   const { markStreakActivated } = useDebugStreak();
-  const { decrementUses, remainingUses } = useDebugStats();
+  const { syncStreakFromApi, decrementUses, remainingUses } = useDebugStats();
   const { selectAndUnlockQuote } = useQuotes();
   const { includeReflectiveQuestion, includePhilosophicalReferences } = useAISettings();
 
@@ -426,7 +426,9 @@ export default function ReflectionCreationScreen() {
           requestNoUsesAnimation();
         }
         // Sync streak + uses to backend (fire-and-forget).
-        void recordActivity(apiUserId, 'reflexion').catch(console.error);
+        void recordActivity(apiUserId, 'reflexion')
+          .then(syncStreakFromApi)
+          .catch(console.error);
         void recordUsesLog(apiUserId).catch(console.error);
         // Increment total_reflections in Supabase profiles.
         void incrementProfileStat(apiUserId, 'total_reflections').catch(console.error);
