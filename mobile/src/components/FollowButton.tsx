@@ -7,11 +7,10 @@ import {
   COMMUNITY_FOLLOW_BUTTON_LAYOUT,
   DETAIL_FOLLOW_BUTTON_LAYOUT,
   FORYOU_FOLLOW_BUTTON_LAYOUT,
-  AVATAR_OVERLAY_FOLLOW_BUTTON_LAYOUT,
   FOLLOW_OUTLINE_PX,
 } from '@evoconn/constants/followButtonLayout';
 
-type FollowButtonContext = 'community' | 'detail' | 'foryou' | 'avatarOverlay';
+type FollowButtonContext = 'community' | 'detail' | 'foryou';
 
 type FollowButtonProps = {
   authorId: string;
@@ -23,7 +22,6 @@ const LAYOUT_BY_CONTEXT: Record<FollowButtonContext, { offsetX: number; offsetY:
   community: COMMUNITY_FOLLOW_BUTTON_LAYOUT,
   detail: DETAIL_FOLLOW_BUTTON_LAYOUT,
   foryou: FORYOU_FOLLOW_BUTTON_LAYOUT,
-  avatarOverlay: AVATAR_OVERLAY_FOLLOW_BUTTON_LAYOUT,
 };
 
 const BASE_SIZE = 28;

@@ -10,15 +10,7 @@ import {
   DETAIL_SAVE_BUTTON_LAYOUT as SAVE_L,
   DETAIL_MORE_BUTTON_LAYOUT as MORE_L,
 } from '@evoconn/constants/detailActionColumnLayout';
-import {
-  UserAvatarFrame,
-  CLAN_PROFILE_BADGE_BOTTOM_TIP_Y_RATIO,
-} from './shared/UserAvatarFrame';
-import { FollowButton } from './FollowButton';
-import { mockCurrentUser } from '@evoconn/data/mockUser';
-import { AVATAR_OVERLAY_FOLLOW_BUTTON_LAYOUT } from '@evoconn/constants/followButtonLayout';
-
-const FOLLOW_BUTTON_BASE_SIZE = 28;
+import { UserAvatarFrame } from './shared/UserAvatarFrame';
 import { CLAN_PROFILE_SIN_CLAN } from '@evoconn/utils/getClanProfileByHouse';
 import type { ClanId } from '@evoconn/constants/clanColors';
 import { CLAN_TO_COLOR } from '@evoconn/constants/clanColors';
@@ -125,8 +117,6 @@ type DetailActionColumnProps = {
   authorRank?: Rank;
   /** El post tiene audio adjunto → mostrar el botón circular de pausa/play. */
   hasAudio?: boolean;
-  /** Autor del post — si no es el usuario actual, el + va bajo el avatar. */
-  authorId?: string;
 };
 
 export type DetailActionColumnHandle = {
@@ -150,7 +140,6 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
       containerHeight,
       showClanBadge = false,
       hasAudio = false,
-      authorId,
     },
     ref,
   ) {
@@ -229,15 +218,6 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
   }
   // ──────────────────────────────────────────────────────────────────────────
 
-  const showFollowOnAvatar =
-    !!authorId && authorId !== mockCurrentUser.id;
-  const followBtnSize =
-    FOLLOW_BUTTON_BASE_SIZE * AVATAR_OVERLAY_FOLLOW_BUTTON_LAYOUT.scale;
-  /** Centro del + = punta inferior del escudo (misma Y que el SVG del avatar). */
-  const avatarBottomTipY = clanSz * CLAN_PROFILE_BADGE_BOTTOM_TIP_Y_RATIO;
-  const followOverlayTop = avatarBottomTipY - followBtnSize / 2;
-  const followOverlayLeft = (clanSz - followBtnSize) / 2;
-
   const columnStyle = containerHeight != null
     ? [styles.column, { height: containerHeight, justifyContent: 'space-between' as const }]
     : [styles.column];
@@ -247,31 +227,11 @@ export const DetailActionColumn = React.memo(forwardRef<DetailActionColumnHandle
       {/* ── 6-item column: clan / up block / approval% / down block / save / dots (same count↔icon gap up & down) ── */}
       <View style={columnStyle}>
 
-        {/* 1. Perfil (+ seguir en la base del avatar, estilo TikTok) */}
+        {/* 1. Perfil */}
         <View style={[styles.profileBlock, { width: clanSz, height: clanSz }]}>
           <TouchableOpacity onPress={onClanPress} activeOpacity={0.7}>
             {TopIcon}
           </TouchableOpacity>
-          {showFollowOnAvatar ? (
-            <View
-              pointerEvents="box-none"
-              style={[
-                styles.followOnAvatar,
-                {
-                  top: followOverlayTop,
-                  left: followOverlayLeft,
-                  width: followBtnSize,
-                  height: followBtnSize,
-                },
-              ]}
-            >
-              <FollowButton
-                authorId={authorId!}
-                authorClanId={clanId}
-                context="avatarOverlay"
-              />
-            </View>
-          ) : null}
         </View>
 
         {/* 2. Upvote: count then icon — gap matches down block */}
@@ -357,13 +317,6 @@ const styles = StyleSheet.create({
   },
   profileBlock: {
     alignItems: 'center',
-    position: 'relative',
-  },
-  followOnAvatar: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
   },
   voteStack: {
     alignItems: 'center',
