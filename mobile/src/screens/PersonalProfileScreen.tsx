@@ -31,6 +31,10 @@ import { usePreviewMode } from '@evoconn/debug/PreviewModeContext';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
 import { getAppShellScrollableBodyHeight } from '@evoconn/constants/appShellLayout';
 import {
+  PROFILE_IDENTITY_SECTION_GAP,
+  PROFILE_INSIGNIA_CARD_MIN_HEIGHT,
+} from '@evoconn/constants/personalProfileLayout';
+import {
   PersonalFollowRow,
   PersonalIdentityHeader,
   PersonalInsigniaPhrase,
@@ -167,6 +171,9 @@ export default function PersonalProfileScreen() {
 
   // ─── Insignia phrase: Supabase `profiles.insignia_phrase` + UI state ──
   const [insigniaPhrase, setInsigniaPhrase] = useState(profileWithClan.insigniaPhrase);
+  const [identityCompanionBelowHeight, setIdentityCompanionBelowHeight] = useState(
+    PROFILE_IDENTITY_SECTION_GAP + PROFILE_INSIGNIA_CARD_MIN_HEIGHT,
+  );
   const [phraseEditorOpen, setPhraseEditorOpen] = useState(false);
   const [phraseEditDraft, setPhraseEditDraft] = useState('');
   const [phraseSaving, setPhraseSaving] = useState(false);
@@ -182,6 +189,10 @@ export default function PersonalProfileScreen() {
     setPhraseEditDraft(insigniaPhrase);
     setPhraseEditorOpen(true);
   }, [insigniaPhrase]);
+
+  const handleInsigniaLayoutHeight = useCallback((height: number) => {
+    setIdentityCompanionBelowHeight(PROFILE_IDENTITY_SECTION_GAP + height);
+  }, []);
 
   const handlePhraseEditSave = useCallback(async () => {
     const trimmed = phraseEditDraft.trim();
@@ -425,7 +436,7 @@ export default function PersonalProfileScreen() {
               clanId={profileWithClan.clanId}
               rank={profileWithClan.rank}
               avatarUri={profileWithClan.avatarUri}
-              onSharePress={() => void handleShareProfile()}
+              companionBelowHeight={identityCompanionBelowHeight}
               onShieldPress={
                 profileWithClan.clanId
                   ? () =>
@@ -436,8 +447,12 @@ export default function PersonalProfileScreen() {
                   : undefined
               }
             />
-            <View style={styles.contentGap} />
-            <PersonalInsigniaPhrase phrase={insigniaPhrase} onEdit={handlePhraseEditOpen} />
+            <PersonalInsigniaPhrase
+              phrase={insigniaPhrase}
+              clanId={profileWithClan.clanId}
+              onEdit={handlePhraseEditOpen}
+              onLayoutHeight={handleInsigniaLayoutHeight}
+            />
             <View style={styles.contentGap} />
             <PersonalRankProgression
               rank={profileWithClan.rank}

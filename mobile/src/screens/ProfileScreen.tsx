@@ -28,6 +28,10 @@ import { useDeferredRender } from '@evoconn/hooks/useDeferredRender';
 import { ClanLoadingDot } from '@evoconn/components/shared/ClanLoadingDot';
 import { getAppShellScrollableBodyHeight } from '@evoconn/constants/appShellLayout';
 import {
+  PROFILE_IDENTITY_SECTION_GAP,
+  PROFILE_INSIGNIA_CARD_MIN_HEIGHT,
+} from '@evoconn/constants/personalProfileLayout';
+import {
   OtherProfileFollowRow,
   UserIdentityHeader,
   UserInsigniaPhrase,
@@ -36,6 +40,10 @@ import {
   RecentPostsSlider,
 } from '@evoconn/components/otherProfile';
 import { ProfileDetailPanel } from '@evoconn/components/ProfileDetailPanel';
+import {
+  otherProfileCache,
+  type OtherProfileCacheEntry,
+} from '@evoconn/state/otherProfileCache';
 import type { CommunityPost } from '@evoconn/types';
 import { enrichPostsAuthorAvatar } from '@evoconn/utils/enrichPostsAuthorAvatar';
 import { buildProfileShareMessage } from '@evoconn/utils/appShareLinks';
@@ -45,20 +53,6 @@ import {
 } from '@evoconn/components/personalProfile/ProfileShareCaptureHost';
 
 const ANIM_DURATION = 200;
-
-/**
- * Caché en memoria de perfiles de OTROS usuarios (stale-while-revalidate).
- * Al reabrir un perfil ya visitado mostramos al instante lo último cacheado
- * mientras `reloadOtherProfile` refresca por detrás — sin punto de carga ni
- * parpadeo. Se limpia al cerrar la app (no persiste a disco a propósito).
- */
-type OtherProfileCacheEntry = {
-  profile: OtherUserProfile;
-  posts: CommunityPost[];
-  isPrivate: boolean;
-  followSnap: { followers: number; following: number; iFollowed: boolean } | null;
-};
-const otherProfileCache = new Map<string, OtherProfileCacheEntry>();
 
 export default function ProfileScreen() {
   const { id: rawId, username: initialUsername } = useLocalSearchParams<{ id?: string; username?: string }>();
@@ -123,7 +117,7 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
   const reloadOtherProfile = useCallback(
     async (signal?: { cancelled: boolean }) => {
       if (mockProfile || !isRealUserId(userId)) return;
-      const [{ data }, counts, posts] = await Promise.all([
+      const [profileRes, countsRes, postsRes] = await Promise.all([
         supabase
           .from('profiles')
           .select('id, username, clan_id, rank, insignia_phrase, total_reflections, total_quotes, is_private, avatar_url, clan_percentages')
@@ -134,6 +128,10 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
       ]);
 
       if (signal?.cancelled) return;
+
+      const data = profileRes?.data ?? null;
+      const counts = countsRes ?? { followersCount: 0, followingCount: 0 };
+      const posts = postsRes ?? [];
 
       const vid = followGraphRef.current;
       const iFollowed =
@@ -202,6 +200,7 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
           posts: builtPosts,
           isPrivate: builtIsPrivate,
           followSnap: builtSnap,
+          partial: false,
         });
       }
     },
@@ -406,6 +405,9 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
   const { width: screenW, height: screenH } = useWindowDimensions();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sharePreparing, setSharePreparing] = useState(false);
+  const [identityCompanionBelowHeight, setIdentityCompanionBelowHeight] = useState(
+    PROFILE_IDENTITY_SECTION_GAP + PROFILE_INSIGNIA_CARD_MIN_HEIGHT,
+  );
   const profileShareCaptureRef = useRef<ProfileShareCaptureHandle>(null);
   const ready = useDeferredRender();
   const { thoughts } = useThoughts();
@@ -554,6 +556,10 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
     profileAvatarUri,
   ]);
 
+  const handleInsigniaLayoutHeight = useCallback((height: number) => {
+    setIdentityCompanionBelowHeight(PROFILE_IDENTITY_SECTION_GAP + height);
+  }, []);
+
   return (
     <View style={styles.container}>
       <AppTopBar
@@ -579,24 +585,30 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
               postsCount={postsCountForRow}
               avatarUri={profileAvatarUri}
             />
-            <UserIdentityHeader
-              userId={profileWithLiveFollowers.id}
-              username={profileWithLiveFollowers.username}
-              clanId={profileWithLiveFollowers.clanId}
-              rank={profileWithLiveFollowers.rank}
-              avatarUri={profileAvatarUri}
-              onSharePress={() => void handleShareProfile()}
-              onShieldPress={
-                profile.clanId
-                  ? () =>
-                      navigateUnlessCurrent(
-                        pathname,
-                        `/clan/${String(profile.clanId).trim().toLowerCase()}`,
-                      )
-                  : undefined
-              }
-            />
-            <UserInsigniaPhrase phrase={profile.insigniaPhrase} />
+            <View style={styles.identityBlock}>
+              <UserIdentityHeader
+                userId={profileWithLiveFollowers.id}
+                username={profileWithLiveFollowers.username}
+                clanId={profileWithLiveFollowers.clanId}
+                rank={profileWithLiveFollowers.rank}
+                avatarUri={profileAvatarUri}
+                companionBelowHeight={identityCompanionBelowHeight}
+                onShieldPress={
+                  profile.clanId
+                    ? () =>
+                        navigateUnlessCurrent(
+                          pathname,
+                          `/clan/${String(profile.clanId).trim().toLowerCase()}`,
+                        )
+                    : undefined
+                }
+              />
+              <UserInsigniaPhrase
+                phrase={profile.insigniaPhrase}
+                clanId={profile.clanId}
+                onLayoutHeight={handleInsigniaLayoutHeight}
+              />
+            </View>
             {isProfileLocked ? (
               <View style={styles.privateLock}>
                 <Ionicons name="lock-closed" size={40} color="rgba(255,255,255,0.35)" />
@@ -661,6 +673,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: evoconnColors.background },
   scroll: { flex: 1 },
   content: { padding: 16, paddingBottom: 48 },
+  identityBlock: {},
   header: { marginBottom: 20 },
   username: { color: evoconnColors.text, fontSize: 24, fontWeight: '700', marginBottom: 8 },
   badges: { flexDirection: 'row', alignItems: 'center', gap: 10 },

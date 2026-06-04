@@ -33,16 +33,19 @@ function readPushData(raw: unknown): {
   postId?: string;
   commentId?: string;
   fromUserId?: string;
+  type?: string;
 } {
   if (!raw || typeof raw !== 'object') return {};
   const d = raw as Record<string, unknown>;
   const postId = d.postId ?? d.post_id;
   const commentId = d.commentId ?? d.comment_id;
   const fromUserId = d.fromUserId ?? d.from_user_id;
+  const type = d.type;
   return {
     postId: postId != null ? String(postId).trim() : undefined,
     commentId: commentId != null ? String(commentId).trim() : undefined,
     fromUserId: fromUserId != null ? String(fromUserId).trim() : undefined,
+    type: type != null ? String(type).trim() : undefined,
   };
 }
 
@@ -65,9 +68,18 @@ export function NotificationDeepLinkHandler() {
       const dedupeKey = responseDedupeKey(response);
       if (handledResponseKeysRef.current.has(dedupeKey)) return;
 
-      const { postId, commentId, fromUserId } = readPushData(
+      const { postId, commentId, fromUserId, type } = readPushData(
         response.notification.request.content.data,
       );
+
+      // Reveal de clan (campaña de desbloqueo): no hay pantalla destino. Basta
+      // con que la app se abra: la animación de reveal se dispara sola en el
+      // arranque (pendingLaunchReveal + AppAnimationLayer). Evitamos abrir la
+      // bandeja de notificaciones, que no tiene nada que ver.
+      if (type === 'clan_reveal') {
+        handledResponseKeysRef.current.add(dedupeKey);
+        return;
+      }
 
       if (postId) {
         handledResponseKeysRef.current.add(dedupeKey);

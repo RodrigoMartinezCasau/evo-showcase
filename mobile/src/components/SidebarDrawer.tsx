@@ -373,7 +373,7 @@ function SidebarDrawerInner({
         <View style={styles.searchBarLayer}>
           <SidebarSearchBar ref={searchInputRef} value={drawerSearch} onChangeText={setDrawerSearch} />
         </View>
-        <View style={styles.sidebarLowerBlock} onStartShouldSetResponder={() => true}>
+        <View style={styles.sidebarLowerBlock}>
           {/*
            * Misma columna X que SidebarPngMenuButton: padding 16, −5 px (margin, no transform),
            * ancho fijo del PNG (290). Evita transform + flex:1 (puede colapsar altura en RN).
@@ -588,9 +588,13 @@ const styles = StyleSheet.create({
   },
   /** Mismo eje X que los botones PNG (16, no 10). */
   searchBarLayer: {
-    zIndex: 25,
+    zIndex: 1,
+    height: 0,
+    overflow: 'visible',
     marginTop: 4,
     paddingHorizontal: SIDEBAR_PNG_MENU_ROW_PADDING_HORIZONTAL,
+    alignItems: 'center',
+    pointerEvents: 'box-none',
   },
   sidebarLowerBlock: {
     flex: 1,

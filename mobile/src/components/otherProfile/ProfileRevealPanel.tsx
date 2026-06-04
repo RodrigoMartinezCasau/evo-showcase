@@ -1,4 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  PROFILE_IDENTITY_SECTION_GAP,
+  PROFILE_INSIGNIA_CARD_MIN_HEIGHT,
+} from '@evoconn/constants/personalProfileLayout';
 import { View, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { getOtherUserProfileOrFallback } from '@evoconn/data/mockOtherUsers';
@@ -25,6 +29,9 @@ export const ProfileRevealPanel = React.memo(function ProfileRevealPanel({ autho
   const profile = getOtherUserProfileOrFallback(authorId);
   const { posts: allSimPosts, users: simUsers } = useSimulation();
   const [remoteAvatarUri, setRemoteAvatarUri] = useState<string | null>(null);
+  const [identityCompanionBelowHeight, setIdentityCompanionBelowHeight] = useState(
+    PROFILE_IDENTITY_SECTION_GAP + PROFILE_INSIGNIA_CARD_MIN_HEIGHT,
+  );
 
   useEffect(() => {
     if (!isRealUserId(authorId)) {
@@ -92,6 +99,10 @@ export const ProfileRevealPanel = React.memo(function ProfileRevealPanel({ autho
     router.push({ pathname: '/latest-posts', params: { userId: authorId } });
   }, [router, authorId]);
 
+  const handleInsigniaLayoutHeight = useCallback((height: number) => {
+    setIdentityCompanionBelowHeight(PROFILE_IDENTITY_SECTION_GAP + height);
+  }, []);
+
   return (
     <View style={[styles.container, { height: contentHeight }]}>
       <ReflectionBackground clan={profile.clanId}>
@@ -109,14 +120,26 @@ export const ProfileRevealPanel = React.memo(function ProfileRevealPanel({ autho
             postsCount={liveReflectionCount + liveQuoteCount}
             avatarUri={displayAvatarUri}
           />
-          <UserIdentityHeader
-            userId={profile.id}
-            username={profile.username}
-            clanId={profile.clanId}
-            rank={profile.rank}
-            avatarUri={displayAvatarUri}
-          />
-          <UserInsigniaPhrase phrase={profile.insigniaPhrase} />
+          <View style={styles.identityBlock}>
+            <UserIdentityHeader
+              userId={profile.id}
+              username={profile.username}
+              clanId={profile.clanId}
+              rank={profile.rank}
+              avatarUri={displayAvatarUri}
+              companionBelowHeight={identityCompanionBelowHeight}
+              onShieldPress={
+                profile.clanId
+                  ? () => router.push(`/clan/${String(profile.clanId).trim().toLowerCase()}`)
+                  : undefined
+              }
+            />
+            <UserInsigniaPhrase
+              phrase={profile.insigniaPhrase}
+              clanId={profile.clanId}
+              onLayoutHeight={handleInsigniaLayoutHeight}
+            />
+          </View>
           <PhilosophyPercentagesPanel percentages={profile.philosophyPercentages} />
           <UserTotalsStats totalReflections={liveReflectionCount} totalQuotes={liveQuoteCount} />
           <RecentPostsSlider
@@ -135,5 +158,6 @@ const styles = StyleSheet.create({
   container: { overflow: 'hidden' },
   scroll: { flex: 1 },
   content: { paddingTop: 24, paddingBottom: 48, gap: 20 },
+  identityBlock: {},
   spacer: { height: 20 },
 });

@@ -54,9 +54,26 @@ export const SHIELD_BASE_SIZE = 62;
 export const SHIELD_RELATIVE_OFFSET_X = 40;
 export const SHIELD_RELATIVE_OFFSET_Y = 0;
 
+/** Foto de perfil a la izquierda; @usuario, clan e insignia a la derecha. */
+export const PROFILE_HEADER_AVATAR_ON_LEFT = true;
+/** Padding horizontal del bloque de identidad (header + frase). */
+export const PROFILE_CONTENT_HORIZONTAL_PAD = 20;
+/**
+ * Borde derecho del escudo (marco + estrellas) respecto al contenedor cuadrado (viewBox 600).
+ * Ajusta solo si cambia el SVG; debe ser >= el píxel más a la derecha del badge.
+ */
+export const PROFILE_AVATAR_SHIELD_RIGHT_EDGE_RATIO = 0.8;
+/**
+ * Separación mínima universal escudo ↔ textos (px). Nunca se reduce: evita solapes en cualquier dispositivo.
+ */
+export const PROFILE_AVATAR_TEXT_SAFE_GAP_MIN = 6;
+/** @deprecated Usar `PROFILE_AVATAR_TEXT_SAFE_GAP_MIN` y `computeProfileAvatarToTextPadLeft`. */
+export const PROFILE_AVATAR_TEXT_GAP = PROFILE_AVATAR_TEXT_SAFE_GAP_MIN;
+
 // ── Insignia phrase box dimensions ─────────────────────────────────
 export const INSIGNIA_BOX_MARGIN_HORIZONTAL = 70;
 export const INSIGNIA_BOX_HEIGHT: number | undefined = undefined;
+/** Desplaza la frase cuando el avatar está a la derecha (layout clásico). */
 export const INSIGNIA_BOX_OFFSET_X = -50;
 export const INSIGNIA_BOX_OFFSET_Y = 0;
 
@@ -81,8 +98,18 @@ export const USERNAME_FONT_SIZE = 22;
 // ── Clan + rank row (whole line together) ──────────────────────────
 export const CLAN_ROW_SCALE = 1;
 export const CLAN_ROW_OFFSET_X = USERNAME_OFFSET_X;
-/** Margin below the clan+rank row — reduces gap with the element below. Negative = closer. */
-export const CLAN_ROW_MARGIN_BOTTOM = 10;
+/**
+ * Hueco vertical @usuario ↔ clan y clan ↔ tarjeta frase insignia (mismo valor en ambos).
+ */
+export const PROFILE_IDENTITY_SECTION_GAP = 6;
+/** Altura mínima de la tarjeta frase insignia (centro del avatar antes del onLayout). */
+export const PROFILE_INSIGNIA_CARD_MIN_HEIGHT = 68;
+/**
+ * Ajuste fino del centro vertical del escudo vs. bloque @usuario + clan + frase (avatar izquierda).
+ */
+export const PROFILE_AVATAR_BLOCK_CENTER_Y_NUDGE = 0;
+/** Sin margen bajo clan: el hueco hasta la frase va en `PROFILE_IDENTITY_SECTION_GAP` (tarjeta). */
+export const CLAN_ROW_MARGIN_BOTTOM = 0;
 
 // ── Clan name text ─────────────────────────────────────────────────
 export const CLAN_OFFSET_X = 0;
@@ -105,8 +132,12 @@ export const SHARE_BUTTON_SIZE = 28;
 export const PROFILE_SHARE_ARROW_FONT_SIZE = 20;
 /** Insignia 100 primeros: 80 % más pequeña que la flecha ↗ (20 % del tamaño). */
 export const PROFILE_TESTER_BADGE_SIZE = Math.round(PROFILE_SHARE_ARROW_FONT_SIZE * 0.5);
+/** Insignia 100 primeros en perfil personal (más visible). */
+export const PROFILE_TESTER_BADGE_SIZE_PERSONAL = Math.round(PROFILE_SHARE_ARROW_FONT_SIZE * 0.8);
 /** Reserva horizontal para la insignia (a la derecha de ↗). */
 export const PROFILE_TESTER_BADGE_RESERVE = PROFILE_TESTER_BADGE_SIZE + 10;
+export const PROFILE_TESTER_BADGE_RESERVE_PERSONAL =
+  PROFILE_TESTER_BADGE_SIZE_PERSONAL + 10;
 
 /** Margen interior al exportar PNG: contenido dentro del borde de clan. */
 export const PROFILE_SHARE_CAPTURE_PADDING_TOP = 18;
@@ -383,3 +414,168 @@ export const SAVED_LABEL_FONT_SIZE = 10;
 export const SAVED_ICON_OFFSET_X = 0;
 export const SAVED_ICON_OFFSET_Y = 5;
 export const SAVED_ICON_SCALE = 2.8;
+
+// ── Helpers (avatar izquierda + columna de texto responsive) ───────
+
+const PROFILE_BADGE_MIN_SIZE = 86;
+/** Ancho mínimo de la columna @usuario + clan/rango antes de reducir avatar/fuentes. */
+const PROFILE_TEXT_COLUMN_MIN_WIDTH = 152;
+const PROFILE_USERNAME_MIN_MAX_WIDTH = 88;
+/** Escala mínima de @usuario / clan al reducir en pantallas estrechas. */
+export const PROFILE_FONT_SCALE_MIN = 0.72;
+
+export type PersonalProfileIdentityLayoutMetrics = {
+  avatarSize: number;
+  avatarToTextGap: number;
+  /** Padding-left del bloque de texto dentro del header (avatar + gap). */
+  textColumnPadLeft: number;
+  textColumnWidth: number;
+  usernameMaxWidth: number;
+  usernameFontSize: number;
+  usernameLineHeight: number;
+  clanFontSize: number;
+  clanLineHeight: number;
+  rankFontSize: number;
+  rankLineHeight: number;
+  /** Margen exterior izquierdo (frase insignia alineada con textos). */
+  textInsetLeft: number;
+  textInsetRight: number;
+};
+
+type IdentityLayoutOptions = {
+  hideShareButton?: boolean;
+};
+
+/**
+ * Padding-left de la columna de texto: borde derecho seguro del escudo + hueco anti-solape.
+ * Única fuente de verdad para avatar-izquierda (header + frase insignia).
+ */
+export function computeProfileAvatarToTextPadLeft(avatarSize: number): number {
+  const shieldRightEdge = Math.ceil(avatarSize * PROFILE_AVATAR_SHIELD_RIGHT_EDGE_RATIO);
+  return shieldRightEdge + PROFILE_AVATAR_TEXT_SAFE_GAP_MIN;
+}
+
+/**
+ * Reparte ancho entre avatar, hueco mínimo/necesario y columna de texto.
+ * Reduce avatar y/o tipografía en pantallas estrechas para evitar solapes y recortes.
+ */
+export function computePersonalProfileIdentityLayout(
+  screenWidth: number,
+  options: IdentityLayoutOptions = {},
+): PersonalProfileIdentityLayoutMetrics {
+  const hideShare = options.hideShareButton ?? true;
+  const shareReserve = hideShare
+    ? PROFILE_TESTER_BADGE_RESERVE_PERSONAL + 14
+    : Math.max(SHARE_BUTTON_SIZE, PROFILE_SHARE_ARROW_FONT_SIZE) +
+      PROFILE_TESTER_BADGE_RESERVE +
+      14;
+
+  const padH = PROFILE_CONTENT_HORIZONTAL_PAD;
+  const innerWidth = Math.max(0, screenWidth - padH * 2);
+
+  if (!PROFILE_HEADER_AVATAR_ON_LEFT) {
+    const preferred = Math.round(SHIELD_BASE_SIZE * SHIELD_SCALE);
+    const fontScale = 1;
+    const usernameFontSize = USERNAME_FONT_SIZE;
+    const clanFontSize = CLAN_FONT_SIZE;
+    const rankFontSize = RANK_FONT_SIZE;
+    return {
+      avatarSize: preferred,
+      avatarToTextGap: 0,
+      textColumnPadLeft: 0,
+      textColumnWidth: innerWidth,
+      usernameMaxWidth: Math.max(PROFILE_USERNAME_MIN_MAX_WIDTH, innerWidth - shareReserve),
+      usernameFontSize,
+      usernameLineHeight: Math.ceil(usernameFontSize * 1.3),
+      clanFontSize,
+      clanLineHeight: Math.ceil(clanFontSize * 1.3),
+      rankFontSize,
+      rankLineHeight: Math.ceil(rankFontSize * 1.3),
+      textInsetLeft: INSIGNIA_BOX_MARGIN_HORIZONTAL,
+      textInsetRight: INSIGNIA_BOX_MARGIN_HORIZONTAL,
+    };
+  }
+
+  const preferredAvatar = Math.round(SHIELD_BASE_SIZE * SHIELD_SCALE);
+  const safeGap = PROFILE_AVATAR_TEXT_SAFE_GAP_MIN;
+  const padForAvatar = (size: number) => computeProfileAvatarToTextPadLeft(size);
+
+  const maxAvatarByWidth = Math.floor(
+    (innerWidth -
+      shareReserve -
+      PROFILE_TEXT_COLUMN_MIN_WIDTH -
+      safeGap) /
+      PROFILE_AVATAR_SHIELD_RIGHT_EDGE_RATIO,
+  );
+
+  let avatarSize = Math.min(
+    preferredAvatar,
+    Math.max(PROFILE_BADGE_MIN_SIZE, maxAvatarByWidth),
+  );
+
+  let textColumnPadLeft = padForAvatar(avatarSize);
+  let textColumnWidth = Math.max(0, innerWidth - textColumnPadLeft);
+
+  while (
+    textColumnWidth < PROFILE_TEXT_COLUMN_MIN_WIDTH &&
+    avatarSize > PROFILE_BADGE_MIN_SIZE
+  ) {
+    avatarSize -= 1;
+    textColumnPadLeft = padForAvatar(avatarSize);
+    textColumnWidth = Math.max(0, innerWidth - textColumnPadLeft);
+  }
+
+  const slack = innerWidth - shareReserve - textColumnPadLeft - PROFILE_TEXT_COLUMN_MIN_WIDTH;
+  if (slack > 0 && avatarSize < preferredAvatar) {
+    const grown = Math.min(preferredAvatar, avatarSize + slack);
+    const grownPad = padForAvatar(grown);
+    if (grownPad + PROFILE_TEXT_COLUMN_MIN_WIDTH + shareReserve <= innerWidth) {
+      avatarSize = grown;
+      textColumnPadLeft = grownPad;
+      textColumnWidth = Math.max(0, innerWidth - textColumnPadLeft);
+    }
+  }
+
+  const gap = safeGap;
+  const usernameMaxWidth = Math.max(
+    PROFILE_USERNAME_MIN_MAX_WIDTH,
+    textColumnWidth - shareReserve,
+  );
+
+  const widthRatio = textColumnWidth / PROFILE_TEXT_COLUMN_MIN_WIDTH;
+  const fontScale = Math.min(1, Math.max(PROFILE_FONT_SCALE_MIN, widthRatio));
+
+  const usernameFontSize = Math.max(16, Math.round(USERNAME_FONT_SIZE * fontScale));
+  const clanFontSize = Math.max(14, Math.round(CLAN_FONT_SIZE * fontScale));
+  const rankFontSize = Math.max(13, Math.round(RANK_FONT_SIZE * fontScale));
+
+  return {
+    avatarSize,
+    avatarToTextGap: gap,
+    textColumnPadLeft,
+    textColumnWidth,
+    usernameMaxWidth,
+    usernameFontSize,
+    usernameLineHeight: Math.ceil(usernameFontSize * 1.3),
+    clanFontSize,
+    clanLineHeight: Math.ceil(clanFontSize * 1.3),
+    rankFontSize,
+    rankLineHeight: Math.ceil(rankFontSize * 1.3),
+    textInsetLeft: padH + textColumnPadLeft,
+    textInsetRight: padH,
+  };
+}
+
+/** Ancho del avatar en el header del perfil personal (px). */
+export function computePersonalProfileAvatarSize(screenWidth: number): number {
+  return computePersonalProfileIdentityLayout(screenWidth).avatarSize;
+}
+
+/** Margen izquierdo de la frase insignia alineado con @usuario / clan. */
+export function computePersonalProfileTextInsetLeft(screenWidth: number): number {
+  return computePersonalProfileIdentityLayout(screenWidth).textInsetLeft;
+}
+
+export function computePersonalProfileTextInsetRight(screenWidth: number): number {
+  return computePersonalProfileIdentityLayout(screenWidth).textInsetRight;
+}

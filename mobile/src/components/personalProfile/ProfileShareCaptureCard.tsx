@@ -17,6 +17,8 @@ import {
   PROFILE_SHARE_CAPTURE_PADDING_HORIZONTAL,
   BOTTOM_BLOCKS_MARGIN_TOP,
   PERSONAL_BOTTOM_BLOCKS_SPACING_TOP,
+  PROFILE_IDENTITY_SECTION_GAP,
+  PROFILE_INSIGNIA_CARD_MIN_HEIGHT,
 } from '@evoconn/constants/personalProfileLayout';
 import { REFLECTION_BACKGROUND_LAYOUT } from '@evoconn/constants/reflectionBackgroundLayout';
 
@@ -88,9 +90,11 @@ export const ProfileShareCaptureCard = React.memo(function ProfileShareCaptureCa
             rank={data.rank}
             avatarUri={data.avatarUri}
             hideShareButton
+            companionBelowHeight={
+              PROFILE_IDENTITY_SECTION_GAP + PROFILE_INSIGNIA_CARD_MIN_HEIGHT
+            }
           />
-          <View style={styles.gap} />
-          <PersonalInsigniaPhrase phrase={data.insigniaPhrase} />
+          <PersonalInsigniaPhrase phrase={data.insigniaPhrase} clanId={data.clanId} />
           <View style={styles.gap} />
           <PersonalRankProgression
             rank={data.rank}

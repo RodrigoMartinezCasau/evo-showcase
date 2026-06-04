@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -19,19 +19,19 @@ import {
   SHIELD_BASE_SIZE,
   USERNAME_OFFSET_X,
   USERNAME_OFFSET_Y,
-  USERNAME_FONT_SIZE,
   CLAN_OFFSET_X,
   CLAN_OFFSET_Y,
-  CLAN_FONT_SIZE,
-  RANK_OFFSET_X,
-  RANK_OFFSET_Y,
-  RANK_FONT_SIZE,
   CLAN_ROW_SCALE,
   CLAN_ROW_OFFSET_X,
   CLAN_ROW_MARGIN_BOTTOM,
-  SHARE_BUTTON_SIZE,
-  PROFILE_SHARE_ARROW_FONT_SIZE,
-  PROFILE_TESTER_BADGE_RESERVE,
+  PROFILE_IDENTITY_SECTION_GAP,
+  PROFILE_HEADER_AVATAR_ON_LEFT,
+  PROFILE_AVATAR_BLOCK_CENTER_Y_NUDGE,
+  PROFILE_CONTENT_HORIZONTAL_PAD,
+  USERNAME_FONT_SIZE,
+  PROFILE_FONT_SCALE_MIN,
+  PROFILE_TESTER_BADGE_SIZE_PERSONAL,
+  computePersonalProfileIdentityLayout,
 } from '@evoconn/constants/personalProfileLayout';
 import { ProfileUsernameRow } from '@evoconn/components/shared/ProfileUsernameRow';
 
@@ -41,16 +41,6 @@ const RANK_LABELS: Record<Rank, string> = {
   filosofo: 'Filósofo',
 };
 
-// Explicit line-heights prevent text-measurement variance across remounts.
-const USERNAME_LINE_HEIGHT = Math.ceil(USERNAME_FONT_SIZE * 1.3);
-const CLAN_LINE_HEIGHT = Math.ceil(CLAN_FONT_SIZE * 1.3);
-const RANK_LINE_HEIGHT = Math.ceil(RANK_FONT_SIZE * 1.3);
-
-// Deterministic row heights so the container never reflows.
-const USERNAME_ROW_HEIGHT = USERNAME_LINE_HEIGHT;
-const USERNAME_ROW_MARGIN_BOTTOM = 4;
-const CLAN_ROW_HEIGHT = Math.max(CLAN_LINE_HEIGHT, RANK_LINE_HEIGHT + 6); // 6 = pill paddingV*2
-const CONTAINER_HEIGHT = USERNAME_ROW_HEIGHT + USERNAME_ROW_MARGIN_BOTTOM + CLAN_ROW_HEIGHT;
 const TEXT_BADGE_SAFE_GAP = 14;
 const TEXT_MIN_WIDTH = 165;
 const BADGE_MIN_SIZE = 86;
@@ -67,10 +57,13 @@ type Props = {
   rank: Rank;
   avatarUri?: string | null;
   onShieldPress?: () => void;
-  /** Captura PNG: oculta la flecha de compartir. */
   hideShareButton?: boolean;
-  /** Si se define, sustituye el Share nativo (p. ej. exportar PNG del perfil). */
   onSharePress?: () => void;
+  /**
+   * Altura del bloque bajo el header (marginTop frase + tarjeta) para centrar el avatar
+   * en el eje Y del conjunto @usuario + clan + frase insignia.
+   */
+  companionBelowHeight?: number;
 };
 
 export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader({
@@ -80,44 +73,17 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
   rank,
   avatarUri,
   onShieldPress,
-  hideShareButton = false,
+  hideShareButton = true,
   onSharePress,
+  companionBelowHeight = 0,
 }: Props) {
   const { width: screenW } = useWindowDimensions();
 
-  // Render the SVG at its true display size so it is not GPU-upscaled from a
-  // small rasterisation. `SHIELD_SCALE` is a transform that would otherwise
-  // cause the GPU compositing layer (sized SHIELD_BASE_SIZE) to be scaled up,
-  // producing a blurry result. By rendering the SVG at the final pixel size
-  // directly and removing the scale transform, we get a crisp vector output.
-  const preferredShieldSize = Math.round(SHIELD_BASE_SIZE * SHIELD_SCALE);
-  // Keep a guaranteed safe text column so the badge cannot invade username /
-  // clan / rank lines on narrow devices.
-  const maxShieldSizeByWidth = Math.max(
-    BADGE_MIN_SIZE,
-    screenW - 20 * 2 - TEXT_MIN_WIDTH - TEXT_BADGE_SAFE_GAP,
+  const layout = useMemo(
+    () => computePersonalProfileIdentityLayout(screenW, { hideShareButton }),
+    [screenW, hideShareButton],
   );
-  const shieldDisplaySize = Math.min(preferredShieldSize, maxShieldSizeByWidth);
-  const maxLeftShift = Math.max(0, screenW - 20 * 2 - TEXT_MIN_WIDTH - shieldDisplaySize);
-  // Clamp only to prevent the badge from going off-screen to the left.
-  // autoBadgePushRight is intentionally removed so the badge stays exactly
-  // where the editor constants place it across all renders and reloads.
-  // Base X (collision clamp) + relative X are summed before clamp so both editors work.
-  const combinedShieldOffsetX = SHIELD_OFFSET_X + SHIELD_RELATIVE_OFFSET_X;
-  const clampedShieldOffsetX = clamp(combinedShieldOffsetX, -maxLeftShift, 24);
-  const reservedRightSpace = Math.max(
-    MIN_RESERVED_RIGHT_SPACE,
-    shieldDisplaySize + TEXT_BADGE_SAFE_GAP + Math.max(0, -clampedShieldOffsetX),
-  );
-  const shareReserve =
-    Math.max(SHARE_BUTTON_SIZE, PROFILE_SHARE_ARROW_FONT_SIZE) +
-    PROFILE_TESTER_BADGE_RESERVE +
-    14;
-  const usernameMaxWidth = Math.max(120, screenW - 20 * 2 - shareReserve);
-  // Container height is always TEXT-ONLY height. The badge is absolute and
-  // overflows visually without pushing sibling components down — so we must
-  // NOT expand containerHeight to accommodate the badge size.
-  const containerHeight = CONTAINER_HEIGHT;
+
   const clanLabel = clanId
     ? `Clan ${clanId.charAt(0).toUpperCase() + clanId.slice(1)}`
     : 'Sin clan';
@@ -132,60 +98,41 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
     }).catch(() => {});
   }, [username, userId, onSharePress]);
 
+  const clanRowHeight = Math.max(layout.clanLineHeight, layout.rankLineHeight + 6);
+  const containerHeight =
+    layout.usernameLineHeight + PROFILE_IDENTITY_SECTION_GAP + clanRowHeight;
+
+  const combinedShieldOffsetX = SHIELD_OFFSET_X + SHIELD_RELATIVE_OFFSET_X;
+  const maxEdgeShift = Math.max(
+    0,
+    screenW - PROFILE_CONTENT_HORIZONTAL_PAD * 2 - TEXT_MIN_WIDTH - layout.avatarSize,
+  );
+  const clampedShieldOffsetX = clamp(combinedShieldOffsetX, -maxEdgeShift, 24);
+
+  const reservedRightSpace = Math.max(
+    MIN_RESERVED_RIGHT_SPACE,
+    layout.avatarSize + TEXT_BADGE_SAFE_GAP + Math.max(0, -clampedShieldOffsetX),
+  );
+
+  const useTightTextOffsets = PROFILE_HEADER_AVATAR_ON_LEFT;
+  const verticalSpan = containerHeight + companionBelowHeight;
+  const avatarTop = PROFILE_HEADER_AVATAR_ON_LEFT
+    ? (verticalSpan - layout.avatarSize) / 2 + PROFILE_AVATAR_BLOCK_CENTER_Y_NUDGE
+    : undefined;
+  const avatarVerticalNudge = PROFILE_HEADER_AVATAR_ON_LEFT
+    ? undefined
+    : -layout.avatarSize / 2 + SHIELD_OFFSET_Y + SHIELD_RELATIVE_OFFSET_Y;
+
+  const textOffsetScale = useTightTextOffsets
+    ? layout.usernameFontSize / USERNAME_FONT_SIZE
+    : 1;
+  const usernameOffsetX = useTightTextOffsets ? 0 : USERNAME_OFFSET_X * textOffsetScale;
+  const usernameOffsetY = useTightTextOffsets ? 0 : USERNAME_OFFSET_Y * textOffsetScale;
+  const clanOffsetX = useTightTextOffsets ? 0 : CLAN_OFFSET_X * textOffsetScale;
+  const clanOffsetY = useTightTextOffsets ? 0 : CLAN_OFFSET_Y * textOffsetScale;
 
   return (
     <View style={[styles.container, { height: containerHeight }]}>
-      {/* Text column — username + clan+rank row */}
-      <View style={styles.textBlock}>
-        {/* Username row */}
-        <ProfileUsernameRow
-          username={username}
-          userId={userId}
-          usernameMaxWidth={usernameMaxWidth}
-          hideShareButton={hideShareButton}
-          onSharePress={handleShare}
-          rowStyle={{
-            height: USERNAME_ROW_HEIGHT,
-            marginBottom: USERNAME_ROW_MARGIN_BOTTOM,
-            transform: [{ translateX: USERNAME_OFFSET_X }, { translateY: USERNAME_OFFSET_Y }],
-          }}
-        />
-
-        {/* Clan + rank row — inline, same baseline */}
-        <View
-          style={[
-            styles.clanRankRow,
-            {
-              paddingRight: reservedRightSpace,
-              marginBottom: CLAN_ROW_MARGIN_BOTTOM,
-              transform: [{ translateX: CLAN_ROW_OFFSET_X }, { scale: CLAN_ROW_SCALE }],
-            },
-          ]}
-        >
-          <Text
-            style={[
-              styles.clanName,
-              {
-                fontSize: CLAN_FONT_SIZE,
-                lineHeight: CLAN_LINE_HEIGHT,
-                transform: [{ translateX: CLAN_OFFSET_X }, { translateY: CLAN_OFFSET_Y }],
-              },
-            ]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.7}
-          >
-            {clanLabel}
-            {'  '}
-            <Text style={[styles.rankInline, { fontSize: RANK_FONT_SIZE, lineHeight: RANK_LINE_HEIGHT }]}>
-              {'— '}
-              {RANK_LABELS[rank]}
-            </Text>
-          </Text>
-        </View>
-      </View>
-
-      {/* Shield — absolute, does not affect layout height */}
       <TouchableOpacity
         activeOpacity={onShieldPress ? 0.7 : 1}
         onPress={onShieldPress}
@@ -193,41 +140,121 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
         hitSlop={8}
         style={[
           styles.shieldWrap,
+          PROFILE_HEADER_AVATAR_ON_LEFT ? styles.shieldWrapLeft : styles.shieldWrapRight,
           {
-            width: shieldDisplaySize,
-            height: shieldDisplaySize,
-            right: -clampedShieldOffsetX,
-            top: '50%',
-            marginTop: -shieldDisplaySize / 2 + SHIELD_OFFSET_Y + SHIELD_RELATIVE_OFFSET_Y,
+            width: layout.avatarSize,
+            height: layout.avatarSize,
+            ...(PROFILE_HEADER_AVATAR_ON_LEFT
+              ? { left: 0, top: avatarTop }
+              : { right: -clampedShieldOffsetX, top: '50%', marginTop: avatarVerticalNudge }),
           },
         ]}
       >
         <UserAvatarFrame
           clanId={clanId}
           avatarUri={avatarUri ?? null}
-          size={shieldDisplaySize}
+          size={layout.avatarSize}
           noPhotoFallback="by-clan"
         />
       </TouchableOpacity>
+
+      <View
+        style={[
+          styles.textBlock,
+          PROFILE_HEADER_AVATAR_ON_LEFT && { paddingLeft: layout.textColumnPadLeft },
+        ]}
+      >
+        <ProfileUsernameRow
+          username={username}
+          userId={userId}
+          usernameMaxWidth={layout.usernameMaxWidth}
+          usernameFontSize={layout.usernameFontSize}
+          usernameLineHeight={layout.usernameLineHeight}
+          usernameMinimumFontScale={PROFILE_FONT_SCALE_MIN}
+          hideShareButton={hideShareButton}
+          testerBadgeIconSize={PROFILE_TESTER_BADGE_SIZE_PERSONAL}
+          onSharePress={handleShare}
+          rowStyle={{
+            height: layout.usernameLineHeight,
+            marginBottom: PROFILE_IDENTITY_SECTION_GAP,
+            transform: [
+              { translateX: usernameOffsetX },
+              { translateY: usernameOffsetY },
+            ],
+          }}
+        />
+
+        <View
+          style={[
+            styles.clanRankRow,
+            {
+              width: PROFILE_HEADER_AVATAR_ON_LEFT ? layout.textColumnWidth : undefined,
+              paddingRight: PROFILE_HEADER_AVATAR_ON_LEFT ? 0 : reservedRightSpace,
+              marginBottom: CLAN_ROW_MARGIN_BOTTOM,
+              transform: [
+                { translateX: useTightTextOffsets ? 0 : CLAN_ROW_OFFSET_X },
+                { scale: CLAN_ROW_SCALE },
+              ],
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.clanName,
+              {
+                fontSize: layout.clanFontSize,
+                lineHeight: layout.clanLineHeight,
+                transform: [
+                  { translateX: clanOffsetX },
+                  { translateY: clanOffsetY },
+                ],
+              },
+            ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={PROFILE_FONT_SCALE_MIN}
+          >
+            {clanLabel}
+            {'  '}
+            <Text
+              style={[
+                styles.rankInline,
+                {
+                  fontSize: layout.rankFontSize,
+                  lineHeight: layout.rankLineHeight,
+                },
+              ]}
+            >
+              {'— '}
+              {RANK_LABELS[rank]}
+            </Text>
+          </Text>
+        </View>
+      </View>
     </View>
   );
 });
 
-
 const styles = StyleSheet.create({
   container: {
     position: 'relative',
-    paddingHorizontal: 20,
+    paddingHorizontal: PROFILE_CONTENT_HORIZONTAL_PAD,
+    overflow: 'visible',
   },
-  textBlock: {},
+  textBlock: {
+    flexShrink: 1,
+    zIndex: 2,
+  },
   clanRankRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 1,
   },
   clanName: {
     fontWeight: '600',
     letterSpacing: 0.3,
     color: '#FFFFFF',
+    flexShrink: 1,
   },
   rankInline: {
     color: 'rgba(255,255,255,0.75)',
@@ -235,10 +262,15 @@ const styles = StyleSheet.create({
   },
   shieldWrap: {
     position: 'absolute',
-    right: 0,
     top: '50%',
     zIndex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  shieldWrapLeft: {
+    left: 0,
+  },
+  shieldWrapRight: {
+    right: 0,
   },
 });

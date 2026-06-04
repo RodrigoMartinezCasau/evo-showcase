@@ -76,6 +76,7 @@ import { useGlobalFollowingVotedFeed } from '@evoconn/hooks/useGlobalFollowingVo
 import { useIncrementalList } from '@evoconn/hooks/useIncrementalList';
 import { ClanLoadingDot } from '@evoconn/components/shared/ClanLoadingDot';
 import { ProfileRevealPanel } from '@evoconn/components/otherProfile';
+import { seedOtherProfileFromAuthor } from '@evoconn/state/otherProfileCache';
 import {
   sortFollowingPosts,
   type FollowingSortOption,
@@ -444,6 +445,8 @@ export default function CommunityScreen() {
   const feedAudio = useFeedAudio();
   const feedAudioRef = useRef(feedAudio);
   feedAudioRef.current = feedAudio;
+  /** Solo true mientras Comunidad está enfocada y el visor Para ti / detalle está activo. */
+  const feedAudioEnabledRef = useRef(false);
 
   // Quitar al instante posts de autores bloqueados del panel Para Ti ya montado.
   useEffect(() => {
@@ -855,6 +858,15 @@ export default function CommunityScreen() {
       if (userId === mockCurrentUser.id) {
         navigateUnlessCurrent(pathname, '/my-profile');
       } else {
+        // Sembrar la caché con lo que ya conocemos del autor (avatar, @, clan,
+        // rango) para que el perfil pinte la identidad al instante mientras
+        // refresca por detrás.
+        const known = allPostsRef.current.find((p) => p.author?.id === userId)?.author;
+        if (known) {
+          seedOtherProfileFromAuthor(known);
+        } else if (username) {
+          seedOtherProfileFromAuthor({ id: userId, username, clanId: null, rank: 'aprendiz' });
+        }
         const href = username
           ? `/profile/${userId}?username=${encodeURIComponent(username)}`
           : `/profile/${userId}`;
@@ -1420,9 +1432,16 @@ export default function CommunityScreen() {
         }
         // Audio adjunto del post visible en cualquier visor ampliado (Para ti
         // y Siguiendo), al volumen elegido al publicar.
-        feedAudioRef.current.playForPost(post);
+        if (feedAudioEnabledRef.current) {
+          feedAudioRef.current.playForPost(post);
+        }
 
         const id = post.author.id;
+        // Prefetch de identidad: al ver el post ya dejamos lista la caché del
+        // autor (avatar/@/clan) para que abrir su perfil sea instantáneo.
+        if (id !== mockCurrentUser.id) {
+          seedOtherProfileFromAuthor(post.author);
+        }
         visibleAuthorIdRef.current = id;
         setVisibleAuthorId(id);
       }
@@ -1483,11 +1502,31 @@ export default function CommunityScreen() {
   /** Revealing the profile overlay works in both: detailFeed AND persistent Para Ti panel. */
   const verticalViewerVisible = detailMounted || paratiPanelVisible;
 
-  // Detener el audio del feed al salir del visor vertical (volver a la lista,
-  // abrir perfil a pantalla completa, etc.).
+  const syncFeedAudioEnabled = useCallback(() => {
+    const enabled =
+      !profileOverlayActive && (paratiPanelVisible || detailFeed !== null);
+    feedAudioEnabledRef.current = enabled;
+    if (!enabled) feedAudio.stop();
+    return enabled;
+  }, [profileOverlayActive, paratiPanelVisible, detailFeed, feedAudio]);
+
+  // Detener el audio al salir del visor, abrir perfil encima o cambiar de pestaña.
+  // El panel Para ti sigue montado (display:none), así que los callbacks de
+  // visibilidad del FlatList no deben volver a disparar playForPost.
   useEffect(() => {
-    if (!verticalViewerVisible) feedAudio.stop();
-  }, [verticalViewerVisible, feedAudio]);
+    syncFeedAudioEnabled();
+  }, [syncFeedAudioEnabled]);
+
+  // Al navegar a perfil, racha, etc., Comunidad sigue montada en tabs pero pierde foco.
+  useFocusEffect(
+    useCallback(() => {
+      syncFeedAudioEnabled();
+      return () => {
+        feedAudioEnabledRef.current = false;
+        feedAudioRef.current.stop();
+      };
+    }, [syncFeedAudioEnabled]),
+  );
   const profileRevealGesture = useMemo(
     () =>
       Gesture.Pan()

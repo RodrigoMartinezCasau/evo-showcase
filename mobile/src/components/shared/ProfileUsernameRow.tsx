@@ -20,8 +20,14 @@ type Props = {
   username: string;
   userId: string;
   usernameMaxWidth: number;
+  usernameFontSize?: number;
+  usernameLineHeight?: number;
+  /** Escala mínima al ajustar fuente en pantallas estrechas (default 0.72). */
+  usernameMinimumFontScale?: number;
   rowStyle?: ViewStyle;
   hideShareButton?: boolean;
+  /** Tamaño de la insignia 100 primeros (perfil personal usa constante mayor). */
+  testerBadgeIconSize?: number;
   onSharePress: () => void;
 };
 
@@ -32,8 +38,12 @@ export function ProfileUsernameRow({
   username,
   userId,
   usernameMaxWidth,
+  usernameFontSize = USERNAME_FONT_SIZE,
+  usernameLineHeight = USERNAME_LINE_HEIGHT,
+  usernameMinimumFontScale = 0.72,
   rowStyle,
   hideShareButton = false,
+  testerBadgeIconSize,
   onSharePress,
 }: Props) {
   return (
@@ -42,13 +52,15 @@ export function ProfileUsernameRow({
         style={[
           styles.username,
           {
-            fontSize: USERNAME_FONT_SIZE,
-            lineHeight: USERNAME_LINE_HEIGHT,
+            fontSize: usernameFontSize,
+            lineHeight: usernameLineHeight,
             maxWidth: usernameMaxWidth,
           },
         ]}
         numberOfLines={1}
         ellipsizeMode="tail"
+        adjustsFontSizeToFit
+        minimumFontScale={usernameMinimumFontScale}
       >
         {username}
       </Text>
@@ -62,7 +74,7 @@ export function ProfileUsernameRow({
           <Text style={styles.shareInline}>↗</Text>
         </TouchableOpacity>
       ) : null}
-      <FirstUsersTesterBadge userId={userId} />
+      <FirstUsersTesterBadge userId={userId} iconSize={testerBadgeIconSize} />
     </View>
   );
 }

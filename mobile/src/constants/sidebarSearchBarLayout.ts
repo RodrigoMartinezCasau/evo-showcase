@@ -2,6 +2,11 @@
  * Barra de búsqueda del sidebar (PNG + TextInput). Parámetros independientes.
  */
 export const SIDEBAR_SEARCH_BAR_LAYOUT = {
+  /**
+   * Desplazamiento vertical del bloque de búsqueda (position:absolute en el drawer).
+   * No usar transform para el bloque: deja la hitbox en el layout original y bloquea filas.
+   */
+  /** Igual que Nueva reflexión / Nueva frase (`SIDEBAR_PNG_MENU_BLOCK_OFFSET_X`). */
   SEARCH_BAR_BLOCK_OFFSET_X: -5,
   SEARCH_BAR_BLOCK_OFFSET_Y: -142,
   SEARCH_BAR_BLOCK_SCALE: 1,
@@ -31,14 +36,22 @@ export const SIDEBAR_SEARCH_BAR_LAYOUT = {
   SEARCH_BAR_TEXT_MAX_CHARS: 42,
 
   /**
-   * Separación visual mínima entre el PNG de búsqueda (ya desplazado con BLOCK_OFFSET_Y)
-   * y el marco de conversaciones. El translateY no reduce el hueco de layout: el bloque
-   * inferior usa marginTop negativo = BLOCK_OFFSET_Y + este valor.
+   * Separación visual entre la búsqueda y el marco de conversaciones.
+   * La capa de búsqueda no ocupa altura en flex (height:0); el bloque inferior
+   * usa marginTop negativo = BLOCK_OFFSET_Y + GAP + altura visible del PNG.
    */
   SIDEBAR_SEARCH_TO_CONVERSATIONS_GAP_PX: 6,
 } as const;
 
-/** marginTop del bloque de conversaciones respecto al layout “sin transformar” de la búsqueda */
+const SEARCH_BAR_VISIBLE_HEIGHT_PX = Math.max(
+  1,
+  SIDEBAR_SEARCH_BAR_LAYOUT.SEARCH_BAR_IMAGE_HEIGHT -
+    SIDEBAR_SEARCH_BAR_LAYOUT.SEARCH_BAR_CROP_TOP -
+    SIDEBAR_SEARCH_BAR_LAYOUT.SEARCH_BAR_CROP_BOTTOM,
+);
+
+/** marginTop del bloque de conversaciones respecto a la capa de búsqueda (altura 0 en flex). */
 export const SIDEBAR_CONVERSATIONS_AFTER_SEARCH_MARGIN_TOP_PX =
   SIDEBAR_SEARCH_BAR_LAYOUT.SEARCH_BAR_BLOCK_OFFSET_Y +
-  SIDEBAR_SEARCH_BAR_LAYOUT.SIDEBAR_SEARCH_TO_CONVERSATIONS_GAP_PX;
+  SIDEBAR_SEARCH_BAR_LAYOUT.SIDEBAR_SEARCH_TO_CONVERSATIONS_GAP_PX +
+  SEARCH_BAR_VISIBLE_HEIGHT_PX;
