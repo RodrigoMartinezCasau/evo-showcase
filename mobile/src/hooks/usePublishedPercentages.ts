@@ -17,6 +17,7 @@ import { supabase } from '../../mobile/lib/supabase';
 import { isRealUserId } from '@evoconn/services/supabaseSocial';
 import type { ClanPct } from '@evoconn/hooks/ClassificationContext';
 import type { Rank } from '@evoconn/types';
+import { getProfileRankFromPercentages } from '@evoconn/utils/getRankFromPct';
 
 type PublishedClassification = {
   percentages: ClanPct[];
@@ -75,7 +76,15 @@ export function usePublishedPercentages(
   }, [needsFallback, userId]);
 
   if (!needsFallback) {
-    return { percentages: localPcts, clanId: localClanId, rank: localRank };
+    return {
+      percentages: localPcts,
+      clanId: localClanId,
+      rank: getProfileRankFromPercentages(localClanId, localPcts, localRank),
+    };
   }
-  return remote;
+  return {
+    percentages: remote.percentages,
+    clanId: remote.clanId,
+    rank: getProfileRankFromPercentages(remote.clanId, remote.percentages, remote.rank),
+  };
 }

@@ -159,7 +159,7 @@ export default function PersonalPhilosophyDetailScreen() {
   const profile = {
     ...baseProfile,
     philosophyPercentages: realPercentages,
-    rank: ready ? classification.getDisplayRank(baseProfile.id) : 'aprendiz',
+    rank: ready ? classification.getPercentageRank(baseProfile.id) : 'aprendiz',
   };
   /** Misma regla que racha/usos: Supabase cuando hay sesión, si no el perfil activo. */
   const apiUserId = authProfile?.id ?? profile.id;

@@ -40,9 +40,8 @@ import {
   RANK_NEXT_FONT_SIZE,
 
   RANK_TEXT_BLACK_COLOR,
-  RANK_PROGRESS_VALUE,
 } from '@evoconn/constants/personalProfileLayout';
-import { CLAN_REVEAL_MIN_INPUTS } from '@evoconn/utils/getRankFromPct';
+import { CLAN_REVEAL_MIN_INPUTS, getRankBarFill } from '@evoconn/utils/getRankFromPct';
 
 /**
  * All gradient stop-colors are STATIC strings defined once at module load.
@@ -76,6 +75,9 @@ const RANK_LABELS: Record<Rank, string> = {
 
 type Props = {
   rank: Rank;
+  /** % del clan visible; rellena la barra con umbrales 25→40→50. */
+  dominantPct?: number;
+  /** @deprecated Usar `dominantPct` (se ignora si hay clan y `dominantPct` está definido). */
   progress?: number;
   onPress?: () => void;
   /** Pass the user's clanId. When null the bar shows sin-clan progression. */
@@ -95,7 +97,8 @@ type Props = {
  */
 export const PersonalRankProgression = React.memo(function PersonalRankProgression({
   rank,
-  progress = RANK_PROGRESS_VALUE,
+  dominantPct,
+  progress,
   onPress,
   clanId = undefined,
   totalReflections = 0,
@@ -116,9 +119,16 @@ export const PersonalRankProgression = React.memo(function PersonalRankProgressi
       ? RANK_ORDER[currentIndex + 1]
       : RANK_ORDER[currentIndex];
   const isMaxRank = currentIndex === RANK_ORDER.length - 1;
+  const rankBarProgress =
+    !isSinClan && dominantPct != null
+      ? getRankBarFill(dominantPct)
+      : progress ?? 0;
+
   const clampedProgress = isSinClan
     ? sinClanProgress!
-    : isMaxRank ? 1 : Math.max(0, Math.min(1, progress));
+    : isMaxRank
+      ? 1
+      : Math.max(0, Math.min(1, rankBarProgress));
 
   const currentLabel = isSinClan ? 'SIN CLAN' : RANK_LABELS[rank].toUpperCase();
   // At max rank (Filósofo) show the clan name on the right instead of repeating "FILÓSOFO"

@@ -20,6 +20,10 @@ import {
   PROFILE_IDENTITY_SECTION_GAP,
   PROFILE_INSIGNIA_CARD_MIN_HEIGHT,
 } from '@evoconn/constants/personalProfileLayout';
+import {
+  getDominantClanPct,
+  getProfileRankFromPercentages,
+} from '@evoconn/utils/getRankFromPct';
 import { REFLECTION_BACKGROUND_LAYOUT } from '@evoconn/constants/reflectionBackgroundLayout';
 
 export type ProfileShareCaptureData = {
@@ -56,6 +60,12 @@ export const ProfileShareCaptureCard = React.memo(function ProfileShareCaptureCa
   data,
   onLayout,
 }: Props) {
+  const captureRank = getProfileRankFromPercentages(
+    data.clanId,
+    data.philosophyPercentages,
+    data.rank,
+  );
+  const captureDominantPct = getDominantClanPct(data.philosophyPercentages, data.clanId);
   return (
     <View
       style={[styles.outer, { width: data.width, borderRadius: REFLECTION_BACKGROUND_LAYOUT.borderRadius }]}
@@ -87,7 +97,7 @@ export const ProfileShareCaptureCard = React.memo(function ProfileShareCaptureCa
             userId={data.userId}
             username={data.username}
             clanId={data.clanId}
-            rank={data.rank}
+            rank={captureRank}
             avatarUri={data.avatarUri}
             hideShareButton
             companionBelowHeight={
@@ -97,7 +107,8 @@ export const ProfileShareCaptureCard = React.memo(function ProfileShareCaptureCa
           <PersonalInsigniaPhrase phrase={data.insigniaPhrase} clanId={data.clanId} />
           <View style={styles.gap} />
           <PersonalRankProgression
-            rank={data.rank}
+            rank={captureRank}
+            dominantPct={captureDominantPct}
             clanId={data.clanId}
             totalReflections={data.rankReflectionCount}
             totalPhrases={data.rankPhraseCount}

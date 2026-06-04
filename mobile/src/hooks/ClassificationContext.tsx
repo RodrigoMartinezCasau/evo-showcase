@@ -205,6 +205,9 @@ export type ClassificationContextValue = {
   /** Official rank badge to show for a user, including history + inactivity. */
   getDisplayRank: (userId?: string) => Rank;
 
+  /** Rango actual solo por % del clan visible (umbrales 40/50); para perfil y barra. */
+  getPercentageRank: (userId?: string) => Rank;
+
   /** Raw state for debugging / advanced screens. */
   getUserState: (userId?: string) => UserClassificationState;
 
@@ -325,6 +328,13 @@ function getDisplayRankForState(state: UserClassificationState): Rank {
   if (!state.visibleClanId) return 'aprendiz';
   if (isTemporarilyInactive(state)) return 'aprendiz';
   return getPersistentRankForState(state);
+}
+
+function getPercentageRankForState(state: UserClassificationState): Rank {
+  if (!state.visibleClanId) return 'aprendiz';
+  if (isTemporarilyInactive(state)) return 'aprendiz';
+  const pcts = totalsToPercentages(state.totals);
+  return getRankFromPct(pcts[state.visibleClanId] ?? 0);
 }
 
 /**
@@ -693,6 +703,13 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
     [getUserStateInternal],
   );
 
+  const getPercentageRank = useCallback(
+    (userId?: string): Rank => {
+      return getPercentageRankForState(getUserStateInternal(userId));
+    },
+    [getUserStateInternal],
+  );
+
   // ── Action: record a new input ────────────────────────────────────────
   //
   // Sync model: AsyncStorage is a local cache; Supabase is the public
@@ -890,6 +907,7 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
       getPhraseCount,
       getClanRankHistory,
       getDisplayRank,
+      getPercentageRank,
       getUserState: getUserStateInternal,
       publishNow,
       isDirty,
@@ -905,6 +923,7 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
       getPhraseCount,
       getClanRankHistory,
       getDisplayRank,
+      getPercentageRank,
       getUserStateInternal,
       publishNow,
       isDirty,

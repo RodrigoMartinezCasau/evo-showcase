@@ -31,6 +31,7 @@ import {
   PROFILE_IDENTITY_SECTION_GAP,
   PROFILE_INSIGNIA_CARD_MIN_HEIGHT,
 } from '@evoconn/constants/personalProfileLayout';
+import { getProfileRankFromPercentages } from '@evoconn/utils/getRankFromPct';
 import {
   OtherProfileFollowRow,
   UserIdentityHeader,
@@ -276,22 +277,34 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
     ? {
         ...baseProfile,
         clanId: classification.getVisibleClanId(userId),
-        rank: classification.getDisplayRank(userId),
+        rank: classification.getPercentageRank(userId),
         philosophyPercentages: classification.getPercentages(userId),
       }
     : baseProfile;
 
+  const profileWithResolvedRank = useMemo(
+    () => ({
+      ...profile,
+      rank: getProfileRankFromPercentages(
+        profile.clanId,
+        profile.philosophyPercentages,
+        profile.rank,
+      ),
+    }),
+    [profile],
+  );
+
   const profileWithLiveFollowers = useMemo(() => {
-    if (mockProfile || !isRealUserId(userId) || !followCountSnap) return profile;
+    if (mockProfile || !isRealUserId(userId) || !followCountSnap) return profileWithResolvedRank;
     const adj =
       followCountSnap.followers +
       (iFollowTargetNow ? 1 : 0) -
       (followCountSnap.iFollowed ? 1 : 0);
     return {
-      ...profile,
+      ...profileWithResolvedRank,
       followersCount: Math.max(0, adj),
     };
-  }, [profile, mockProfile, userId, followCountSnap, iFollowTargetNow]);
+  }, [profileWithResolvedRank, mockProfile, userId, followCountSnap, iFollowTargetNow]);
 
   const [batchAvatarUri, setBatchAvatarUri] = useState<string | null>(null);
   useEffect(() => {

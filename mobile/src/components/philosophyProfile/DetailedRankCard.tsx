@@ -1,7 +1,7 @@
 /**
  * Detailed rank/progression display.
  * Rank thresholds (based on dominant clan %):
- *   25 – <40  → Aprendiz
+ *   < 40      → Aprendiz
  *   40 – <50  → Maestro
  *   ≥  50     → Filósofo
  */
@@ -114,7 +114,7 @@ export const DetailedRankCard = React.memo(function DetailedRankCard({
       {/* Threshold labels */}
       <View style={styles.thresholdRow}>
         <Text style={styles.thresholdLabel}>
-          {rank === 'Aprendiz' ? '25%' : rank === 'Maestro' ? '40%' : '50%'}
+          {rank === 'Aprendiz' ? '0%' : rank === 'Maestro' ? '40%' : '50%'}
         </Text>
         {nextRank && (
           <Text style={styles.thresholdLabel}>

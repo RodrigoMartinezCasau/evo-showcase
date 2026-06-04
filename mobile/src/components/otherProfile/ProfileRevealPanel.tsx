@@ -3,6 +3,7 @@ import {
   PROFILE_IDENTITY_SECTION_GAP,
   PROFILE_INSIGNIA_CARD_MIN_HEIGHT,
 } from '@evoconn/constants/personalProfileLayout';
+import { getProfileRankFromPercentages } from '@evoconn/utils/getRankFromPct';
 import { View, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { getOtherUserProfileOrFallback } from '@evoconn/data/mockOtherUsers';
@@ -50,6 +51,12 @@ export const ProfileRevealPanel = React.memo(function ProfileRevealPanel({ autho
 
   const displayAvatarUri =
     profile.avatarUri?.trim() || remoteAvatarUri?.trim() || undefined;
+
+  const displayRank = getProfileRankFromPercentages(
+    profile.clanId,
+    profile.philosophyPercentages,
+    profile.rank,
+  );
 
   // Build live posts for this user so the panel always reflects real published content.
   const livePosts = useMemo<CommunityPost[]>(
@@ -125,7 +132,7 @@ export const ProfileRevealPanel = React.memo(function ProfileRevealPanel({ autho
               userId={profile.id}
               username={profile.username}
               clanId={profile.clanId}
-              rank={profile.rank}
+              rank={displayRank}
               avatarUri={displayAvatarUri}
               companionBelowHeight={identityCompanionBelowHeight}
               onShieldPress={

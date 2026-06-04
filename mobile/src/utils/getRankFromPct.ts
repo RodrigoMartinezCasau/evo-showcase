@@ -4,8 +4,8 @@ import type { Rank } from '@evoconn/types';
  * Rank thresholds based on dominant clan percentage.
  * ONLY applies to users WITH an assigned clan (clanId !== null).
  *
- *  25–40%  → 'aprendiz'  (clan assigned, first stage)
- *  40–50%  → 'maestro'
+ *  < 40%   → 'aprendiz'
+ *  40–49%  → 'maestro'
  *  ≥ 50%   → 'filosofo'
  *
  * Users without a clan (clanId === null) are always 'aprendiz'.
@@ -24,20 +24,21 @@ export function getRankFromPct(pct: number): Rank {
 
 /**
  * Progress fraction (0–1) within the current rank's segment for the bar.
- *   Aprendiz: 25% → 40%  (15 pt range, start at 25)
- *   Maestro:  40% → 50%  (10 pt range)
- *   Filósofo: always full
+ * Mide cuánto falta para el **siguiente** rango (no usa el 25 % de asignación de clan).
+ *   Aprendiz: 0% → 40%  (p. ej. 24 % → 60 % de barra)
+ *   Maestro:  40% → 50%
+ *   Filósofo: barra llena
  */
 export function getRankBarFill(pct: number): number {
-  if (pct >= RANK_THRESHOLDS.FILOSOFO) return 1;
-  if (pct >= RANK_THRESHOLDS.MAESTRO) {
-    return (pct - RANK_THRESHOLDS.MAESTRO) / (RANK_THRESHOLDS.FILOSOFO - RANK_THRESHOLDS.MAESTRO);
+  const clampedPct = Math.max(0, pct);
+  if (clampedPct >= RANK_THRESHOLDS.FILOSOFO) return 1;
+  if (clampedPct >= RANK_THRESHOLDS.MAESTRO) {
+    return (
+      (clampedPct - RANK_THRESHOLDS.MAESTRO) /
+      (RANK_THRESHOLDS.FILOSOFO - RANK_THRESHOLDS.MAESTRO)
+    );
   }
-  // Aprendiz segment starts at 25 (clan assignment threshold)
-  const APRENDIZ_START = 25;
-  const aprendizRange = RANK_THRESHOLDS.MAESTRO - APRENDIZ_START;
-  const clamped = Math.max(0, pct - APRENDIZ_START);
-  return Math.min(1, clamped / aprendizRange);
+  return Math.min(1, clampedPct / RANK_THRESHOLDS.MAESTRO);
 }
 
 /** Threshold percentage where the current rank ends (= next rank starts). */
@@ -55,6 +56,44 @@ export function getNextRankThreshold(pct: number): number | null {
 export function getRankForUser(pct: number, clanId: string | null): Rank {
   if (clanId === null) return 'aprendiz';
   return getRankFromPct(pct);
+}
+
+export type ClanPctLike = { clanId: string; pct: number };
+
+/** % del clan visible dentro de `philosophyPercentages` / `clan_percentages`. */
+export function getDominantClanPct(
+  percentages: ReadonlyArray<ClanPctLike>,
+  clanId: string | null | undefined,
+): number {
+  if (clanId == null) return 0;
+  const key = String(clanId).trim().toLowerCase();
+  if (!key) return 0;
+  const hit = percentages.find(
+    (e) => String(e.clanId).trim().toLowerCase() === key,
+  );
+  return hit?.pct ?? 0;
+}
+
+/**
+ * Rango mostrado en perfil según umbrales (40 / 50) y % del clan asignado.
+ * Si no hay porcentajes, usa `fallback`.
+ */
+export function getProfileRankFromPercentages(
+  clanId: string | null | undefined,
+  percentages: ReadonlyArray<ClanPctLike>,
+  fallback: Rank = 'aprendiz',
+): Rank {
+  if (!percentages.length) return fallback;
+  return getRankForUser(getDominantClanPct(percentages, clanId), clanId ?? null);
+}
+
+/** Progreso 0–1 de la barra de rango en perfil (misma lógica que DetailedRankCard). */
+export function getProfileRankBarProgress(
+  clanId: string | null | undefined,
+  percentages: ReadonlyArray<ClanPctLike>,
+): number {
+  if (clanId == null) return 0;
+  return getRankBarFill(getDominantClanPct(percentages, clanId));
 }
 
 /**

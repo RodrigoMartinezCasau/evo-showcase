@@ -35,6 +35,11 @@ import {
   PROFILE_INSIGNIA_CARD_MIN_HEIGHT,
 } from '@evoconn/constants/personalProfileLayout';
 import {
+  getDominantClanPct,
+  getProfileRankBarProgress,
+  getProfileRankFromPercentages,
+} from '@evoconn/utils/getRankFromPct';
+import {
   PersonalFollowRow,
   PersonalIdentityHeader,
   PersonalInsigniaPhrase,
@@ -119,6 +124,10 @@ export default function PersonalProfileScreen() {
     () => (ready ? classification.getVisibleClanId(profile.id) : null),
     [ready, classification, profile.id],
   );
+  const percentageRank = useMemo(
+    () => (ready ? classification.getPercentageRank(profile.id) : 'aprendiz'),
+    [ready, classification, profile.id],
+  );
   // Fallback robusto: si el store local está vacío (build nuevo / storage
   // limpio), usamos el `clan_percentages` publicado en Supabase — la misma
   // fuente que ya muestra correctamente el perfil ajeno.
@@ -126,10 +135,22 @@ export default function PersonalProfileScreen() {
     authProfile?.id ?? session?.user?.id ?? profile.id,
     localPercentages,
     localVisibleClanId,
+    percentageRank,
   );
-  const displayRank = useMemo(
-    () => (ready ? classification.getDisplayRank(profile.id) : 'aprendiz'),
-    [ready, classification, profile.id],
+  const dominantPct = useMemo(
+    () => getDominantClanPct(realPercentages, activeClan),
+    [realPercentages, activeClan],
+  );
+  const resolvedRank = useMemo(
+    () =>
+      realPercentages.length > 0
+        ? getProfileRankFromPercentages(activeClan, realPercentages, percentageRank)
+        : percentageRank,
+    [realPercentages, activeClan, percentageRank],
+  );
+  const rankBarProgress = useMemo(
+    () => getProfileRankBarProgress(activeClan, realPercentages),
+    [activeClan, realPercentages],
   );
   const reflectionCount = useMemo(
     () => (ready ? classification.getReflectionCount(profile.id) : 0),
@@ -150,7 +171,7 @@ export default function PersonalProfileScreen() {
     clanId: activeClan,
     avatarUri: authProfile?.avatar_url ?? mockCurrentUser.avatarUri ?? null,
     philosophyPercentages: realPercentages,
-    rank: displayRank,
+    rank: resolvedRank,
     insigniaPhrase: authProfile?.insignia_phrase ?? profile.insigniaPhrase,
     totalReflections: authProfile?.total_reflections ?? profile.totalReflections,
     totalQuotes: authProfile?.total_quotes ?? profile.totalQuotes,
@@ -160,7 +181,7 @@ export default function PersonalProfileScreen() {
     authProfile?.avatar_url,
     activeClan,
     realPercentages,
-    displayRank,
+    resolvedRank,
     authProfile?.insignia_phrase,
     authProfile?.total_reflections,
     authProfile?.total_quotes,
@@ -456,6 +477,7 @@ export default function PersonalProfileScreen() {
             <View style={styles.contentGap} />
             <PersonalRankProgression
               rank={profileWithClan.rank}
+              dominantPct={dominantPct}
               clanId={profileWithClan.clanId}
               totalReflections={reflectionCount}
               totalPhrases={phraseCount}

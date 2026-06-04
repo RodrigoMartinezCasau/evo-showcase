@@ -43,6 +43,8 @@ import { UserAvatarFrame } from './shared/UserAvatarFrame';
 import SettingsSvg from '../assets/sidebar/settingsIconSvg/settings.svg';
 import { INRIA_SERIF_FONT_FAMILY } from '@evoconn/constants/inriaSerifFontFamily';
 import type { Rank } from '@evoconn/types';
+import { useClassification } from '@evoconn/hooks/ClassificationContext';
+import { getProfileRankFromPercentages } from '@evoconn/utils/getRankFromPct';
 import type { ConversationItem as ConvItem } from '@evoconn/types';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { useAuth } from '../../mobile/lib/AuthContext';
@@ -96,6 +98,7 @@ function SidebarDrawerInner({
   const router = useRouter();
   const pathname = usePathname();
   const { profile: authProfile, session } = useAuth();
+  const classification = useClassification();
   const activeClan = useActiveClan(authProfile?.clan_id ?? mockCurrentUser.clanId);
   // El sidebar SIEMPRE se deriva del perfil autenticado cuando hay sesión,
   // así re-renderiza al cargar/cambiar el perfil real. Solo cae al
@@ -103,11 +106,15 @@ function SidebarDrawerInner({
   const user = useMemo(() => {
     if (session && authProfile) {
       const raw = authProfile.username?.trim();
+      const pcts = classification.getPercentages(authProfile.id);
+      const rank = pcts.length
+        ? getProfileRankFromPercentages(activeClan, pcts, authProfile.rank)
+        : classification.getPercentageRank(authProfile.id);
       return {
         id: authProfile.id,
         username: raw ? `@${raw.toUpperCase()}` : '',
         clanId: activeClan,
-        rank: authProfile.rank,
+        rank,
         avatarUri: authProfile.avatar_url ?? undefined,
       };
     }
@@ -120,19 +127,17 @@ function SidebarDrawerInner({
         avatarUri: undefined,
       };
     }
-    return { ...mockCurrentUser, clanId: activeClan };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const mockPcts = classification.getPercentages(mockCurrentUser.id);
+    const mockRank = mockPcts.length
+      ? getProfileRankFromPercentages(activeClan, mockPcts, mockCurrentUser.rank)
+      : classification.getPercentageRank(mockCurrentUser.id);
+    return { ...mockCurrentUser, clanId: activeClan, rank: mockRank };
   }, [
     session,
-    authProfile?.id,
-    authProfile?.username,
-    authProfile?.rank,
-    authProfile?.avatar_url,
+    authProfile,
     activeClan,
-    mockCurrentUser.id,
-    mockCurrentUser.username,
-    mockCurrentUser.rank,
-    mockCurrentUser.avatarUri,
+    classification,
+    mockCurrentUser,
   ]);
   const closeSidebar = onClose;
   const searchInputRef = useRef<TextInput>(null);
