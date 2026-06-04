@@ -58,7 +58,7 @@ export function getRankForUser(pct: number, clanId: string | null): Rank {
   return getRankFromPct(pct);
 }
 
-export type ClanPctLike = { clanId: string; pct: number };
+export type ClanPctLike = { clanId: string; pct: number; label?: string };
 
 /** % del clan visible dentro de `philosophyPercentages` / `clan_percentages`. */
 export function getDominantClanPct(
@@ -72,6 +72,20 @@ export function getDominantClanPct(
     (e) => String(e.clanId).trim().toLowerCase() === key,
   );
   return hit?.pct ?? 0;
+}
+
+/** Etiqueta + % del clan visible (para DetailedRankCard y contexto IA). */
+export function getVisibleClanPctEntry(
+  percentages: ReadonlyArray<ClanPctLike>,
+  clanId: string | null | undefined,
+): { label: string; pct: number } {
+  const pct = getDominantClanPct(percentages, clanId);
+  if (clanId == null) return { label: '', pct: 0 };
+  const key = String(clanId).trim().toLowerCase();
+  const hit = percentages.find(
+    (e) => String(e.clanId).trim().toLowerCase() === key,
+  );
+  return { label: hit?.label ?? '', pct };
 }
 
 /**

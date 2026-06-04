@@ -66,6 +66,10 @@ import { useDebugStats } from '../debug/DebugStatsContext';
 import { requestNoUsesAnimation } from '@evoconn/components/animations/AppAnimationLayer';
 import { mergeClanRankHistories } from '@evoconn/services/classificationStorage';
 import type { ClanScoreId } from '@evoconn/services/clanClassifier';
+import {
+  getProfileRankFromPercentages,
+  getVisibleClanPctEntry,
+} from '@evoconn/utils/getRankFromPct';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -125,7 +129,7 @@ export default function PersonalPhilosophyDetailScreen() {
   // Mientras `!ready` el cuerpo no se muestra, así que devolvemos valores neutros.
   const localPercentages = ready ? classification.getPercentages(baseProfile.id) : [];
   const localVisibleClanId = ready ? classification.getVisibleClanId(baseProfile.id) : null;
-  const localDisplayRank = ready ? classification.getDisplayRank(baseProfile.id) : 'aprendiz';
+  const percentageRank = ready ? classification.getPercentageRank(baseProfile.id) : 'aprendiz';
   // Fallback robusto: si el store local está vacío (build nuevo / storage
   // limpio), usamos el `clan_percentages` / `clan_id` / `rank` publicados en
   // Supabase.
@@ -137,8 +141,14 @@ export default function PersonalPhilosophyDetailScreen() {
     authProfile?.id ?? baseProfile.id,
     localPercentages,
     localVisibleClanId,
-    localDisplayRank,
+    percentageRank,
   );
+  const effectiveClanId = publishedClanId ?? localVisibleClanId ?? activeClan;
+  const resolvedRank: Rank = realPercentages.length
+    ? getProfileRankFromPercentages(effectiveClanId, realPercentages, percentageRank)
+    : ready
+      ? percentageRank
+      : 'aprendiz';
   const localRankHistory = ready
     ? classification.getClanRankHistory(authProfile?.id ?? baseProfile.id)
     : {};
@@ -159,7 +169,7 @@ export default function PersonalPhilosophyDetailScreen() {
   const profile = {
     ...baseProfile,
     philosophyPercentages: realPercentages,
-    rank: ready ? classification.getPercentageRank(baseProfile.id) : 'aprendiz',
+    rank: resolvedRank,
   };
   /** Misma regla que racha/usos: Supabase cuando hay sesión, si no el perfil activo. */
   const apiUserId = authProfile?.id ?? profile.id;
@@ -167,7 +177,7 @@ export default function PersonalPhilosophyDetailScreen() {
   const { decrementUses, remainingUses } = useDebugStats();
   const remainingUsesRef = useRef(remainingUses);
   remainingUsesRef.current = remainingUses;
-  const clanId = activeClan;
+  const clanId = effectiveClanId ?? activeClan;
 
   /** Same quota as enviar reflexión/frase: 1 uso local + log remoto por generación. */
   const consumeAiUse = useCallback(() => {
@@ -177,9 +187,15 @@ export default function PersonalPhilosophyDetailScreen() {
     void recordUsesLog(apiUserId).catch(() => {});
   }, [apiUserId, decrementUses]);
 
-  // Dominant clan (highest pct)
-  const sorted = [...profile.philosophyPercentages].sort((a, b) => b.pct - a.pct);
-  const dominant = sorted[0] ?? { label: '', pct: 0 };
+  // % y etiqueta del clan visible (misma base que perfil + barra de rango)
+  const visibleClan = getVisibleClanPctEntry(profile.philosophyPercentages, clanId);
+  const dominant =
+    visibleClan.label || visibleClan.pct > 0
+      ? visibleClan
+      : [...profile.philosophyPercentages].sort((a, b) => b.pct - a.pct)[0] ?? {
+          label: '',
+          pct: 0,
+        };
   const ctx = buildContext(profile, dominant.label, authProfile?.username);
 
   // ─── AI block state ──────────────────────────────────────────────────────
@@ -374,7 +390,7 @@ export default function PersonalPhilosophyDetailScreen() {
             <DetailedRankCard
               dominantClanLabel={dominant.label}
               dominantPct={dominant.pct}
-              displayRank={profile.rank}
+              displayRank={resolvedRank}
             />
 
             <View style={styles.gap} />
