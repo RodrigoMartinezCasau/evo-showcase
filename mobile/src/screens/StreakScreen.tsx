@@ -137,7 +137,8 @@ export default function StreakScreen() {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  const displayStreakDays = data?.streak_current ?? streakDays;
+  // streakDays ya aplica 0 en el día de recuperación (antes de publicar).
+  const displayStreakDays = streakDays;
 
   const load = useCallback(async () => {
     setLoading(true);

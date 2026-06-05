@@ -244,6 +244,19 @@ export function getStreakRecovery(stats: UserStats, today: string): StreakRecove
 }
 
 /**
+ * Contador de racha visible en la UI (top bar, pantalla de racha, widget).
+ * En el día de recuperación, antes de publicar, mostramos 0 aunque el valor
+ * interno o del servidor conserve la racha perdida hasta que se restaure.
+ */
+export function getDisplayStreakCount(stats: UserStats, today: string): number {
+  const recovery = getStreakRecovery(stats, today);
+  if (recovery.eligible && stats.hasSentTodayDate !== today) {
+    return 0;
+  }
+  return Math.max(0, stats.currentStreak);
+}
+
+/**
  * Recupera la racha perdida: la restablece (días perdidos + el día de hoy) y
  * limpia el marcador de recuperación. Pensado para llamarse desde la activación
  * de racha cuando getStreakRecovery() es elegible.

@@ -40,6 +40,7 @@ import {
   reconcileStreakOnLoad,
   mergeStatsFromRemote,
   applyRemoteStreakData,
+  getDisplayStreakCount,
   getStreakRecovery,
   getLocalDayKey,
   DAILY_USES_LIMIT,
@@ -406,7 +407,10 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
     [db, activeUserId],
   );
   const hasSentToday = activeSlice.hasSentTodayDate === currentDay;
-  const streakDays = activeSlice.currentStreak;
+  const streakDays = useMemo(
+    () => getDisplayStreakCount(activeSlice, currentDay),
+    [activeSlice, currentDay],
+  );
   const remainingUses = activeSlice.dailyUsesRemaining;
 
   // ── Recuperación de racha perdida ──────────────────────────────────────────
