@@ -698,6 +698,49 @@ export async function fetchSavesForPosts(postIds: string[]): Promise<DbSaveRow[]
   return all;
 }
 
+// ─── Engagement counts (agregado) ─────────────────────────────────────────────
+
+export type EngagementCounts = { up: number; down: number; save: number };
+
+/**
+ * Conteos agregados (votos arriba/abajo y guardados) de una lista de posts,
+ * vía RPC `get_post_engagement_counts` (COUNT en Postgres). Sustituye a
+ * descargar miles de filas individuales de `votes`/`saves` solo para contar.
+ *
+ * Devuelve `null` si el RPC no está desplegado o falla → el llamador cae a
+ * traer las filas individuales (`fetchVotesForPosts` / `fetchSavesForPosts`),
+ * preservando el comportamiento anterior sin romper nada.
+ */
+export async function fetchEngagementCounts(
+  postIds: string[],
+): Promise<Record<string, EngagementCounts> | null> {
+  if (postIds.length === 0) return {};
+  const { data, error } = await supabase.rpc('get_post_engagement_counts', {
+    p_post_ids: postIds,
+  });
+  if (error) {
+    console.warn(
+      '[Social] get_post_engagement_counts RPC no disponible, usando filas individuales:',
+      error.message,
+    );
+    return null;
+  }
+  const out: Record<string, EngagementCounts> = {};
+  for (const row of (data ?? []) as {
+    post_id: string;
+    up_count: number;
+    down_count: number;
+    save_count: number;
+  }[]) {
+    out[String(row.post_id)] = {
+      up: Number(row.up_count) || 0,
+      down: Number(row.down_count) || 0,
+      save: Number(row.save_count) || 0,
+    };
+  }
+  return out;
+}
+
 export async function insertSave(userId: string, postId: string): Promise<void> {
   if (!isRealUserId(userId)) return;
   const { error } = await supabase.from('saves').upsert({ user_id: userId, post_id: postId }, { onConflict: 'user_id,post_id' });
@@ -1009,8 +1052,9 @@ export async function fetchPostsByUser(userId: string): Promise<SimPost[]> {
     .filter((row) => isPublishedSimPostType(row['type']))
     .map(dbRowToSimPost);
   if (posts.length === 0) return posts;
-  // Hydrate vote + save counts.
+  // Hydrate vote + save counts (muta los posts en sitio).
   await hydrateSimPostEngagement(posts);
+  return posts;
 }
 
 // ─── Follow counts ────────────────────────────────────────────────────────────
@@ -1113,13 +1157,82 @@ export async function fetchProfilesBatch(userIds: string[]): Promise<BasicProfil
 export type TopUser = BasicProfile & { followersCount: number };
 
 /**
- * Cuentas con más seguidores de la app (para el feed de "cuentas destacadas"
- * de la pantalla de búsqueda). No existe una columna `followers_count`, así que
- * agregamos la tabla `follows` en cliente: contamos cuántas veces aparece cada
- * `following_id`, cogemos los top N y traemos sus perfiles. Suficiente para la
- * escala actual; si la red crece mucho conviene mover esto a un RPC con GROUP BY.
+ * Dada una lista de ids ya ordenada (top N) y sus conteos de seguidores,
+ * trae los perfiles en una sola consulta y construye los `TopUser`.
+ * Compartido por la ruta RPC y el escaneo en cliente.
  */
-export async function fetchTopUsersByFollowers(limit = 10): Promise<TopUser[]> {
+async function fetchTopUsersProfiles(
+  topIds: string[],
+  counts: Record<string, number>,
+): Promise<TopUser[]> {
+  if (topIds.length === 0) return [];
+  const { data: profs, error: pErr } = await supabase
+    .from('profiles')
+    .select('id, username, clan_id, rank, avatar_url')
+    .in('id', topIds);
+  if (pErr) {
+    console.error('[Social] fetchTopUsersByFollowers profiles:', pErr.message);
+    return [];
+  }
+
+  const byId = new Map(
+    (profs ?? []).map((r) => [
+      r.id as string,
+      {
+        id: r.id as string,
+        username: (r.username as string) ?? (r.id as string).slice(0, 8),
+        clanId: (r.clan_id as string | null) ?? null,
+        rank: (r.rank as string) ?? 'aprendiz',
+        avatarUri: (r as { avatar_url?: string | null }).avatar_url ?? null,
+      } as BasicProfile,
+    ]),
+  );
+
+  return topIds
+    .map((id) => {
+      const p = byId.get(id);
+      return p ? { ...p, followersCount: counts[id] ?? 0 } : null;
+    })
+    .filter((u): u is TopUser => u != null);
+}
+
+/**
+ * Ruta rápida: RPC `get_top_followed_users` que agrega `follows` en Postgres
+ * (GROUP BY) y devuelve solo los top N con su conteo real. Una sola consulta
+ * en vez de descargar ~2000 filas + N conteos exactos.
+ *
+ * Devuelve `null` si el RPC no está desplegado/falla → el llamador cae al
+ * escaneo en cliente (comportamiento anterior, sin romper nada).
+ */
+async function fetchTopUsersByFollowersViaRpc(limit: number): Promise<TopUser[] | null> {
+  const { data, error } = await supabase.rpc('get_top_followed_users', {
+    p_result_limit: limit,
+  });
+  if (error) {
+    console.warn(
+      '[Social] get_top_followed_users RPC no disponible, usando escaneo en cliente:',
+      error.message,
+    );
+    return null;
+  }
+  const rows = (data ?? []) as { following_id: string; followers_count: number }[];
+  const counts: Record<string, number> = {};
+  const topIds: string[] = [];
+  for (const row of rows) {
+    const id = String(row.following_id);
+    if (!isRealUserId(id)) continue;
+    counts[id] = Number(row.followers_count) || 0;
+    topIds.push(id);
+  }
+  return fetchTopUsersProfiles(topIds, counts);
+}
+
+/**
+ * Fallback en cliente: muestrea `follows`, agrega por `following_id`, hace un
+ * conteo exacto por candidato y trae sus perfiles. Se usa solo si el RPC
+ * `get_top_followed_users` no está disponible.
+ */
+async function fetchTopUsersByFollowersClientScan(limit: number): Promise<TopUser[]> {
   // 1) Descubrimiento de candidatos: una muestra de `follows` (el servidor
   //    limita el nº de filas, así que esto es solo para saber QUIÉN aparece
   //    mucho, no para el número final).
@@ -1153,34 +1266,19 @@ export async function fetchTopUsersByFollowers(limit = 10): Promise<TopUser[]> {
     .sort((a, b) => (exact[b] ?? 0) - (exact[a] ?? 0))
     .slice(0, limit);
 
-  const { data: profs, error: pErr } = await supabase
-    .from('profiles')
-    .select('id, username, clan_id, rank, avatar_url')
-    .in('id', topIds);
-  if (pErr) {
-    console.error('[Social] fetchTopUsersByFollowers profiles:', pErr.message);
-    return [];
-  }
+  return fetchTopUsersProfiles(topIds, exact);
+}
 
-  const byId = new Map(
-    (profs ?? []).map((r) => [
-      r.id as string,
-      {
-        id: r.id as string,
-        username: (r.username as string) ?? (r.id as string).slice(0, 8),
-        clanId: (r.clan_id as string | null) ?? null,
-        rank: (r.rank as string) ?? 'aprendiz',
-        avatarUri: (r as { avatar_url?: string | null }).avatar_url ?? null,
-      } as BasicProfile,
-    ]),
-  );
-
-  return topIds
-    .map((id) => {
-      const p = byId.get(id);
-      return p ? { ...p, followersCount: exact[id] ?? 0 } : null;
-    })
-    .filter((u): u is TopUser => u != null);
+/**
+ * Cuentas con más seguidores de la app (para el feed de "cuentas destacadas"
+ * de la pantalla de búsqueda). Prefiere el RPC agregado en Postgres
+ * (`get_top_followed_users`) y, si no está disponible, cae al escaneo en
+ * cliente — mismo resultado, comportamiento anterior preservado.
+ */
+export async function fetchTopUsersByFollowers(limit = 10): Promise<TopUser[]> {
+  const viaRpc = await fetchTopUsersByFollowersViaRpc(limit);
+  if (viaRpc) return viaRpc;
+  return fetchTopUsersByFollowersClientScan(limit);
 }
 
 /** Search users by username prefix/substring in Supabase profiles. */
@@ -1190,7 +1288,7 @@ export async function searchSupabaseUsers(query: string): Promise<BasicProfile[]
     .from('profiles')
     .select('id, username, clan_id, rank, avatar_url')
     .ilike('username', `%${query.trim()}%`)
-    .limit(15);
+    .limit(30);
   if (error) { console.error('[Social] searchSupabaseUsers:', error.message); return []; }
   return (data ?? []).map(r => ({
     id: r.id,

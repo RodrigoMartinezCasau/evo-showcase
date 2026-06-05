@@ -26,11 +26,15 @@ type ClanCardFeedRimOverlayProps = {
   rimArmX?: number;
   /** Vertical arm length; defaults to `rimArm`. */
   rimArmY?: number;
+  /** `all` = 4 esquinas (feed). `diagonal` = solo superior izquierda + inferior derecha. */
+  corners?: 'all' | 'diagonal';
 };
 
 /**
- * Apple-style glowing rim on all four corners (Siguiendo feed cards).
- * Para Ti reflection uses only TL + BR via `ReflectionBackground`.
+ * Apple-style glowing rim on card corners.
+ * - `all` (default): las 4 esquinas — tarjetas del feed Siguiendo.
+ * - `diagonal`: solo superior izquierda + inferior derecha — chips de pensamiento
+ *   filosófico y posts Para ti (`ReflectionBackground`).
  */
 export function ClanCardFeedRimOverlay({
   width,
@@ -40,6 +44,7 @@ export function ClanCardFeedRimOverlay({
   rimArm = RIM_ARM,
   rimArmX,
   rimArmY,
+  corners = 'all',
 }: ClanCardFeedRimOverlayProps) {
   const r = borderRadius;
   const ax = rimArmX ?? rimArm;
@@ -93,8 +98,12 @@ export function ClanCardFeedRimOverlay({
           </LinearGradient>
         </Defs>
         <Path d={tlD} fill="none" stroke={`url(#${idTL})`} strokeWidth={RIM_WIDTH} strokeLinecap="round" strokeLinejoin="round" />
-        <Path d={trD} fill="none" stroke={`url(#${idTR})`} strokeWidth={RIM_WIDTH} strokeLinecap="round" strokeLinejoin="round" />
-        <Path d={blD} fill="none" stroke={`url(#${idBL})`} strokeWidth={RIM_WIDTH} strokeLinecap="round" strokeLinejoin="round" />
+        {corners === 'all' ? (
+          <>
+            <Path d={trD} fill="none" stroke={`url(#${idTR})`} strokeWidth={RIM_WIDTH} strokeLinecap="round" strokeLinejoin="round" />
+            <Path d={blD} fill="none" stroke={`url(#${idBL})`} strokeWidth={RIM_WIDTH} strokeLinecap="round" strokeLinejoin="round" />
+          </>
+        ) : null}
         <Path d={brD} fill="none" stroke={`url(#${idBR})`} strokeWidth={RIM_WIDTH} strokeLinecap="round" strokeLinejoin="round" />
       </Svg>
     </View>

@@ -15,23 +15,30 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { evoconnColors } from '../theme/colors';
 import { SEARCH_LAYOUT as SL } from '../constants/searchScreenLayout';
 import { mockSearchableUsers } from '../data/mockSearchUsers';
-import { searchUsers, type ScoredUser } from '../utils/searchUsers';
+import {
+  rankSearchUserResults,
+  searchUsers,
+  type ScoredUser,
+  type SearchRankContext,
+} from '../utils/searchUsers';
 import { searchClans, type ScoredClan } from '../utils/searchClans';
 import { UserResultCard } from './UserResultCard';
 import { ClanResultCard } from './ClanResultCard';
 import { ProfileFollowButton } from './otherProfile/ProfileFollowButton';
 import {
-  fetchFollowersCountsBatch,
   searchSupabaseUsers,
   fetchTopUsersByFollowers,
+  fetchFollowersCountsExact,
   type TopUser,
 } from '../services/supabaseSocial';
+import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../mobile/lib/AuthContext';
 import { useEffectiveClanId } from '@evoconn/hooks/useEffectiveClanId';
 import { useBlockedUsers } from '@evoconn/hooks/BlockedUsersContext';
 import { getClanColor } from '@evoconn/constants/clanColors';
 import { useClanRankings } from '@evoconn/hooks/useClanRankings';
+import type { User } from '../types';
 
 const MAX_RECENTS = 10;
 const DEBOUNCE_MS = 250;
@@ -71,6 +78,7 @@ type SearchListItem =
 
 export function SearchScreen({ onUserPress, onClanPress }: SearchScreenProps) {
   const { profile } = useAuth();
+  const { followGraph } = useSimulation();
   const { isBlocked } = useBlockedUsers();
   const myEffectiveClanId = useEffectiveClanId();
   const myClanColor = getClanColor(myEffectiveClanId);
@@ -147,25 +155,30 @@ export function SearchScreen({ onUserPress, onClanPress }: SearchScreenProps) {
     };
   }, []);
 
-  const [supabaseResults, setSupabaseResults] = useState<ScoredUser[]>([]);
+  const searchRankContext = useMemo<SearchRankContext>(
+    () => ({ viewerId: profile?.id, followGraph }),
+    [profile?.id, followGraph],
+  );
+
+  const [supabaseCandidates, setSupabaseCandidates] = useState<User[]>([]);
   useEffect(() => {
     if (!debouncedQuery.trim()) {
-      setSupabaseResults([]);
+      setSupabaseCandidates([]);
       return;
     }
     let cancelled = false;
     void (async () => {
       const profiles = await searchSupabaseUsers(debouncedQuery);
       if (cancelled) return;
-      const followerCounts = await fetchFollowersCountsBatch(profiles.map((p) => p.id));
+      // Conteos exactos solo para ordenar (no se muestran en la tarjeta).
+      const followerCounts = await fetchFollowersCountsExact(profiles.map((p) => p.id));
       if (cancelled) return;
-      setSupabaseResults(
+      setSupabaseCandidates(
         profiles.map((p) => ({
           id: p.id,
           username: p.username,
           clanId: p.clanId,
           rank: p.rank as ScoredUser['rank'],
-          score: 1,
           avatarUri: p.avatarUri ?? null,
           followersCount: followerCounts[p.id] ?? 0,
         })),
@@ -177,21 +190,29 @@ export function SearchScreen({ onUserPress, onClanPress }: SearchScreenProps) {
   }, [debouncedQuery]);
 
   const localResults = useMemo(
-    () => searchUsers(debouncedQuery, mockSearchableUsers),
-    [debouncedQuery],
+    () => searchUsers(debouncedQuery, mockSearchableUsers, searchRankContext),
+    [debouncedQuery, searchRankContext],
   );
 
   const userResults: ScoredUser[] = useMemo(() => {
-    const sbIds = new Set(supabaseResults.map(r => r.id));
-    const localOnly = localResults.filter(r => !sbIds.has(r.id));
-    const merged = [...supabaseResults, ...localOnly]
-      .filter((r) => !isBlocked(r.id))
-      .slice(0, SEARCH_MAX_RESULTS);
-    if (!profile?.id || !myEffectiveClanId) return merged;
-    return merged.map((r) =>
+    const sbIds = new Set(supabaseCandidates.map((r) => r.id));
+    const localOnly = localResults.filter((r) => !sbIds.has(r.id));
+    const merged = [...supabaseCandidates, ...localOnly].filter((r) => !isBlocked(r.id));
+    const ranked = rankSearchUserResults(debouncedQuery, merged, searchRankContext);
+    const top = ranked.slice(0, SEARCH_MAX_RESULTS);
+    if (!profile?.id || !myEffectiveClanId) return top;
+    return top.map((r) =>
       r.id === profile.id ? { ...r, clanId: myEffectiveClanId } : r,
     );
-  }, [supabaseResults, localResults, profile?.id, myEffectiveClanId, isBlocked]);
+  }, [
+    supabaseCandidates,
+    localResults,
+    debouncedQuery,
+    searchRankContext,
+    profile?.id,
+    myEffectiveClanId,
+    isBlocked,
+  ]);
 
   const clanResults = useMemo(
     () => searchClans(debouncedQuery).slice(0, 3),
@@ -304,7 +325,6 @@ export function SearchScreen({ onUserPress, onClanPress }: SearchScreenProps) {
         username={item.user.username}
         clanId={item.user.clanId}
         rank={item.user.rank}
-        followersCount={item.user.followersCount ?? 0}
         avatarUri={item.user.avatarUri}
         onPress={() => handleUserPress(item.user)}
       />
@@ -414,7 +434,6 @@ export function SearchScreen({ onUserPress, onClanPress }: SearchScreenProps) {
                     username={u.username}
                     clanId={u.clanId}
                     rank={u.rank}
-                    followersCount={u.followersCount}
                     avatarUri={u.avatarUri}
                     onPress={() => handleFeaturedUserPress(u)}
                     trailing={

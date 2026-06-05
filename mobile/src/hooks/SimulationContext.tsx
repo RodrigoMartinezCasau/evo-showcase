@@ -42,6 +42,7 @@ import {
   fetchHiddenPostIdsByAuthor,
   fetchVotesForPosts,
   fetchSavesForPosts,
+  fetchEngagementCounts,
   fetchMyVotes,
   fetchMySaves,
   fetchFollowing,
@@ -168,6 +169,26 @@ async function loadSupabaseHydrationPayload(hydrateFor: string): Promise<{
   const commentsByPost: Record<string, SimComment[]> = {};
 
   return { sbPosts, myVotesMap, mySavedPostIds, following, followers, commentsByPost };
+}
+
+/**
+ * Construye un array de "votantes/guardadores" cuya LONGITUD coincide con un
+ * conteo agregado del servidor, sin descargar las filas reales.
+ *
+ * Los conteos del feed se leen siempre como `.length` de estos arrays, y "¿he
+ * votado/guardado YO?" se resuelve aparte (voteMap / savedMap), así que rellenar
+ * con ids placeholder es seguro para los conteos. Incluimos el id REAL del
+ * usuario actual cuando él participó, para que el toggle optimista
+ * (`castVote` / `toggleSave`, que añade/quita su id real) ajuste el conteo
+ * correctamente (+1 / −1) sin doble conteo.
+ */
+function buildSyntheticVoterIds(count: number, realSelfId: string | null): string[] {
+  const total = Math.max(0, Math.floor(count));
+  const ids: string[] = [];
+  if (realSelfId) ids.push(realSelfId);
+  const fillers = realSelfId ? total - 1 : total;
+  for (let i = 0; i < fillers; i++) ids.push(`__count_${i}`);
+  return ids;
 }
 
 // ─── State initialisers ───────────────────────────────────────────────────────
@@ -513,15 +534,15 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       }
 
       const sbPosts = Array.from(byId.values());
-      const postIds = sbPosts.map(p => p.id);
 
       applyPosts(sbPosts);
       console.log('[Social] Posts hydrated:', sbPosts.length);
 
       // ── FASE 2: todo lo demás en paralelo (background) ─────────────────
+      // Los conteos de votos/guardados YA NO se traen como filas individuales
+      // aquí: se piden agregados (COUNT en Postgres) más abajo, una sola vez
+      // sobre TODOS los posts (global + guardados + seguidos).
       const [
-        allVoteRows,
-        allSaveRows,
         myVotesMap,
         myCommentVoteIds,
         mySavedPostIds,
@@ -529,8 +550,6 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
         followers,
         hiddenPostIds,
       ] = await Promise.all([
-        fetchVotesForPosts(postIds),
-        fetchSavesForPosts(postIds),
         fetchMyVotes(hydrateFor),
         fetchMyCommentVotes(hydrateFor),
         fetchMySaves(hydrateFor),
@@ -540,62 +559,70 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       ]);
       if (cancelled || activeUserIdRef.current !== hydrateFor) return;
 
-      // Aplicar vote rows a los posts (mutación segura: cada post es nuestro).
+      // Mutación segura: cada post es nuestro (recién mapeado).
       const postById = new Map(sbPosts.map(p => [p.id, p] as const));
 
       // Guardados fuera del feed global: traer cuerpos para perfil / lista guardados.
       const missingSavedIds = mySavedPostIds.filter((id) => !postById.has(id));
-      const voteRows = [...allVoteRows];
-      const saveRows = [...allSaveRows];
       if (missingSavedIds.length > 0) {
         const savedPosts = await fetchPostsByIds(missingSavedIds);
         for (const p of savedPosts) {
           postById.set(p.id, p);
         }
-        // `dbRowToSimPost` deja up/down en 0; hay que pedir votos como en Siguiendo.
-        const savedVoteRows = await fetchVotesForPosts(missingSavedIds);
-        voteRows.push(...savedVoteRows);
-        const savedSaveRows = await fetchSavesForPosts(missingSavedIds);
-        saveRows.push(...savedSaveRows);
       }
 
       // Posts antiguos de la gente a la que sigues (fuera del top global de 200)
-      // → que sigan apareciendo en "Siguiendo". Traemos sus cuerpos y, para los
-      // que no estaban ya, sus votos (allVoteRows solo cubría el top global).
+      // → que sigan apareciendo en "Siguiendo". Solo traemos sus cuerpos; los
+      // conteos se resuelven junto al resto justo después.
       if (following.length > 0) {
         const followedPosts = await fetchPostsByAuthors(following);
-        const newFollowedIds: string[] = [];
         for (const p of followedPosts) {
           if (!postById.has(p.id)) {
             postById.set(p.id, p);
-            newFollowedIds.push(p.id);
           }
         }
-        if (newFollowedIds.length > 0) {
-          const followedVoteRows = await fetchVotesForPosts(newFollowedIds);
-          voteRows.push(...followedVoteRows);
-          const followedSaveRows = await fetchSavesForPosts(newFollowedIds);
-          saveRows.push(...followedSaveRows);
-        }
       }
+      if (cancelled || activeUserIdRef.current !== hydrateFor) return;
 
-      // Antes resetear: fase 1 puede haber preservado votos cacheados para
-      for (const p of postById.values()) {
-        p.upvoterIds = [];
-        p.downvoterIds = [];
-        p.saverIds = [];
-      }
-      for (const row of voteRows) {
-        const post = postById.get(row.post_id);
-        if (!post) continue;
-        if (row.vote === 'up') post.upvoterIds = [...post.upvoterIds, row.user_id];
-        if (row.vote === 'down') post.downvoterIds = [...post.downvoterIds, row.user_id];
-      }
-      for (const row of saveRows) {
-        const post = postById.get(row.post_id);
-        if (!post) continue;
-        if (!post.saverIds.includes(row.user_id)) {
-          post.saverIds = [...post.saverIds, row.user_id];
+      // ── Conteos de engagement (votos arriba/abajo + guardados) ─────────
+      // Preferimos el COUNT agregado en Postgres (un único RPC) en vez de
+      // descargar miles de filas. Si el RPC no está desplegado, caemos a las
+      // filas individuales (comportamiento anterior, idéntico resultado).
+      const allPostIds = Array.from(postById.keys());
+      const mySavedSet = new Set(mySavedPostIds);
+      const counts = await fetchEngagementCounts(allPostIds);
+      if (cancelled || activeUserIdRef.current !== hydrateFor) return;
+
+      if (counts) {
+        for (const p of postById.values()) {
+          const c = counts[p.id] ?? { up: 0, down: 0, save: 0 };
+          const myVote = myVotesMap[p.id] ?? null;
+          p.upvoterIds = buildSyntheticVoterIds(c.up, myVote === 'up' ? hydrateFor : null);
+          p.downvoterIds = buildSyntheticVoterIds(c.down, myVote === 'down' ? hydrateFor : null);
+          p.saverIds = buildSyntheticVoterIds(c.save, mySavedSet.has(p.id) ? hydrateFor : null);
+        }
+      } else {
+        // Fallback: filas individuales (como antes), sobre todos los posts.
+        const voteRows = await fetchVotesForPosts(allPostIds);
+        const saveRows = await fetchSavesForPosts(allPostIds);
+        if (cancelled || activeUserIdRef.current !== hydrateFor) return;
+        for (const p of postById.values()) {
+          p.upvoterIds = [];
+          p.downvoterIds = [];
+          p.saverIds = [];
+        }
+        for (const row of voteRows) {
+          const post = postById.get(row.post_id);
+          if (!post) continue;
+          if (row.vote === 'up') post.upvoterIds = [...post.upvoterIds, row.user_id];
+          if (row.vote === 'down') post.downvoterIds = [...post.downvoterIds, row.user_id];
+        }
+        for (const row of saveRows) {
+          const post = postById.get(row.post_id);
+          if (!post) continue;
+          if (!post.saverIds.includes(row.user_id)) {
+            post.saverIds = [...post.saverIds, row.user_id];
+          }
         }
       }
       setPosts(() => Array.from(postById.values()));

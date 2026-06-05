@@ -188,7 +188,7 @@ export default function PersonalProfileScreen() {
   ]);
 
   // ─── Personal profile shared state ────────────────────────────────
-  const { posts, isHidden, toggleHidePost, deletePost, friends, savedPosts } = usePersonalProfile();
+  const { posts, isHidden, toggleHidePost, deletePost } = usePersonalProfile();
 
   // ─── Insignia phrase: Supabase `profiles.insignia_phrase` + UI state ──
   const [insigniaPhrase, setInsigniaPhrase] = useState(profileWithClan.insigniaPhrase);
@@ -336,13 +336,6 @@ export default function PersonalProfileScreen() {
       else deletePost(postId);
     },
     [toggleHidePost, deletePost],
-  );
-
-  const handleSavedPostPress = useCallback(
-    (post: CommunityPost) => {
-      openDetailFeed(savedPosts, post.id);
-    },
-    [openDetailFeed, savedPosts],
   );
 
   const handleDetailAuthorPress = useCallback(
@@ -501,12 +494,7 @@ export default function PersonalProfileScreen() {
                   onSeeMorePress={handleSeeMoreRecentPosts}
                 />
                 <View style={styles.contentGap} />
-                <PersonalBottomBlocks
-                  clanId={profileWithClan.clanId}
-                  friends={friends}
-                  savedPosts={savedPosts}
-                  onSavedPostPress={handleSavedPostPress}
-                />
+                <PersonalBottomBlocks clanId={profileWithClan.clanId} />
               </>
             ) : null}
             <View style={styles.bottomSpacer} />

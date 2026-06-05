@@ -1,7 +1,5 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import type { CommunityPost } from '@evoconn/types';
-import type { FriendEntry } from '@evoconn/data/mockPersonalProfile';
 import { PersonalDailyPhraseWidgetBlock } from './PersonalDailyPhraseWidgetBlock';
 import { PersonalFriendsBlock } from './PersonalFriendsBlock';
 import { PersonalSavedPostsBlock } from './PersonalSavedPostsBlock';
@@ -16,17 +14,9 @@ import {
 
 type Props = {
   clanId: string | null;
-  friends: FriendEntry[];
-  savedPosts: CommunityPost[];
-  onSavedPostPress?: (post: CommunityPost) => void;
 };
 
-export const PersonalBottomBlocks = React.memo(function PersonalBottomBlocks({
-  clanId,
-  friends,
-  savedPosts,
-  onSavedPostPress,
-}: Props) {
+export const PersonalBottomBlocks = React.memo(function PersonalBottomBlocks({ clanId }: Props) {
   return (
     <View
       style={[
@@ -43,8 +33,8 @@ export const PersonalBottomBlocks = React.memo(function PersonalBottomBlocks({
       ]}
     >
       <PersonalDailyPhraseWidgetBlock clanId={clanId} />
-      <PersonalFriendsBlock friends={friends} clanId={clanId} />
-      <PersonalSavedPostsBlock savedPosts={savedPosts} clanId={clanId} onPostPress={onSavedPostPress} />
+      <PersonalFriendsBlock clanId={clanId} />
+      <PersonalSavedPostsBlock clanId={clanId} />
     </View>
   );
 });

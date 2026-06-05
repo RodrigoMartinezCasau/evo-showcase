@@ -195,25 +195,33 @@ export function BottomCommunityTabs({
   // cambio es interno y no debe emitir la señal.
   const emitTabChange = useCallback(
     (id: TabId) => {
+      const deferTabChangeWithLoading = () => {
+        showNavLoadingOverlayHold();
+        requestAnimationFrame(() => requestAnimationFrame(() => onTabChange(id)));
+      };
+
       // Entrada a Comunidad desde fuera (perfil, clan, etc.). El bloqueo de JS
       // que congela la app durante la carga SOLO ocurre en Android de gama baja;
       // en iPhone la transición es instantánea. Por eso el overlay de Para Ti/
       // Siguiendo es exclusivo de Android: mostramos el spinner AL INSTANTE
       // (modo hold) y diferimos la navegación un par de frames para que se pinte
       // antes del montaje pesado. En iPhone navegamos directo, sin overlay, para
-      // no añadir latencia percibida.
+      // no añadir latencia percibida. Búsqueda (lupa) sí usa overlay en todos
+      // los dispositivos: SearchScreen monta consultas y listas al abrir.
       if (activeTab === null) {
         requestCommunityTab(id);
-        if (Platform.OS === 'android') {
-          showNavLoadingOverlayHold();
-          requestAnimationFrame(() => requestAnimationFrame(() => onTabChange(id)));
+        if (Platform.OS === 'android' || id === 'search') {
+          deferTabChangeWithLoading();
           return;
         }
         onTabChange(id);
         return;
       }
-      // Cambio interno entre pestañas (ya en Comunidad): es instantáneo, sin
-      // overlay para no añadir latencia percibida.
+      // Cambio interno a Búsqueda: misma sensación de carga que perfil/clan.
+      if (id === 'search' && activeTab !== 'search') {
+        deferTabChangeWithLoading();
+        return;
+      }
       onTabChange(id);
     },
     [activeTab, onTabChange],

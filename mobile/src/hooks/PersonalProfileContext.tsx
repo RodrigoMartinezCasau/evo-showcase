@@ -337,6 +337,7 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
   const savedPosts = useMemo<CommunityPost[]>(
     () =>
       [...savedPostIds]
+        .reverse()
         .map((postId) => simPosts.find((p) => p.id === postId))
         .filter((p): p is SimPost => p !== undefined && isPublishedSimPostType(p.type))
         .filter((p) => !isBlocked(p.authorId))

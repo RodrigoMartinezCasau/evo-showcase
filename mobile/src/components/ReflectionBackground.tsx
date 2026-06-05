@@ -2,8 +2,8 @@ import React, { useMemo, useState, useCallback } from 'react';
 import { View, StyleSheet, LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Path } from 'react-native-svg';
 import { REFLECTION_BACKGROUND_LAYOUT as L } from '@evoconn/constants/reflectionBackgroundLayout';
-import { getReflectionBackgroundByHouse } from '@evoconn/utils/getReflectionBackgroundByHouse';
 import { getClanColor } from '@evoconn/constants/clanColors';
+import { evoconnColors } from '@evoconn/theme/colors';
 
 // ── Clan rim constants ────────────────────────────────────────────────────────
 const RIM_WIDTH = 1.8;
@@ -26,19 +26,13 @@ function ClanRimOverlay({ width, height, clanColor }: { width: number; height: n
   const w   = width;
   const h   = height;
   const hl  = lightenHex(clanColor);
-  // Gradient IDs are scoped per <Svg> in react-native-svg, but include the color
-  // slug for clarity when debugging.
   const slug = clanColor.replace('#', '');
   const idTL = `rimTL_${slug}`;
   const idBR = `rimBR_${slug}`;
 
-  // Top-left:     vertical arm → arc → horizontal arm
   const tlD = `M 0 ${r + a} L 0 ${r} A ${r} ${r} 0 0 1 ${r} 0 L ${r + a} 0`;
-  // Bottom-right: vertical arm → arc → horizontal arm
   const brD = `M ${w} ${h - r - a} L ${w} ${h - r} A ${r} ${r} 0 0 1 ${w - r} ${h} L ${w - r - a} ${h}`;
 
-  // IMPORTANT: pointerEvents must be set on the View wrapper, NOT on <Svg>.
-  // react-native-svg does not forward pointerEvents to the native touch system.
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       <Svg width={w} height={h}>
@@ -65,8 +59,6 @@ function ClanRimOverlay({ width, height, clanColor }: { width: number; height: n
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-
 type ReflectionBackgroundProps = {
   clan: string | null | undefined;
   children: React.ReactNode;
@@ -75,15 +67,15 @@ type ReflectionBackgroundProps = {
 };
 
 /**
- * Wrapper that renders the clan-specific SVG background behind its children.
- * Use as:  <ReflectionBackground clan={clanId}>{content}</ReflectionBackground>
+ * Wrapper that renders the reflection display background behind its children.
+ * The fill is native `#0B0B0F` with the same scale/clip tuning as the old SVG
+ * (`REFLECTION_BACKGROUND_LAYOUT`). Clan color only appears on `ClanRimOverlay`.
  */
 export const ReflectionBackground = React.memo(function ReflectionBackground({
   clan,
   children,
   containerStyle,
 }: ReflectionBackgroundProps) {
-  const BgIcon    = useMemo(() => getReflectionBackgroundByHouse(clan), [clan]);
   const clanColor = useMemo(() => getClanColor(clan), [clan]);
 
   const [dims, setDims] = useState<{ width: number; height: number } | null>(null);
@@ -105,6 +97,7 @@ export const ReflectionBackground = React.memo(function ReflectionBackground({
           style={[
             styles.bgInner,
             {
+              backgroundColor: evoconnColors.background,
               transform: [
                 { translateX: L.offsetX },
                 { translateY: L.offsetY },
@@ -112,9 +105,7 @@ export const ReflectionBackground = React.memo(function ReflectionBackground({
               ],
             },
           ]}
-        >
-          <BgIcon width="100%" height="100%" preserveAspectRatio="xMidYMid slice" />
-        </View>
+        />
       </View>
       {children}
       {dims ? (

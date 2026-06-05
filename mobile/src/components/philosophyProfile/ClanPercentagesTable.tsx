@@ -6,9 +6,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import {
-  EXPANDED_PHILOSOPHY_BANNER_SCALE,
-  EXPANDED_PHILOSOPHY_BANNER_OFFSET_X,
-  EXPANDED_PHILOSOPHY_BANNER_OFFSET_Y,
   EXPANDED_PHILOSOPHY_ROW_GAP,
   EXPANDED_PHILOSOPHY_CONTAINER_PADDING_TOP,
   EXPANDED_PHILOSOPHY_CONTAINER_PADDING_BOTTOM,
@@ -17,7 +14,7 @@ import {
   PHILOSOPHY_BAR_CLAN_COLORS,
   PHILOSOPHY_BAR_DEFAULT_COLOR,
 } from '@evoconn/constants/philosophyBannerLayout';
-import { PhilosophyClanBanner } from '@evoconn/components/shared/PhilosophyClanBanner';
+import { PhilosophyClanLabel } from '@evoconn/components/shared/PhilosophyClanLabel';
 import { GradientBarFill } from '@evoconn/components/shared/GradientBarFill';
 
 const ALL_CLANS: { clanId: string; label: string }[] = [
@@ -68,17 +65,11 @@ export const ClanPercentagesTable = React.memo(function ClanPercentagesTable({
             EXPANDED_PHILOSOPHY_ROW_HEIGHT !== undefined && { height: EXPANDED_PHILOSOPHY_ROW_HEIGHT, overflow: 'hidden' },
           ]}
         >
-          <View style={styles.labelWrap}>
-            <PhilosophyClanBanner
-              clanId={entry.clanId}
-              label={entry.label}
-              scale={EXPANDED_PHILOSOPHY_BANNER_SCALE}
-              offsetX={EXPANDED_PHILOSOPHY_BANNER_OFFSET_X}
-              offsetY={EXPANDED_PHILOSOPHY_BANNER_OFFSET_Y}
-              containerWidth={i === 0 ? 116 : 122}
-              fallbackTextStyle={i === 0 ? styles.dominantLabel : styles.label}
-            />
-          </View>
+          <PhilosophyClanLabel
+            clanId={entry.clanId}
+            label={entry.label}
+            muted={entry.pct === 0}
+          />
           <View style={styles.barTrack}>
             <GradientBarFill
               widthStyle={`${entry.pct}%`}
@@ -116,22 +107,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-  },
-  labelWrap: {
-    width: 130,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  label: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 12,
-    fontWeight: '500',
-    flex: 1,
-  },
-  dominantLabel: {
-    color: '#FFFFFF',
-    fontWeight: '700',
   },
   barTrack: {
     flex: 1,

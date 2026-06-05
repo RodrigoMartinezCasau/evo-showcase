@@ -15,9 +15,7 @@ import type { CommunityPost } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getReflectionCardTier } from '@evoconn/utils/getCardSizeFromText';
 import { formatNumber } from '@evoconn/utils/formatNumber';
-import { getSmallClanBackgroundSvg } from '@evoconn/assets/cards/smallClanBackgroundsSvg';
-import { getMediumClanBackgroundSvg } from '@evoconn/assets/cards/mediumClanBackgroundsSvg';
-import { getQuoteClanBackgroundSvg } from '@evoconn/assets/cards/quoteClanBackgroundsSvg';
+import { NativeFeedCardBackground } from './NativeFeedCardBackground';
 import { smallStatsIcons } from '@evoconn/assets/icons/smallStats';
 import UpvoteInactiveSvg from '../assets/detailActions/31.svg';
 import UpvoteActiveSvg from '../assets/detailActions/32.svg';
@@ -27,6 +25,7 @@ import { formatPhraseBodyForDisplay } from '@evoconn/utils/phrasePublish';
 import {
   computeCommunityFeedCardContentLayout,
   computeFeedCardTextContentBottomY,
+  computeInnerPanelBorderRadius,
   computeSvgCardLayout,
   COMMUNITY_FEED_CARD_MAX_INNER_WIDTH,
   getBodyMaxLines,
@@ -98,12 +97,6 @@ function CommunityPostCardBase({
   }, [isReflection, post.author.username, post.title, post.body]);
 
   const isQuoteCard = cardTier === 'quote';
-
-  const CardBgSvg = useMemo(() => {
-    if (cardTier === 'small') return getSmallClanBackgroundSvg(post.author.clanId);
-    if (cardTier === 'medium') return getMediumClanBackgroundSvg(post.author.clanId);
-    return getQuoteClanBackgroundSvg(post.author.clanId);
-  }, [cardTier, post.author.clanId]);
 
   const { width: screenWidth } = useWindowDimensions();
   const maxUsableWidth = screenWidth - V.CARD_HORIZONTAL_MARGIN * 2;
@@ -192,9 +185,9 @@ function CommunityPostCardBase({
     ],
   );
 
-  /** Inner black rounded rect in card SVGs — rx ≈ 15.77 in 600 viewBox; clip stars to same silhouette. */
+  /** Inner black rounded rect — rx ≈ 15.77 in 600 viewBox; clip stars to same silhouette. */
   const innerGrayPanelBorderRadius = useMemo(
-    () => Math.max(8, Math.round((15.77 / 600) * cardWidth)),
+    () => computeInnerPanelBorderRadius(cardWidth),
     [cardWidth],
   );
 
@@ -242,23 +235,7 @@ function CommunityPostCardBase({
           overflow: 'hidden',
         }}
       >
-        {/* SVG background — cropped to the colored frame area */}
-        <View
-          style={[
-            styles.svgCrop,
-            { width: cardWidth, height: layout.cardHeight, borderRadius: V.CARD_BORDER_RADIUS },
-          ]}
-          pointerEvents="none"
-          renderToHardwareTextureAndroid
-          shouldRasterizeIOS
-        >
-          <CardBgSvg
-            width={layout.svgRenderSize}
-            height={layout.svgRenderSize}
-            style={{ position: 'absolute', top: -layout.svgCropTop, left: 0 }}
-            preserveAspectRatio="xMidYMid meet"
-          />
-        </View>
+        <NativeFeedCardBackground tier={cardTier} cardWidth={cardWidth} layout={layout} />
 
         {/* Star field — same rim margin on all sides as horizontal gutter (blackLeft/blackRight). */}
         <View
@@ -428,12 +405,6 @@ function CommunityPostCardBase({
 export const CommunityPostCard = React.memo(CommunityPostCardBase);
 
 const styles = StyleSheet.create({
-  svgCrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    overflow: 'hidden',
-  },
   feedUsernameRow: {
     flexDirection: 'row',
     alignItems: 'center',

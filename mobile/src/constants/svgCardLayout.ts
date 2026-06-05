@@ -1,18 +1,108 @@
 import type { CardSizeTier } from './cardSizing';
 
 /**
- * Layout constants for SVG-based community feed cards.
+ * Layout constants for community feed cards.
  *
- * Every clan SVG follows the same template (600×600 viewBox):
- *  - Colored rounded frame (size varies by tier)
- *  - Inner black rounded box (where the text content sits)
- *  - Banner pill at translate(408, 454) — bottom-right
+ * Card backgrounds were SVGs (600×600 viewBox) but are now native Views driven by
+ * the geometry below. Every clan shared the same black-only template:
+ *  - Outer frame (#0B0B0F)
+ *  - Inner panel (#0d0d11)
+ *  - Banner dock (3 rounded pieces, bottom-right)
  *
- * The constants below are derived directly from the SVG path geometry
- * and should NOT be edited unless the SVGs themselves change.
+ * The constants below are derived directly from the original SVG path geometry
+ * and should NOT be edited unless the visual template changes.
  */
 
 const SVG_VIEWBOX_SIZE = 600;
+
+/** Outer frame fill — matches every clan `*ClanBackgroundSvg` asset. */
+export const CARD_FRAME_BACKGROUND = '#0B0B0F';
+/** Inner content panel fill — matches the `#0d0d11` layer in those SVGs. */
+export const CARD_INNER_BACKGROUND = '#0d0d11';
+
+/** Inner panel corner radius in the 600×600 viewBox (rx ≈ 15.77). */
+const INNER_PANEL_BORDER_RADIUS_VB = 15.77;
+
+/** Banner-dock group origin + local pieces (viewBox coords, shared by all clans per tier). */
+const BANNER_DOCK_BY_TIER: Record<
+  CardSizeTier,
+  { originX: number; originY: number; pieces: readonly { x: number; y: number; w: number; h: number; r: number }[] }
+> = {
+  small: {
+    originX: 408,
+    originY: 380,
+    pieces: [
+      { x: 0.367188, y: 0.445312, w: 185.125, h: 53.429688, r: 27.082031 },
+      { x: 95.582031, y: 0.445312, w: 91.960938, h: 33.535156, r: 27.082031 },
+      { x: 0.367188, y: 27.160156, w: 91.925781, h: 29.75, r: 27.082031 },
+    ],
+  },
+  medium: {
+    originX: 408,
+    originY: 454,
+    pieces: [
+      { x: 0.367188, y: 0.445312, w: 185.125, h: 53.429688, r: 27.082031 },
+      { x: 95.582031, y: 0.445312, w: 91.960938, h: 33.535156, r: 27.082031 },
+      { x: 0.367188, y: 27.160156, w: 91.925781, h: 29.75, r: 27.082031 },
+    ],
+  },
+  quote: {
+    originX: 408,
+    originY: 333,
+    pieces: [
+      { x: 0.367188, y: 0.445312, w: 185.125, h: 53.429688, r: 27.082031 },
+      { x: 95.582031, y: 0.445312, w: 91.960938, h: 33.535156, r: 27.082031 },
+      { x: 0.367188, y: 27.160156, w: 91.925781, h: 29.75, r: 27.082031 },
+    ],
+  },
+};
+
+export type NativeFeedCardBackgroundLayout = {
+  cardWidth: number;
+  cardHeight: number;
+  blackTopPx: number;
+  blackBottomPx: number;
+  blackLeftPx: number;
+  blackRightPx: number;
+  innerPanelBorderRadius: number;
+  bannerPieces: { top: number; left: number; width: number; height: number; borderRadius: number }[];
+};
+
+export function computeInnerPanelBorderRadius(cardWidth: number): number {
+  return Math.max(8, Math.round((INNER_PANEL_BORDER_RADIUS_VB / SVG_VIEWBOX_SIZE) * cardWidth));
+}
+
+/** Maps SVG viewBox geometry to px in the cropped visible card (frameTop → y=0). */
+export function computeNativeFeedCardBackgroundLayout(
+  tier: CardSizeTier,
+  cardWidth: number,
+  cardLayout: SvgCardLayout,
+): NativeFeedCardBackgroundLayout {
+  const g = SVG_GEOMETRY[tier] ?? SVG_GEOMETRY.medium;
+  const frameHeight = g.frameBottom - g.frameTop;
+  const scale = cardWidth / SVG_VIEWBOX_SIZE;
+  const dock = BANNER_DOCK_BY_TIER[tier] ?? BANNER_DOCK_BY_TIER.medium;
+  const dockTop =
+    ((dock.originY - g.frameTop) / frameHeight) * cardLayout.cardHeight;
+  const dockLeft = dock.originX * scale;
+
+  return {
+    cardWidth,
+    cardHeight: cardLayout.cardHeight,
+    blackTopPx: cardLayout.blackTopPx,
+    blackBottomPx: cardLayout.blackBottomPx,
+    blackLeftPx: cardLayout.blackLeftPx,
+    blackRightPx: cardLayout.blackRightPx,
+    innerPanelBorderRadius: computeInnerPanelBorderRadius(cardWidth),
+    bannerPieces: dock.pieces.map((p) => ({
+      top: dockTop + p.y * scale,
+      left: dockLeft + p.x * scale,
+      width: p.w * scale,
+      height: p.h * scale,
+      borderRadius: p.r * scale,
+    })),
+  };
+}
 
 type SvgGeometry = {
   /** Y of the colored frame top inside the 600×600 viewBox */

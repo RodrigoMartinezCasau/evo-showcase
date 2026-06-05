@@ -362,6 +362,19 @@ export default function CommunityScreen() {
   const [activeTab, setActiveTab] = useState<TabId>(() =>
     peekCommunityPostId() ? 'para-ti' : 'siguiendo',
   );
+  // Relevo del overlay global al montar la pestaña Búsqueda (la ruta no cambia,
+  // así que no basta con el auto-hide por pathname de NavLoadingContext).
+  useEffect(() => {
+    if (activeTab !== 'search') return;
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => hideNavLoading());
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      if (raf2) cancelAnimationFrame(raf2);
+    };
+  }, [activeTab, hideNavLoading]);
   // Spinner del clan mientras "llegamos" a Comunidad desde otra pantalla
   // (perfil, racha, etc.). Unifica la sensación de carga con ProfileScreen y
   // tapa el destello del fondo de estrellas al revelar el panel. Se mantiene

@@ -9,18 +9,16 @@ import {
   PERSONAL_PHILOSOPHY_CARD_OPACITY,
 } from '@evoconn/constants/personalProfileLayout';
 import {
-  PHILOSOPHY_BANNER_SCALE,
-  PHILOSOPHY_BANNER_OFFSET_X,
-  PHILOSOPHY_BANNER_OFFSET_Y,
   PHILOSOPHY_ROW_GAP,
   PHILOSOPHY_CONTAINER_PADDING_TOP,
   PHILOSOPHY_CONTAINER_PADDING_BOTTOM,
   PHILOSOPHY_CONTAINER_PADDING_HORIZONTAL,
+  PHILOSOPHY_TITLE_TO_ROWS_GAP,
   PHILOSOPHY_ROW_HEIGHT,
   PHILOSOPHY_BAR_CLAN_COLORS,
   PHILOSOPHY_BAR_DEFAULT_COLOR,
 } from '@evoconn/constants/philosophyBannerLayout';
-import { PhilosophyClanBanner } from '@evoconn/components/shared/PhilosophyClanBanner';
+import { PhilosophyClanLabel } from '@evoconn/components/shared/PhilosophyClanLabel';
 import { GradientBarFill } from '@evoconn/components/shared/GradientBarFill';
 import { getClanColor } from '@evoconn/constants/clanColors';
 
@@ -81,15 +79,7 @@ export const PersonalPhilosophyPanel = React.memo(function PersonalPhilosophyPan
               PHILOSOPHY_ROW_HEIGHT !== undefined && { height: PHILOSOPHY_ROW_HEIGHT, overflow: 'hidden' },
             ]}
           >
-            <PhilosophyClanBanner
-              clanId={entry.clanId}
-              label={entry.label}
-              scale={PHILOSOPHY_BANNER_SCALE}
-              offsetX={PHILOSOPHY_BANNER_OFFSET_X}
-              offsetY={PHILOSOPHY_BANNER_OFFSET_Y}
-              containerWidth={110}
-              fallbackTextStyle={styles.label}
-            />
+            <PhilosophyClanLabel clanId={entry.clanId} label={entry.label} />
             <View style={styles.barTrack}>
               <GradientBarFill
                 widthStyle={`${entry.pct}%`}
@@ -144,7 +134,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 2,
+    marginBottom: PHILOSOPHY_TITLE_TO_ROWS_GAP,
   },
   title: {
     fontSize: 11,
@@ -161,12 +151,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-  },
-  label: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '500',
-    width: 110,
   },
   barTrack: {
     flex: 1,

@@ -40,6 +40,9 @@ export const PHILOSOPHY_CONTAINER_PADDING_BOTTOM = 14;
 /** Horizontal padding (left + right) of the black container in profile panels. */
 export const PHILOSOPHY_CONTAINER_PADDING_HORIZONTAL = 16;
 
+/** Espacio entre la fila del título ("Pensamiento filosófico") y la primera barra de %. */
+export const PHILOSOPHY_TITLE_TO_ROWS_GAP = 12;
+
 /** Space between the top edge of the black container and the title (expanded table). */
 export const EXPANDED_PHILOSOPHY_CONTAINER_PADDING_TOP = 20;
 
@@ -73,12 +76,12 @@ export const EXPANDED_PHILOSOPHY_ROW_GAP = 4;
  * without changing banner scale, bar, or percentage text.
  * Set to `undefined` to let the row size itself naturally.
  */
-export const PHILOSOPHY_ROW_HEIGHT: number | undefined = 46;
+export const PHILOSOPHY_ROW_HEIGHT: number | undefined = 38;
 
 /**
  * Visible height (px) of each row in the expanded philosophy table.
  */
-export const EXPANDED_PHILOSOPHY_ROW_HEIGHT: number | undefined = 46;
+export const EXPANDED_PHILOSOPHY_ROW_HEIGHT: number | undefined = 38;
 
 // ─── Bar gradient clan colors ─────────────────────────────────────────────────
 
@@ -99,6 +102,20 @@ export const PHILOSOPHY_BAR_CLAN_COLORS: Record<string, string> = {
 
 /** Fallback gradient end color when clanId is unknown. */
 export const PHILOSOPHY_BAR_DEFAULT_COLOR = '#FFFFFF';
+
+// ─── Clan name chips (filas de % — sustituyen estandartes SVG) ───────────────
+
+/** Ancho fijo de cada cajita de pensamiento filosófico. */
+export const PHILOSOPHY_CLAN_CHIP_WIDTH = 108;
+
+/** Alto fijo de cada cajita (todas iguales). */
+export const PHILOSOPHY_CLAN_CHIP_HEIGHT = 34;
+
+/** Radio de esquina de la cajita (estilo frase insignia). */
+export const PHILOSOPHY_CLAN_CHIP_RADIUS = 8;
+
+/** Longitud del brazo del reborde Apple en la cajita. */
+export const PHILOSOPHY_CLAN_CHIP_RIM_ARM = 16;
 
 // ─── Base size (shared) ───────────────────────────────────────────────────────
 

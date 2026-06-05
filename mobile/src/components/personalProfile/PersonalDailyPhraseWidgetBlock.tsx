@@ -2,69 +2,27 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
-  Image,
-  TouchableOpacity,
   StyleSheet,
   Modal,
   Pressable,
   ScrollView,
   Platform,
+  TouchableOpacity,
 } from 'react-native';
-import { getStarByHouse, SIDEBAR_DEFAULT_STAR } from '@evoconn/utils/getSidebarStar';
-import { getClanColor } from '@evoconn/constants/clanColors';
-import CientistaStarSvg from '../../assets/topbar/estrellasNuevasSvg/11.svg';
-import TrascendentalistaStarSvg from '../../assets/topbar/estrellasNuevasSvg/12.svg';
 import { useFeedStore } from '@evoconn/hooks/useFeedStore';
 import { resolveTopPhraseWidgetPayload } from '@evoconn/widget/widgetPhraseLock';
 import { pushTopPhraseWidgetSnapshot } from '@evoconn/widget/iosWidgetBridge';
-import {
-  BOTTOM_BLOCK_SIZE,
-  BOTTOM_BLOCK_BORDER_RADIUS,
-  ICON_SWITCH_OFFSET_X,
-  ICON_SWITCH_OFFSET_Y,
-  ICON_SWITCH_SCALE,
-  APP_ICON_STAR_OFFSET_X,
-  APP_ICON_STAR_OFFSET_Y,
-  APP_ICON_STAR_SCALE,
-  APP_ICON_STAR_SVG_EDITOR,
-  PERSONAL_BOTTOM_BLOCKS_OPACITY,
-} from '@evoconn/constants/personalProfileLayout';
+import { PersonalBottomChipButton } from './PersonalBottomChipButton';
 
 type Props = {
   clanId: string | null;
 };
-
-/** Misma base que el antiguo bloque «Icono de app» (solo decorativa). */
-const STAR_BASE = 52;
-const PNG_STAR_VISIBLE_WIDTH_RATIO = 346 / 800;
-const PNG_STAR_VISIBLE_HEIGHT_RATIO = 353 / 800;
-const PNG_STAR_VISIBLE_OFFSET_X_RATIO = 17 / 800;
-const PNG_STAR_VISIBLE_OFFSET_Y_RATIO = -12.5 / 800;
 
 export const PersonalDailyPhraseWidgetBlock = React.memo(function PersonalDailyPhraseWidgetBlock({
   clanId,
 }: Props) {
   const { posts } = useFeedStore();
   const [modalOpen, setModalOpen] = useState(false);
-  const titleColor = getClanColor(clanId);
-  const normalizedClanId = clanId?.trim().toLowerCase() ?? null;
-  const starSource = clanId ? getStarByHouse(clanId) : SIDEBAR_DEFAULT_STAR;
-  const SvgStar =
-    normalizedClanId === 'cientista'
-      ? CientistaStarSvg
-      : normalizedClanId === 'trascendentalista'
-        ? TrascendentalistaStarSvg
-        : null;
-  const svgEditor =
-    normalizedClanId === 'cientista'
-      ? APP_ICON_STAR_SVG_EDITOR.cientista
-      : normalizedClanId === 'trascendentalista'
-        ? APP_ICON_STAR_SVG_EDITOR.trascendentalista
-        : null;
-  const starW = STAR_BASE * APP_ICON_STAR_SCALE;
-  const starH = STAR_BASE * APP_ICON_STAR_SCALE;
-  const svgStarW = starW * PNG_STAR_VISIBLE_WIDTH_RATIO * (svgEditor?.scale ?? 1);
-  const svgStarH = starH * PNG_STAR_VISIBLE_HEIGHT_RATIO * (svgEditor?.scale ?? 1);
 
   useEffect(() => {
     if (!modalOpen) return;
@@ -94,69 +52,12 @@ export const PersonalDailyPhraseWidgetBlock = React.memo(function PersonalDailyP
 
   return (
     <>
-      <TouchableOpacity
-        activeOpacity={0.75}
+      <PersonalBottomChipButton
+        label="Widgets"
+        clanId={clanId}
         onPress={openModal}
-        accessibilityRole="button"
         accessibilityLabel="Añadir widget de frase del día"
-        style={[
-          styles.block,
-          {
-            width: BOTTOM_BLOCK_SIZE,
-            height: BOTTOM_BLOCK_SIZE,
-            borderRadius: BOTTOM_BLOCK_BORDER_RADIUS,
-            transform: [
-              { translateX: ICON_SWITCH_OFFSET_X },
-              { translateY: ICON_SWITCH_OFFSET_Y },
-              { scale: ICON_SWITCH_SCALE },
-            ],
-          },
-        ]}
-      >
-        <Text style={[styles.label, { color: titleColor }]} numberOfLines={2}>
-          Widgets
-        </Text>
-        {SvgStar ? (
-          <View
-            style={[
-              styles.star,
-              styles.svgStarFrame,
-              {
-                width: starW,
-                height: starH,
-                transform: [
-                  { translateX: APP_ICON_STAR_OFFSET_X + (svgEditor?.offsetX ?? 0) },
-                  { translateY: APP_ICON_STAR_OFFSET_Y + (svgEditor?.offsetY ?? 0) },
-                ],
-              },
-            ]}
-          >
-            <SvgStar
-              width={svgStarW}
-              height={svgStarH}
-              style={{
-                transform: [
-                  { translateX: starW * PNG_STAR_VISIBLE_OFFSET_X_RATIO },
-                  { translateY: starH * PNG_STAR_VISIBLE_OFFSET_Y_RATIO },
-                ],
-              }}
-            />
-          </View>
-        ) : (
-          <Image
-            source={starSource}
-            resizeMode="contain"
-            style={[
-              styles.star,
-              {
-                width: starW,
-                height: starH,
-                transform: [{ translateX: APP_ICON_STAR_OFFSET_X }, { translateY: APP_ICON_STAR_OFFSET_Y }],
-              },
-            ]}
-          />
-        )}
-      </TouchableOpacity>
+      />
 
       <Modal visible={modalOpen} transparent animationType="fade" onRequestClose={closeModal}>
         <Pressable style={styles.modalBackdrop} onPress={closeModal}>
@@ -181,32 +82,6 @@ export const PersonalDailyPhraseWidgetBlock = React.memo(function PersonalDailyP
 });
 
 const styles = StyleSheet.create({
-  block: {
-    backgroundColor: `rgba(0,0,0,${PERSONAL_BOTTOM_BLOCKS_OPACITY})`,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    paddingTop: 8,
-  },
-  label: {
-    fontSize: 9,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    zIndex: 1,
-    position: 'absolute',
-    top: 6,
-    textAlign: 'center',
-    paddingHorizontal: 4,
-    lineHeight: 11,
-  },
-  star: {
-    position: 'absolute',
-  },
-  svgStarFrame: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.72)',

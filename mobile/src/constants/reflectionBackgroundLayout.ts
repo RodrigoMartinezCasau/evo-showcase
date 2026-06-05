@@ -1,6 +1,7 @@
 /**
- * Fondo SVG del display de reflexión (shared: Para ti / Siguiendo).
- * Ajustar scale y offsets para encuadrar el asset sin tocar el layout del contenido.
+ * Fondo del display de reflexión (perfil, detalle, etc.).
+ * El relleno es nativo; `scale` / `offsetX` / `offsetY` / `borderRadius` recortan
+ * el negro igual que el antiguo SVG escalado dentro del clip.
  */
 export const REFLECTION_BACKGROUND_LAYOUT = {
   /** Escala uniforme del SVG respecto al contenedor. */

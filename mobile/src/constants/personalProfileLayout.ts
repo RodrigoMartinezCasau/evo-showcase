@@ -216,22 +216,22 @@ export const POSTS_SECTION_PADDING_TOP = 0;
 export const PERSONAL_LATEST_POSTS_SPACING = 0;
 
 // ═══════════════════════════════════════════════════════════════════
-// ── Bottom blocks (3 squares: icon switch, friends, saved posts) ──
+// ── Bottom blocks (3 compact chips: widgets, friends, saved posts) ─
 // ═══════════════════════════════════════════════════════════════════
 
 // Shared container & sizing
 export const BOTTOM_BLOCKS_CONTAINER_OFFSET_X = 0;
 export const BOTTOM_BLOCKS_CONTAINER_OFFSET_Y = 0;
-/** Espacio horizontal entre cada bloque. */
-export const BOTTOM_BLOCKS_SPACING = 12;
-/** Margen horizontal del row de bloques — debe coincidir con RANK_CONTAINER_MARGIN_HORIZONTAL. */
+/** Espacio horizontal entre cada chip. */
+export const BOTTOM_BLOCKS_SPACING = 10;
+/** Margen horizontal del row de chips — debe coincidir con RANK_CONTAINER_MARGIN_HORIZONTAL. */
 export const BOTTOM_BLOCKS_MARGIN_HORIZONTAL = 20;
-/** Tamaño (ancho × alto) de cada bloque cuadrado — calculado para que los 3 bloques llenen
- *  exactamente el ancho disponible entre los márgenes (igual que los rectángulos de arriba). */
-export const BOTTOM_BLOCK_SIZE = Math.floor(
-  (SCREEN_W - 2 * BOTTOM_BLOCKS_MARGIN_HORIZONTAL - 2 * BOTTOM_BLOCKS_SPACING) / 3,
-);
-export const BOTTOM_BLOCK_BORDER_RADIUS = 18;
+/** Alto fijo de cada chip; el ancho se ajusta al texto del botón. */
+export const BOTTOM_CHIP_HEIGHT = 30;
+export const BOTTOM_CHIP_PADDING_HORIZONTAL = 14;
+export const BOTTOM_CHIP_BORDER_RADIUS = 10;
+export const BOTTOM_CHIP_FONT_SIZE = 11;
+export const BOTTOM_CHIP_LETTER_SPACING = 0.6;
 /** Margen superior del row de bloques (espaciado interno fijo). */
 export const BOTTOM_BLOCKS_MARGIN_TOP = 10;
 
@@ -253,8 +253,8 @@ export const PERSONAL_INSIGNIA_CARD_OPACITY   = 0.5;
 export const PERSONAL_PHILOSOPHY_CARD_OPACITY = 1;
 
 /**
- * Opacidad del fondo negro de los 3 bloques inferiores:
- * Icono de app · Amigos · Guardados (perfil personal).
+ * Opacidad del fondo negro de los 3 chips inferiores:
+ * Widgets · Amigos · Guardados (perfil personal).
  */
 export const PERSONAL_BOTTOM_BLOCKS_OPACITY   = 1;
 
@@ -302,31 +302,6 @@ export const PERSONAL_POST_MENU_DOTS_SCALE = 1;
  * 1 = same size as the slider cards. >1 = larger stats.
  */
 export const PERSONAL_POSTS_GRID_STATS_SCALE = 0.85;
-
-// Block 1 — App icon / Clan star  (container-level position)
-export const ICON_SWITCH_OFFSET_X = 0;
-export const ICON_SWITCH_OFFSET_Y = 0;
-export const ICON_SWITCH_SCALE = 1;
-/** Estrella del clan DENTRO del cuadrado — posición y escala independientes del contenedor. */
-export const APP_ICON_STAR_OFFSET_X = 0;
-export const APP_ICON_STAR_OFFSET_Y = 10;
-export const APP_ICON_STAR_SCALE = 3.8;
-/**
- * Ajustes SOLO para los SVG nuevos del bloque "Icono de app".
- * No afecta a otros clanes ni a otros bloques.
- */
-export const APP_ICON_STAR_SVG_EDITOR = {
-  cientista: {
-    offsetX: -3,
-    offsetY: 0,
-    scale: 1.1,
-  },
-  trascendentalista: {
-    offsetX: -3,
-    offsetY: 0,
-    scale: 1.1,
-  },
-} as const;
 
 // ── Personal posts total-stats summary row ──────────────────────────
 
@@ -396,24 +371,6 @@ export const TOTAL_STATS_SAVED_SCALE         = 1;
 export const TOTAL_STATS_PERCENTAGE_OFFSET_X = 0;
 export const TOTAL_STATS_PERCENTAGE_OFFSET_Y = 0;
 export const TOTAL_STATS_PERCENTAGE_SCALE    = 1;
-
-// Block 2 — Friends display
-export const FRIENDS_BLOCK_OFFSET_X = 0;
-export const FRIENDS_BLOCK_OFFSET_Y = 0;
-export const FRIENDS_BLOCK_SCALE = 1;
-
-// Block 3 — Saved posts  (container-level position)
-export const SAVED_BLOCK_OFFSET_X = 0;
-export const SAVED_BLOCK_OFFSET_Y = 0;
-export const SAVED_BLOCK_SCALE = 1;
-/** Texto "GUARDADOS" dentro del cuadrado — posición y tamaño fijo. */
-export const SAVED_LABEL_OFFSET_X = 0;
-export const SAVED_LABEL_OFFSET_Y = -4;
-export const SAVED_LABEL_FONT_SIZE = 10;
-/** Icono guardados DENTRO del cuadrado — posición y escala independientes del contenedor. */
-export const SAVED_ICON_OFFSET_X = 0;
-export const SAVED_ICON_OFFSET_Y = 5;
-export const SAVED_ICON_SCALE = 2.8;
 
 // ── Helpers (avatar izquierda + columna de texto responsive) ───────
 
