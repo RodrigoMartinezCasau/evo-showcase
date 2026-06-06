@@ -840,6 +840,8 @@ const PublishBlockConnected = React.memo(function PublishBlockConnected({
       clanId={clanId}
       onTitleChange={handleTitleChange}
       onPublish={handlePublish}
+      previewType="reflection"
+      previewBody={userReflectionText}
       onAuthorFocusChange={onPublishAuthorFocusChange}
       authorInputAnchorRef={registerPublishAuthorAnchor}
     />

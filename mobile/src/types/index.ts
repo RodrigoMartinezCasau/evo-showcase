@@ -45,6 +45,19 @@ export type CommunityPost = {
   audioTrackId?: string | null
   /** Volumen elegido por el autor para su publicación (0 = mudo … 1 = máx). */
   audioVolume?: number | null
+  /** Foto adjunta (bucket `post-images`, ya moderada). URL pública o null. */
+  imageUrl?: string | null
+  /** Dimensiones originales de la foto (para calcular el aspect ratio sin medir). */
+  imageWidth?: number | null
+  imageHeight?: number | null
+  /** Punto vertical normalizado en la imagen fuente (0–1) para encuadre universal. */
+  imageCropFocusY?: number | null
+  /** Encuadre en Siguiendo; si null, cae back a `imageCropFocusY`. */
+  imageCropFocusYFollowing?: number | null
+  /** Si false, no mostrar imagen en Para ti. */
+  imageShowParaTi?: boolean | null
+  /** Si false, no mostrar imagen en Siguiendo. */
+  imageShowSiguiendo?: boolean | null
 }
 
 export type ReflectionPost = CommunityPost & { type: 'reflection'; title: string }

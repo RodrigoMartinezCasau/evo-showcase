@@ -117,6 +117,13 @@ function simPostToCommunityPost(
     quoteAuthor: p.quoteAuthor,
     audioTrackId: p.audioTrackId ?? null,
     audioVolume: p.audioVolume ?? null,
+    imageUrl: p.imageUrl ?? null,
+    imageWidth: p.imageWidth ?? null,
+    imageHeight: p.imageHeight ?? null,
+    imageCropFocusY: p.imageCropFocusY ?? null,
+    imageCropFocusYFollowing: p.imageCropFocusYFollowing ?? null,
+    imageShowParaTi: p.imageShowParaTi ?? null,
+    imageShowSiguiendo: p.imageShowSiguiendo ?? null,
     voteStats: {
       up:   p.upvoterIds.length,
       down: p.downvoterIds.length,

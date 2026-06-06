@@ -6,6 +6,7 @@ import {
   FlatList,
   TouchableOpacity,
   Pressable,
+  Image,
   StyleSheet,
   Share,
   Keyboard,
@@ -23,6 +24,10 @@ import type { CommunityPost, Comment } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { ReflectionBackground } from './ReflectionBackground';
 import { DETAIL_HEADER_ROW_OFFSET_Y, DETAIL_HEADER_ROW_OFFSET_X } from '@evoconn/constants/reflectionDetailRankBadgeLayout';
+import {
+  DETAIL_PHOTO_HEADER_MARGIN_BOTTOM,
+  computeDetailPhotoImageTopInset,
+} from '@evoconn/constants/reflectionDetailPhotoLayout';
 import { DetailActionColumn } from './DetailActionColumn';
 import type { DetailActionColumnHandle } from './DetailActionColumn';
 import { CommentThreadBlock } from './CommentThreadBlock';
@@ -82,6 +87,9 @@ import {
 } from '@evoconn/components/shared/EvoActionSheetModal';
 import type { EvoActionOption } from '@evoconn/components/shared/EvoActionSheetModal';
 import { PanelStarField } from '@evoconn/components/animations/StarFieldBackground';
+import { PostImageCover } from '@evoconn/components/publish/PostImageCover';
+import type { PostImageFocusY } from '@evoconn/utils/postImageCoverLayout';
+import { postShowsImageInParaTi } from '@evoconn/utils/postImageDisplay';
 import { ClanCardFeedRimOverlay } from './ClanCardFeedRimOverlay';
 import { getClanColor } from '@evoconn/constants/clanColors';
 import {
@@ -163,6 +171,17 @@ type ReflectionDetailItemProps = {
    * perfil ajeno, donde el autor ya es evidente). El botón Seguir se mantiene.
    */
   hideAuthorUsername?: boolean;
+  /**
+   * Vista previa (antes de publicar): renderiza el post tal cual se vería en
+   * "Para ti" pero SIN efectos secundarios — sin cargar comentarios, sin votar,
+   * guardar, comentar, denunciar ni seguir. El post no existe aún en el store.
+   */
+  previewMode?: boolean;
+  /** Editor de encuadre: foto arrastrable con previsualización borrosa fuera del marco. */
+  photoCropInteractive?: {
+    onFocusYChange: (focusY: PostImageFocusY) => void;
+    onRemoveFromDisplay?: () => void;
+  };
 };
 
 /** Comentarios raíz mostrados por bloque (se cargan más al hacer scroll). */
@@ -197,12 +216,19 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   highlightCommentId,
   showRepostLabel = false,
   hideAuthorUsername = false,
+  previewMode = false,
+  photoCropInteractive,
 }: ReflectionDetailItemProps) {
   const isNoClanAuthor =
     post.author.clanId == null || String(post.author.clanId).trim() === '';
   const reflectionPanelBorderColor = evoconnColors.background;
   const starFieldSurfaceColor =
     reflectionStarSurfaceColor ?? evoconnColors.background;
+
+  /** Franja negra encima de la foto — constantes de producción en reflectionDetailPhotoLayout. */
+  const showParaTiPhoto = postShowsImageInParaTi(post);
+  const postImageTopInset = showParaTiPhoto ? computeDetailPhotoImageTopInset() : 0;
+
   const actionColRef = useRef<DetailActionColumnHandle>(null);
   const { updatePostVote, updatePostSaveToggle, getPostById, getMyVote } = useFeedStore();
   const { savePost, unsavePost, isSaved } = usePersonalProfile();
@@ -248,21 +274,24 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   }, []);
 
   const handleUpvote = useCallback(() => {
+    if (previewMode) return;
     const next: 'up' | null = voted === 'up' ? null : 'up';
     updatePostVote(post.id, voted, next);
-  }, [post.id, voted, updatePostVote]);
+  }, [post.id, voted, updatePostVote, previewMode]);
 
   const handleDownvote = useCallback(() => {
+    if (previewMode) return;
     const next: 'down' | null = voted === 'down' ? null : 'down';
     updatePostVote(post.id, voted, next);
-  }, [post.id, voted, updatePostVote]);
+  }, [post.id, voted, updatePostVote, previewMode]);
 
   const handleSave = useCallback(() => {
+    if (previewMode) return;
     const now = !isSaved(post.id);
     updatePostSaveToggle(post.id, !now, now);
     if (now) savePost(post);
     else unsavePost(post.id);
-  }, [post, isSaved, updatePostSaveToggle, savePost, unsavePost]);
+  }, [post, isSaved, updatePostSaveToggle, savePost, unsavePost, previewMode]);
 
   const {
     commentsMap,
@@ -286,6 +315,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   // a la vez; lanzar el fetch durante el montaje/scroll competía con la
   // animación de entrada. Esperamos a que las interacciones terminen.
   useEffect(() => {
+    if (previewMode) return;
     const task = InteractionManager.runAfterInteractions(() => {
       ensureCommentsForPost(post.id).catch(console.error);
     });
@@ -517,6 +547,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   }, [onReadingModeChange]);
 
   const openComments = useCallback(() => {
+    if (previewMode) return;
     commentsExpandedRef.current = true;
     setCommentsSheetMounted(true);
     setCommentsExpanded(true);
@@ -527,7 +558,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
         setCommentsSheetListReady(true);
       });
     }
-  }, [onReadingModeChange]);
+  }, [onReadingModeChange, previewMode]);
 
   const closeComments = useCallback(() => {
     commentsSheetRef.current?.close();
@@ -551,6 +582,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
 
   const handleAddComment = useCallback(
     async (text: string) => {
+      if (previewMode) return;
       const authorId =
         session?.user?.id && isRealUserId(session.user.id)
           ? session.user.id
@@ -631,6 +663,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
       replyingTo,
       commentsMap,
       contextComments,
+      previewMode,
     ],
   );
 
@@ -766,8 +799,9 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   }, [deletePost, post.author.id, post.id, showInfo]);
 
   const handleMorePress = useCallback(() => {
+    if (previewMode) return;
     setPostMoreSheetOpen(true);
-  }, []);
+  }, [previewMode]);
 
   const confirmBlockUser = useCallback(() => {
     void handleBlockUser(post.author.id);
@@ -809,6 +843,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   }, [handleUpvote, onReadingModeChange]);
 
   const handlePanelTouchStart = useCallback((e: any) => {
+    if (photoCropInteractive) return;
     const { pageX, pageY } = e.nativeEvent;
     touchStartRef.current = { x: pageX, y: pageY };
     didMoveRef.current = false;
@@ -816,9 +851,10 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
       longPressTimerRef.current = null;
       handleMorePress();
     }, 500);
-  }, [handleMorePress]);
+  }, [handleMorePress, photoCropInteractive]);
 
   const handlePanelTouchMove = useCallback((e: any) => {
+    if (photoCropInteractive) return;
     if (didMoveRef.current) return;
     const { pageX, pageY } = e.nativeEvent;
     const dx = Math.abs(pageX - touchStartRef.current.x);
@@ -830,9 +866,10 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
         longPressTimerRef.current = null;
       }
     }
-  }, []);
+  }, [photoCropInteractive]);
 
   const handlePanelTouchEnd = useCallback(() => {
+    if (photoCropInteractive) return;
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
@@ -840,14 +877,15 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     if (!didMoveRef.current) {
       fireTap();
     }
-  }, [fireTap]);
+  }, [fireTap, photoCropInteractive]);
 
   const handlePanelTouchCancel = useCallback(() => {
+    if (photoCropInteractive) return;
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
-  }, []);
+  }, [photoCropInteractive]);
 
   const { width: screenW, height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -954,6 +992,10 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     const ch = phraseContentHRef.current;
     const vh = phraseViewportHRef.current;
     if (vh <= 0) return;
+    if (previewMode && isPhrase) {
+      setPhraseOverflowScroll(ch > vh + 2);
+      return;
+    }
     if (ch <= vh + 2) {
       setPhraseOverflowScroll(false);
       return;
@@ -966,7 +1008,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     } else {
       setPhraseOverflowScroll(true);
     }
-  }, []);
+  }, [previewMode, isPhrase]);
 
   const onPhraseScrollViewportLayout = useCallback(
     (e: LayoutChangeEvent) => {
@@ -1430,7 +1472,10 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     notifyParentFeedScrollLock();
   }, [notifyParentFeedScrollLock]);
 
-  const reflectionTitleUsesLongLayout = isLongText || readingMode;
+  const reflectionTitleUsesLongLayout = isLongText || readingMode || previewMode;
+
+  /** Reflexiones cortas en feed: centradas; en preview/editor: arriba-izq como lectura larga. */
+  const reflectionShortCentered = !isPhrase && !isLongText && !previewMode && !photoCropInteractive;
 
   // ── Etiqueta "Republicado por …" (solo Para Ti) ───────────────────────────
   const repostAttribution = showRepostLabel ? repostAttributionByPost[post.id] : undefined;
@@ -1644,7 +1689,13 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
       <ReflectionBackground clan={post.author.clanId}>
         <View style={styles.content}>
           {/* ── Header ── */}
-          <View style={[styles.headerRow, { transform: [{ translateX: DETAIL_HEADER_ROW_OFFSET_X }, { translateY: DETAIL_HEADER_ROW_OFFSET_Y }] }]}>
+          <View
+            style={[
+              styles.headerRow,
+              showParaTiPhoto && { marginBottom: DETAIL_PHOTO_HEADER_MARGIN_BOTTOM },
+              { transform: [{ translateX: DETAIL_HEADER_ROW_OFFSET_X }, { translateY: DETAIL_HEADER_ROW_OFFSET_Y }] },
+            ]}
+          >
             <View style={styles.usernameFollowRow}>
               {!hideAuthorUsername ? (
                 <>
@@ -1657,20 +1708,26 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                   />
                 </>
               ) : null}
-              <FollowButton
-                authorId={post.author.id}
-                authorClanId={post.author.clanId}
-                context="detail"
-              />
+              {!previewMode ? (
+                <FollowButton
+                  authorId={post.author.id}
+                  authorClanId={post.author.clanId}
+                  context="detail"
+                />
+              ) : null}
             </View>
           </View>
 
           {/* ── Reflection panel (upper black box) ── */}
           <View
-            onTouchStart={handlePanelTouchStart}
-            onTouchMove={handlePanelTouchMove}
-            onTouchEnd={handlePanelTouchEnd}
-            onTouchCancel={handlePanelTouchCancel}
+            {...(photoCropInteractive
+              ? {}
+              : {
+                  onTouchStart: handlePanelTouchStart,
+                  onTouchMove: handlePanelTouchMove,
+                  onTouchEnd: handlePanelTouchEnd,
+                  onTouchCancel: handlePanelTouchCancel,
+                })}
             onLayout={handleReflPanelLayout}
             style={[
               styles.reflectionPanel,
@@ -1691,10 +1748,26 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
               },
             ]}
           >
-            <PanelStarField surfaceColor={starFieldSurfaceColor} />
+            {showParaTiPhoto ? (
+              <PostImageCover
+                uri={post.imageUrl!}
+                imageWidth={post.imageWidth}
+                imageHeight={post.imageHeight}
+                focusY={post.imageCropFocusY}
+                contentTopInset={postImageTopInset}
+                surfaceColor={starFieldSurfaceColor}
+                interactive={!!photoCropInteractive}
+                onFocusYChange={photoCropInteractive?.onFocusYChange}
+                onRemoveFromDisplay={photoCropInteractive?.onRemoveFromDisplay}
+              />
+            ) : (
+              <PanelStarField surfaceColor={starFieldSurfaceColor} />
+            )}
             {isPhrase ? (
               <ScrollView
-                scrollEnabled={phraseOverflowScroll}
+                style={photoCropInteractive ? styles.panelPhotoCropTextLayer : undefined}
+                pointerEvents={photoCropInteractive ? 'none' : 'auto'}
+                scrollEnabled={photoCropInteractive ? false : (previewMode && isPhrase) || phraseOverflowScroll}
                 onLayout={onPhraseScrollViewportLayout}
                 contentContainerStyle={[
                   styles.quoteCenter,
@@ -1708,8 +1781,9 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                     ],
                   },
                 ]}
-                showsVerticalScrollIndicator={phraseOverflowScroll}
-                nestedScrollEnabled
+                showsVerticalScrollIndicator={photoCropInteractive ? false : phraseOverflowScroll}
+                nestedScrollEnabled={!photoCropInteractive}
+                bounces={!photoCropInteractive && phraseOverflowScroll}
               >
                 <View style={styles.phraseQuoteStack} onLayout={onPhraseContentLayout}>
                   <Text
@@ -1745,57 +1819,72 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                 </View>
               </ScrollView>
             ) : (
-              <View style={styles.reflectionScrollRow} onLayout={handleReflectionScrollRowLayout}>
+              <View
+                style={[
+                  styles.reflectionScrollRow,
+                  photoCropInteractive && showParaTiPhoto && styles.panelPhotoCropTextLayer,
+                ]}
+                pointerEvents={photoCropInteractive ? 'none' : 'auto'}
+                onLayout={handleReflectionScrollRowLayout}
+              >
                 <ScrollView
                   style={[styles.reflectionScroll, styles.reflectionScrollFlex]}
-                  scrollEnabled={readingMode && isLongText}
+                  scrollEnabled={photoCropInteractive ? false : readingMode && isLongText}
                   showsVerticalScrollIndicator={false}
-                  nestedScrollEnabled
-                  bounces={readingMode && isLongText}
+                  nestedScrollEnabled={!photoCropInteractive}
+                  bounces={!photoCropInteractive && readingMode && isLongText}
                   keyboardShouldPersistTaps="handled"
                   contentContainerStyle={[
                     styles.reflectionScrollContent,
-                    !isLongText && styles.reflectionScrollContentCentered,
+                    reflectionShortCentered && styles.reflectionScrollContentCentered,
                   ]}
                   onLayout={handleReflectionScrollLayout}
                   onContentSizeChange={handleReflectionContentSize}
                 >
-                  <View style={[styles.reflectionScrollTextOuter, !isLongText && styles.reflectionScrollTextOuterCentered]}>
-                    <View style={{ width: reflectionTextColumnWidth, alignItems: !isLongText ? 'center' : 'flex-start' }}>
+                  <View style={[styles.reflectionScrollTextOuter, reflectionShortCentered && styles.reflectionScrollTextOuterCentered]}>
+                    <View style={{ width: reflectionTextColumnWidth, alignItems: reflectionShortCentered ? 'center' : 'flex-start' }}>
                       {post.title ? (
-                        <Text
-                          {...(reflectionTitleUsesLongLayout
-                            ? {}
-                            : { numberOfLines: 1, ellipsizeMode: 'tail' as const })}
+                        <View
                           style={[
-                            styles.title,
-                            !reflectionTitleUsesLongLayout && styles.textCentered,
-                            reflectionTitleUsesLongLayout && styles.titleDetailLongMode,
+                            reflectionTitleUsesLongLayout && styles.titleDetailLongWrap,
                             !reflectionTitleUsesLongLayout && {
-                              // Misma caja horizontal que el cuerpo: el centro geométrico del título
-                              // coincide con el del párrafo (sin TL.offsetX, que rompía ese eje).
                               width: '100%',
                               transform: [
                                 { translateX: 0 },
-                                { translateY: TL.offsetY },
+                                { translateY: TL.offsetY + TL.reflectionBodyGapNudgeY },
                                 { scale: TL.scale },
                               ],
                             },
+                            reflectionTitleUsesLongLayout && {
+                              transform: [{ translateY: TL.reflectionBodyGapNudgeY }],
+                            },
                           ]}
                         >
-                          {reflectionTitleUsesLongLayout
-                            ? post.title
-                            : post.title.length > TL.maxCharacters
-                              ? post.title.slice(0, TL.maxCharacters) + '…'
-                              : post.title}
-                        </Text>
+                          <Text
+                            {...(reflectionTitleUsesLongLayout
+                              ? {}
+                              : { numberOfLines: 1, ellipsizeMode: 'tail' as const })}
+                            style={[
+                              styles.title,
+                              !reflectionTitleUsesLongLayout && styles.textCentered,
+                              reflectionTitleUsesLongLayout && styles.titleDetailLongMode,
+                              !reflectionTitleUsesLongLayout && { width: '100%' },
+                            ]}
+                          >
+                            {reflectionTitleUsesLongLayout
+                              ? post.title
+                              : post.title.length > TL.maxCharacters
+                                ? post.title.slice(0, TL.maxCharacters) + '…'
+                                : post.title}
+                          </Text>
+                        </View>
                       ) : null}
                       <Text
                         key={bodyLayoutKey}
                         style={[
                           styles.bodyText,
-                          !isLongText && styles.textCentered,
-                          !isLongText && styles.reflectBodyShortFill,
+                          reflectionShortCentered && styles.textCentered,
+                          reflectionShortCentered && styles.reflectBodyShortFill,
                         ]}
                         numberOfLines={!readingMode && isLongText ? maxBodyLines : undefined}
                         onTextLayout={handleBodyTextLayout}
@@ -2004,8 +2093,9 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
               renderItem={renderCommentRoot}
               keyExtractor={commentRootKeyExtractor}
               extraData={commentsSheetExtraData}
+              scrollEnabled={!photoCropInteractive}
               showsVerticalScrollIndicator={false}
-              nestedScrollEnabled
+              nestedScrollEnabled={!photoCropInteractive}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
               onEndReached={handleCommentsEndReached}
@@ -2101,6 +2191,12 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     overflow: 'hidden',
   },
+  /** En editor de encuadre: frase/título por encima de capas de foto (misma vista que producción). */
+  panelPhotoCropTextLayer: {
+    flex: 1,
+    zIndex: 10,
+    elevation: 10,
+  },
   reflectionScrollRow: {
     flex: 1,
     alignItems: 'stretch',
@@ -2137,9 +2233,12 @@ const styles = StyleSheet.create({
     fontSize: 20,
     marginBottom: 10,
   },
+  /** Contenedor del título en preview/lectura larga (translateY vive aquí, no en Text). */
+  titleDetailLongWrap: {
+    alignSelf: 'stretch',
+  },
   /** Título en “Ver más” / lectura: alineado con el cuerpo (eje X), sin scale que el panel recorta; texto completo (varias líneas). */
   titleDetailLongMode: {
-    alignSelf: 'stretch',
     textAlign: 'left',
     fontSize: REFLECTION_TITLE_LONG_FONT_SIZE,
     lineHeight: REFLECTION_TITLE_LONG_LINE_HEIGHT,

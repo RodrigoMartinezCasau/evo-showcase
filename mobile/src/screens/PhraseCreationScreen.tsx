@@ -1043,6 +1043,10 @@ export default function PhraseCreationScreen() {
                           : (audio) =>
                               handlePhrasePublish(effectiveThreadId, userPhrase, i, audio)
                       }
+                      previewType={published ? undefined : 'phrase'}
+                      previewBody={
+                        published ? undefined : normalizePhraseInnerForPublish(userPhrase)
+                      }
                       onDeletePublication={
                         published
                           ? () => handleDeletePhrasePublication(effectiveThreadId, i)

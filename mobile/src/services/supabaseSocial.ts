@@ -1601,6 +1601,13 @@ function simPostToDbRow(p: SimPost) {
     quote_author:    p.quoteAuthor   ?? null,
     audio_track_id:  p.audioTrackId  ?? null,
     audio_volume:    p.audioVolume   ?? 1,
+    image_url:       p.imageUrl      ?? null,
+    image_width:     p.imageWidth    ?? null,
+    image_height:    p.imageHeight   ?? null,
+    image_crop_focus_y: p.imageCropFocusY ?? null,
+    image_crop_focus_y_following: p.imageCropFocusYFollowing ?? null,
+    image_show_para_ti: p.imageShowParaTi ?? null,
+    image_show_siguiendo: p.imageShowSiguiendo ?? null,
     created_at:      p.createdAt,
   };
 }
@@ -1624,6 +1631,16 @@ export function dbRowToSimPost(row: Record<string, unknown>): SimPost {
     quoteAuthor:    row.quote_author    as string | undefined,
     audioTrackId:   (row.audio_track_id as string | null | undefined) ?? null,
     audioVolume:    (row.audio_volume   as number | null | undefined) ?? null,
+    imageUrl:       (row.image_url      as string | null | undefined) ?? null,
+    imageWidth:     (row.image_width    as number | null | undefined) ?? null,
+    imageHeight:    (row.image_height   as number | null | undefined) ?? null,
+    imageCropFocusY: (row.image_crop_focus_y as number | null | undefined) ?? null,
+    imageCropFocusYFollowing:
+      (row.image_crop_focus_y_following as number | null | undefined) ?? null,
+    imageShowParaTi:
+      (row.image_show_para_ti as boolean | null | undefined) ?? null,
+    imageShowSiguiendo:
+      (row.image_show_siguiendo as boolean | null | undefined) ?? null,
     createdAt:      row.created_at      as string,
     upvoterIds:   [],
     downvoterIds: [],

@@ -14,6 +14,8 @@ type Props = {
   tier: CardSizeTier;
   cardWidth: number;
   layout: SvgCardLayout;
+  /** Extensión inferior por foto (Siguiendo). Mantiene el dock a inset fijo del fondo. */
+  bottomExtendPx?: number;
 };
 
 /**
@@ -24,10 +26,11 @@ export const NativeFeedCardBackground = React.memo(function NativeFeedCardBackgr
   tier,
   cardWidth,
   layout,
+  bottomExtendPx = 0,
 }: Props) {
   const bg = useMemo(
-    () => computeNativeFeedCardBackgroundLayout(tier, cardWidth, layout),
-    [tier, cardWidth, layout],
+    () => computeNativeFeedCardBackgroundLayout(tier, cardWidth, layout, bottomExtendPx),
+    [tier, cardWidth, layout, bottomExtendPx],
   );
 
   const innerHeight = bg.blackBottomPx - bg.blackTopPx;

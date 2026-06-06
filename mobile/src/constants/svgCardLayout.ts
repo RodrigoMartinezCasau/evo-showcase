@@ -77,13 +77,25 @@ export function computeNativeFeedCardBackgroundLayout(
   tier: CardSizeTier,
   cardWidth: number,
   cardLayout: SvgCardLayout,
+  /**
+   * Píxeles que la tarjeta se ha estirado por DEBAJO de su altura natural para
+   * dar cabida a una foto (solo Siguiendo). El marco y el panel interior ya
+   * vienen estirados en `cardLayout` (cardHeight/blackBottomPx). Aquí lo usamos
+   * para mantener el "dock" (la muesca de stats) a una distancia FIJA del borde
+   * inferior en lugar de recolocarlo proporcionalmente (que lo separaría de los
+   * stats, anclados al fondo).
+   */
+  bottomExtendPx = 0,
 ): NativeFeedCardBackgroundLayout {
   const g = SVG_GEOMETRY[tier] ?? SVG_GEOMETRY.medium;
   const frameHeight = g.frameBottom - g.frameTop;
   const scale = cardWidth / SVG_VIEWBOX_SIZE;
   const dock = BANNER_DOCK_BY_TIER[tier] ?? BANNER_DOCK_BY_TIER.medium;
+  // Altura natural (sin la extensión de la foto) para situar el dock; luego lo
+  // desplazamos por `bottomExtendPx` para que quede a inset fijo del fondo.
+  const naturalHeight = cardLayout.cardHeight - bottomExtendPx;
   const dockTop =
-    ((dock.originY - g.frameTop) / frameHeight) * cardLayout.cardHeight;
+    ((dock.originY - g.frameTop) / frameHeight) * naturalHeight + bottomExtendPx;
   const dockLeft = dock.originX * scale;
 
   return {

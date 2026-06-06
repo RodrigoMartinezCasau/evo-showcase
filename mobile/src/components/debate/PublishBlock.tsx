@@ -6,6 +6,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { EvoConfirmModal } from '@evoconn/components/shared/EvoActionSheetModal';
 import { PublishAudioPickerModal } from '@evoconn/components/publish/PublishAudioPickerModal';
 import type { PublishAudioChoice } from '@evoconn/types/publishAudio';
+import type { CommunityPost } from '@evoconn/types';
+import { userForPublish } from '@evoconn/utils/publishAuthor';
+import { useAuth } from '../../../mobile/lib/AuthContext';
 import {
   AI_SPECIAL_BLOCK_LAYOUT as SB,
   DEBATE_CARD_LAYOUT as CARD,
@@ -63,6 +66,17 @@ type Props = {
    * reflexiones omiten y queda 0.
    */
   actionBarInnerPaddingHorizontal?: number;
+  /**
+   * Habilita el botón "Previsualización" en el picker. Tipo de publicación que se
+   * está creando (frase / reflexión) para construir el post de vista previa.
+   */
+  previewType?: 'phrase' | 'reflection';
+  /**
+   * Cuerpo de la publicación para la vista previa: en frases el texto de la frase
+   * ya normalizado; en reflexiones el texto de la reflexión. El título/autor citado
+   * sale del propio campo del bloque.
+   */
+  previewBody?: string;
 };
 
 export const PublishBlock = React.memo(function PublishBlock({
@@ -88,7 +102,10 @@ export const PublishBlock = React.memo(function PublishBlock({
   authorInputAnchorRef,
   onDeletePublication,
   actionBarInnerPaddingHorizontal = 0,
+  previewType,
+  previewBody,
 }: Props) {
+  const { profile: authProfile } = useAuth();
   const isAuthorControlled = authorValue !== undefined;
   const [internalTitle, setInternalTitle] = useState(() =>
     published && initialAuthorValue ? initialAuthorValue : '',
@@ -111,6 +128,34 @@ export const PublishBlock = React.memo(function PublishBlock({
     if (published || !onPublish) return;
     setAudioPickerOpen(true);
   }, [published, onPublish]);
+
+  const buildPreviewPost = useCallback(
+    (choice: PublishAudioChoice): CommunityPost | null => {
+      if (!previewType) return null;
+      const author = userForPublish(authProfile);
+      const trimmedTitle = (title ?? '').trim();
+      const common = {
+        id: 'preview',
+        author,
+        audioTrackId: choice.audioTrackId ?? null,
+        audioVolume: choice.audioVolume ?? null,
+        imageUrl: choice.imageUrl ?? null,
+        imageWidth: choice.imageWidth ?? null,
+        imageHeight: choice.imageHeight ?? null,
+        imageCropFocusY: choice.imageCropFocusY ?? null,
+        imageCropFocusYFollowing: choice.imageCropFocusYFollowing ?? null,
+        imageShowParaTi: choice.imageShowParaTi ?? null,
+        imageShowSiguiendo: choice.imageShowSiguiendo ?? null,
+        voteStats: { up: 0, down: 0, save: 0 },
+        createdAt: new Date().toISOString(),
+      } as const;
+      if (previewType === 'phrase') {
+        return { ...common, type: 'phrase', body: previewBody ?? '', quoteAuthor: trimmedTitle };
+      }
+      return { ...common, type: 'reflection', title: trimmedTitle, body: previewBody ?? '' };
+    },
+    [previewType, previewBody, title, authProfile],
+  );
 
   const handleChange = (t: string) => {
     if (published) return;
@@ -213,6 +258,7 @@ export const PublishBlock = React.memo(function PublishBlock({
         clanId={clanId}
         onClose={() => setAudioPickerOpen(false)}
         onConfirm={handleAudioConfirm}
+        buildPreviewPost={previewType ? buildPreviewPost : undefined}
       />
 
       {published && onDeletePublication ? (

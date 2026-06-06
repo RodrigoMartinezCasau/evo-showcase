@@ -55,6 +55,10 @@ export const DETAIL_TITLE_LAYOUT = {
   scale: 1.16,
   /** Caracteres máximos visibles. Si el título es más largo, se trunca con "…". */
   maxCharacters: 25,
+  /**
+   * Para ti (reflexiones): baja el título hacia el cuerpo sin mover el párrafo (+ px).
+   */
+  reflectionBodyGapNudgeY: 5,
 } as const;
 
 /** Límites internos del contenido de comentarios dentro del panel negro. */

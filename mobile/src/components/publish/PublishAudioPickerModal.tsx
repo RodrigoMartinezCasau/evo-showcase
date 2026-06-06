@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Platform,
   Animated,
+  Image,
   PanResponder,
   type LayoutChangeEvent,
 } from 'react-native';
@@ -22,9 +23,21 @@ import {
   setIsAudioActiveAsync,
 } from 'expo-audio';
 import { fetchAudioTracks, type AudioTrack } from '@evoconn/services/audioTracks';
+import {
+  pickPostImage,
+  uploadAndModeratePostImage,
+} from '@evoconn/services/postImages';
 import { getClanColor } from '@evoconn/constants/clanColors';
 import type { PublishAudioChoice } from '@evoconn/types/publishAudio';
 import { DEFAULT_PUBLISH_AUDIO } from '@evoconn/types/publishAudio';
+import type { CommunityPost } from '@evoconn/types';
+import { useAuth } from '../../../mobile/lib/AuthContext';
+import { PostPreviewModal } from './PostPreviewModal';
+import {
+  PostImageFrameEditorModal,
+  DEFAULT_POST_IMAGE_FOCUS_Y,
+} from './PostImageFrameEditorModal';
+import { clampPostImageFocusY } from '@evoconn/utils/postImageCoverLayout';
 
 const SIN_AUDIO_ID = '__sin_audio__';
 
@@ -33,6 +46,11 @@ type Props = {
   clanId?: string | null;
   onClose: () => void;
   onConfirm: (choice: PublishAudioChoice) => void;
+  /**
+   * Construye el post que se vería en "Para ti" con la selección actual de
+   * audio + foto. Si se define, se muestra el botón "Previsualización".
+   */
+  buildPreviewPost?: (choice: PublishAudioChoice) => CommunityPost | null;
 };
 
 function normalizeSearch(s: string): string {
@@ -152,9 +170,11 @@ function VolumeSlider({
   );
 }
 
-export function PublishAudioPickerModal({ visible, clanId, onClose, onConfirm }: Props) {
+export function PublishAudioPickerModal({ visible, clanId, onClose, onConfirm, buildPreviewPost }: Props) {
   const insets = useSafeAreaInsets();
   const clanAccent = getClanColor(clanId ?? null);
+  const { session } = useAuth();
+  const [previewPost, setPreviewPost] = useState<CommunityPost | null>(null);
 
   const [tracks, setTracks] = useState<AudioTrack[]>([]);
   const [loading, setLoading] = useState(false);
@@ -162,6 +182,112 @@ export function PublishAudioPickerModal({ visible, clanId, onClose, onConfirm }:
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [volume, setVolume] = useState(1);
   const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(null);
+
+  // ── Foto adjunta ──────────────────────────────────────────────────────────
+  // photoPreviewUri: la imagen local que se enseña mientras se sube/modera.
+  // photoUrl: URL pública DEFINITIVA (solo se rellena si AWS aprueba la foto).
+  const [photoPreviewUri, setPhotoPreviewUri] = useState<string | null>(null);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoDims, setPhotoDims] = useState<{ w: number; h: number } | null>(null);
+  const [photoCropFocusY, setPhotoCropFocusY] = useState<number>(DEFAULT_POST_IMAGE_FOCUS_Y);
+  const [photoCropFocusYFollowing, setPhotoCropFocusYFollowing] =
+    useState<number>(DEFAULT_POST_IMAGE_FOCUS_Y);
+  const photoCropFocusYRef = useRef<number>(DEFAULT_POST_IMAGE_FOCUS_Y);
+  const photoCropFocusYFollowingRef = useRef<number>(DEFAULT_POST_IMAGE_FOCUS_Y);
+  const [imageShowParaTi, setImageShowParaTi] = useState(true);
+  const [imageShowSiguiendo, setImageShowSiguiendo] = useState(true);
+  const imageShowParaTiRef = useRef(true);
+  const imageShowSiguiendoRef = useRef(true);
+  const [frameEditorVisible, setFrameEditorVisible] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+
+  const resetPhoto = useCallback(() => {
+    setPhotoPreviewUri(null);
+    setPhotoUrl(null);
+    setPhotoDims(null);
+    photoCropFocusYRef.current = DEFAULT_POST_IMAGE_FOCUS_Y;
+    photoCropFocusYFollowingRef.current = DEFAULT_POST_IMAGE_FOCUS_Y;
+    imageShowParaTiRef.current = true;
+    imageShowSiguiendoRef.current = true;
+    setPhotoCropFocusY(DEFAULT_POST_IMAGE_FOCUS_Y);
+    setPhotoCropFocusYFollowing(DEFAULT_POST_IMAGE_FOCUS_Y);
+    setImageShowParaTi(true);
+    setImageShowSiguiendo(true);
+    setFrameEditorVisible(false);
+    setPhotoBusy(false);
+    setPhotoError(null);
+  }, []);
+
+  const applyCropFocus = useCallback((paraTi: number, siguiendo: number) => {
+    const pt = clampPostImageFocusY(paraTi);
+    const sg = clampPostImageFocusY(siguiendo);
+    photoCropFocusYRef.current = pt;
+    photoCropFocusYFollowingRef.current = sg;
+    setPhotoCropFocusY(pt);
+    setPhotoCropFocusYFollowing(sg);
+  }, []);
+
+  const applyImageDisplay = useCallback((showParaTi: boolean, showSiguiendo: boolean) => {
+    imageShowParaTiRef.current = showParaTi;
+    imageShowSiguiendoRef.current = showSiguiendo;
+    setImageShowParaTi(showParaTi);
+    setImageShowSiguiendo(showSiguiendo);
+  }, []);
+
+  const clearAttachedPhoto = useCallback(() => {
+    setPhotoPreviewUri(null);
+    setPhotoUrl(null);
+    setPhotoDims(null);
+    photoCropFocusYRef.current = DEFAULT_POST_IMAGE_FOCUS_Y;
+    photoCropFocusYFollowingRef.current = DEFAULT_POST_IMAGE_FOCUS_Y;
+    imageShowParaTiRef.current = true;
+    imageShowSiguiendoRef.current = true;
+    setPhotoCropFocusY(DEFAULT_POST_IMAGE_FOCUS_Y);
+    setPhotoCropFocusYFollowing(DEFAULT_POST_IMAGE_FOCUS_Y);
+    setImageShowParaTi(true);
+    setImageShowSiguiendo(true);
+    setFrameEditorVisible(false);
+  }, []);
+
+  const handlePickPhoto = useCallback(async () => {
+    if (photoBusy) return;
+    setPhotoError(null);
+    const userId = session?.user?.id;
+    if (!userId) {
+      setPhotoError('Inicia sesión para añadir fotos.');
+      return;
+    }
+    try {
+      const picked = await pickPostImage();
+      if (!picked) return;
+      setPhotoPreviewUri(picked.uri);
+      setPhotoBusy(true);
+      const res = await uploadAndModeratePostImage(userId, picked);
+      if (res.approved) {
+        setPhotoUrl(res.imageUrl);
+        setPhotoDims({ w: res.width, h: res.height });
+        applyCropFocus(DEFAULT_POST_IMAGE_FOCUS_Y, DEFAULT_POST_IMAGE_FOCUS_Y);
+        applyImageDisplay(true, true);
+      } else {
+        setPhotoPreviewUri(null);
+        setPhotoUrl(null);
+        setPhotoDims(null);
+        setPhotoError(res.message);
+      }
+    } catch (e) {
+      setPhotoPreviewUri(null);
+      setPhotoUrl(null);
+      setPhotoDims(null);
+      setPhotoError(
+        e instanceof Error && e.message === 'PERMISSION_DENIED'
+          ? 'Permite el acceso a tus fotos para adjuntar una.'
+          : 'No se pudo añadir la foto. Inténtalo de nuevo.',
+      );
+    } finally {
+      setPhotoBusy(false);
+    }
+  }, [photoBusy, session, applyCropFocus, applyImageDisplay]);
 
   const previewRef = useRef<ReturnType<typeof createAudioPlayer> | null>(null);
   const previewRequestRef = useRef(0);
@@ -253,8 +379,10 @@ export function PublishAudioPickerModal({ visible, clanId, onClose, onConfirm }:
       setVolume(1);
       volumeRef.current = 1;
       setPreviewLoadingId(null);
+      resetPhoto();
+      setPreviewPost(null);
     }
-  }, [visible, disposePreviewPlayer]);
+  }, [visible, disposePreviewPlayer, resetPhoto]);
 
   useEffect(() => () => disposePreviewPlayer(), [disposePreviewPlayer]);
 
@@ -293,15 +421,36 @@ export function PublishAudioPickerModal({ visible, clanId, onClose, onConfirm }:
     setVolume(value);
   }, []);
 
+  // Selección actual (audio + foto) en forma de PublishAudioChoice.
+  const buildChoice = useCallback((): PublishAudioChoice => {
+    const imageFields = {
+      imageUrl: photoUrl,
+      imageWidth: photoUrl ? photoDims?.w ?? null : null,
+      imageHeight: photoUrl ? photoDims?.h ?? null : null,
+      imageCropFocusY: photoUrl ? photoCropFocusYRef.current : null,
+      imageCropFocusYFollowing: photoUrl ? photoCropFocusYFollowingRef.current : null,
+      imageShowParaTi: photoUrl ? imageShowParaTiRef.current : null,
+      imageShowSiguiendo: photoUrl ? imageShowSiguiendoRef.current : null,
+    };
+    if (selectedId == null || selectedId === SIN_AUDIO_ID) {
+      return { ...DEFAULT_PUBLISH_AUDIO, ...imageFields };
+    }
+    return { audioTrackId: selectedId, audioVolume: volumeRef.current, ...imageFields };
+  }, [selectedId, photoUrl, photoDims]);
+
   const handleConfirm = useCallback(() => {
     if (selectedId == null) return;
+    if (photoBusy) return; // no publicar mientras se modera la foto
     disposePreviewPlayer();
-    if (selectedId === SIN_AUDIO_ID) {
-      onConfirm(DEFAULT_PUBLISH_AUDIO);
-      return;
-    }
-    onConfirm({ audioTrackId: selectedId, audioVolume: volumeRef.current });
-  }, [onConfirm, selectedId, disposePreviewPlayer]);
+    onConfirm(buildChoice());
+  }, [onConfirm, selectedId, disposePreviewPlayer, photoBusy, buildChoice]);
+
+  const handleOpenPreview = useCallback(() => {
+    if (photoBusy || !buildPreviewPost) return;
+    disposePreviewPlayer(); // corta el preview de pista del picker
+    const post = buildPreviewPost(buildChoice());
+    if (post) setPreviewPost(post);
+  }, [photoBusy, buildPreviewPost, disposePreviewPlayer, buildChoice]);
 
   const renderItem = useCallback(
     ({ item }: { item: (typeof listData)[number] }) => {
@@ -364,7 +513,63 @@ export function PublishAudioPickerModal({ visible, clanId, onClose, onConfirm }:
     >
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable style={[styles.sheet, { paddingBottom: Math.max(16, insets.bottom + 12) }]} onPress={(e) => e.stopPropagation()}>
-          <Text style={styles.sheetTitle}>Audio para tu publicación</Text>
+          <Text style={styles.sheetTitle}>Tu publicación</Text>
+
+          {/* ── Añadir foto (encima de las canciones) ── */}
+          {photoPreviewUri ? (
+            <View style={styles.photoPreviewRow}>
+              <Image source={{ uri: photoPreviewUri }} style={styles.photoThumb} resizeMode="cover" />
+              <View style={styles.photoInfo}>
+                <Text style={styles.photoTitle} numberOfLines={1}>
+                  {photoBusy ? 'Verificando foto…' : 'Foto añadida'}
+                </Text>
+                <Text style={styles.photoSubtitle} numberOfLines={2}>
+                  {photoBusy
+                    ? 'Comprobando que cumple las normas de la comunidad.'
+                    : 'Se mostrará en tu publicación.'}
+                </Text>
+              </View>
+              {photoBusy ? (
+                <ActivityIndicator color={clanAccent} style={styles.photoAction} />
+              ) : (
+                <View style={styles.photoActions}>
+                  <TouchableOpacity
+                    style={styles.photoAction}
+                    onPress={() => setFrameEditorVisible(true)}
+                    disabled={!photoUrl}
+                    accessibilityRole="button"
+                    accessibilityLabel="Encuadrar foto"
+                  >
+                    <Ionicons
+                      name="crop-outline"
+                      size={24}
+                      color={photoUrl ? clanAccent : 'rgba(255,255,255,0.25)'}
+                    />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.photoAction}
+                    onPress={resetPhoto}
+                    accessibilityRole="button"
+                    accessibilityLabel="Quitar foto"
+                  >
+                    <Ionicons name="close-circle" size={26} color="rgba(255,255,255,0.6)" />
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.addPhotoRow, { borderColor: clanAccent }]}
+              activeOpacity={0.8}
+              onPress={handlePickPhoto}
+            >
+              <Ionicons name="image-outline" size={20} color={clanAccent} />
+              <Text style={[styles.addPhotoText, { color: clanAccent }]}>Añadir foto</Text>
+            </TouchableOpacity>
+          )}
+          {photoError ? <Text style={styles.photoError}>{photoError}</Text> : null}
+
+          <Text style={styles.sectionLabel}>Audio para tu publicación</Text>
 
           <TextInput
             style={styles.search}
@@ -403,11 +608,54 @@ export function PublishAudioPickerModal({ visible, clanId, onClose, onConfirm }:
             </View>
           ) : null}
 
-          <TouchableOpacity style={styles.cancelBtn} onPress={onClose} activeOpacity={0.75}>
-            <Text style={styles.cancelTxt}>Cancelar</Text>
-          </TouchableOpacity>
+          <View style={styles.bottomRow}>
+            <TouchableOpacity style={styles.cancelBtn} onPress={onClose} activeOpacity={0.75}>
+              <Text style={styles.cancelTxt}>Cancelar</Text>
+            </TouchableOpacity>
+            {buildPreviewPost ? (
+              <TouchableOpacity
+                style={styles.previewBtn}
+                onPress={handleOpenPreview}
+                activeOpacity={0.7}
+                disabled={photoBusy}
+                hitSlop={8}
+              >
+                <Ionicons name="eye-outline" size={18} color={clanAccent} />
+                <Text style={[styles.previewBtnTxt, { color: clanAccent }]}>Previsualización</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
         </Pressable>
       </Pressable>
+
+      <PostPreviewModal
+        visible={previewPost != null}
+        post={previewPost}
+        onClose={() => setPreviewPost(null)}
+      />
+
+      {frameEditorVisible && buildPreviewPost ? (() => {
+        const editorPost = buildPreviewPost(buildChoice());
+        if (!editorPost?.imageUrl) return null;
+        return (
+          <PostImageFrameEditorModal
+            visible={frameEditorVisible}
+            post={editorPost}
+            focusYParaTi={photoCropFocusY}
+            focusYSiguiendo={photoCropFocusYFollowing}
+            imageShowParaTi={imageShowParaTi}
+            imageShowSiguiendo={imageShowSiguiendo}
+            clanAccent={clanAccent}
+            onCancel={() => setFrameEditorVisible(false)}
+            onPhotoFullyRemoved={clearAttachedPhoto}
+            onConfirm={(paraTi, siguiendo, showParaTi, showSiguiendo) => {
+              applyCropFocus(paraTi, siguiendo);
+              applyImageDisplay(showParaTi, showSiguiendo);
+              setFrameEditorVisible(false);
+            }}
+          />
+        );
+      })() : null}
     </Modal>
   );
 }
@@ -432,6 +680,78 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 16,
+  },
+  sectionLabel: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginBottom: 10,
+  },
+  addPhotoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    marginBottom: 16,
+  },
+  addPhotoText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  photoPreviewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    marginBottom: 16,
+  },
+  photoThumb: {
+    width: 52,
+    height: 52,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  photoInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  photoTitle: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  photoSubtitle: {
+    color: 'rgba(255,255,255,0.42)',
+    fontSize: 12,
+    marginTop: 3,
+    lineHeight: 16,
+  },
+  photoAction: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  photoError: {
+    color: '#ff6b6b',
+    fontSize: 13,
+    marginTop: -6,
+    marginBottom: 12,
   },
   search: {
     backgroundColor: 'rgba(255,255,255,0.07)',
@@ -526,14 +846,31 @@ const styles = StyleSheet.create({
     height: 16,
     borderRadius: 8,
   },
-  cancelBtn: {
+  bottomRow: {
     marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  cancelBtn: {
     paddingVertical: 14,
+    paddingHorizontal: 6,
     alignItems: 'center',
   },
   cancelTxt: {
     color: 'rgba(255,255,255,0.55)',
     fontSize: 14,
     fontWeight: '600',
+  },
+  previewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingVertical: 14,
+    paddingHorizontal: 6,
+  },
+  previewBtnTxt: {
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

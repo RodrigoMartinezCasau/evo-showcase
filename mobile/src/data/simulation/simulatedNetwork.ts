@@ -48,6 +48,15 @@ export type SimPost = {
   audioTrackId?: string | null;
   /** Volumen elegido por el autor para su publicación (0 = mudo … 1 = máx). */
   audioVolume?: number | null;
+  /** Foto adjunta (bucket `post-images`, ya moderada). URL pública o null. */
+  imageUrl?: string | null;
+  /** Dimensiones originales de la foto (aspect ratio sin medir). */
+  imageWidth?: number | null;
+  imageHeight?: number | null;
+  imageCropFocusY?: number | null;
+  imageCropFocusYFollowing?: number | null;
+  imageShowParaTi?: boolean | null;
+  imageShowSiguiendo?: boolean | null;
   /** User IDs that upvoted — max combined with downvoterIds ≤ 8, author excluded. */
   upvoterIds: string[];
   downvoterIds: string[];

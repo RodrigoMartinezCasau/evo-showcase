@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useState } from 'react';
+import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -22,6 +22,8 @@ import UpvoteActiveSvg from '../assets/detailActions/32.svg';
 import { useFeedStore } from '@evoconn/hooks/useFeedStore';
 import { usePersonalProfile } from '@evoconn/hooks/PersonalProfileContext';
 import { formatPhraseBodyForDisplay } from '@evoconn/utils/phrasePublish';
+import type { PostImageFocusY } from '@evoconn/utils/postImageCoverLayout';
+import { PostImageCover } from '@evoconn/components/publish/PostImageCover';
 import {
   computeCommunityFeedCardContentLayout,
   computeFeedCardTextContentBottomY,
@@ -38,6 +40,12 @@ import { COMMUNITY_FOLLOW_BUTTON_LAYOUT } from '@evoconn/constants/followButtonL
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { PanelStarField, PANEL_STAR_SURFACE_DEFAULT } from '@evoconn/components/animations/StarFieldBackground';
 import { PARA_TI_STAR_BRIGHTNESS } from '@evoconn/constants/starFieldLayout';
+import { postShowsImageInSiguiendo } from '@evoconn/utils/postImageDisplay';
+import {
+  computeFollowingFeedPhotoSlotLayout,
+  computeFollowingFeedMaxCardInnerHeight,
+  resolveFollowingPhotoFocusY,
+} from '@evoconn/constants/followingFeedPhotoLayout';
 
 const V = SVG_CARD_VISUAL;
 
@@ -60,6 +68,12 @@ type CommunityPostCardProps = {
    * Siguiendo: fondo de tarjeta al color de app + rebordes brillantes en las 4 esquinas (color clan).
    */
   followingFeedStyle?: boolean;
+  /** Editor de encuadre en Siguiendo (foto arrastrable). */
+  photoCropInteractive?: {
+    focusY: PostImageFocusY;
+    onFocusYChange: (focusY: PostImageFocusY) => void;
+    onRemoveFromDisplay?: () => void;
+  };
 };
 
 function CommunityPostCardBase({
@@ -70,6 +84,7 @@ function CommunityPostCardBase({
   showPhraseAuthor = false,
   slotOuterHeight,
   followingFeedStyle = false,
+  photoCropInteractive,
 }: CommunityPostCardProps) {
   const { updatePostVote, updatePostSaveToggle, getMyVote } = useFeedStore();
   const { savePost, unsavePost, isSaved } = usePersonalProfile();
@@ -97,17 +112,33 @@ function CommunityPostCardBase({
   }, [isReflection, post.author.username, post.title, post.body]);
 
   const isQuoteCard = cardTier === 'quote';
+  /** Siguiendo: la frase entera (sin ellipsis); la tarjeta crece y la foto va debajo. */
+  const phraseShowsFullText = followingFeedStyle && isQuoteCard;
+
+  const [phraseTextBottomY, setPhraseTextBottomY] = useState<number | null>(null);
+
+  useEffect(() => {
+    setPhraseTextBottomY(null);
+  }, [post.id, post.body, post.quoteAuthor, cardWidth, followingFeedStyle]);
+
+  // Solo en Siguiendo la tarjeta crece para mostrar la foto a ancho completo.
+  // (En Para ti la foto sustituye el fondo de estrellas en ReflectionDetailItem.)
+  const hasPhoto = followingFeedStyle && postShowsImageInSiguiendo(post);
 
   const { width: screenWidth } = useWindowDimensions();
   const maxUsableWidth = screenWidth - V.CARD_HORIZONTAL_MARGIN * 2;
   const baseCardWidth = Math.min(maxUsableWidth, COMMUNITY_FEED_CARD_MAX_INNER_WIDTH);
   const cardWidth = useMemo(() => {
+    // Con foto NO encogemos el ancho para encajar en el hueco: la tarjeta debe
+    // ser ancha (foto full-width) y se le permite crecer en alto (la lista de
+    // Siguiendo mide cada tarjeta, no usa altura fija).
+    if (hasPhoto) return baseCardWidth;
     if (slotOuterHeight == null || !(slotOuterHeight > 0)) return baseCardWidth;
     const innerMax = Math.max(0, slotOuterHeight - V.CARD_VERTICAL_MARGIN * 2);
     if (!(innerMax > 0)) return baseCardWidth;
     const maxW = maxCardWidthForInnerCardHeightPx(cardTier, innerMax);
     return Math.max(120, Math.floor(Math.min(baseCardWidth, maxW)));
-  }, [baseCardWidth, cardTier, slotOuterHeight]);
+  }, [baseCardWidth, cardTier, slotOuterHeight, hasPhoto]);
   const cardMarginH = (screenWidth - cardWidth) / 2;
   const layout = useMemo(
     () => computeSvgCardLayout(cardTier, cardWidth),
@@ -165,13 +196,30 @@ function CommunityPostCardBase({
     [],
   );
 
-  const textContentBottomY = useMemo(
+  const statsBottomInset = followingFeedStyle
+    ? starPanelVInset + feedContent.paddingBottom
+    : V.STATS_BOTTOM;
+
+  const onPhraseTextBlockLayout = useCallback(
+    (e: LayoutChangeEvent) => {
+      if (!phraseShowsFullText) return;
+      const h = e.nativeEvent.layout.height;
+      if (h <= 0) return;
+      const bottom = feedStackMinTopPx + h;
+      setPhraseTextBottomY((prev) =>
+        prev != null && Math.abs(prev - bottom) < 1 ? prev : bottom,
+      );
+    },
+    [phraseShowsFullText, feedStackMinTopPx],
+  );
+
+  const tierTextContentBottomY = useMemo(
     () =>
       computeFeedCardTextContentBottomY({
         cardHeight: layout.cardHeight,
         blackBottomPx: layout.blackBottomPx,
         paddingBottom: feedContent.paddingBottom,
-        statsBottom: V.STATS_BOTTOM,
+        statsBottom: statsBottomInset,
         statsRowHeight,
         clearanceAboveStats: V.STATS_TEXT_CLEARANCE_ABOVE_CHIP,
         feedStackMinTopPx,
@@ -180,16 +228,103 @@ function CommunityPostCardBase({
       layout.cardHeight,
       layout.blackBottomPx,
       feedContent.paddingBottom,
+      statsBottomInset,
       statsRowHeight,
       feedStackMinTopPx,
     ],
   );
+
+  const textContentBottomY =
+    phraseShowsFullText && phraseTextBottomY != null
+      ? phraseTextBottomY
+      : tierTextContentBottomY;
+
+  const baseCardHeightForLayout = useMemo(() => {
+    if (phraseShowsFullText && phraseTextBottomY != null) {
+      const statsBlock =
+        statsBottomInset +
+        statsRowHeight +
+        V.STATS_TEXT_CLEARANCE_ABOVE_CHIP +
+        feedContent.paddingBottom;
+      return Math.max(layout.cardHeight, phraseTextBottomY + statsBlock);
+    }
+    return layout.cardHeight;
+  }, [
+    phraseShowsFullText,
+    phraseTextBottomY,
+    layout.cardHeight,
+    statsBottomInset,
+    statsRowHeight,
+    feedContent.paddingBottom,
+  ]);
+
+  const phraseCardExtra = Math.max(0, baseCardHeightForLayout - layout.cardHeight);
+
+  const maxCardInnerHeight = useMemo(() => {
+    if (slotOuterHeight == null || !(slotOuterHeight > 0)) return undefined;
+    return computeFollowingFeedMaxCardInnerHeight(
+      slotOuterHeight - V.CARD_VERTICAL_MARGIN * 2,
+    );
+  }, [slotOuterHeight]);
+
+  // ── Foto (Siguiendo): debajo del texto; solo el recuadro cede si hay tope ───
+  const phraseLayoutReady = !phraseShowsFullText || phraseTextBottomY != null;
+
+  const photo = useMemo(() => {
+    if (!hasPhoto || !phraseLayoutReady) return null;
+
+    const padX = feedContent.paddingLeft;
+    return computeFollowingFeedPhotoSlotLayout({
+      baseCardHeight: baseCardHeightForLayout,
+      blackLeftPx: layout.blackLeftPx,
+      blackRightPx: layout.blackRightPx,
+      padX,
+      cardWidth,
+      textContentBottomY,
+      statsBottomInset,
+      statsRowHeight,
+      maxCardHeight: maxCardInnerHeight,
+    });
+  }, [
+    hasPhoto,
+    baseCardHeightForLayout,
+    layout.blackLeftPx,
+    layout.blackRightPx,
+    cardWidth,
+    textContentBottomY,
+    statsBottomInset,
+    statsRowHeight,
+    feedContent.paddingLeft,
+    maxCardInnerHeight,
+    phraseLayoutReady,
+    phraseShowsFullText,
+    phraseTextBottomY,
+  ]);
+
+  const cardExtendExtra = photo
+    ? Math.max(0, photo.cardHeight - layout.cardHeight)
+    : phraseCardExtra;
+  const effLayout = useMemo(
+    () =>
+      cardExtendExtra > 0
+        ? {
+            ...layout,
+            cardHeight: layout.cardHeight + cardExtendExtra,
+            blackBottomPx: layout.blackBottomPx + cardExtendExtra,
+          }
+        : layout,
+    [layout, cardExtendExtra],
+  );
+  const photoTopY = photo?.photoTopY ?? 0;
 
   /** Inner black rounded rect — rx ≈ 15.77 in 600 viewBox; clip stars to same silhouette. */
   const innerGrayPanelBorderRadius = useMemo(
     () => computeInnerPanelBorderRadius(cardWidth),
     [cardWidth],
   );
+
+  const followingPhotoFocusY = photoCropInteractive?.focusY
+    ?? resolveFollowingPhotoFocusY(post.imageCropFocusYFollowing, post.imageCropFocusY);
 
   const renderFeedStats = () => (
     <View style={styles.feedStatsRow}>
@@ -223,19 +358,28 @@ function CommunityPostCardBase({
   );
 
   return (
-    <TouchableOpacity activeOpacity={0.92} onPress={() => onPress(post)}>
+    <TouchableOpacity
+      activeOpacity={0.92}
+      onPress={() => onPress(post)}
+      disabled={!!photoCropInteractive}
+    >
       <View
         onLayout={onCardLayout}
         style={{
           width: cardWidth,
-          height: layout.cardHeight,
+          height: effLayout.cardHeight,
           marginHorizontal: cardMarginH,
           marginVertical: V.CARD_VERTICAL_MARGIN,
           borderRadius: V.CARD_BORDER_RADIUS,
           overflow: 'hidden',
         }}
       >
-        <NativeFeedCardBackground tier={cardTier} cardWidth={cardWidth} layout={layout} />
+        <NativeFeedCardBackground
+          tier={cardTier}
+          cardWidth={cardWidth}
+          layout={effLayout}
+          bottomExtendPx={cardExtendExtra}
+        />
 
         {/* Star field — same rim margin on all sides as horizontal gutter (blackLeft/blackRight). */}
         <View
@@ -305,20 +449,22 @@ function CommunityPostCardBase({
 
         {/* Title + body — starts after username row with same gap as under title. */}
         <View
+          onLayout={phraseShowsFullText ? onPhraseTextBlockLayout : undefined}
           style={{
             position: 'absolute',
             top: feedStackMinTopPx,
             left: layout.blackLeftPx + feedContent.paddingLeft,
-            // Siguiendo reflection: right margin matches left so text reaches the full width.
-            // Para ti and quote cards keep the wider right gutter (banner corridor / stats horizontal guard).
-            // Vertical overlap with stats is prevented by textContentBottomY regardless of device size.
             right: layout.blackRightPx + (
-              followingFeedStyle && !isQuoteCard
+              followingFeedStyle
                 ? feedContent.paddingLeft
                 : feedContent.paddingRight
             ),
-            bottom: layout.cardHeight - textContentBottomY,
-            overflow: 'hidden',
+            ...(phraseShowsFullText
+              ? {}
+              : {
+                  bottom: effLayout.cardHeight - textContentBottomY,
+                  overflow: 'hidden' as const,
+                }),
             zIndex: 1,
           }}
         >
@@ -346,7 +492,7 @@ function CommunityPostCardBase({
               },
               isQuoteCard && { fontWeight: '700' as const, fontStyle: 'italic' as const },
             ]}
-            numberOfLines={bodyMaxLines}
+            numberOfLines={phraseShowsFullText ? undefined : bodyMaxLines}
           >
             {isQuoteCard ? formatPhraseBodyForDisplay(post.body) : post.body}
           </Text>
@@ -359,12 +505,42 @@ function CommunityPostCardBase({
                   lineHeight: Math.round(feedContent.phraseAuthorFontSize * 1.25),
                 },
               ]}
-              numberOfLines={2}
+              numberOfLines={phraseShowsFullText ? undefined : 2}
             >
               {post.quoteAuthor}
             </Text>
           ) : null}
         </View>
+
+        {/* Foto (Siguiendo): debajo del texto; recuadro simétrico L/R. */}
+        {photo && post.imageUrl && photo.displayH > 0 ? (
+          <View
+            style={{
+              position: 'absolute',
+              top: photoTopY,
+              left: photo.photoLeft,
+              width: photo.innerW,
+              height: photo.displayH,
+              borderRadius: Math.round(innerGrayPanelBorderRadius * 0.55),
+              backgroundColor: 'rgba(255,255,255,0.06)',
+              zIndex: photoCropInteractive ? 3 : 1,
+              overflow: photoCropInteractive ? 'visible' : 'hidden',
+            }}
+          >
+            <PostImageCover
+              uri={post.imageUrl}
+              imageWidth={post.imageWidth}
+              imageHeight={post.imageHeight}
+              focusY={followingPhotoFocusY}
+              imageBorderRadius={Math.round(innerGrayPanelBorderRadius * 0.55)}
+              scrimOpacity={0}
+              interactive={!!photoCropInteractive}
+              onFocusYChange={photoCropInteractive?.onFocusYChange}
+              onRemoveFromDisplay={photoCropInteractive?.onRemoveFromDisplay}
+              style={StyleSheet.absoluteFill}
+            />
+          </View>
+        ) : null}
 
         {/* Rim: under stats so the stroke does not paint over icons. */}
         {followingFeedStyle && cardDims ? (

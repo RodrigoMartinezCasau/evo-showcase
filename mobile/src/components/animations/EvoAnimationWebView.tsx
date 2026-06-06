@@ -82,7 +82,7 @@ export async function ensureAnimationAssets(): Promise<void> {
 
   _copyPromise = (async () => {
     const STAMP_FILE = ANIM_DIR + '.stamp';
-    const APP_VERSION = '76';
+    const APP_VERSION = '78';
 
     try {
       const stampInfo = await FileSystem.getInfoAsync(STAMP_FILE);
@@ -98,6 +98,7 @@ export async function ensureAnimationAssets(): Promise<void> {
     try {
       await FileSystem.deleteAsync(ANIM_DIR, { idempotent: true });
     } catch {}
+    _inlinedHtmlCache.clear();
 
     // Create directories
     await FileSystem.makeDirectoryAsync(ANIM_DIR,   { intermediates: true });
