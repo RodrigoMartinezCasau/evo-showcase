@@ -194,6 +194,7 @@ export default function AppAnimationLayer() {
 
   const finishEntryAnimation = useCallback(() => {
     setShowEntry(false);
+    setEntryAnimPlaying(false);
     if (Date.now() < entryCooldownUntilRef.current) {
       queueRef.current = queueRef.current.filter((q) => q.kind !== 'clanReveal');
     }
@@ -230,7 +231,7 @@ export default function AppAnimationLayer() {
 
   useEffect(() => {
     if (!showEntry) return;
-    const t = setTimeout(() => finishEntryAnimation(), 12000);
+    const t = setTimeout(() => finishEntryAnimation(), 8000);
     return () => clearTimeout(t);
   }, [showEntry, finishEntryAnimation]);
 

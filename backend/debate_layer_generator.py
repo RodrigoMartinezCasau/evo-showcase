@@ -348,6 +348,15 @@ def _build_structured_debate_prompts(
 
 LANGUAGE (MANDATORY): All text values in the JSON — titles, bullets, quick_summary, socratic_question — MUST be written in Spanish. Do NOT use English anywhere, not even inside a single bullet.
 
+PLAIN LANGUAGE (MANDATORY — for a general audience, not academics):
+- Write as you would explain it to a smart friend who has NOT studied philosophy.
+- Use everyday words. Prefer short, direct sentences (ideally under 18 words per bullet).
+- stance.quick_summary and counter.quick_summary: say the gist in plain Spanish, as if summarizing out loud in 1–2 simple sentences ("en cristiano").
+- Point titles: concrete everyday phrases (e.g. "Cuando todo depende de ti", "El miedo a equivocarte") — NOT academic labels like "Epistemología del riesgo", "Ontología del sujeto", "Heurística cognitiva".
+- Bullets: one clear idea each; no jargon, no -ismo/-ología unless unavoidable — and then explain it with ordinary words right after.
+- BANNED unless paraphrased in plain words: paradigma, dialéctica, epistemológico, ontológico, heurística, axioma, teleológico, fenomenológico, deontológico, relativismo (as label), constructo (psych/academic sense).
+- The ideas can stay deep; the WORDS must stay simple.
+
 CONTEXT HANDLING (CRITICAL):
 - If the prompt includes a [Recent conversation …] block, the user's CURRENT message may be a follow-up (e.g. "¿qué opinas?", "desarrolla eso", "no estoy de acuerdo", "y si lo miramos al revés", "explica más", "pero entonces…").
 - In that case, the real subject is whatever the previous user reflection was about, and the new message is asking you to extend, react to, or push back on it.
@@ -360,9 +369,9 @@ RULES:
   * First, mentally draft the full argument.
   * Then, split it into 3–6 thematic points (use as many as the content demands — no padding, no filler).
   * Each point has a short, specific TITLE (3–8 words) that names the concrete idea — NOT generic labels like "Key Consideration" or "Important Factor".
-  * Each point has 1–3 BULLETS. Each bullet is ONE concise sentence that adds a unique idea. No repetition, no paraphrasing the title, no filler.
-  * Bullets must be intellectually dense: each one should teach, reveal, or reframe something.
-- stance.quick_summary and counter.quick_summary: 1–2 sentences summarizing each section.
+  * Each point has 1–3 BULLETS. Each bullet is ONE short sentence that adds a unique idea. No repetition, no paraphrasing the title, no filler.
+  * Bullets must be easy to grasp on first read: clear, concrete, no stacked abstractions.
+- stance.quick_summary and counter.quick_summary: 1–2 SHORT sentences in plain Spanish (max ~25 words total per summary).
 - question.socratic_question: 1 sentence that invites reflection (Socratic question).
 - Include counterarguments and where_contrarian_might_fail as arrays (same as before).
 - QUALITY: Do NOT produce empty or generic points. Every point must correspond to a real idea from the reflection. Every bullet must contribute something new.
@@ -563,9 +572,11 @@ CONTEXT HANDLING (CRITICAL):
 - If the prompt includes a [Recent conversation …] block, the user's CURRENT message may be a follow-up (e.g. "what do you think?", "develop that", "I disagree", "explain more", "but then…").
 - Treat the previous user reflection as the real subject and continue that thread; do NOT debate the literal short follow-up phrase as if it were a fresh standalone topic.
 
+PLAIN LANGUAGE: Write in everyday Spanish (Spain). No philosophy jargon; explain like to a smart friend, not an academic.
+
 MANDATORY STRUCTURE:
-1. steelman_of_user: Present the user's view in its strongest form. Minimum 2 distinct arguments with reasoning. Aim: ~200–350 words. One or two continuous paragraphs, not bullet points. Formal, reflective tone.
-2. contrarian_position: Adopt a contrarian position. Minimum 2 distinct counterarguments with reasoning. Aim: ~150–280 words. One or two continuous paragraphs, not bullet points.
+1. steelman_of_user: Present the user's view in its strongest form. Minimum 2 distinct arguments with reasoning. Aim: ~200–350 words. One or two continuous paragraphs, not bullet points. Warm, clear tone — simple words.
+2. contrarian_position: Adopt a contrarian position. Minimum 2 distinct counterarguments with reasoning. Aim: ~150–280 words. One or two continuous paragraphs, not bullet points. Same plain tone.
 3. socratic_questions: First question MUST be specific and Socratic. Total 3–7 questions. Exactly 1 main question.
 
 HARD RULES:
@@ -641,20 +652,20 @@ def _generate_conversational_intro(
 ) -> str | None:
     """
     Generate a HUMAN, context-specific conversational intro that reacts to
-    the user's reflection. 3–5 lines, one idea per line. Must reference the
+    the user's reflection. Exactly 2 short sentences. Must reference the
     actual content of the user's message, not generic vague reactions.
     """
     lang_instruction = (
-        "Write in natural, everyday Spanish."
+        "Write in natural, everyday Spanish — simple words, no philosophy jargon."
         if response_language == "es"
-        else "Write in natural, everyday English."
+        else "Write in natural, everyday English — simple words, no jargon."
     )
     system = f"""You are a thoughtful friend reacting to something the user just told you. Your reply must feel HUMAN, SPECIFIC to what they said, and NEVER GENERIC.
 
-LENGTH:
-- 3 to 5 short lines.
-- Around 30–60 words total.
-- One idea per line. Use real line breaks (\\n).
+LENGTH (STRICT):
+- Exactly 2 sentences. No more.
+- Around 15–30 words total.
+- Write as a single short paragraph (no line breaks, no bullet points).
 
 CONTENT — THIS IS THE MOST IMPORTANT RULE:
 - You MUST mention the actual SUBJECT of what the user wrote (a key word, the dilemma they posed, the feeling they expressed, the contradiction they pointed at, etc.).
@@ -678,26 +689,19 @@ TONE:
 
 LANGUAGE: {lang_instruction}
 
-GOOD EXAMPLES (match this *style and specificity*, never the words):
+GOOD EXAMPLES (match this *style, length and specificity*, never the words):
 
 User wrote about whether to choose a partner who can't change vs one who's too easily influenced:
 →
-Curiosa esa elección entre la rigidez y la maleabilidad.
-Las dos opciones parecen extremas, y quizá por eso incomodan.
-Una niega el crecimiento, la otra disuelve la identidad.
-Ahí hay algo más profundo sobre qué buscamos en el otro.
+Esa elección entre alguien que no cambia y alguien que se deja llevar por todo suena incómoda. Detrás hay la duda de qué tipo de pareja quieres de verdad.
 
 User wrote a vague rant about feeling stuck:
 →
-Suena a esa sensación de estar parado mientras todo lo demás se mueve.
-No siempre es falta de dirección — a veces es exceso de opciones invisibles.
-Vale la pena mirar de dónde viene esa quietud.
+Se nota que te sientes atascado y eso cansa. A veces no es pereza, sino que hay demasiadas cosas tirando en direcciones distintas.
 
 User asked a simple question (not really a reflection):
 →
-Más que una reflexión, esto parece una pregunta directa.
-Pero tiene fondo: detrás de ella hay un supuesto sobre cómo funcionan las cosas.
-Vamos a desarmarla un poco antes de responder.
+Suena más a pregunta directa que a reflexión larga. Igual tiene un supuesto escondido que merece la pena mirar.
 
 FOLLOW-UPS (CRITICAL):
 - If the user's CURRENT message is short or refers to something already said (e.g. "¿qué opinas?", "desarrolla eso", "no estoy de acuerdo", "y si lo miramos al revés", "eso no me convence", "explica más"), it IS a follow-up to the prior conversation.
@@ -719,7 +723,7 @@ Return ONLY the intro text. No quotes, no JSON, no labels."""
             system=system,
             user=user,
             language=None,
-            max_tokens=120,  # intro is short (3-5 lines, ~30-60 words)
+            max_tokens=80,  # intro is short (2 sentences, ~15-30 words)
             prompt_id="CONVERSATIONAL_INTRO",
         )
         intro = (result or "").strip()
