@@ -1,17 +1,13 @@
-import type { FC } from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
+import React, { type FC } from 'react';
+import {
+  Image,
+  type ImageSourcePropType,
+  type ImageStyle,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 
 import type { ClanId } from '@evoconn/constants/clanColors';
-
-import Svg111 from '../assets/topbar/lapizSvg/111.svg';
-import Svg112 from '../assets/topbar/lapizSvg/112.svg';
-import Svg113 from '../assets/topbar/lapizSvg/113.svg';
-import Svg114 from '../assets/topbar/lapizSvg/114.svg';
-import Svg115 from '../assets/topbar/lapizSvg/115.svg';
-import Svg116 from '../assets/topbar/lapizSvg/116.svg';
-import Svg117 from '../assets/topbar/lapizSvg/117.svg';
-import Svg118 from '../assets/topbar/lapizSvg/118.svg';
-import Svg119 from '../assets/topbar/lapizSvg/119.svg';
 
 export type TopBarLapizSvgProps = {
   width?: number;
@@ -19,19 +15,35 @@ export type TopBarLapizSvgProps = {
   style?: StyleProp<ViewStyle>;
 };
 
-/** Carpeta LAPIZ; mismo criterio 111–119 que sidebar racha / lápiz frases numérico. */
+/**
+ * PNG (320 px) del lápiz de frases por clan. Antes eran SVG de ~55 KB con
+ * ~190 clipPaths cada uno; rasterizados pesan menos y se decodifican una vez.
+ */
+function makeIcon(source: ImageSourcePropType): FC<TopBarLapizSvgProps> {
+  const LapizIcon: FC<TopBarLapizSvgProps> = ({ width, height, style }) =>
+    React.createElement(Image, {
+      source,
+      resizeMode: 'contain',
+      fadeDuration: 0,
+      style: [{ width, height }, style as StyleProp<ImageStyle>],
+    });
+  return LapizIcon;
+}
+
 const LAPIZ_BY_CLAN: Record<ClanId, FC<TopBarLapizSvgProps>> = {
-  racionalista: Svg112,
-  realista: Svg113,
-  humanista: Svg114,
-  existencialista: Svg115,
-  trascendentalista: Svg116,
-  cientista: Svg117,
-  nihilista: Svg118,
-  estoico: Svg119,
+  racionalista: makeIcon(require('../assets/topbar/lapizPng/112.png')),
+  realista: makeIcon(require('../assets/topbar/lapizPng/113.png')),
+  humanista: makeIcon(require('../assets/topbar/lapizPng/114.png')),
+  existencialista: makeIcon(require('../assets/topbar/lapizPng/115.png')),
+  trascendentalista: makeIcon(require('../assets/topbar/lapizPng/116.png')),
+  cientista: makeIcon(require('../assets/topbar/lapizPng/117.png')),
+  nihilista: makeIcon(require('../assets/topbar/lapizPng/118.png')),
+  estoico: makeIcon(require('../assets/topbar/lapizPng/119.png')),
 };
 
-export const TOP_BAR_DEFAULT_LAPIZ: FC<TopBarLapizSvgProps> = Svg111;
+export const TOP_BAR_DEFAULT_LAPIZ: FC<TopBarLapizSvgProps> = makeIcon(
+  require('../assets/topbar/lapizPng/111.png'),
+);
 
 export function getTopBarLapizByHouse(house?: string | null): FC<TopBarLapizSvgProps> {
   if (house == null || house === '') {

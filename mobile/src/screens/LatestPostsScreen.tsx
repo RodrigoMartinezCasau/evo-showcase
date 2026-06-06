@@ -44,8 +44,20 @@ import {
 } from '@evoconn/constants/communityDetailFeed';
 import { fetchPostsByUser, isRealUserId } from '@evoconn/services/supabaseSocial';
 import { enrichPostsAuthorAvatar } from '@evoconn/utils/enrichPostsAuthorAvatar';
+import { otherProfileCache, formatProfileUsername } from '@evoconn/state/otherProfileCache';
 import { supabase } from '../../mobile/lib/supabase';
 import { useAuth } from '../../mobile/lib/AuthContext';
+
+function applyProfileUsernameToPosts(
+  posts: CommunityPost[],
+  username: string | null | undefined,
+): CommunityPost[] {
+  if (!username || username === '?') return posts;
+  return posts.map((p) => ({
+    ...p,
+    author: { ...p.author, username },
+  }));
+}
 
 const BG = '#0b0b0f';
 
@@ -68,10 +80,11 @@ function pinPostFirst(posts: CommunityPost[], postId: string | undefined): Commu
 export default function LatestPostsScreen() {
   const router = useRouter();
   const pathname = usePathname();
-  const params = useLocalSearchParams<{ postId?: string; userId?: string }>();
+  const params = useLocalSearchParams<{ postId?: string; userId?: string; username?: string }>();
   const postId = typeof params.postId === 'string' ? params.postId : undefined;
   const paramUserId = typeof params.userId === 'string' ? params.userId : undefined;
-  const { activeUserId } = useSimulation();
+  const paramUsername = typeof params.username === 'string' ? params.username : undefined;
+  const { activeUserId, ensurePostViewCounts, recordPostView } = useSimulation();
   const { posts: myProfilePosts } = usePersonalProfile();
   const { session, profile: authProfile } = useAuth();
 
@@ -93,6 +106,15 @@ export default function LatestPostsScreen() {
   const [feedScrollEnabled, setFeedScrollEnabled] = useState(true);
   const [remotePosts, setRemotePosts] = useState<CommunityPost[] | null>(null);
   const [remoteAuthorAvatar, setRemoteAuthorAvatar] = useState<string | undefined>();
+  const [remoteAuthorUsername, setRemoteAuthorUsername] = useState<string | null>(null);
+
+  const authorUsernameFallback = useMemo(() => {
+    if (remoteAuthorUsername) return remoteAuthorUsername;
+    if (paramUsername?.trim()) return formatProfileUsername(paramUsername);
+    const cached = otherProfileCache.get(targetUserId)?.profile?.username;
+    if (cached && cached !== '?') return cached;
+    return null;
+  }, [remoteAuthorUsername, paramUsername, targetUserId]);
 
   const handleReadingModeChange = useCallback((active: boolean) => {
     setFeedScrollEnabled(!active);
@@ -102,10 +124,15 @@ export default function LatestPostsScreen() {
     if (!needsRemoteFetch) {
       setRemotePosts(null);
       setRemoteAuthorAvatar(undefined);
+      setRemoteAuthorUsername(null);
       return;
     }
     let cancelled = false;
     setRemotePosts(null);
+    setRemoteAuthorUsername(null);
+    const seedUsername = paramUsername?.trim()
+      ? formatProfileUsername(paramUsername)
+      : otherProfileCache.get(targetUserId)?.profile?.username ?? null;
     Promise.all([
       supabase
         .from('profiles')
@@ -116,10 +143,13 @@ export default function LatestPostsScreen() {
     ])
       .then(([{ data }, simPosts]) => {
         if (cancelled) return;
-        const resolvedUsername = data?.username ? '@' + data.username.toUpperCase() : null;
+        const resolvedUsername = data?.username
+          ? formatProfileUsername(data.username)
+          : seedUsername;
         const authorAvatar =
           (data as { avatar_url?: string | null } | null)?.avatar_url?.trim() || undefined;
         setRemoteAuthorAvatar(authorAvatar);
+        if (resolvedUsername) setRemoteAuthorUsername(resolvedUsername);
         const mapped: CommunityPost[] = simPosts.map((p) => ({
           id: p.id,
           type: p.type,
@@ -127,7 +157,9 @@ export default function LatestPostsScreen() {
             id: p.authorId,
             username:
               resolvedUsername ??
-              (p.authorUsername && p.authorUsername.length < 36 ? p.authorUsername : '?'),
+              (p.authorUsername && p.authorUsername.length < 36
+                ? formatProfileUsername(p.authorUsername)
+                : '?'),
             clanId: p.authorClanId ?? null,
             rank: p.authorRank ?? 'aprendiz',
             avatarUri: authorAvatar,
@@ -152,7 +184,7 @@ export default function LatestPostsScreen() {
     return () => {
       cancelled = true;
     };
-  }, [needsRemoteFetch, targetUserId]);
+  }, [needsRemoteFetch, targetUserId, paramUsername]);
 
   const data = useMemo(() => {
     const profileAvatar = needsRemoteFetch
@@ -163,7 +195,10 @@ export default function LatestPostsScreen() {
       if (remotePosts === null) return null;
       const sorted = sortMyPostsNewestFirst(remotePosts);
       return pinPostFirst(
-        enrichPostsAuthorAvatar(sorted, targetUserId, profileAvatar),
+        applyProfileUsernameToPosts(
+          enrichPostsAuthorAvatar(sorted, targetUserId, profileAvatar),
+          authorUsernameFallback,
+        ),
         postId,
       );
     }
@@ -174,7 +209,10 @@ export default function LatestPostsScreen() {
         : sortMyPostsNewestFirst(allPosts.filter((p) => p.author.id === targetUserId));
     const sorted = sortMyPostsNewestFirst(ownPosts);
     return pinPostFirst(
-      enrichPostsAuthorAvatar(sorted, targetUserId, profileAvatar),
+      applyProfileUsernameToPosts(
+        enrichPostsAuthorAvatar(sorted, targetUserId, profileAvatar),
+        authProfile?.username ? formatProfileUsername(authProfile.username) : null,
+      ),
       postId,
     );
   }, [
@@ -185,8 +223,14 @@ export default function LatestPostsScreen() {
     needsRemoteFetch,
     remotePosts,
     remoteAuthorAvatar,
-    authProfile?.avatar_url,
+    authProfile?.username,
+    authorUsernameFallback,
   ]);
+
+  const postIdsKey = useMemo(() => (data ?? []).map((p) => p.id).join(','), [data]);
+  useEffect(() => {
+    if (postIdsKey) ensurePostViewCounts(postIdsKey.split(','));
+  }, [postIdsKey, ensurePostViewCounts]);
 
   const initialIndex = 0;
 
@@ -254,6 +298,8 @@ export default function LatestPostsScreen() {
   const feedAudio = useFeedAudio();
   const feedAudioRef = useRef(feedAudio);
   feedAudioRef.current = feedAudio;
+  const recordPostViewRef = useRef(recordPostView);
+  recordPostViewRef.current = recordPostView;
 
   const verticalFeedVisiblePostIdRef = useRef<string | null>(null);
   const verticalFeedViewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
@@ -266,6 +312,7 @@ export default function LatestPostsScreen() {
       if (prev !== null && prev !== post.id) {
         Keyboard.dismiss();
       }
+      recordPostViewRef.current(post.id);
       // Audio adjunto del post visible (volumen elegido al publicar).
       feedAudioRef.current.playForPost(post);
     },
@@ -280,6 +327,7 @@ export default function LatestPostsScreen() {
     const post = data[Math.min(initialIndex, data.length - 1)];
     if (post) {
       initialAudioPlayedRef.current = true;
+      recordPostViewRef.current(post.id);
       feedAudioRef.current.playForPost(post);
     }
   }, [data, initialIndex]);
@@ -295,7 +343,12 @@ export default function LatestPostsScreen() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={22} color="rgba(255,255,255,0.7)" />
         </TouchableOpacity>
-        <Text style={styles.screenTitle}>ÚLTIMAS PUBLICACIONES</Text>
+        <View style={styles.headerTextCol}>
+          <Text style={styles.screenTitle}>ÚLTIMAS PUBLICACIONES</Text>
+          {authorUsernameFallback ? (
+            <Text style={styles.screenUsername}>{authorUsernameFallback}</Text>
+          ) : null}
+        </View>
       </View>
 
       <View style={{ height: listPanelHeight, overflow: 'hidden' }}>
@@ -380,12 +433,21 @@ const styles = StyleSheet.create({
   backBtn: {
     marginRight: 8,
   },
-  screenTitle: {
+  headerTextCol: {
     flex: 1,
+    gap: 2,
+  },
+  screenTitle: {
     color: 'rgba(255,255,255,0.6)',
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 1.5,
+  },
+  screenUsername: {
+    color: evoconnColors.text,
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
   loadingWrap: {
     flex: 1,

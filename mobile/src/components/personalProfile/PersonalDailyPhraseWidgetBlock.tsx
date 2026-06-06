@@ -39,7 +39,7 @@ export const PersonalDailyPhraseWidgetBlock = React.memo(function PersonalDailyP
     'Mantén pulsada una zona vacía de la pantalla de inicio hasta que los iconos tiemblen.',
     'Pulsa el botón «+» de la galería de widgets (suele estar arriba o en la barra de edición).',
     'Busca «Evo» en la galería de widgets.',
-    'Elige el widget de la frase más votada del día anterior (fija todo el día) y pulsa «Añadir widget».',
+    'Elige el widget de la frase ganadora del concurso de las 24 horas anteriores (fija todo el día) y pulsa «Añadir widget».',
   ];
 
   const stepsAndroid = [

@@ -50,7 +50,7 @@ const PROGRESSION_SPAN = PROGRESSION_MAX - PROGRESSION_MIN;
  * Badge "Sin clan" en la top bar: SVG 36 (inicio) → 50 (justo antes del reveal).
  *
  * Antes: +1 cada 2 inputs → el 50 solo llegaba con ~28 envíos, pero el clan
- * puede revelarse con 10 (REVEAL_TOTAL_INPUTS_THRESHOLD), así que el badge
+ * puede revelarse con REVEAL_TOTAL_INPUTS_THRESHOLD inputs, así que el badge
  * se quedaba siempre en los SVG intermedios (37–43).
  */
 export function getProgressionIcon(totalReflectionAndPhraseInputs: number): FC<ProgressionSvgProps> {

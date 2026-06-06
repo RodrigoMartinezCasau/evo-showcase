@@ -115,6 +115,6 @@ export function getProfileRankBarProgress(
  * Used to calculate sin-clan progress bar fill.
  * Keep in sync with REVEAL_TOTAL_INPUTS_THRESHOLD in ClassificationContext.
  */
-export const CLAN_REVEAL_MIN_INPUTS = 8;
+export const CLAN_REVEAL_MIN_INPUTS = 5;
 /** @deprecated Use CLAN_REVEAL_MIN_INPUTS */
 export const CLAN_REVEAL_MIN_REFLECTIONS = CLAN_REVEAL_MIN_INPUTS;

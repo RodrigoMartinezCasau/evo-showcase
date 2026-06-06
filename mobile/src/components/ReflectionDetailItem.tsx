@@ -158,6 +158,11 @@ type ReflectionDetailItemProps = {
    * comentarios. SOLO en el feed de Para Ti (no en Siguiendo ni otras pantallas).
    */
   showRepostLabel?: boolean;
+  /**
+   * Oculta @usuario en la cabecera (p. ej. feed de últimas publicaciones de un
+   * perfil ajeno, donde el autor ya es evidente). El botón Seguir se mantiene.
+   */
+  hideAuthorUsername?: boolean;
 };
 
 /** Comentarios raíz mostrados por bloque (se cargan más al hacer scroll). */
@@ -191,6 +196,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   reflectionStarSurfaceColor,
   highlightCommentId,
   showRepostLabel = false,
+  hideAuthorUsername = false,
 }: ReflectionDetailItemProps) {
   const isNoClanAuthor =
     post.author.clanId == null || String(post.author.clanId).trim() === '';
@@ -276,8 +282,14 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   const fetchedCommentAuthorIds = useRef<Set<string>>(new Set());
 
   // Fetch fresh comments from Supabase the first time this post is opened.
+  // Diferido con InteractionManager: al abrir Para ti se montan varias páginas
+  // a la vez; lanzar el fetch durante el montaje/scroll competía con la
+  // animación de entrada. Esperamos a que las interacciones terminen.
   useEffect(() => {
-    ensureCommentsForPost(post.id).catch(console.error);
+    const task = InteractionManager.runAfterInteractions(() => {
+      ensureCommentsForPost(post.id).catch(console.error);
+    });
+    return () => task.cancel();
   // We only want to run this once per post open, not on every update.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [post.id]);
@@ -1634,13 +1646,17 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
           {/* ── Header ── */}
           <View style={[styles.headerRow, { transform: [{ translateX: DETAIL_HEADER_ROW_OFFSET_X }, { translateY: DETAIL_HEADER_ROW_OFFSET_Y }] }]}>
             <View style={styles.usernameFollowRow}>
-              <TouchableOpacity onPress={handleAuthorPressAction}>
-                <Text style={styles.username}>{post.author.username}</Text>
-              </TouchableOpacity>
-              <FirstUsersTesterBadge
-                userId={post.author.id}
-                iconSize={PROFILE_TESTER_BADGE_SIZE}
-              />
+              {!hideAuthorUsername ? (
+                <>
+                  <TouchableOpacity onPress={handleAuthorPressAction}>
+                    <Text style={styles.username}>{post.author.username}</Text>
+                  </TouchableOpacity>
+                  <FirstUsersTesterBadge
+                    userId={post.author.id}
+                    iconSize={PROFILE_TESTER_BADGE_SIZE}
+                  />
+                </>
+              ) : null}
               <FollowButton
                 authorId={post.author.id}
                 authorClanId={post.author.clanId}

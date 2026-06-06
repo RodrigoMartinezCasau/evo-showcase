@@ -32,6 +32,7 @@ import {
 } from '@evoconn/services/clanClassifier';
 import {
   REVEAL_MIN_REFLECTIONS,
+  REVEAL_MIN_PHRASES,
   REVEAL_TOTAL_INPUTS_THRESHOLD,
   REVEAL_PCT_THRESHOLD,
   REVEAL_LEAD_OVER_SECOND_PP,
@@ -176,7 +177,7 @@ export function ClassificationDebugPanel() {
             <View style={[styles.progressThreshold]} />
           </View>
           <Text style={styles.thresholdNote}>
-            ≥{REVEAL_MIN_REFLECTIONS} ref, ≥{REVEAL_TOTAL_INPUTS_THRESHOLD} total, líder ≥{REVEAL_PCT_THRESHOLD}%
+            ≥{REVEAL_MIN_REFLECTIONS} ref, ≥{REVEAL_MIN_PHRASES} frases, ≥{REVEAL_TOTAL_INPUTS_THRESHOLD} total, líder ≥{REVEAL_PCT_THRESHOLD}%
             y +{REVEAL_LEAD_OVER_SECOND_PP} pp sobre el 2.º
           </Text>
 

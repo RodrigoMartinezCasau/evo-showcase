@@ -46,8 +46,8 @@ export const RecentPostsSlider = React.memo(function RecentPostsSlider({
 
   const { postViewCounts, ensurePostViewCounts } = useSimulation();
   const previewIdsKey = useMemo(
-    () => previewPosts.map((p) => p.id).join(','),
-    [previewPosts],
+    () => sortedAll.map((p) => p.id).join(','),
+    [sortedAll],
   );
   useEffect(() => {
     if (previewIdsKey) ensurePostViewCounts(previewIdsKey.split(','));

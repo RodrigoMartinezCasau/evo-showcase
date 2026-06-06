@@ -103,8 +103,14 @@ export const ProfileRevealPanel = React.memo(function ProfileRevealPanel({ autho
   );
 
   const handleSeeMoreRecentPosts = useCallback(() => {
-    router.push({ pathname: '/latest-posts', params: { userId: authorId } });
-  }, [router, authorId]);
+    router.push({
+      pathname: '/latest-posts',
+      params: {
+        userId: authorId,
+        username: profile.username.replace(/^@/, ''),
+      },
+    });
+  }, [router, authorId, profile.username]);
 
   const handleInsigniaLayoutHeight = useCallback((height: number) => {
     setIdentityCompanionBelowHeight(PROFILE_IDENTITY_SECTION_GAP + height);

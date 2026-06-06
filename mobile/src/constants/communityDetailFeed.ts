@@ -8,8 +8,14 @@
  * del JS thread que causa stutters al scrollear. El número de posts renderizados
  * en paralelo es mucho menor (3 vs 15 viewports), lo que mejora el rendimiento.
  */
-export const COMMUNITY_DETAIL_PREFETCH_POSTS = 5;
-export const COMMUNITY_DETAIL_PREFETCH_POSTS_ANDROID = 3;
+/**
+ * iOS: bajado de 5 → 2. Cada página del feed (Para ti / Siguiendo / detalle) es
+ * un `ReflectionDetailItem` muy pesado (decenas de useState + 12 contextos +
+ * sistema de comentarios). Montar 5 a la vez al abrir era el grueso del "tirón"
+ * de entrada. Con paginación (1 post por viewport) basta montar el actual + 1.
+ */
+export const COMMUNITY_DETAIL_PREFETCH_POSTS = 2;
+export const COMMUNITY_DETAIL_PREFETCH_POSTS_ANDROID = 2;
 
 /** ~5 viewports arriba + abajo del buffer (default RN es 21). Bajado de 15→11
  * para montar menos posts a la vez y reducir el trabajo del JS thread. */

@@ -85,6 +85,7 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
     posts: allSimPosts,
     users: simUsers,
     recordPostView,
+    ensurePostViewCounts,
   } = useSimulation();
   const followGraphRef = useRef(followGraph);
   followGraphRef.current = followGraph;
@@ -377,10 +378,22 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
           };
         });
       }
+      const username = profileWithLiveFollowers.username;
+      if (username && username !== '?') {
+        list = list.map((p) => ({
+          ...p,
+          author: { ...p.author, username },
+        }));
+      }
       return enrichPostsAuthorAvatar(list, userId, resolvedProfileAvatarUri);
     },
-    [allSimPosts, userId, simUsers, supabasePosts, resolvedProfileAvatarUri],
+    [allSimPosts, userId, simUsers, supabasePosts, resolvedProfileAvatarUri, profileWithLiveFollowers.username],
   );
+
+  const livePostIdsKey = useMemo(() => livePosts.map((p) => p.id).join(','), [livePosts]);
+  useEffect(() => {
+    if (livePostIdsKey) ensurePostViewCounts(livePostIdsKey.split(','));
+  }, [livePostIdsKey, ensurePostViewCounts]);
 
   const profileAvatarUri = useMemo(() => {
     if (resolvedProfileAvatarUri) return resolvedProfileAvatarUri;
@@ -476,8 +489,12 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
   );
 
   const handleSeeMoreRecentPosts = useCallback(() => {
-    router.push({ pathname: '/latest-posts', params: { userId: profileWithLiveFollowers.id } });
-  }, [router, profileWithLiveFollowers.id]);
+    const rawUsername = profileWithLiveFollowers.username.replace(/^@/, '');
+    router.push({
+      pathname: '/latest-posts',
+      params: { userId: profileWithLiveFollowers.id, username: rawUsername },
+    });
+  }, [router, profileWithLiveFollowers.id, profileWithLiveFollowers.username]);
 
   const handleDetailAuthorPress = useCallback(
     (authorId: string) => {

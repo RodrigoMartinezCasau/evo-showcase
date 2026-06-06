@@ -52,6 +52,9 @@ export const EXPANDED_PHILOSOPHY_CONTAINER_PADDING_BOTTOM = 14;
 /** Horizontal padding of the black container in the expanded philosophy table. */
 export const EXPANDED_PHILOSOPHY_CONTAINER_PADDING_HORIZONTAL = 16;
 
+/** Espacio entre el título y la primera fila de % (distribución completa). */
+export const EXPANDED_PHILOSOPHY_TITLE_TO_ROWS_GAP = 12;
+
 // ─── Row spacing ─────────────────────────────────────────────────────────────
 
 /**

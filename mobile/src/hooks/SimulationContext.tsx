@@ -992,12 +992,16 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     void (async () => {
       try {
         const counts = await fetchPostViewCounts(wanted);
+        if (Object.keys(counts).length === 0) return;
         setPostViewCounts((prev) => {
           const next = { ...prev };
-          // Los ids sin filas devuelven 0 (no aparecen en `counts`).
-          for (const id of wanted) next[id] = counts[id] ?? 0;
+          for (const id of wanted) {
+            if (counts[id] !== undefined) next[id] = counts[id];
+          }
           return next;
         });
+      } catch {
+        // No pisar recuentos ya conocidos si la petición falla.
       } finally {
         for (const id of wanted) viewCountsInFlightRef.current.delete(id);
       }

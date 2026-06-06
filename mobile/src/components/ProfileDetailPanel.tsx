@@ -32,6 +32,8 @@ type Props = {
   onClose: () => void;
   onAuthorPress: (userId: string) => void;
   onClanPress: (clanId: string) => void;
+  /** Oculta @usuario en cada post (p. ej. visor desde perfil ajeno). */
+  hideAuthorUsername?: boolean;
 };
 
 const SPRING_CONFIG = { friction: 9, tension: 68, useNativeDriver: true } as const;
@@ -47,6 +49,7 @@ export function ProfileDetailPanel({
   onClose,
   onAuthorPress,
   onClanPress,
+  hideAuthorUsername = false,
 }: Props) {
   const [feedScrollEnabled, setFeedScrollEnabled] = useState(true);
 
@@ -111,9 +114,10 @@ export function ProfileDetailPanel({
         onAuthorPress={onAuthorPress}
         onClanPress={onClanPress}
         onReadingModeChange={handleReadingModeChange}
+        hideAuthorUsername={hideAuthorUsername}
       />
     ),
-    [itemHeight, onAuthorPress, onClanPress, handleReadingModeChange],
+    [itemHeight, onAuthorPress, onClanPress, handleReadingModeChange, hideAuthorUsername],
   );
 
   const feedAudio = useFeedAudio();

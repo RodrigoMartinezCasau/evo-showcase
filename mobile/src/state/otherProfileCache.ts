@@ -23,7 +23,7 @@ export type OtherProfileCacheEntry = {
 export const otherProfileCache = new Map<string, OtherProfileCacheEntry>();
 
 /** @usuario en el formato que espera el header del perfil ("@LALI"). */
-function normalizeUsername(raw: string | undefined | null): string {
+export function formatProfileUsername(raw: string | undefined | null): string {
   const trimmed = (raw ?? '').trim();
   const noAt = trimmed.startsWith('@') ? trimmed.slice(1) : trimmed;
   return noAt ? `@${noAt.toUpperCase()}` : '?';
@@ -43,7 +43,7 @@ export function seedOtherProfileFromAuthor(author: Pick<User, 'id' | 'username' 
 
   const profile: OtherUserProfile = {
     id,
-    username: normalizeUsername(author.username),
+    username: formatProfileUsername(author.username),
     clanId: author.clanId ?? null,
     rank: author.rank ?? 'aprendiz',
     followersCount: existing?.profile.followersCount ?? 0,

@@ -229,6 +229,65 @@ export async function fetchGloballyTopVotedPosts(options: {
 }
 
 /**
+ * Ranking global en una ventana fija [sinceMs, untilMs) por `created_at`.
+ * Usado por el widget (concurso de las 24 h anteriores al inicio del día).
+ */
+export async function fetchGloballyTopVotedPostsInWindow(options: {
+  sinceMs: number;
+  untilMs: number;
+  resultLimit?: number;
+}): Promise<SimPost[]> {
+  const { sinceMs, untilMs, resultLimit = 80 } = options;
+  const since = new Date(sinceMs).toISOString();
+
+  const { data, error } = await supabase.rpc('get_top_voted_post_ids', {
+    p_since: since,
+    p_result_limit: resultLimit,
+  });
+
+  if (error) {
+    console.warn(
+      '[Social] get_top_voted_post_ids (window) unavailable:',
+      error.message,
+    );
+    return [];
+  }
+
+  const ranked = (data ?? []) as TopVotedPostIdRow[];
+  if (ranked.length === 0) return [];
+
+  const orderedIds = ranked.map((row) => row.post_id);
+  const posts = await fetchPostsByIds(orderedIds);
+  await hydrateSimPostEngagement(posts);
+  const ordered = orderSimPostsByIds(posts, orderedIds);
+  return ordered.filter((p) => {
+    const ts = new Date(p.createdAt).getTime();
+    return ts >= sinceMs && ts < untilMs;
+  });
+}
+
+/** Primera `phrase` del ranking global en la ventana [startMs, endMs). */
+export async function fetchTopVotedPhraseInWindow(
+  startMs: number,
+  endMs: number,
+): Promise<SimPost | null> {
+  const posts = await fetchGloballyTopVotedPostsInWindow({
+    sinceMs: startMs,
+    untilMs: endMs,
+    resultLimit: 80,
+  });
+  return posts.find((p) => p.type === 'phrase') ?? null;
+}
+
+/**
+ * Frase más votada en las últimas 24 h rodantes (live, p. ej. Siguiendo → 24 HORAS).
+ */
+export async function fetchTopVotedPhrase24h(): Promise<SimPost | null> {
+  const posts = await fetchGloballyTopVotedPosts({ period: '24h', resultLimit: 80 });
+  return posts.find((p) => p.type === 'phrase') ?? null;
+}
+
+/**
  * Trae TODOS los posts de un autor concreto, sin el techo global de 500.
  *
  * Garantiza que el usuario SIEMPRE vea sus propios posts en su perfil aunque
@@ -560,19 +619,48 @@ export async function fetchPostViewCounts(
   postIds: string[],
 ): Promise<Record<string, number>> {
   if (postIds.length === 0) return {};
-  const { data, error } = await supabase
-    .from('post_views')
-    .select('post_id')
-    .in('post_id', postIds);
-  if (error) {
-    // La tabla puede no existir aún (migración sin aplicar): degradar a 0.
-    console.warn('[Social] fetchPostViewCounts:', error.message);
-    return {};
+
+  const { data: rpcData, error: rpcError } = await supabase.rpc(
+    'get_post_view_counts',
+    { p_post_ids: postIds },
+  );
+  if (!rpcError && Array.isArray(rpcData)) {
+    const counts: Record<string, number> = {};
+    for (const row of rpcData as { post_id: string; view_count: number }[]) {
+      counts[row.post_id] = Number(row.view_count) || 0;
+    }
+    return counts;
   }
+  if (rpcError && __DEV__) {
+    console.warn('[Social] get_post_view_counts RPC unavailable, paginating post_views:', rpcError.message);
+  }
+
+  // Fallback: paginar filas (mismo problema que votes — límite 1000 filas).
+  const POST_CHUNK = 40;
+  const PAGE = 1000;
   const counts: Record<string, number> = {};
-  for (const row of data ?? []) {
-    const id = (row as { post_id: string }).post_id;
-    counts[id] = (counts[id] ?? 0) + 1;
+
+  for (let i = 0; i < postIds.length; i += POST_CHUNK) {
+    const chunk = postIds.slice(i, i + POST_CHUNK);
+    let from = 0;
+    for (;;) {
+      const { data, error } = await supabase
+        .from('post_views')
+        .select('post_id')
+        .in('post_id', chunk)
+        .range(from, from + PAGE - 1);
+      if (error) {
+        console.warn('[Social] fetchPostViewCounts:', error.message);
+        return counts;
+      }
+      const rows = data ?? [];
+      for (const row of rows) {
+        const id = (row as { post_id: string }).post_id;
+        counts[id] = (counts[id] ?? 0) + 1;
+      }
+      if (rows.length < PAGE) break;
+      from += PAGE;
+    }
   }
   return counts;
 }

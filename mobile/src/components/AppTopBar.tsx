@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Text,
   Animated,
+  Image,
   useWindowDimensions,
   type LayoutChangeEvent,
 } from 'react-native';
@@ -28,10 +29,10 @@ import { getTopBarEstrellaByHouse } from '@evoconn/utils/getTopBarEstrellaByHous
 import { getTopBarLapizByHouse } from '@evoconn/utils/getTopBarLapizByHouse';
 import { getTopBarUsosByHouse } from '@evoconn/utils/getTopBarUsosByHouse';
 import { getTopBarRachaTopByHouse } from '@evoconn/utils/getTopBarRachaTopByHouse';
-import { getTopBarInsigniaByHouse } from '@evoconn/utils/getTopBarInsigniaByHouse';
+import { getTopBarInsigniaPngByHouse } from '@evoconn/utils/getTopBarInsigniaPngByHouse';
 import { getProgressionIcon } from '@evoconn/utils/getTopBarProgressionIcon';
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
-import FuegoApagadoIcon from '../assets/topbar/fueguitoSvg/fuego-apagado.svg';
+const FUEGO_APAGADO_PNG = require('../assets/topbar/fueguitoPng/fuego-apagado.png');
 import { useDebugStreak } from '../debug/DebugStreakContext';
 import { useDebugStats } from '../debug/DebugStatsContext';
 import { useQuotes } from '../hooks/QuotesContext';
@@ -142,7 +143,7 @@ function AppTopBarInner({
   // simulación local aún no había "revelado" su clan.
   const InsigniaIcon = useMemo(
     () => effectiveClan
-      ? getTopBarInsigniaByHouse(effectiveClan)
+      ? getTopBarInsigniaPngByHouse(effectiveClan)
       : getProgressionIcon(progressionInputs),
     [effectiveClan, progressionInputs],
   );
@@ -354,7 +355,12 @@ function AppTopBarInner({
                     (Fabric) tardaba un frame en calcularla → el icono se
                     veía vacío al arrancar hasta tocar la pantalla. */}
                 <View style={StyleSheet.absoluteFill}>
-                  <FuegoApagadoIcon width={counterIconFrame.width} height={counterIconFrame.height} />
+                  <Image
+                    source={FUEGO_APAGADO_PNG}
+                    resizeMode="contain"
+                    fadeDuration={0}
+                    style={{ width: counterIconFrame.width, height: counterIconFrame.height }}
+                  />
                 </View>
                 <Animated.View style={[StyleSheet.absoluteFill, { opacity: fireAnim }]}>
                   <RachaIcon width={counterIconFrame.width} height={counterIconFrame.height} />

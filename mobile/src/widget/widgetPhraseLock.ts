@@ -1,16 +1,22 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { CommunityPost } from '@evoconn/types';
 import {
-  computeYesterdayTopPhrasePayload,
-  localCalendarDayKey,
-  startOfLocalCalendarDay,
+  fetchTopVotedPhraseInWindow,
+  fetchProfilesBatch,
+  isRealUserId,
+  type BasicProfile,
+} from '@evoconn/services/supabaseSocial';
+import { simPostToCommunityPost } from '@evoconn/hooks/useFeedStore';
+import {
+  computeTopPhraseInWindowPayload,
+  communityPostToWidgetPayload,
+  getWidgetDailyPhraseWindow,
   type TopPhraseWidgetPayload,
 } from './topPhraseWidgetPayload';
 
 const STORAGE_KEY = '@evo/widget_phrase_daily_lock_v1';
 
 type WidgetPhraseDailyLock = {
-  /** Día local para el que esta frase está fijada (YYYY-MM-DD). */
   displayDay: string;
   payload: TopPhraseWidgetPayload | null;
 };
@@ -36,31 +42,56 @@ async function saveLock(lock: WidgetPhraseDailyLock): Promise<void> {
 }
 
 /**
- * Frase del widget fijada para hoy: la más votada de **ayer**.
- * Una vez calculada, no cambia hasta medianoche local.
+ * Frase del widget: ganadora del concurso de las **24 h anteriores** al inicio
+ * del día local. Se calcula una vez y permanece **fija todo el día** (hasta
+ * medianoche). Ranking global Supabase; fallback al feed local.
  */
 export async function resolveTopPhraseWidgetPayload(
-  posts: CommunityPost[],
+  localPosts: CommunityPost[],
   now: Date = new Date(),
 ): Promise<TopPhraseWidgetPayload | null> {
-  const displayDay = localCalendarDayKey(now);
+  const { startMs, endMs, displayDay } = getWidgetDailyPhraseWindow(now);
+
   const cached = await loadLock();
   if (cached?.displayDay === displayDay) {
     return cached.payload;
   }
 
-  const payload = computeYesterdayTopPhrasePayload(posts, now);
+  let payload: TopPhraseWidgetPayload | null = null;
 
-  // No fijar un día vacío hasta que el feed incluya frases anteriores a hoy
-  // (evita bloquear antes de que Supabase hidrate publicaciones de ayer).
-  const todayStart = startOfLocalCalendarDay(now);
-  const feedCoversPastPhrases = posts.some((p) => {
+  try {
+    const topSim = await fetchTopVotedPhraseInWindow(startMs, endMs);
+    if (topSim) {
+      const profileCache: Record<string, BasicProfile> = {};
+      if (isRealUserId(topSim.authorId)) {
+        const profiles = await fetchProfilesBatch([topSim.authorId]);
+        for (const p of profiles) profileCache[p.id] = p;
+      }
+      const post = simPostToCommunityPost(topSim, profileCache);
+      payload = communityPostToWidgetPayload(post, displayDay, now);
+    }
+  } catch {
+    // caer al feed local
+  }
+
+  if (!payload) {
+    payload = computeTopPhraseInWindowPayload(
+      localPosts,
+      startMs,
+      endMs,
+      displayDay,
+      now,
+    );
+  }
+
+  // No fijar un día vacío hasta que el feed cubra frases de la ventana del concurso.
+  const feedCoversWindow = localPosts.some((p) => {
     if (p.type !== 'phrase') return false;
     const ts = Date.parse(p.createdAt);
-    return Number.isFinite(ts) && ts < todayStart;
+    return Number.isFinite(ts) && ts >= startMs && ts < endMs;
   });
 
-  if (payload != null || feedCoversPastPhrases) {
+  if (payload != null || feedCoversWindow) {
     await saveLock({ displayDay, payload });
   }
 

@@ -7,7 +7,8 @@ import { pushTopPhraseWidgetSnapshot } from './iosWidgetBridge';
 const DEBOUNCE_MS = 400;
 
 /**
- * Sincroniza el widget con la frase más votada de **ayer**, fijada todo el día local.
+ * Sincroniza el widget: ganadora del concurso de las **24 h anteriores** al
+ * inicio del día, **fijada todo el día** (no cambia hasta medianoche).
  * Android: no empuja `{ kind: "empty" }` hasta tener candidato o feed con frases pasadas.
  */
 export function WidgetSnapshotSync() {
