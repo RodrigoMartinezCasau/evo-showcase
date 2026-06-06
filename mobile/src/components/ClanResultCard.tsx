@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getClanColor } from '@evoconn/constants/clanColors';
-import { getTopBarInsigniaByHouse } from '@evoconn/utils/getTopBarInsigniaByHouse';
+import { getTopBarInsigniaPngByHouse } from '@evoconn/utils/getTopBarInsigniaPngByHouse';
 
 const ICON_SIZE = 40;
 const ICON_SCALE = 1.2;
@@ -19,7 +19,7 @@ const RANK_ORDINAL = ['', '1°', '2°', '3°', '4°', '5°', '6°', '7°', '8°'
 
 export function ClanResultCard({ clanId, name, rank, onPress }: ClanResultCardProps) {
   const clanColor = getClanColor(clanId);
-  const ClanBadge = useMemo(() => getTopBarInsigniaByHouse(clanId), [clanId]);
+  const ClanBadge = useMemo(() => getTopBarInsigniaPngByHouse(clanId), [clanId]);
   const iconSide = ICON_SIZE * ICON_SCALE;
   const rankLabel = rank != null ? (RANK_ORDINAL[rank] ?? `${rank}°`) : null;
 

@@ -31,7 +31,7 @@ import { getClanColor } from '@evoconn/constants/clanColors';
 import { getClanConfig } from '@evoconn/constants/clanConfig';
 import { formatMythologyOriginPrefix } from '@evoconn/constants/clanDisplayCopy';
 import { getClanProfileOrFallback } from '@evoconn/data/mockClanProfiles';
-import { getTopBarInsigniaByHouse } from '@evoconn/utils/getTopBarInsigniaByHouse';
+import { getClanDisplayInsigniaByHouse } from '@evoconn/utils/getClanDisplayInsigniaByHouse';
 import { getClanEstandarte } from '@evoconn/utils/getClanEstandarte';
 import {
   CLAN_DISPLAY_SHIELD_SIZE,
@@ -130,7 +130,7 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
   const config     = getClanConfig(clanId);
   const clanColor  = getClanColor(clanId);
   const [phraseBoxDims, setPhraseBoxDims] = useState<{ width: number; height: number } | null>(null);
-  const ShieldSvg      = useMemo(() => getTopBarInsigniaByHouse(clanId), [clanId]);
+  const ShieldSvg      = useMemo(() => getClanDisplayInsigniaByHouse(clanId), [clanId]);
   const EstandarteSvg  = useMemo(() => getClanEstandarte(clanId), [clanId]);
 
   // ── Usuario autenticado real ──────────────────────────────────────────────

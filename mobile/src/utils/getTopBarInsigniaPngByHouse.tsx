@@ -19,8 +19,8 @@ import type { ClanId } from '@evoconn/constants/clanColors';
  * MISMO arte ya compuesto (escudo + estrellas + animal), ×16 más ligeros y
  * decodificados una sola vez por el sistema de imágenes de RN.
  *
- * Las pantallas que muestran el escudo grande (ClanDisplay, 250 px) siguen
- * usando el SVG vía `getTopBarInsigniaByHouse` para no perder nitidez.
+ * El escudo grande (ClanDisplay, 250 px) usa su propio set PNG de alta
+ * resolución en `getClanDisplayInsigniaByHouse`.
  */
 export type TopBarInsigniaSvgProps = {
   width?: number;
