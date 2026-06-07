@@ -1830,6 +1830,34 @@ def _recalculate_streak(activity_log: list[str], today: str) -> tuple[int, str |
     return streak, last
 
 
+def _valid_day_key(value: str | None) -> str | None:
+    """YYYY-MM-DD from client; None if invalid."""
+    if not value:
+        return None
+    day = value.strip()[:10]
+    try:
+        from datetime import date as _date
+        _date.fromisoformat(day)
+        return day
+    except ValueError:
+        return None
+
+
+def _resolve_streak_today(request: Request | None = None, explicit_date: str | None = None) -> str:
+    """
+    Día calendario del usuario para recalcular racha.
+    Prioridad: explicit_date → header x-client-date → UTC (fallback legacy).
+    """
+    for candidate in (
+        explicit_date,
+        request.headers.get("x-client-date") if request else None,
+    ):
+        day = _valid_day_key(candidate)
+        if day:
+            return day
+    return datetime.utcnow().strftime("%Y-%m-%d")
+
+
 class StreakActivityPayload(BaseModel):
     type: str   # "frase" | "reflexion"
     date: str   # YYYY-MM-DD — the day the activity occurred
@@ -1877,12 +1905,12 @@ def admin_streak_export(request: Request):
 
 
 @app.get("/streak/{user_id}")
-def get_streak(user_id: str):
+def get_streak(user_id: str, request: Request):
     """Return current streak data + activity logs for the last 90 days."""
     with get_session() as s:
         row = _get_or_init_streak(s, user_id)
         s.commit()
-        today = datetime.utcnow().strftime("%Y-%m-%d")
+        today = _resolve_streak_today(request)
         activity = _json.loads(row.activity_log or "[]")
         frases = _json.loads(row.frases_log or "[]")
         reflexiones = _json.loads(row.reflexiones_log or "[]")
@@ -2047,10 +2075,10 @@ def phrase_intro(payload: PhraseIntroRequest):
 
 
 @app.post("/streak/{user_id}/activity")
-def record_streak_activity(user_id: str, payload: StreakActivityPayload):
+def record_streak_activity(user_id: str, payload: StreakActivityPayload, request: Request):
     """Record that the user sent a frase or reflexion on the given day."""
-    today = datetime.utcnow().strftime("%Y-%m-%d")
-    date = payload.date or today
+    today = _resolve_streak_today(request, payload.date)
+    date = _valid_day_key(payload.date) or today
 
     with get_session() as s:
         row = _get_or_init_streak(s, user_id)

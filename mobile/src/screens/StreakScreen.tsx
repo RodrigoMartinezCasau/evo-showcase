@@ -27,6 +27,7 @@ import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { getAppShellScrollableBodyHeight } from '@evoconn/constants/appShellLayout';
 import { fetchStreak, type StreakData } from '@evoconn/services/streakApi';
+import { getLocalDayKey } from '@evoconn/services/userStatsStorage';
 import { CalendarGrid } from '@evoconn/components/shared/CalendarGrid';
 import { getTopBarRachaTopByHouse } from '@evoconn/utils/getTopBarRachaTopByHouse';
 import { getClanStreakColors } from '@evoconn/constants/clanStreakColors';
@@ -44,18 +45,27 @@ import { useAuth } from '../../mobile/lib/AuthContext';
 
 /**
  * Returns an array of the last `n` YYYY-MM-DD strings up to and including today,
- * computed in UTC to avoid DST edge cases.
- * Used in debug mode to synthesise a streak calendar from simulatedStreakDays.
+ * using the device local calendar (same as getLocalDayKey / recordActivity).
  */
 function generateLastNDays(n: number): string[] {
   if (n <= 0) return [];
   const result: string[] = [];
-  const now = new Date();
-  const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-  for (let i = n - 1; i >= 0; i--) {
-    result.push(new Date(todayUtc - i * 86_400_000).toISOString().slice(0, 10));
+  const todayKey = getLocalDayKey();
+  const [y, m, d] = todayKey.split('-').map(Number);
+  const todayMs = new Date(y, m - 1, d).getTime();
+  for (let i = n - 1; i >= 0; i -= 1) {
+    const dt = new Date(todayMs - i * 86_400_000);
+    result.push(getLocalDayKeyFromDate(dt));
   }
   return result;
+}
+
+function getLocalDayKeyFromDate(d: Date): string {
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, '0'),
+    String(d.getDate()).padStart(2, '0'),
+  ].join('-');
 }
 import {
   STREAK_CARD_PADDING_H,
@@ -135,7 +145,7 @@ export default function StreakScreen() {
   const scaleAnim      = useRef(new Animated.Value(1)).current;
   const prevActiveRef  = useRef<boolean | null>(null);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getLocalDayKey();
 
   // streakDays ya aplica 0 en el día de recuperación (antes de publicar).
   const displayStreakDays = streakDays;
