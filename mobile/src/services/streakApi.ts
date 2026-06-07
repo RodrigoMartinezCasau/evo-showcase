@@ -3,6 +3,7 @@
  * Reuses the same base-URL logic as philosophyProfileApi.ts.
  */
 import { getDefaultApiUrl, mergeApiHeaders } from './apiRuntimeConfig';
+import { getLocalDayKey } from './userStatsStorage';
 
 let _apiUrl: string = getDefaultApiUrl();
 
@@ -48,7 +49,7 @@ export async function recordActivity(
   type: ActivityType,
   date?: string,
 ): Promise<StreakData> {
-  const body = { type, date: date ?? new Date().toISOString().slice(0, 10) };
+  const body = { type, date: date ?? getLocalDayKey() };
   const res = await fetch(`${_apiUrl}/streak/${userId}/activity`, {
     method: 'POST',
     headers: makeHeaders(),

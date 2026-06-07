@@ -91,6 +91,7 @@ async def beta_protection_middleware(request: Request, call_next):
         or request.method == "OPTIONS"
         or path.startswith("/streak/")
         or path.startswith("/uses-log/")
+        or path == "/admin/streak-export"
     ):
         return await call_next(request)
 
@@ -1834,6 +1835,47 @@ class StreakActivityPayload(BaseModel):
     date: str   # YYYY-MM-DD — the day the activity occurred
 
 
+STREAK_RESTORE_KEY = os.environ.get("STREAK_RESTORE_KEY") or os.environ.get("ADMIN_RESTORE_KEY") or ""
+
+
+@app.get("/admin/streak-export")
+def admin_streak_export(request: Request):
+    """
+    Exporta user_streak sin escribir en Supabase (restauración one-off).
+    Header: x-streak-restore-key = STREAK_RESTORE_KEY en Railway.
+    """
+    if not STREAK_RESTORE_KEY:
+        raise HTTPException(status_code=503, detail="STREAK_RESTORE_KEY not configured")
+    provided = (
+        request.headers.get("x-streak-restore-key")
+        or request.headers.get("x-admin-restore-key")
+        or ""
+    )
+    if provided != STREAK_RESTORE_KEY:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    from sqlmodel import select
+
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    rows_out = []
+    with get_session() as s:
+        streak_rows = s.exec(select(UserStreak)).all()
+        for row in streak_rows:
+            activity = _json.loads(row.activity_log or "[]")
+            recalc, _last = _recalculate_streak(activity, today)
+            rows_out.append(
+                {
+                    "user_id": row.user_id,
+                    "streak_current": row.streak_current,
+                    "streak_best": row.streak_best,
+                    "last_activity_date": row.last_activity_date,
+                    "activity_log": activity,
+                    "recalculated_streak": recalc,
+                }
+            )
+    return {"today_utc": today, "rows": rows_out}
+
+
 @app.get("/streak/{user_id}")
 def get_streak(user_id: str):
     """Return current streak data + activity logs for the last 90 days."""
@@ -1852,7 +1894,9 @@ def get_streak(user_id: str):
             row.updated_at = datetime.utcnow()
             s.add(row)
             s.commit()
-            _sync_streak_async(user_id, streak)
+            # No propagar 0 a Supabase si no hay activity_log (usuarios legacy en Railway).
+            if activity or streak > 0:
+                _sync_streak_async(user_id, streak)
         return {
             "streak_current": streak,
             "streak_best": row.streak_best,

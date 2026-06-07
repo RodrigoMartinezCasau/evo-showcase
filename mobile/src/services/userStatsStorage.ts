@@ -346,6 +346,8 @@ export function mergeStatsFromRemote(
   local: UserStats,
   remote: {
     streakDays?: number;
+    /** Racha en Supabase profiles — respaldo si Railway no tiene activity_log. */
+    profileStreakDays?: number;
     remainingUses?: number;
     hasSentToday?: boolean;
     lastUsesResetDate?: string | null;
@@ -357,21 +359,29 @@ export function mergeStatsFromRemote(
   const rolled = applyDailyRollover(local, today);
   let next = { ...rolled };
 
-  if (
-    typeof remote.streakDays === 'number' &&
-    remote.activityLog !== undefined
-  ) {
+  const activityLog = remote.activityLog ?? [];
+  const hasActivityHistory = activityLog.length > 0;
+
+  if (typeof remote.streakDays === 'number' && hasActivityHistory) {
     next = applyRemoteStreakData(
       rolled,
       {
         streak_current: remote.streakDays,
         last_activity_date: remote.lastActivityDate ?? null,
-        activity_log: remote.activityLog,
+        activity_log: activityLog,
       },
       today,
     );
   } else if (typeof remote.streakDays === 'number') {
-    next.currentStreak = Math.max(0, remote.streakDays);
+    const backendStreak = Math.max(0, remote.streakDays);
+    const profileStreak = Math.max(0, remote.profileStreakDays ?? 0);
+    const localStreak = Math.max(0, rolled.currentStreak);
+    // Railway sin historial: no degradar a 0 si Supabase/local tenían racha (Beta 121).
+    if (backendStreak === 0) {
+      next.currentStreak = Math.max(localStreak, profileStreak);
+    } else {
+      next.currentStreak = Math.max(localStreak, profileStreak, backendStreak);
+    }
   }
   if (typeof remote.remainingUses === 'number') {
     next.dailyUsesRemaining = Math.min(

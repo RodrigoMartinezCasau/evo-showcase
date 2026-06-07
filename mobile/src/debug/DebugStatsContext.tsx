@@ -332,6 +332,7 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
             local,
             {
               streakDays: streakData.streak_current ?? 0,
+              profileStreakDays: Math.max(0, Number(authProfile.streak_days ?? 0)),
               remainingUses: serverRemaining,
               hasSentToday:
                 streakData.last_activity_date === today ||
@@ -386,6 +387,7 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
     authProfile?.id,
     authProfile?.remaining_uses,
     authProfile?.last_uses_reset_date,
+    authProfile?.streak_days,
     currentDay,
   ]);
 
