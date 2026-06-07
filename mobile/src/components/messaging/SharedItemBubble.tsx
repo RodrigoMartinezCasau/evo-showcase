@@ -4,7 +4,9 @@ import { Ionicons } from '@expo/vector-icons';
 import type { SharedItem } from '@evoconn/types/messaging';
 import type { CommunityPost } from '@evoconn/types';
 import type { BasicProfile } from '@evoconn/services/supabaseSocial';
+import { UserAvatarFrame } from '@evoconn/components/shared/UserAvatarFrame';
 import { formatProfileUsername } from '@evoconn/state/otherProfileCache';
+import { SharedPostPreviewCard } from './SharedPostPreviewCard';
 
 type Props = {
   item: SharedItem;
@@ -36,18 +38,16 @@ export const SharedItemBubble = React.memo(function SharedItemBubble({
 }: Props) {
   const isMine = item.senderId === myUserId;
 
-  const label = useMemo(() => {
-    if (item.kind === 'post') {
-      if (!post) return 'Publicación';
-      const preview = (post.title ?? post.body ?? '').trim();
-      const short = preview.length > 80 ? `${preview.slice(0, 77)}…` : preview;
-      return post.type === 'phrase' ? `Frase: ${short}` : short || 'Reflexión';
-    }
-    const uname = profile?.username
-      ? formatProfileUsername(profile.username)
-      : 'Perfil';
-    return `Perfil ${uname}`;
-  }, [item.kind, post, profile]);
+  const postAuthorLabel = useMemo(() => {
+    const raw = post?.author.username?.trim();
+    if (!raw) return 'Publicación';
+    return raw.startsWith('@') ? raw : `@${raw.toUpperCase()}`;
+  }, [post?.author.username]);
+
+  const profileLabel = useMemo(() => {
+    if (!profile?.username) return 'Perfil';
+    return formatProfileUsername(profile.username);
+  }, [profile?.username]);
 
   const handlePress = () => {
     if (item.kind === 'post' && item.postId) {
@@ -64,19 +64,38 @@ export const SharedItemBubble = React.memo(function SharedItemBubble({
         activeOpacity={0.85}
         onPress={handlePress}
       >
-        <View style={styles.iconRow}>
-          <Ionicons
-            name={item.kind === 'post' ? 'document-text-outline' : 'person-outline'}
-            size={18}
-            color="rgba(255,255,255,0.7)"
-          />
-          <Text style={styles.kindLabel}>
-            {item.kind === 'post' ? 'Publicación' : 'Perfil'}
+        {item.kind === 'post' ? (
+          <Text style={styles.authorLabel} numberOfLines={1}>
+            {postAuthorLabel}
           </Text>
-        </View>
-        <Text style={styles.preview} numberOfLines={3}>
-          {label}
-        </Text>
+        ) : (
+          <View style={styles.iconRow}>
+            <Ionicons name="person-outline" size={18} color="rgba(255,255,255,0.7)" />
+            <Text style={styles.kindLabel}>Perfil</Text>
+          </View>
+        )}
+
+        {item.kind === 'post' && post ? (
+          <SharedPostPreviewCard post={post} />
+        ) : item.kind === 'profile' && profile ? (
+          <View style={styles.profilePreview}>
+            <UserAvatarFrame
+              clanId={profile.clanId}
+              avatarUri={profile.avatarUri}
+              size={52}
+              iconScale={1.05}
+              deferRender
+            />
+            <Text style={styles.profileName} numberOfLines={1}>
+              {profileLabel}
+            </Text>
+          </View>
+        ) : (
+          <Text style={styles.fallbackPreview} numberOfLines={2}>
+            {item.kind === 'post' ? postAuthorLabel : 'Perfil'}
+          </Text>
+        )}
+
         <Text style={styles.time}>{relativeTime(item.createdAt)}</Text>
       </TouchableOpacity>
     </View>
@@ -97,9 +116,10 @@ const styles = StyleSheet.create({
   },
   card: {
     maxWidth: '82%',
+    minWidth: 220,
     borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
   },
@@ -109,11 +129,18 @@ const styles = StyleSheet.create({
   cardTheirs: {
     backgroundColor: 'rgba(255,255,255,0.05)',
   },
+  authorLabel: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+    marginBottom: 8,
+  },
   iconRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 6,
+    marginBottom: 8,
   },
   kindLabel: {
     color: 'rgba(255,255,255,0.45)',
@@ -122,10 +149,20 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
-  preview: {
+  profilePreview: {
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+  },
+  profileName: {
     color: '#FFFFFF',
     fontSize: 15,
-    lineHeight: 21,
+    fontWeight: '700',
+  },
+  fallbackPreview: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 14,
+    paddingVertical: 8,
   },
   time: {
     marginTop: 8,

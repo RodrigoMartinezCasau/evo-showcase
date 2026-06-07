@@ -1,4 +1,5 @@
 import type { Router } from 'expo-router';
+import { sanitizeRouteId } from '@evoconn/utils/sanitizeRouteId';
 import {
   scheduleCommunityPostDeepLink,
   peekCommunityPostNavigationEpoch,
@@ -8,7 +9,6 @@ import {
 
 export { subscribeCommunityPostNavigation };
 
-/** Fuerza que CommunityScreen vuelva a procesar el mismo deep link (p. ej. otro post). */
 let forcedCommunityPostId: string | null = null;
 let forcedCommunityCommentId: string | null = null;
 let forcedNavigationEpoch = 0;
@@ -25,7 +25,6 @@ export function consumeForcedCommunityCommentOpen(): string | null {
   return id;
 }
 
-/** Epoch de la última navegación forzada (0 si no había). */
 export function consumeForcedNavigationEpoch(): number {
   const epoch = forcedNavigationEpoch;
   forcedNavigationEpoch = 0;
@@ -41,28 +40,31 @@ function scheduleCommunityPostOpen(postId: string, commentId?: string): number {
   return epoch;
 }
 
+export function peekNavigationEpoch(): number {
+  return Math.max(peekCommunityPostNavigationEpoch(), forcedNavigationEpoch);
+}
+
 /**
- * Abre la publicación en el visor fullscreen de Para ti (misma UX que el widget).
- * `commentId` opcional: despliega el hilo y centra ese comentario (notificaciones).
- * Usa `replace` para no apilar otro `(tabs)` encima de /notifications (evita crash).
+ * Abre una publicación en el visor fullscreen de Para ti.
+ * Usa `/detail-feed` con el post objetivo siempre en índice 0.
  */
 export function navigateToCommunityPost(
   router: Router,
   postId: string | undefined,
   commentId?: string,
 ): void {
-  const id = postId?.trim();
+  const id = sanitizeRouteId(postId);
   if (!id) return;
   const cleanComment = commentId?.trim() || undefined;
   scheduleCommunityPostOpen(id, cleanComment);
-  // Sin postId en params: evita starfield colgado en cold start; CommunityScreen
-  // consume el intent vía forced + subscribe (mismo flujo que widget).
-  router.replace('/(tabs)');
-}
-
-/** Epoch actual del intent pendiente (para deps en CommunityScreen). */
-export function peekNavigationEpoch(): number {
-  return Math.max(peekCommunityPostNavigationEpoch(), forcedNavigationEpoch);
+  router.push({
+    pathname: '/detail-feed',
+    params: {
+      mode: 'foryou',
+      postId: id,
+      ...(cleanComment ? { commentId: cleanComment } : {}),
+    },
+  });
 }
 
 /** Perfil de otro usuario (@username opcional para cabecera mientras carga). */

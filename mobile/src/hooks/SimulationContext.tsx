@@ -47,6 +47,7 @@ import {
   fetchMySaves,
   fetchFollowing,
   fetchFollowers,
+  fetchFollowCounts,
   fetchCommentsForPost,
   insertPost,
   removePost,
@@ -83,6 +84,7 @@ import {
 const SIM_POSTS_STORAGE_KEY    = '@physicscopilot/sim_posts_v3';
 const SIM_VOTES_STORAGE_KEY    = '@physicscopilot/sim_votes_v2';
 const SIM_FOLLOW_STORAGE_KEY   = '@physicscopilot/sim_follow_v2';
+const SIM_FOLLOW_GRAPH_SCOPE_KEY = '@physicscopilot/sim_follow_scope_v1';
 const SIM_COMMENTS_STORAGE_KEY = '@physicscopilot/sim_comments_v3';
 const SIM_COMMENT_VOTES_STORAGE_KEY = '@physicscopilot/sim_comment_votes_v1';
 const SIM_SAVED_STORAGE_KEY    = '@physicscopilot/sim_saved_v1';
@@ -335,6 +337,11 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
    * y batería mientras la app está minimizada (Android se nota mucho).
    */
   const [realtimeEpoch, setRealtimeEpoch] = useState(0);
+  /** Conteos exactos desde Supabase (usuarios reales); evita inflar con followGraph local. */
+  const [exactFollowCounts, setExactFollowCounts] = useState<{
+    followers: number;
+    following: number;
+  } | null>(null);
   useEffect(() => {
     let lastState: AppStateStatus = AppState.currentState;
     let lastEpochAt = 0;
@@ -383,13 +390,48 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     if (authLoading) return;
     if (!session?.user) {
       setActiveUserIdRaw('u1');
+      setExactFollowCounts(null);
       return;
     }
     const id = authProfile?.id ?? session.user.id;
     if (id && !SIM_USERS_BY_ID[id]) {
       setActiveUserIdRaw(id);
+      setExactFollowCounts(null);
     }
   }, [authProfile?.id, session?.user, authLoading]);
+
+  // Conteos exactos en cuanto hay sesión real (no esperar a hidratar todo el grafo).
+  useEffect(() => {
+    if (!isRealUserId(activeUserId)) {
+      setExactFollowCounts(null);
+      return;
+    }
+    let cancelled = false;
+    void fetchFollowCounts(activeUserId).then((counts) => {
+      if (!cancelled) {
+        setExactFollowCounts({
+          followers: counts.followersCount,
+          following: counts.followingCount,
+        });
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeUserId]);
+
+  // Usuario real: no reutilizar aristas del grafo simulado mezclado en AsyncStorage.
+  useEffect(() => {
+    if (!isRealUserId(activeUserId)) return;
+    void AsyncStorage.multiSet([
+      [SIM_FOLLOW_GRAPH_SCOPE_KEY, 'real'],
+    ]);
+    void AsyncStorage.removeItem(SIM_FOLLOW_STORAGE_KEY);
+    setFollowGraph((prev) => {
+      const mine = prev[activeUserId] ?? [];
+      return { [activeUserId]: [...mine] };
+    });
+  }, [activeUserId]);
 
   // ── Posts ─────────────────────────────────────────────────────────────────
   const [posts, setPosts] = useState<SimPost[]>(() => SIM_POSTS.map(p => ({ ...p })));
@@ -462,9 +504,18 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     const applyFollowGraph = (following: string[], followers: string[]) => {
       if (cancelled || activeUserIdRef.current !== hydrateFor) return;
       setFollowGraph(prev => {
+        // Usuario real: solo guardamos a quién sigo. Las aristas inversas
+        // (quién me sigue) inflaban el conteo local cuando la cache mezclaba sim + real.
+        if (isRealUserId(hydrateFor)) {
+          return { ...prev, [hydrateFor]: [...new Set(following)] };
+        }
         const updated = { ...prev };
-        const prevMine = prev[hydrateFor] ?? [];
-        updated[hydrateFor] = [...new Set([...following, ...prevMine])];
+        for (const [userId, targets] of Object.entries(updated)) {
+          if (targets.includes(hydrateFor)) {
+            updated[userId] = targets.filter((id) => id !== hydrateFor);
+          }
+        }
+        updated[hydrateFor] = [...new Set(following)];
         for (const followerId of followers) {
           updated[followerId] = [
             ...new Set([...(updated[followerId] ?? []), hydrateFor]),
@@ -631,6 +682,15 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       applyMyCommentVotes(myCommentVoteIds);
       applyMySaves(mySavedPostIds);
       applyFollowGraph(following, followers);
+      if (isRealUserId(hydrateFor)) {
+        void fetchFollowCounts(hydrateFor).then((counts) => {
+          if (cancelled || activeUserIdRef.current !== hydrateFor) return;
+          setExactFollowCounts({
+            followers: counts.followersCount,
+            following: counts.followingCount,
+          });
+        });
+      }
       if (hiddenPostIds.length > 0) {
         setHiddenMapArr((prev) => ({ ...prev, [hydrateFor]: hiddenPostIds }));
       }
@@ -846,25 +906,37 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    AsyncStorage.getItem(SIM_FOLLOW_STORAGE_KEY)
-      .then((raw) => {
-        if (raw) {
-          try {
-            const parsed = JSON.parse(raw) as Record<string, string[]>;
-            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-              setFollowGraph(parsed);
-            }
-          } catch { /* ignore */ }
+    void (async () => {
+      try {
+        const [raw, scope] = await Promise.all([
+          AsyncStorage.getItem(SIM_FOLLOW_STORAGE_KEY),
+          AsyncStorage.getItem(SIM_FOLLOW_GRAPH_SCOPE_KEY),
+        ]);
+        if (raw && scope !== 'real') {
+          const parsed = JSON.parse(raw) as Record<string, string[]>;
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            setFollowGraph(parsed);
+          }
         }
+      } catch {
+        /* ignore parse errors */
+      } finally {
         followHydrated.current = true;
-      })
-      .catch(() => { followHydrated.current = true; });
+      }
+    })();
   }, []);
 
   useEffect(() => {
     if (!followHydrated.current) return;
-    AsyncStorage.setItem(SIM_FOLLOW_STORAGE_KEY, JSON.stringify(followGraph)).catch(console.error);
-  }, [followGraph]);
+    if (isRealUserId(activeUserId)) {
+      void AsyncStorage.setItem(SIM_FOLLOW_GRAPH_SCOPE_KEY, 'real');
+      return;
+    }
+    void AsyncStorage.multiSet([
+      [SIM_FOLLOW_STORAGE_KEY, JSON.stringify(followGraph)],
+      [SIM_FOLLOW_GRAPH_SCOPE_KEY, 'sim'],
+    ]);
+  }, [followGraph, activeUserId]);
 
   // ── Vote map ──────────────────────────────────────────────────────────────
   const [voteMapRaw, setVoteMapRaw] = useState<Record<string, Record<string, 'up' | 'down'>>>(
@@ -1125,13 +1197,27 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   const activeUser = users[activeUserId];
 
   // Derived follower/following counts for the active user
-  const activeFollowersCount = useMemo(
+  const graphFollowersCount = useMemo(
     () => Object.values(followGraph).filter(arr => arr.includes(activeUserId)).length,
     [followGraph, activeUserId],
   );
-  const activeFollowingCount = useMemo(
+  const graphFollowingCount = useMemo(
     () => (followGraph[activeUserId] ?? []).length,
     [followGraph, activeUserId],
+  );
+  const activeFollowersCount = useMemo(
+    () =>
+      isRealUserId(activeUserId)
+        ? (exactFollowCounts?.followers ?? 0)
+        : graphFollowersCount,
+    [activeUserId, exactFollowCounts, graphFollowersCount],
+  );
+  const activeFollowingCount = useMemo(
+    () =>
+      isRealUserId(activeUserId)
+        ? (exactFollowCounts?.following ?? 0)
+        : graphFollowingCount,
+    [activeUserId, exactFollowCounts, graphFollowingCount],
   );
 
   // ── Keep mockCurrentUser in sync ─────────────────────────────────────────
@@ -1143,9 +1229,21 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   // referencia oscilaba y dejaba caer la guardia, pisando la identidad real
   // con @RODRIGOMARTINEZ.
   useEffect(() => {
-    if (!activeUser) return;
     if (authLoading) return;
-    if (isRealUserId(activeUserId)) return;
+    if (isRealUserId(activeUserId)) {
+      if (exactFollowCounts == null) return;
+      setActiveSimUser({
+        id: activeUserId,
+        username: mockCurrentUser.username,
+        clanId: mockCurrentUser.clanId,
+        rank: mockCurrentUser.rank,
+        followersCount: exactFollowCounts.followers,
+        followingCount: exactFollowCounts.following,
+        avatarUri: mockCurrentUser.avatarUri,
+      });
+      return;
+    }
+    if (!activeUser) return;
     setActiveSimUser({
       id: activeUser.id,
       username: activeUser.username,
@@ -1154,7 +1252,14 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       followersCount: activeFollowersCount,
       followingCount: activeFollowingCount,
     });
-  }, [activeUser, activeFollowersCount, activeFollowingCount, authLoading, activeUserId]);
+  }, [
+    activeUser,
+    activeFollowersCount,
+    activeFollowingCount,
+    authLoading,
+    activeUserId,
+    exactFollowCounts,
+  ]);
 
   // Real-user clan sync → EffectiveClanSync (ClassificationProvider tree).
 
@@ -1623,14 +1728,25 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     }
     setFollowGraph(prev => {
       const updated = { ...prev };
-      const prevMine = prev[hydrateFor] ?? [];
-      updated[hydrateFor] = [...new Set([...payload.following, ...prevMine])];
+      for (const [userId, targets] of Object.entries(updated)) {
+        if (targets.includes(hydrateFor)) {
+          updated[userId] = targets.filter((id) => id !== hydrateFor);
+        }
+      }
+      updated[hydrateFor] = [...new Set(payload.following)];
       for (const followerId of payload.followers) {
         updated[followerId] = [
           ...new Set([...(updated[followerId] ?? []), hydrateFor]),
         ];
       }
       return updated;
+    });
+    void fetchFollowCounts(hydrateFor).then((counts) => {
+      if (activeUserIdRef.current !== hydrateFor) return;
+      setExactFollowCounts({
+        followers: counts.followersCount,
+        following: counts.followingCount,
+      });
     });
     setCommentsMap(prev => ({ ...prev, ...payload.commentsByPost }));
     postsHydrated.current  = true;

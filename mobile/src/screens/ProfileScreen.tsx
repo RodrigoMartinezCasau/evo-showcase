@@ -16,7 +16,11 @@ import {
   fetchPostsByUser,
   fetchProfilesBatch,
   isRealUserId,
+  type BasicProfile,
 } from '@evoconn/services/supabaseSocial';
+import { simPostToCommunityPost, useFeedStore } from '@evoconn/hooks/useFeedStore';
+import type { SimPost } from '@evoconn/data/simulation/simulatedNetwork';
+import type { Rank } from '@evoconn/types';
 import { AppTopBar, AppShellBottomTabsWrap, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
@@ -55,6 +59,57 @@ import {
 
 const ANIM_DURATION = 200;
 
+function mapAuthorPostsToCommunity(
+  posts: SimPost[],
+  authorId: string,
+  author: {
+    username: string | null;
+    clanId: string | null | undefined;
+    rank?: string | null;
+    avatarUri?: string;
+  },
+): CommunityPost[] {
+  const profileCache: Record<string, BasicProfile> = {
+    [authorId]: {
+      id: authorId,
+      username: author.username ?? '?',
+      clanId: author.clanId ?? null,
+      rank: (author.rank as Rank | undefined) ?? 'aprendiz',
+      avatarUri: author.avatarUri,
+    },
+  };
+  return posts.map((p) => simPostToCommunityPost(p, profileCache));
+}
+
+/** Si el caché del perfil no trae foto de fondo, reutiliza la del feed global. */
+function mergePostsWithFeedImages(
+  posts: CommunityPost[],
+  feedPosts: CommunityPost[],
+  authorId: string,
+): CommunityPost[] {
+  const feedById = new Map(
+    feedPosts.filter((p) => p.author.id === authorId).map((p) => [p.id, p]),
+  );
+  if (feedById.size === 0) return posts;
+  return posts.map((p) => {
+    if (p.imageUrl) return p;
+    const fromFeed = feedById.get(p.id);
+    if (!fromFeed?.imageUrl) return p;
+    return {
+      ...p,
+      imageUrl: fromFeed.imageUrl,
+      imageWidth: fromFeed.imageWidth ?? null,
+      imageHeight: fromFeed.imageHeight ?? null,
+      imageCropFocusY: fromFeed.imageCropFocusY ?? null,
+      imageCropFocusYFollowing: fromFeed.imageCropFocusYFollowing ?? null,
+      imageShowParaTi: fromFeed.imageShowParaTi ?? null,
+      imageShowSiguiendo: fromFeed.imageShowSiguiendo ?? null,
+      audioTrackId: p.audioTrackId ?? fromFeed.audioTrackId ?? null,
+      audioVolume: p.audioVolume ?? fromFeed.audioVolume ?? null,
+    };
+  });
+}
+
 export default function ProfileScreen() {
   const { id: rawId, username: initialUsername } = useLocalSearchParams<{ id?: string; username?: string }>();
   const id = sanitizeRouteId(rawId);
@@ -87,6 +142,7 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
     recordPostView,
     ensurePostViewCounts,
   } = useSimulation();
+  const { posts: feedPosts } = useFeedStore();
   const followGraphRef = useRef(followGraph);
   followGraphRef.current = followGraph;
 
@@ -177,22 +233,12 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
         : null;
       const authorAvatar =
         (data as { avatar_url?: string | null } | null | undefined)?.avatar_url ?? undefined;
-      const builtPosts: CommunityPost[] = posts.map(p => ({
-        id: p.id,
-        type: p.type,
-        author: {
-          id: p.authorId,
-          username: resolvedUsername ?? (p.authorUsername && p.authorUsername.length < 36 ? p.authorUsername : '?'),
-          clanId: p.authorClanId ?? null,
-          rank: p.authorRank ?? 'aprendiz',
-          avatarUri: authorAvatar,
-        },
-        title: p.title,
-        body: p.body,
-        quoteAuthor: p.quoteAuthor,
-        voteStats: { up: p.upvoterIds.length, down: p.downvoterIds.length, save: p.saverIds.length },
-        createdAt: p.createdAt,
-      }));
+      const builtPosts = mapAuthorPostsToCommunity(posts, userId, {
+        username: resolvedUsername,
+        clanId: data?.clan_id ?? posts[0]?.authorClanId,
+        rank: data?.rank ?? posts[0]?.authorRank,
+        avatarUri: authorAvatar,
+      });
       setSupabasePosts(builtPosts);
 
       // Stale-while-revalidate: persist the freshest snapshot for instant reopen.
@@ -342,40 +388,16 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
     () => {
       let list: CommunityPost[];
       if (isRealUserId(userId) && supabasePosts.length > 0) {
-        list = supabasePosts;
+        list = mergePostsWithFeedImages(supabasePosts, feedPosts, userId);
       } else {
-      list = allSimPosts
-        .filter((p) => p.authorId === userId && isPublishedSimPostType(p.type))
-        .sort((a, b) => (b.createdAt > a.createdAt ? 1 : b.createdAt < a.createdAt ? -1 : 0))
-        .map((p): CommunityPost => {
-          const author = simUsers[p.authorId];
-          return {
-            id: p.id,
-            type: p.type,
-            author: author
-              ? {
-                  id: author.id,
-                  username: author.username,
-                  clanId: author.clanId,
-                  rank: author.rank,
-                  avatarUri: author.avatarUri,
-                }
-              : {
-                  id: p.authorId,
-                  username: p.authorUsername ?? '?',
-                  clanId: p.authorClanId ?? null,
-                  rank: p.authorRank ?? 'aprendiz',
-                },
-            title: p.title,
-            body: p.body,
-            quoteAuthor: p.quoteAuthor,
-            voteStats: {
-              up: p.upvoterIds.length,
-              down: p.downvoterIds.length,
-              save: p.saverIds.length,
-            },
-            createdAt: p.createdAt,
-          };
+        const filtered = allSimPosts
+          .filter((p) => p.authorId === userId && isPublishedSimPostType(p.type))
+          .sort((a, b) => (b.createdAt > a.createdAt ? 1 : b.createdAt < a.createdAt ? -1 : 0));
+        list = mapAuthorPostsToCommunity(filtered, userId, {
+          username: profileWithLiveFollowers.username,
+          clanId: profileWithLiveFollowers.clanId,
+          rank: profileWithLiveFollowers.rank,
+          avatarUri: resolvedProfileAvatarUri,
         });
       }
       const username = profileWithLiveFollowers.username;
@@ -387,7 +409,7 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
       }
       return enrichPostsAuthorAvatar(list, userId, resolvedProfileAvatarUri);
     },
-    [allSimPosts, userId, simUsers, supabasePosts, resolvedProfileAvatarUri, profileWithLiveFollowers.username],
+    [allSimPosts, userId, supabasePosts, feedPosts, resolvedProfileAvatarUri, profileWithLiveFollowers.username, profileWithLiveFollowers.clanId, profileWithLiveFollowers.rank],
   );
 
   const livePostIdsKey = useMemo(() => livePosts.map((p) => p.id).join(','), [livePosts]);

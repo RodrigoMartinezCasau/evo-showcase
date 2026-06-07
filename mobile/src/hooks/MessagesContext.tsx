@@ -28,7 +28,7 @@ export type MessagesContextValue = {
   unreadCount: number;
   loading: boolean;
   refreshInbox: () => Promise<void>;
-  sendSharedItem: (args: SendSharedItemArgs) => Promise<boolean>;
+  sendSharedItem: (args: SendSharedItemArgs) => Promise<{ ok: boolean; error?: string }>;
   markConversationRead: (conversationId: string) => Promise<void>;
   markAllInboxRead: () => Promise<void>;
 };
@@ -107,12 +107,14 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
   }, [activeUserId, refreshInbox]);
 
   const sendSharedItem = useCallback(
-    async (args: SendSharedItemArgs): Promise<boolean> => {
-      if (!isRealUserId(activeUserId)) return false;
-      const id = await sendSharedItemApi(args);
-      if (!id) return false;
+    async (args: SendSharedItemArgs): Promise<{ ok: boolean; error?: string }> => {
+      if (!isRealUserId(activeUserId)) {
+        return { ok: false, error: 'Inicia sesión con una cuenta real para enviar mensajes.' };
+      }
+      const result = await sendSharedItemApi(args);
+      if (!result.ok) return { ok: false, error: result.error };
       await refreshInbox();
-      return true;
+      return { ok: true };
     },
     [activeUserId, refreshInbox],
   );

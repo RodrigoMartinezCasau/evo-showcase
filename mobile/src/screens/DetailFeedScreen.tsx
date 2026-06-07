@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
-import { useLocalSearchParams, useRouter, usePathname } from 'expo-router';
+import { useLocalSearchParams, useRouter, usePathname, useFocusEffect } from 'expo-router';
 import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { requestCommunityTab } from '@evoconn/utils/communityPostDeepLink';
 import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
@@ -19,8 +19,10 @@ import { evoconnColors } from '@evoconn/theme/colors';
 import type { CommunityPost } from '@evoconn/types';
 import { ReflectionDetailItem } from '@evoconn/components/ReflectionDetailItem';
 import { AppTopBar, AppShellBottomTabsWrap, SidebarDrawer, BottomCommunityTabs } from '@evoconn/components';
+import { ClanLoadingDot } from '@evoconn/components/shared/ClanLoadingDot';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useFeedStore } from '@evoconn/hooks/useFeedStore';
+import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { useFeedAudio } from '@evoconn/hooks/useFeedAudio';
 import { getBottomBarEdgeGestureBottomOffset } from '@evoconn/constants/bottomBarLayout';
 import { getAppShellScrollableBodyHeight } from '@evoconn/constants/appShellLayout';
@@ -45,6 +47,7 @@ import {
   sortFollowingPosts,
   parseFollowingSortParam,
 } from '@evoconn/constants/followingFeedSort';
+import { sanitizeRouteId } from '@evoconn/utils/sanitizeRouteId';
 
 type FeedMode = 'following' | 'foryou';
 
@@ -115,13 +118,14 @@ export default function DetailFeedScreen() {
   }>();
 
   const mode = normalizeFeedMode(params.mode ?? 'foryou');
-  const postId = typeof params.postId === 'string' ? params.postId : undefined;
+  const postId = sanitizeRouteId(typeof params.postId === 'string' ? params.postId : undefined);
   const followingSortParam = params.followingSort;
 
   const { followingSet } = useFollowState();
   const { blockedIds } = useBlockedUsers();
   const { thoughts } = useThoughts();
-  const { posts: allPosts } = useFeedStore();
+  const { posts: allPosts, getPostById } = useFeedStore();
+  const { ingestPostsByIds } = useSimulation();
   const followingSort = parseFollowingSortParam(followingSortParam);
   const { posts: globalVotedFeedPosts } = useGlobalFollowingVotedFeed(
     followingSort,
@@ -129,12 +133,47 @@ export default function DetailFeedScreen() {
     blockedIds,
   );
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  const [targetPostPending, setTargetPostPending] = React.useState(false);
+  const [targetPostMissing, setTargetPostMissing] = React.useState(false);
   const drawerOpenProgress = useRef(new Animated.Value(0)).current;
   const gestureCommittingRef = useRef(false);
   const activeTab = modeToTab(mode) as 'siguiendo' | 'para-ti' | 'search';
 
-  // When a specific postId is requested, put that post first so initialIndex=0 lands on it.
+  useEffect(() => {
+    if (!postId) {
+      setTargetPostPending(false);
+      setTargetPostMissing(false);
+      return;
+    }
+    if (getPostById(postId)) {
+      setTargetPostPending(false);
+      setTargetPostMissing(false);
+      return;
+    }
+    let cancelled = false;
+    setTargetPostPending(true);
+    setTargetPostMissing(false);
+    void ingestPostsByIds([postId]).then((ok) => {
+      if (cancelled) return;
+      setTargetPostPending(false);
+      if (!ok) setTargetPostMissing(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [postId, getPostById, ingestPostsByIds]);
+
+  const awaitingTargetPost = Boolean(postId) && (targetPostPending || (!getPostById(postId) && !targetPostMissing));
+
+  useEffect(() => {
+    if (!targetPostMissing) return;
+    const t = setTimeout(() => router.back(), 400);
+    return () => clearTimeout(t);
+  }, [targetPostMissing, router]);
+
+  // Post objetivo siempre en índice 0; el resto del deck puede barajarse.
   const data = useMemo(() => {
+    if (postId && !getPostById(postId)) return [] as CommunityPost[];
     let base: CommunityPost[];
     if (mode === 'following' && followingSort !== 'recientes') {
       base = globalVotedFeedPosts;
@@ -142,13 +181,22 @@ export default function DetailFeedScreen() {
       base = getDataForMode(mode, allPosts, followingSet, followingSortParam);
     }
     if (!postId) return base;
-    const targetIdx = base.findIndex((p) => p.id === postId);
-    if (targetIdx <= 0) return base;
-    const reordered = [...base];
-    const [target] = reordered.splice(targetIdx, 1);
-    reordered.unshift(target);
-    return reordered;
-  }, [mode, allPosts, followingSet, postId, followingSortParam, followingSort, globalVotedFeedPosts]);
+
+    const target = getPostById(postId) ?? base.find((p) => p.id === postId);
+    if (!target) return [] as CommunityPost[];
+
+    const rest = base.filter((p) => p.id !== postId);
+    return [target, ...rest];
+  }, [
+    mode,
+    allPosts,
+    followingSet,
+    postId,
+    followingSortParam,
+    followingSort,
+    globalVotedFeedPosts,
+    getPostById,
+  ]);
 
   // If postId was passed via params, always start at index 0 (target is first).
   // Otherwise honour the explicit initialIndex param.
@@ -213,6 +261,22 @@ export default function DetailFeedScreen() {
   const feedAudio = useFeedAudio();
   const feedAudioRef = useRef(feedAudio);
   feedAudioRef.current = feedAudio;
+  const screenFocusedRef = useRef(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      screenFocusedRef.current = true;
+      return () => {
+        screenFocusedRef.current = false;
+        feedAudioRef.current.stop();
+      };
+    }, []),
+  );
+
+  const playAudioForPost = useCallback((post: CommunityPost | undefined) => {
+    if (!screenFocusedRef.current || !post?.id) return;
+    feedAudioRef.current.playForPost(post);
+  }, []);
 
   const detailPagerVisiblePostIdRef = useRef<string | null>(null);
   const detailPagerViewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
@@ -226,7 +290,7 @@ export default function DetailFeedScreen() {
         Keyboard.dismiss();
       }
       // Audio adjunto del post visible (volumen elegido al publicar).
-      feedAudioRef.current.playForPost(post);
+      playAudioForPost(post);
     },
   ).current;
 
@@ -239,11 +303,11 @@ export default function DetailFeedScreen() {
     const post = data[Math.min(initialIndex, data.length - 1)];
     if (post) {
       initialAudioPlayedRef.current = true;
-      feedAudioRef.current.playForPost(post);
+      playAudioForPost(post);
     }
-  }, [data, initialIndex]);
+  }, [data, initialIndex, playAudioForPost]);
 
-  // Detener el audio al salir del visor (desmontar la pantalla).
+  // Respaldo por desmontaje (p. ej. pop del stack); el foco ya para el audio al salir.
   useEffect(() => () => feedAudioRef.current.stop(), []);
 
   const handleTabChange = useCallback(
@@ -343,6 +407,11 @@ export default function DetailFeedScreen() {
         onMenuPress={() => setSidebarOpen(true)}
       />
 
+      {awaitingTargetPost || targetPostMissing ? (
+        <View style={styles.loadingWrap}>
+          <ClanLoadingDot />
+        </View>
+      ) : (
       <FlatList
         data={data}
         renderItem={renderItem}
@@ -365,6 +434,7 @@ export default function DetailFeedScreen() {
         viewabilityConfig={detailPagerViewabilityConfig}
         onViewableItemsChanged={onDetailPagerViewableItemsChanged}
       />
+      )}
 
       <AppShellBottomTabsWrap>
         <BottomCommunityTabs
@@ -412,4 +482,5 @@ const styles = StyleSheet.create({
     zIndex: 250,
   },
   list: { flex: 1 },
+  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 });

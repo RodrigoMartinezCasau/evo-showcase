@@ -17,6 +17,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSinglePressGate } from '@evoconn/hooks/useSinglePress';
 
@@ -42,6 +43,8 @@ export type EvoActionOption = {
   label: string;
   onPress: () => void;
   destructive?: boolean;
+  /** Icono blanco a la izquierda del texto (Ionicons). */
+  icon?: React.ComponentProps<typeof Ionicons>['name'];
 };
 
 type ActionSheetProps = {
@@ -91,11 +94,7 @@ export function EvoActionSheetModal({
                 {title}
               </Text>
             ) : null}
-            <ScrollView
-              style={styles.scroll}
-              keyboardShouldPersistTaps="handled"
-              bounces={false}
-            >
+            <View style={styles.optionsList}>
               {options.map((o) => (
                 <TouchableOpacity
                   key={o.key}
@@ -103,12 +102,20 @@ export function EvoActionSheetModal({
                   onPress={() => runOption(o.onPress)}
                   activeOpacity={0.65}
                 >
+                  {o.icon ? (
+                    <Ionicons
+                      name={o.icon}
+                      size={22}
+                      color={o.destructive ? DESTRUCTIVE : '#FFFFFF'}
+                      style={styles.optionIcon}
+                    />
+                  ) : null}
                   <Text style={[styles.optionLabel, o.destructive && styles.optionDestructive]}>
                     {o.label}
                   </Text>
                 </TouchableOpacity>
               ))}
-            </ScrollView>
+            </View>
             <TouchableOpacity
               style={[styles.cancelOuter, { borderColor: cancelBorder }]}
               onPress={onClose}
@@ -249,7 +256,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 18,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderColor: ROW_BORDER,
-    maxHeight: '72%',
   },
   sheetTitle: {
     color: 'rgba(255,255,255,0.55)',
@@ -261,17 +267,27 @@ const styles = StyleSheet.create({
     paddingTop: 18,
     paddingBottom: 10,
   },
-  scroll: { maxHeight: 360 },
+  optionsList: {
+    paddingTop: 4,
+  },
   optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 16,
     paddingHorizontal: 20,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: ROW_BORDER,
   },
+  optionIcon: {
+    marginRight: 14,
+    width: 24,
+    textAlign: 'center',
+  },
   optionLabel: {
     color: TEXT,
     fontSize: 17,
     fontWeight: '600',
+    flex: 1,
   },
   optionDestructive: { color: DESTRUCTIVE },
   cancelOuter: {

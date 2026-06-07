@@ -727,12 +727,14 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
         ? [{
             key: 'repost',
             label: reposted ? 'Quitar republicación' : 'Republicar',
+            icon: 'repeat-outline' as const,
             onPress: () => toggleRepost(post.id),
           }]
         : []),
       {
         key: 'share',
         label: 'Compartir enlace',
+        icon: 'share-outline',
         onPress: () => {
           void (async () => {
             try {
@@ -756,11 +758,13 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
             {
               key: 'sharePostInApp',
               label: 'Enviar publicación',
+              icon: 'paper-plane-outline' as const,
               onPress: () => setSharePostPickerOpen(true),
             },
             {
               key: 'shareProfileInApp',
               label: 'Enviar perfil del autor',
+              icon: 'person-outline' as const,
               onPress: () => setShareProfilePickerOpen(true),
             },
           ]
@@ -768,16 +772,19 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
       {
         key: 'follow',
         label: following ? 'Dejar de seguir' : 'Seguir usuario',
+        icon: following ? 'close-outline' : 'person-add-outline',
         onPress: () => toggleFollow(post.author.id),
       },
       {
         key: 'report',
         label: 'Denunciar publicación',
+        icon: 'flag-outline',
         onPress: () => setReportReasonPickerOpen(true),
       },
       {
         key: 'block',
         label: 'Bloquear usuario',
+        icon: 'ban-outline',
         destructive: true,
         onPress: () => setBlockConfirmOpen(true),
       },
@@ -785,6 +792,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
         ? [{
             key: 'adminDeletePost',
             label: 'Eliminar publicación (admin)',
+            icon: 'trash-outline' as const,
             destructive: true,
             onPress: () => setAdminDeletePostOpen(true),
           }]
@@ -2055,7 +2063,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
       <EvoActionSheetModal
         visible={postMoreSheetOpen}
         onClose={() => setPostMoreSheetOpen(false)}
-        title={post.title?.trim() ? String(post.title) : 'Publicación'}
+        accentColor={getClanColor(viewerClanIdForRanking)}
         options={postMoreOptions}
       />
       <ShareToFriendPicker

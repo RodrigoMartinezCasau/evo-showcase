@@ -58,6 +58,8 @@ import { useDeferredRender } from '@evoconn/hooks/useDeferredRender';
 import { ClanLoadingDot } from '@evoconn/components/shared/ClanLoadingDot';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { useAuth } from '../../mobile/lib/AuthContext';
+import { fetchFollowCounts, isRealUserId } from '@evoconn/services/supabaseSocial';
+import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../mobile/lib/supabase';
 import type { CommunityPost } from '@evoconn/types';
 
@@ -73,7 +75,41 @@ export default function PersonalProfileScreen() {
   const { activeFollowersCount, activeFollowingCount, recordPostView } = useSimulation();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [serverFollowCounts, setServerFollowCounts] = useState<{
+    followers: number;
+    following: number;
+  } | null>(null);
   const ready = useDeferredRender();
+
+  const profileUserId = authProfile?.id ?? session?.user?.id ?? mockCurrentUser.id;
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isRealUserId(profileUserId)) {
+        setServerFollowCounts(null);
+        return;
+      }
+      let cancelled = false;
+      void fetchFollowCounts(profileUserId).then((counts) => {
+        if (!cancelled) {
+          setServerFollowCounts({
+            followers: counts.followersCount,
+            following: counts.followingCount,
+          });
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [profileUserId]),
+  );
+
+  const displayFollowersCount = isRealUserId(profileUserId)
+    ? (serverFollowCounts?.followers ?? activeFollowersCount)
+    : activeFollowersCount;
+  const displayFollowingCount = isRealUserId(profileUserId)
+    ? (serverFollowCounts?.following ?? activeFollowingCount)
+    : activeFollowingCount;
 
   // Render por trozos: primero las secciones ligeras (armazón visible al
   // instante tras la transición), y las pesadas (panel filosófico, slider de
@@ -369,8 +405,8 @@ export default function PersonalProfileScreen() {
         rank: profileWithClan.rank,
         avatarUri: profileWithClan.avatarUri,
         insigniaPhrase,
-        followersCount: activeFollowersCount,
-        followingCount: activeFollowingCount,
+        followersCount: displayFollowersCount,
+        followingCount: displayFollowingCount,
         totalPosts: posts.length,
         totalReflections: profileWithClan.totalReflections,
         totalQuotes: profileWithClan.totalQuotes,
@@ -390,8 +426,8 @@ export default function PersonalProfileScreen() {
     screenW,
     profileWithClan,
     insigniaPhrase,
-    activeFollowersCount,
-    activeFollowingCount,
+    displayFollowersCount,
+    displayFollowingCount,
     posts,
     reflectionCount,
     phraseCount,
@@ -435,8 +471,8 @@ export default function PersonalProfileScreen() {
               userId={profileWithClan.id}
               username={profileWithClan.username}
               clanId={profileWithClan.clanId}
-              followersCount={activeFollowersCount}
-              followingCount={activeFollowingCount}
+              followersCount={displayFollowersCount}
+              followingCount={displayFollowingCount}
               totalPosts={posts.length}
               onPostsPress={() => router.push('/personal-posts')}
               onFollowersPress={() => router.push('/personal-followers')}

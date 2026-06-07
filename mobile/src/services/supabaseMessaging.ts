@@ -1,4 +1,11 @@
 import { supabase } from '../../mobile/lib/supabase';
+import {
+  fetchFollowing,
+  fetchFollowers,
+  fetchProfilesBatch,
+  isRealUserId,
+  type BasicProfile,
+} from '@evoconn/services/supabaseSocial';
 import type {
   SendSharedItemArgs,
   SharedConversation,
@@ -58,8 +65,56 @@ export function otherParticipantId(
     : conversation.userLowId;
 }
 
+export type SendSharedItemResult =
+  | { ok: true; itemId: string }
+  | { ok: false; error: string };
+
+function mapSendSharedItemError(message: string): string {
+  const m = message.toLowerCase();
+  if (m.includes('not mutual friends')) {
+    return 'En el servidor no aparecéis como amigos mutuos. Comprobad que os seguís los dos en la app real.';
+  }
+  if (m.includes('post not found')) {
+    return 'Esta publicación no está guardada en el servidor y no se puede compartir.';
+  }
+  if (m.includes('profile not found')) {
+    return 'No se encontró el perfil a compartir.';
+  }
+  if (m.includes('not authenticated')) {
+    return 'Tu sesión ha caducado. Vuelve a iniciar sesión.';
+  }
+  if (m.includes('invalid recipient')) {
+    return 'No puedes enviarte contenido a ti mismo.';
+  }
+  return 'No se pudo enviar. Inténtalo de nuevo en unos segundos.';
+}
+
+/** IDs de amigos mutuos (misma regla que el RPC send_shared_item). */
+export async function fetchMutualFriendIds(userId: string): Promise<string[]> {
+  if (!isRealUserId(userId)) return [];
+  const [following, followers] = await Promise.all([
+    fetchFollowing(userId),
+    fetchFollowers(userId),
+  ]);
+  const followerSet = new Set(followers);
+  return following.filter((id) => followerSet.has(id));
+}
+
+export type MutualFriendEntry = BasicProfile;
+
+/** Amigos mutuos con perfil básico (fuente: Supabase, no cache local). */
+export async function fetchMutualFriends(userId: string): Promise<MutualFriendEntry[]> {
+  const ids = await fetchMutualFriendIds(userId);
+  if (ids.length === 0) return [];
+  const profiles = await fetchProfilesBatch(ids);
+  const byId = new Map(profiles.map((p) => [p.id, p]));
+  return ids
+    .map((id) => byId.get(id))
+    .filter((p): p is BasicProfile => !!p);
+}
+
 /** Envía un post o perfil a un amigo mutuo (RPC con validación en servidor). */
-export async function sendSharedItem(args: SendSharedItemArgs): Promise<string | null> {
+export async function sendSharedItem(args: SendSharedItemArgs): Promise<SendSharedItemResult> {
   const { data, error } = await supabase.rpc('send_shared_item', {
     p_recipient_id: args.recipientId,
     p_kind: args.kind,
@@ -68,9 +123,12 @@ export async function sendSharedItem(args: SendSharedItemArgs): Promise<string |
   });
   if (error) {
     console.error('[Messaging] sendSharedItem:', error.message);
-    return null;
+    return { ok: false, error: mapSendSharedItemError(error.message) };
   }
-  return typeof data === 'string' ? data : null;
+  if (typeof data !== 'string' || !data) {
+    return { ok: false, error: mapSendSharedItemError('unknown') };
+  }
+  return { ok: true, itemId: data };
 }
 
 export async function fetchMyConversations(userId: string): Promise<SharedConversation[]> {

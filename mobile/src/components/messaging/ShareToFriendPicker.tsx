@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Modal,
   View,
@@ -11,14 +11,16 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { usePersonalProfile } from '@evoconn/hooks/PersonalProfileContext';
+import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { useMessages } from '@evoconn/hooks/MessagesContext';
 import { UserAvatarFrame } from '@evoconn/components/shared/UserAvatarFrame';
-import type { FollowingEntry } from '@evoconn/data/mockPersonalProfile';
 import type { SharedItemKind } from '@evoconn/types/messaging';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getClanColor } from '@evoconn/constants/clanColors';
 import { useAuth } from '../../../mobile/lib/AuthContext';
+import { fetchMutualFriends, type MutualFriendEntry } from '@evoconn/services/supabaseMessaging';
+import { isRealUserId } from '@evoconn/services/supabaseSocial';
+import { formatProfileUsername } from '@evoconn/state/otherProfileCache';
 
 type Props = {
   visible: boolean;
@@ -40,30 +42,49 @@ export function ShareToFriendPicker({
   onSent,
 }: Props) {
   const insets = useSafeAreaInsets();
-  const { friends } = usePersonalProfile();
+  const { activeUserId } = useSimulation();
   const { sendSharedItem } = useMessages();
   const { profile: authProfile } = useAuth();
   const [sendingTo, setSendingTo] = useState<string | null>(null);
+  const [friends, setFriends] = useState<MutualFriendEntry[]>([]);
+  const [loadingFriends, setLoadingFriends] = useState(false);
   const clanAccent = getClanColor(authProfile?.clan_id ?? null);
 
   const headerTitle = title ?? (kind === 'post' ? 'Enviar publicación' : 'Enviar perfil');
 
+  useEffect(() => {
+    if (!visible) return;
+    if (!isRealUserId(activeUserId)) {
+      setFriends([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingFriends(true);
+    void fetchMutualFriends(activeUserId)
+      .then((rows) => {
+        if (!cancelled) setFriends(rows);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingFriends(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, activeUserId]);
+
   const handleSelect = useCallback(
-    async (friend: FollowingEntry) => {
+    async (friend: MutualFriendEntry) => {
       if (sendingTo) return;
       setSendingTo(friend.id);
-      const ok = await sendSharedItem({
+      const result = await sendSharedItem({
         recipientId: friend.id,
         kind,
         postId: kind === 'post' ? postId : undefined,
         profileUserId: kind === 'profile' ? profileUserId : undefined,
       });
       setSendingTo(null);
-      if (!ok) {
-        Alert.alert(
-          'No se pudo enviar',
-          'Solo puedes compartir con amigos (seguimiento mutuo).',
-        );
+      if (!result.ok) {
+        Alert.alert('No se pudo enviar', result.error ?? 'Inténtalo de nuevo.');
         return;
       }
       onSent?.(friend.id);
@@ -72,13 +93,16 @@ export function ShareToFriendPicker({
     [sendingTo, sendSharedItem, kind, postId, profileUserId, onSent, onClose],
   );
 
-  const emptyMessage = useMemo(
-    () =>
-      friends.length === 0
-        ? 'Aún no tienes amigos. Los amigos son personas con las que os seguís mutuamente.'
-        : null,
-    [friends.length],
-  );
+  const emptyMessage = useMemo(() => {
+    if (!isRealUserId(activeUserId)) {
+      return 'Inicia sesión con una cuenta real para enviar mensajes.';
+    }
+    if (loadingFriends) return null;
+    if (friends.length === 0) {
+      return 'No tienes amigos mutuos en el servidor. Solo puedes enviar a personas con las que os seguís los dos.';
+    }
+    return null;
+  }, [activeUserId, loadingFriends, friends.length]);
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose} statusBarTranslucent>
@@ -91,7 +115,11 @@ export function ShareToFriendPicker({
           <View style={styles.headerBtn} />
         </View>
 
-        {emptyMessage ? (
+        {loadingFriends ? (
+          <View style={styles.emptyWrap}>
+            <ActivityIndicator size="large" color={clanAccent} />
+          </View>
+        ) : emptyMessage ? (
           <View style={styles.emptyWrap}>
             <Ionicons name="people-outline" size={40} color="rgba(255,255,255,0.25)" />
             <Text style={styles.emptyText}>{emptyMessage}</Text>
@@ -119,7 +147,7 @@ export function ShareToFriendPicker({
                   />
                   <View style={styles.rowText}>
                     <Text style={styles.username} numberOfLines={1}>
-                      {item.username}
+                      {formatProfileUsername(item.username)}
                     </Text>
                   </View>
                   {busy ? (

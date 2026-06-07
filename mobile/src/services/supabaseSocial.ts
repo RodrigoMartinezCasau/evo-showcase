@@ -901,26 +901,49 @@ export async function deleteRepost(userId: string, postId: string): Promise<void
 
 // ─── Follows ──────────────────────────────────────────────────────────────────
 
+const FOLLOWS_PAGE_SIZE = 1000;
+
+async function fetchFollowColumnIds(
+  column: 'follower_id' | 'following_id',
+  filterColumn: 'follower_id' | 'following_id',
+  filterValue: string,
+): Promise<string[]> {
+  const valueColumn = column;
+  const out: string[] = [];
+  let from = 0;
+
+  for (;;) {
+    const { data, error } = await supabase
+      .from('follows')
+      .select(valueColumn)
+      .eq(filterColumn, filterValue)
+      .order(valueColumn, { ascending: true })
+      .range(from, from + FOLLOWS_PAGE_SIZE - 1);
+
+    if (error) {
+      console.error('[Social] fetchFollowColumnIds:', error.message);
+      break;
+    }
+
+    const page = (data ?? []).map((row) => String(row[valueColumn]));
+    out.push(...page);
+    if (page.length < FOLLOWS_PAGE_SIZE) break;
+    from += FOLLOWS_PAGE_SIZE;
+  }
+
+  return out;
+}
+
 /** Returns the list of user IDs that `userId` follows. */
 export async function fetchFollowing(userId: string): Promise<string[]> {
   if (!isRealUserId(userId)) return [];
-  const { data, error } = await supabase
-    .from('follows')
-    .select('following_id')
-    .eq('follower_id', userId);
-  if (error) { console.error('[Social] fetchFollowing:', error.message); return []; }
-  return (data ?? []).map(r => r.following_id);
+  return fetchFollowColumnIds('following_id', 'follower_id', userId);
 }
 
 /** Returns the list of user IDs that follow `userId`. */
 export async function fetchFollowers(userId: string): Promise<string[]> {
   if (!isRealUserId(userId)) return [];
-  const { data, error } = await supabase
-    .from('follows')
-    .select('follower_id')
-    .eq('following_id', userId);
-  if (error) { console.error('[Social] fetchFollowers:', error.message); return []; }
-  return (data ?? []).map(r => r.follower_id);
+  return fetchFollowColumnIds('follower_id', 'following_id', userId);
 }
 
 export async function insertFollow(followerId: string, followingId: string): Promise<void> {
@@ -1157,11 +1180,28 @@ export async function fetchPostsByUser(userId: string): Promise<SimPost[]> {
 
 // ─── Follow counts ────────────────────────────────────────────────────────────
 
-/** Returns { followersCount, followingCount } for any user. */
+/** Returns { followersCount, followingCount } for any user (conteo exacto en servidor). */
 export async function fetchFollowCounts(
   userId: string,
 ): Promise<{ followersCount: number; followingCount: number }> {
   if (!isRealUserId(userId)) return { followersCount: 0, followingCount: 0 };
+
+  const { data, error } = await supabase.rpc('get_profile_follow_counts', {
+    p_user_id: userId,
+  });
+
+  if (!error && data && typeof data === 'object') {
+    const row = data as { followers_count?: number; following_count?: number };
+    return {
+      followersCount: Number(row.followers_count) || 0,
+      followingCount: Number(row.following_count) || 0,
+    };
+  }
+
+  if (error) {
+    console.warn('[Social] get_profile_follow_counts RPC fallback:', error.message);
+  }
+
   const [followersRes, followingRes] = await Promise.all([
     supabase.from('follows').select('follower_id', { count: 'exact', head: true }).eq('following_id', userId),
     supabase.from('follows').select('following_id', { count: 'exact', head: true }).eq('follower_id', userId),

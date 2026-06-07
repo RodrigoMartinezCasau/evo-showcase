@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 import { getOtherUserProfileOrFallback } from '@evoconn/data/mockOtherUsers';
 import { isPublishedSimPostType } from '@evoconn/data/simulation/simulatedNetwork';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
+import { simPostToCommunityPost } from '@evoconn/hooks/useFeedStore';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
 import { OtherProfileFollowRow } from './OtherProfileFollowRow';
 import { UserIdentityHeader } from './UserIdentityHeader';
@@ -60,30 +61,25 @@ export const ProfileRevealPanel = React.memo(function ProfileRevealPanel({ autho
 
   // Build live posts for this user so the panel always reflects real published content.
   const livePosts = useMemo<CommunityPost[]>(
-    () =>
-      allSimPosts
+    () => {
+      const filtered = allSimPosts
         .filter((p) => p.authorId === authorId && isPublishedSimPostType(p.type))
-        .sort((a, b) => (b.createdAt > a.createdAt ? 1 : b.createdAt < a.createdAt ? -1 : 0))
-        .map((p): CommunityPost => {
-          const author = simUsers[p.authorId];
-          return {
-            id: p.id,
-            type: p.type,
-            author: author
-              ? { id: author.id, username: author.username, clanId: author.clanId, rank: author.rank }
-              : { id: p.authorId, username: '?', clanId: null, rank: 'aprendiz' },
-            title: p.title,
-            body: p.body,
-            quoteAuthor: p.quoteAuthor,
-            voteStats: {
-              up: p.upvoterIds.length,
-              down: p.downvoterIds.length,
-              save: p.saverIds.length,
+        .sort((a, b) => (b.createdAt > a.createdAt ? 1 : b.createdAt < a.createdAt ? -1 : 0));
+      const author = simUsers[authorId];
+      const profileCache = author
+        ? {
+            [authorId]: {
+              id: author.id,
+              username: author.username,
+              clanId: author.clanId,
+              rank: author.rank,
+              avatarUri: displayAvatarUri,
             },
-            createdAt: p.createdAt,
-          };
-        }),
-    [allSimPosts, authorId, simUsers],
+          }
+        : undefined;
+      return filtered.map((p) => simPostToCommunityPost(p, profileCache));
+    },
+    [allSimPosts, authorId, simUsers, displayAvatarUri],
   );
 
   const liveReflectionCount = useMemo(

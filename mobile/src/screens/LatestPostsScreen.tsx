@@ -24,7 +24,7 @@ import { ClanLoadingDot } from '@evoconn/components/shared/ClanLoadingDot';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { BOTTOM_BAR_LAYOUT } from '@evoconn/constants/bottomBarLayout';
 import { getMainColumnHeightForFloatingBottomBar } from '@evoconn/constants/appShellLayout';
-import { useFeedStore } from '@evoconn/hooks/useFeedStore';
+import { useFeedStore, simPostToCommunityPost } from '@evoconn/hooks/useFeedStore';
 import { useFeedAudio } from '@evoconn/hooks/useFeedAudio';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { usePersonalProfile } from '@evoconn/hooks/PersonalProfileContext';
@@ -42,7 +42,7 @@ import {
   COMMUNITY_DETAIL_PREFETCH_POSTS_ANDROID,
   COMMUNITY_DETAIL_UPDATE_CELLS_PERIOD_ANDROID,
 } from '@evoconn/constants/communityDetailFeed';
-import { fetchPostsByUser, isRealUserId } from '@evoconn/services/supabaseSocial';
+import { fetchPostsByUser, isRealUserId, type BasicProfile } from '@evoconn/services/supabaseSocial';
 import { enrichPostsAuthorAvatar } from '@evoconn/utils/enrichPostsAuthorAvatar';
 import { otherProfileCache, formatProfileUsername } from '@evoconn/state/otherProfileCache';
 import { supabase } from '../../mobile/lib/supabase';
@@ -150,32 +150,20 @@ export default function LatestPostsScreen() {
           (data as { avatar_url?: string | null } | null)?.avatar_url?.trim() || undefined;
         setRemoteAuthorAvatar(authorAvatar);
         if (resolvedUsername) setRemoteAuthorUsername(resolvedUsername);
-        const mapped: CommunityPost[] = simPosts.map((p) => ({
-          id: p.id,
-          type: p.type,
-          author: {
-            id: p.authorId,
+        const profileCache: Record<string, BasicProfile> = {
+          [targetUserId]: {
+            id: targetUserId,
             username:
               resolvedUsername ??
-              (p.authorUsername && p.authorUsername.length < 36
-                ? formatProfileUsername(p.authorUsername)
+              (simPosts[0]?.authorUsername && simPosts[0].authorUsername.length < 36
+                ? formatProfileUsername(simPosts[0].authorUsername)
                 : '?'),
-            clanId: p.authorClanId ?? null,
-            rank: p.authorRank ?? 'aprendiz',
+            clanId: simPosts[0]?.authorClanId ?? null,
+            rank: simPosts[0]?.authorRank ?? 'aprendiz',
             avatarUri: authorAvatar,
           },
-          title: p.title,
-          body: p.body,
-          quoteAuthor: p.quoteAuthor,
-          audioTrackId: p.audioTrackId ?? null,
-          audioVolume: p.audioVolume ?? null,
-          voteStats: {
-            up: p.upvoterIds.length,
-            down: p.downvoterIds.length,
-            save: p.saverIds.length,
-          },
-          createdAt: p.createdAt,
-        }));
+        };
+        const mapped = simPosts.map((p) => simPostToCommunityPost(p, profileCache));
         setRemotePosts(mapped);
       })
       .catch(() => {
