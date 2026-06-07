@@ -27,7 +27,7 @@ import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { getAppShellScrollableBodyHeight } from '@evoconn/constants/appShellLayout';
 import { fetchStreak, type StreakData } from '@evoconn/services/streakApi';
-import { getLocalDayKey } from '@evoconn/services/userStatsStorage';
+import { getLocalDayKey, formatLocalDayKey } from '@evoconn/services/userStatsStorage';
 import { CalendarGrid } from '@evoconn/components/shared/CalendarGrid';
 import { getTopBarRachaTopByHouse } from '@evoconn/utils/getTopBarRachaTopByHouse';
 import { getClanStreakColors } from '@evoconn/constants/clanStreakColors';
@@ -40,33 +40,6 @@ import {
 } from '../debug/DebugStreakContext';
 import { useDebugStats } from '../debug/DebugStatsContext';
 import { useAuth } from '../../mobile/lib/AuthContext';
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/**
- * Returns an array of the last `n` YYYY-MM-DD strings up to and including today,
- * using the device local calendar (same as getLocalDayKey / recordActivity).
- */
-function generateLastNDays(n: number): string[] {
-  if (n <= 0) return [];
-  const result: string[] = [];
-  const todayKey = getLocalDayKey();
-  const [y, m, d] = todayKey.split('-').map(Number);
-  const todayMs = new Date(y, m - 1, d).getTime();
-  for (let i = n - 1; i >= 0; i -= 1) {
-    const dt = new Date(todayMs - i * 86_400_000);
-    result.push(getLocalDayKeyFromDate(dt));
-  }
-  return result;
-}
-
-function getLocalDayKeyFromDate(d: Date): string {
-  return [
-    d.getFullYear(),
-    String(d.getMonth() + 1).padStart(2, '0'),
-    String(d.getDate()).padStart(2, '0'),
-  ].join('-');
-}
 import {
   STREAK_CARD_PADDING_H,
   STREAK_CARD_PADDING_V,
@@ -85,6 +58,19 @@ import {
   heroIconSlotSize,
   heroIconVisualScale,
 } from '@evoconn/constants/heroSummaryCardLayout';
+
+/** Last n local calendar days including today (debug fallback calendar). */
+function generateLastNDays(n: number): string[] {
+  if (n <= 0) return [];
+  const result: string[] = [];
+  const todayKey = getLocalDayKey();
+  const [y, m, d] = todayKey.split('-').map(Number);
+  const todayMs = new Date(y, m - 1, d).getTime();
+  for (let i = n - 1; i >= 0; i -= 1) {
+    result.push(formatLocalDayKey(new Date(todayMs - i * 86_400_000)));
+  }
+  return result;
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -167,15 +153,12 @@ export default function StreakScreen() {
 
   useEffect(() => { load(); }, [load]);
 
-  // ─── Fire icon state: PRODUCTION mode ────────────────────────────────────
-  //
-  //  In production, source of truth is data.activity_log from the backend.
-  //  Rules: initial load → instant (no animation). false→true → ignition anim.
+  // Producción: API + estado local (hasSentToday) para no apagar el fuego tras publicar.
   useEffect(() => {
     if (IS_DEBUG_STREAK_MODE) return; // debug mode handled by its own effect below
     if (!data) return;
 
-    const isActiveToday = data.activity_log.includes(today);
+    const isActiveToday = data.activity_log.includes(today) || hasSentToday;
 
     if (prevActiveRef.current === null) {
       prevActiveRef.current = isActiveToday;
@@ -203,7 +186,7 @@ export default function StreakScreen() {
       transitionAnim.setValue(isActiveToday ? 1 : 0);
       scaleAnim.setValue(1);
     }
-  }, [data, today, transitionAnim, scaleAnim]);
+  }, [data, today, hasSentToday, transitionAnim, scaleAnim]);
 
   // ─── Fire icon state: DEBUG mode ──────────────────────────────────────────
   //

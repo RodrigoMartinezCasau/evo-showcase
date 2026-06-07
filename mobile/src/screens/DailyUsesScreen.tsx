@@ -30,7 +30,7 @@ import { useDebugStats } from '../debug/DebugStatsContext';
 import { useAuth } from '../../mobile/lib/AuthContext';
 import { getAppShellScrollableBodyHeight } from '@evoconn/constants/appShellLayout';
 import { fetchUsesLog, type UsesLogData } from '@evoconn/services/streakApi';
-import { DAILY_USES_LIMIT } from '@evoconn/services/userStatsStorage';
+import { DAILY_USES_LIMIT, getLocalDayKey } from '@evoconn/services/userStatsStorage';
 import { getTopBarUsosByHouse } from '@evoconn/utils/getTopBarUsosByHouse';
 import { getClanStreakColors } from '@evoconn/constants/clanStreakColors';
 import {
@@ -152,7 +152,7 @@ function GradBar({ used, limit, clanColor }: { used: number; limit: number; clan
 // ─── Usage calendar ───────────────────────────────────────────────────────────
 
 function UsesCalendarGrid({ log, limit }: { log: UsesLogData; limit: number }) {
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = getLocalDayKey();
   const [ty, tm] = todayStr.split('-').map(Number);
 
   // ── Month navigation state ────────────────────────────────────────────────
@@ -330,7 +330,7 @@ export default function DailyUsesScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getLocalDayKey();
 
   const load = useCallback(async () => {
     setLoading(true);

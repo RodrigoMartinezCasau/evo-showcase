@@ -15,6 +15,7 @@
  */
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { getLocalDayKey } from '@evoconn/services/userStatsStorage';
 import {
   STREAK_DAY_CELL_SIZE,
   STREAK_DAY_CELL_GAP,
@@ -184,7 +185,7 @@ export const CalendarGrid = React.memo(function CalendarGrid({
   offsetY = STREAK_CALENDAR_OFFSET_Y,
   variant = 'circles',
 }: Props) {
-  const todayStr = today ?? new Date().toISOString().slice(0, 10);
+  const todayStr = today ?? getLocalDayKey();
   const [ty, tm] = todayStr.split('-').map(Number);
 
   // ── Month navigation state ────────────────────────────────────────────────

@@ -164,7 +164,18 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
       const today = getLocalDayKey();
       setDB((prev) => {
         const local = prev[uid] ?? defaultUserStats();
-        const merged = applyRemoteStreakData(local, data, today);
+        const merged = applyRemoteStreakData(
+          local,
+          {
+            streak_current: data.streak_current ?? 0,
+            last_activity_date: data.last_activity_date,
+            activity_log: data.activity_log ?? [],
+          },
+          today,
+          {
+            profileStreakDays: Math.max(0, Number(authProfile?.streak_days ?? 0)),
+          },
+        );
         if (
           merged.currentStreak === local.currentStreak &&
           merged.hasSentTodayDate === local.hasSentTodayDate &&
@@ -177,7 +188,7 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
         return nextDB;
       });
     },
-    [authProfile?.id, activeUserId],
+    [authProfile?.id, authProfile?.streak_days, activeUserId],
   );
 
   // Load the entire DB ONCE on app mount.
@@ -335,6 +346,7 @@ export function DebugStatsProvider({ children }: { children: ReactNode }) {
               profileStreakDays: Math.max(0, Number(authProfile.streak_days ?? 0)),
               remainingUses: serverRemaining,
               hasSentToday:
+                local.hasSentTodayDate === today ||
                 streakData.last_activity_date === today ||
                 (streakData.activity_log ?? []).includes(today),
               lastUsesResetDate: today,

@@ -70,7 +70,7 @@ export function getLocalDayKey(): string {
 }
 
 /** Returns yesterday's local calendar date as "YYYY-MM-DD". */
-function getYesterdayKey(): string {
+export function getYesterdayKey(): string {
   const d = new Date();
   d.setDate(d.getDate() - 1);
   return [
@@ -78,6 +78,37 @@ function getYesterdayKey(): string {
     String(d.getMonth() + 1).padStart(2, '0'),
     String(d.getDate()).padStart(2, '0'),
   ].join('-');
+}
+
+/** Formats any Date as local YYYY-MM-DD (same calendar as getLocalDayKey). */
+export function formatLocalDayKey(d: Date): string {
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, '0'),
+    String(d.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
+/**
+ * Recalcula racha actual desde activity_log usando el día local `today`.
+ * Misma regla que backend `_recalculate_streak`.
+ */
+export function recalculateStreakFromActivityLog(
+  activityLog: string[],
+  today: string,
+): { streak: number; last: string | null } {
+  const dates = [...new Set(activityLog.filter(Boolean))].sort().reverse();
+  if (!dates.length) return { streak: 0, last: null };
+  const last = dates[0];
+  if (daysBetweenDayKeys(last, today) > 1) {
+    return { streak: 0, last };
+  }
+  let streak = 1;
+  for (let i = 1; i < dates.length; i += 1) {
+    if (daysBetweenDayKeys(dates[i], dates[i - 1]) === 1) streak += 1;
+    else break;
+  }
+  return { streak, last };
 }
 
 /**
@@ -301,8 +332,9 @@ export function applyDecrementUses(stats: UserStats): UserStats {
 }
 
 /**
- * Aplica datos de racha del backend (activity_log + recálculo) sobre el slice local.
- * El servidor es la fuente de verdad del contador; el calendario ya venía de ahí.
+ * Aplica datos de racha del backend sobre el slice local.
+ * Nunca degrada si el usuario ya activó hoy (local) o activity_log incluye hoy.
+ * Nunca pisa con 0 si el servidor no tiene historial (Beta 121).
  */
 export function applyRemoteStreakData(
   stats: UserStats,
@@ -312,17 +344,35 @@ export function applyRemoteStreakData(
     activity_log: string[];
   },
   today: string,
+  options?: { profileStreakDays?: number },
 ): UserStats {
   const rolled = applyDailyRollover(stats, today);
+  const log = data.activity_log ?? [];
   const serverStreak = Math.max(0, data.streak_current);
-  const activeToday = data.activity_log.includes(today);
+  const fromLog = recalculateStreakFromActivityLog(log, today).streak;
+  const localSentToday = rolled.hasSentTodayDate === today;
+  const logHasToday = log.includes(today);
+  const profileStreak = Math.max(0, options?.profileStreakDays ?? 0);
+
+  let currentStreak: number;
+  if (log.length === 0) {
+    // Servidor sin historial: conservar lo mejor entre local, Supabase y servidor.
+    currentStreak = Math.max(rolled.currentStreak, profileStreak, serverStreak);
+  } else if (localSentToday || logHasToday) {
+    // Activó hoy: no borrar la racha tras publicar (Angel / timezone).
+    currentStreak = Math.max(rolled.currentStreak, fromLog, serverStreak);
+  } else {
+    currentStreak = Math.max(fromLog, serverStreak);
+  }
+
+  const activeToday = localSentToday || logHasToday;
   const lastActive = activeToday
     ? today
     : data.last_activity_date ?? rolled.hasSentTodayDate;
 
   let streakLostValue = rolled.streakLostValue;
   if (
-    serverStreak === 0 &&
+    currentStreak === 0 &&
     rolled.currentStreak > MIN_RECOVERABLE_STREAK &&
     lastActive &&
     daysBetweenDayKeys(lastActive, today) >= 2
@@ -332,8 +382,8 @@ export function applyRemoteStreakData(
 
   return {
     ...rolled,
-    currentStreak: serverStreak,
-    hasSentTodayDate: lastActive,
+    currentStreak,
+    hasSentTodayDate: activeToday ? today : lastActive,
     streakLostValue,
   };
 }
@@ -371,6 +421,7 @@ export function mergeStatsFromRemote(
         activity_log: activityLog,
       },
       today,
+      { profileStreakDays: remote.profileStreakDays },
     );
   } else if (typeof remote.streakDays === 'number') {
     const backendStreak = Math.max(0, remote.streakDays);
@@ -382,6 +433,10 @@ export function mergeStatsFromRemote(
     } else {
       next.currentStreak = Math.max(localStreak, profileStreak, backendStreak);
     }
+    if (rolled.hasSentTodayDate === today) {
+      next.hasSentTodayDate = today;
+      next.currentStreak = Math.max(next.currentStreak, rolled.currentStreak);
+    }
   }
   if (typeof remote.remainingUses === 'number') {
     next.dailyUsesRemaining = Math.min(
@@ -389,7 +444,7 @@ export function mergeStatsFromRemote(
       Math.max(0, remote.remainingUses),
     );
   }
-  if (remote.hasSentToday) {
+  if (remote.hasSentToday || rolled.hasSentTodayDate === today) {
     next.hasSentTodayDate = today;
   }
   if (remote.lastUsesResetDate) {
