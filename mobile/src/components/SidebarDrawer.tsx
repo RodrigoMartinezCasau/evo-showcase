@@ -38,7 +38,7 @@ import {
 import EstrellaComunidadSvg from '../assets/sidebar/estrellaComunidadSvg/estrellaComunidad.svg';
 import { SidebarSearchBar } from './SidebarSearchBar';
 import { SidebarConversationsPanel } from './SidebarConversationsPanel';
-import { SidebarHeaderNotificationsButton } from './SidebarHeaderNotificationsButton';
+import { SidebarHeaderActionIcons } from './SidebarHeaderActionIcons';
 import { UserAvatarFrame } from './shared/UserAvatarFrame';
 import SettingsSvg from '../assets/sidebar/settingsIconSvg/settings.svg';
 import { INRIA_SERIF_FONT_FAMILY } from '@evoconn/constants/inriaSerifFontFamily';
@@ -310,7 +310,7 @@ function SidebarDrawerInner({
             </View>
           </View>
           <View style={styles.headerTitleSpacer} />
-          <SidebarHeaderNotificationsButton onBeforeNavigate={closeSidebar} />
+          <SidebarHeaderActionIcons onBeforeNavigate={closeSidebar} />
         </View>
         <SidebarPngMenuButton
           config={getCommunityPngMenuConfig()}

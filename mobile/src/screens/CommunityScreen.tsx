@@ -49,7 +49,10 @@ import {
   COMMUNITY_FEED_CARD_MAX_INNER_WIDTH,
   SVG_CARD_VISUAL,
 } from '@evoconn/constants/svgCardLayout';
-import { getMainColumnHeightForFloatingBottomBar } from '@evoconn/constants/appShellLayout';
+import {
+  COMMUNITY_FEED_LIST_PADDING_TOP,
+  computeCommunityFeedSlotHeights,
+} from '@evoconn/constants/communityFeedSlotLayout';
 import { getAppTopBarLayoutHeight } from '@evoconn/constants/topBarLayout';
 import { useEvoPreferences } from '@evoconn/hooks/EvoPreferencesContext';
 import {
@@ -276,9 +279,6 @@ const TAB_INDEX: Record<TabId, number> = {
 
 const VALID_TAB_IDS: TabId[] = ['siguiendo', 'para-ti', 'search'];
 
-/** Debe coincidir con `styles.list.paddingTop` — define el hueco vertical útil de cada fila del feed. */
-const COMMUNITY_FEED_LIST_PADDING_TOP = 8;
-
 // ── Android FlatList params — valores más conservadores para evitar lag en JS thread ──
 const IS_ANDROID = Platform.OS === 'android';
 const FEED_WINDOW_SIZE    = IS_ANDROID ? COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE_ANDROID : COMMUNITY_DETAIL_FLATLIST_WINDOW_SIZE;
@@ -287,12 +287,6 @@ const FEED_MAX_BATCH      = IS_ANDROID ? COMMUNITY_DETAIL_MAX_TO_RENDER_PER_BATC
 const FEED_BATCH_PERIOD   = IS_ANDROID ? COMMUNITY_DETAIL_UPDATE_CELLS_PERIOD_ANDROID : 50;
 /** removeClippedSubviews: en Android mejora el rendimiento; en iOS puede causar flashes con pagingEnabled. */
 const FEED_CLIP_SUBVIEWS  = IS_ANDROID;
-/**
- * Android: respiro extra bajo la tarjeta (dentro del área del feed) para acercar el margen al de iOS.
- */
-const COMMUNITY_FEED_SLOT_BOTTOM_INSET_ANDROID = 14;
-/** Pantallas anchas (tablet / iPad): mismo criterio que el tope de ancho de tarjeta; evita que el slot sea tan alto que el display quede pegado a la barra. */
-const COMMUNITY_FEED_SLOT_BOTTOM_WIDE = 18;
 
 export default function CommunityScreen() {
   const router = useRouter();
@@ -1096,11 +1090,16 @@ export default function CommunityScreen() {
   }, [tabParam, postIdParam, applyRequestedTab]);
 
   const topBarHeight = getAppTopBarLayoutHeight(insets.top);
-  const feedItemHeight = getMainColumnHeightForFloatingBottomBar(
-    screenH,
-    insets.top,
-    insets.bottom,
-    safeFrame.height,
+  const { feedItemHeight, feedCardSlotOuterHeight } = useMemo(
+    () =>
+      computeCommunityFeedSlotHeights({
+        windowHeight: screenH,
+        insetTop: insets.top,
+        insetBottom: insets.bottom,
+        safeFrameHeight: safeFrame.height,
+        screenWidth: screenW,
+      }),
+    [screenH, insets.top, insets.bottom, safeFrame.height, screenW],
   );
 
   /**
@@ -1148,17 +1147,6 @@ export default function CommunityScreen() {
     setFollowingWindowStart(0);
     resetFollowingPagination();
   }, [followingSort, resetFollowingPagination]);
-
-  const communityFeedUsableWidth =
-    screenW - SVG_CARD_VISUAL.CARD_HORIZONTAL_MARGIN * 2;
-  const communityWideFeedLayout =
-    communityFeedUsableWidth > COMMUNITY_FEED_CARD_MAX_INNER_WIDTH;
-
-  const feedCardSlotOuterHeight =
-    feedItemHeight -
-    COMMUNITY_FEED_LIST_PADDING_TOP -
-    (Platform.OS === 'android' ? COMMUNITY_FEED_SLOT_BOTTOM_INSET_ANDROID : 0) -
-    (communityWideFeedLayout ? COMMUNITY_FEED_SLOT_BOTTOM_WIDE : 0);
 
   const renderMainListItem = useCallback(
     ({ item, index }: { item: CommunityPost; index: number }): React.ReactElement => {
@@ -1981,7 +1969,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  list: { paddingTop: 8 },
+  list: { paddingTop: COMMUNITY_FEED_LIST_PADDING_TOP },
   followingVotedFeedLoading: {
     paddingTop: 48,
     alignItems: 'center',

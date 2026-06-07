@@ -12,8 +12,6 @@ import {
   Keyboard,
   Platform,
   PixelRatio,
-  Animated,
-  Easing,
   useWindowDimensions,
   InteractionManager,
   type LayoutChangeEvent,
@@ -32,7 +30,8 @@ import { DetailActionColumn } from './DetailActionColumn';
 import type { DetailActionColumnHandle } from './DetailActionColumn';
 import { CommentThreadBlock } from './CommentThreadBlock';
 import { CommentsSheet, type CommentsSheetHandle } from './CommentsSheet';
-import { NewCommentBox } from './NewCommentBox';
+import { NewCommentBox, CommentComposerTrigger } from './NewCommentBox';
+import { CommentComposerOverlay } from './CommentComposerOverlay';
 import {
   REFLECTION_PANEL_LAYOUT as RP,
   COMMENTS_PANEL_LAYOUT as CP,
@@ -79,6 +78,7 @@ import { useIncrementalList } from '@evoconn/hooks/useIncrementalList';
 import { ClanLoadingDot } from '@evoconn/components/shared/ClanLoadingDot';
 import { computePhraseDetailTypography } from '@evoconn/utils/phraseDetailTypography';
 import { buildPostShareMessage } from '@evoconn/utils/appShareLinks';
+import { ShareToFriendPicker } from '@evoconn/components/messaging/ShareToFriendPicker';
 import {
   EvoActionSheetModal,
   EvoConfirmModal,
@@ -96,7 +96,6 @@ import {
   NEW_COMMENT_BOX_LAYOUT as INBOX,
   NEW_COMMENT_SEND_BUTTON_LAYOUT as SEND_BTN,
 } from '@evoconn/constants/newCommentBoxLayout';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 /** “Ver más” / lectura: mismo tamaño aprox. que el título escalado, sin `transform: scale` (evita recorte por `overflow: hidden` del panel). */
 const REFLECTION_TITLE_LONG_FONT_SIZE = Math.round(20 * TL.scale);
@@ -105,38 +104,6 @@ const REFLECTION_TITLE_LONG_LINE_HEIGHT = Math.round(REFLECTION_TITLE_LONG_FONT_
 /** Matches `styles.content` horizontal padding — used until the reflection panel is measured. */
 const REFLECTION_DETAIL_CONTENT_PAD_H = 16;
 
-/**
- * Android OEMs often disagree between `endCoordinates.screenY` and `height` vs the app window.
- * Prefer `windowHeight - height` when `height` is known, and only blend with `screenY` when it
- * matches that estimate (otherwise `screenY` can sit under the keys and clip the composer).
- */
-function androidKeyboardTopY(
-  end: { screenY: number; height?: number },
-  windowHeight: number,
-): number {
-  if (!Number.isFinite(windowHeight) || windowHeight < 120) {
-    const sy = end.screenY;
-    return sy > 0 ? sy : 0;
-  }
-  const h = end.height ?? 0;
-  const { screenY } = end;
-  if (h > 0) {
-    const fromHeight = windowHeight - h;
-    const tolerance = Math.max(64, windowHeight * 0.15);
-    const plausible =
-      screenY > 40 &&
-      screenY < windowHeight - 24 &&
-      Math.abs(screenY - fromHeight) < tolerance;
-    if (plausible) {
-      return Math.min(fromHeight, screenY);
-    }
-    return fromHeight;
-  }
-  if (screenY > 40 && screenY < windowHeight - 24) {
-    return screenY;
-  }
-  return windowHeight;
-}
 
 type ReflectionDetailItemProps = {
   post: CommunityPost;
@@ -464,6 +431,8 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   }, [post.author.avatarUri, post.author.id, session?.user?.id, authProfile?.avatar_url]);
 
   const [postMoreSheetOpen, setPostMoreSheetOpen] = useState(false);
+  const [sharePostPickerOpen, setSharePostPickerOpen] = useState(false);
+  const [shareProfilePickerOpen, setShareProfilePickerOpen] = useState(false);
   const [reportReasonPickerOpen, setReportReasonPickerOpen] = useState(false);
   const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
   const [infoModalOpen, setInfoModalOpen] = useState(false);
@@ -513,18 +482,17 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   /** Lista completa diferida 1 frame para no bloquear el tap. */
   const [commentsSheetListReady, setCommentsSheetListReady] = useState(false);
   const commentsSheetListReadyRef = useRef(false);
+  const [commentComposerOpen, setCommentComposerOpen] = useState(false);
   const [commentComposerKbOpen, setCommentComposerKbOpen] = useState(false);
-  const [commentComposerFocused, setCommentComposerFocused] = useState(false);
+  const commentComposerOpenRef = useRef(false);
   const commentComposerKbOpenRef = useRef(false);
-  const commentComposerFocusedRef = useRef(false);
   const commentsSheetRef = useRef<CommentsSheetHandle>(null);
 
   const notifyParentFeedScrollLock = useCallback(() => {
     onReadingModeChange?.(
       readingModeRef.current ||
         commentsExpandedRef.current ||
-        commentComposerKbOpenRef.current ||
-        commentComposerFocusedRef.current,
+        commentComposerOpenRef.current,
     );
   }, [onReadingModeChange]);
 
@@ -535,10 +503,10 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
 
   const finishSheetClose = useCallback(() => {
     Keyboard.dismiss();
+    setCommentComposerOpen(false);
+    commentComposerOpenRef.current = false;
     setCommentComposerKbOpen(false);
     commentComposerKbOpenRef.current = false;
-    setCommentComposerFocused(false);
-    commentComposerFocusedRef.current = false;
     commentsExpandedRef.current = false;
     setCommentsSheetListReady(false);
     commentsSheetListReadyRef.current = false;
@@ -571,10 +539,10 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     setCommentsSheetMounted(false);
     setCommentsSheetListReady(false);
     commentsSheetListReadyRef.current = false;
+    setCommentComposerOpen(false);
+    commentComposerOpenRef.current = false;
     setCommentComposerKbOpen(false);
     commentComposerKbOpenRef.current = false;
-    setCommentComposerFocused(false);
-    commentComposerFocusedRef.current = false;
     setExpandedThreads({});
     setThreadRepliesVisibleCount({});
     onReadingModeChange?.(readingModeRef.current);
@@ -667,9 +635,26 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     ],
   );
 
+  const openCommentComposer = useCallback(() => {
+    if (previewMode) return;
+    setCommentComposerOpen(true);
+    commentComposerOpenRef.current = true;
+    notifyParentFeedScrollLock();
+  }, [previewMode, notifyParentFeedScrollLock]);
+
+  const closeCommentComposer = useCallback(() => {
+    Keyboard.dismiss();
+    setCommentComposerOpen(false);
+    commentComposerOpenRef.current = false;
+    setCommentComposerKbOpen(false);
+    commentComposerKbOpenRef.current = false;
+    notifyParentFeedScrollLock();
+  }, [notifyParentFeedScrollLock]);
+
   const startReply = useCallback((commentId: string, username: string) => {
     setReplyingTo({ commentId, username });
-  }, []);
+    openCommentComposer();
+  }, [openCommentComposer]);
 
   const cancelReply = useCallback(() => setReplyingTo(null), []);
 
@@ -747,7 +732,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
         : []),
       {
         key: 'share',
-        label: 'Compartir',
+        label: 'Compartir enlace',
         onPress: () => {
           void (async () => {
             try {
@@ -766,6 +751,20 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
           })();
         },
       },
+      ...(isRealUserId(activeUserId)
+        ? [
+            {
+              key: 'sharePostInApp',
+              label: 'Enviar publicación',
+              onPress: () => setSharePostPickerOpen(true),
+            },
+            {
+              key: 'shareProfileInApp',
+              label: 'Enviar perfil del autor',
+              onPress: () => setShareProfilePickerOpen(true),
+            },
+          ]
+        : []),
       {
         key: 'follow',
         label: following ? 'Dejar de seguir' : 'Seguir usuario',
@@ -791,7 +790,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
           }]
         : []),
     ];
-  }, [post, livePost, checkFollowing, toggleFollow, isAdmin, repostAttributionByPost, toggleRepost, showRepostLabel]);
+  }, [post, livePost, checkFollowing, toggleFollow, isAdmin, repostAttributionByPost, toggleRepost, showRepostLabel, activeUserId]);
 
   const confirmAdminDeletePost = useCallback(() => {
     deletePost(post.author.id, post.id, { admin: true });
@@ -887,8 +886,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     }
   }, [photoCropInteractive]);
 
-  const { width: screenW, height: windowHeight } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
+  const { width: screenW } = useWindowDimensions();
 
   /**
    * The reflection panel uses `transform: [{ scaleX: widthScale }]`. Layout still uses the unscaled
@@ -1390,87 +1388,36 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     onAuthorPress(post.author.id);
   }, [post.author.id, onAuthorPress]);
 
-  const kbOffset = useRef(new Animated.Value(0)).current;
-  const newCommentMeasureRef = useRef<View>(null);
-
   useEffect(() => {
+    if (!commentComposerOpen) return;
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
 
-    const onShow = (e: {
-      endCoordinates: { screenY: number; height?: number };
-      duration?: number;
-    }) => {
+    const onShow = () => {
       setCommentComposerKbOpen(true);
       commentComposerKbOpenRef.current = true;
-      notifyParentFeedScrollLock();
-      const kbTopY =
-        Platform.OS === 'android'
-          ? androidKeyboardTopY(e.endCoordinates, windowHeight)
-          : e.endCoordinates.screenY;
-      const duration = Platform.OS === 'ios' ? (e.duration ?? 250) : 220;
-
-      const applyMeasure = () => {
-        newCommentMeasureRef.current?.measureInWindow((x, y, _w, h) => {
-          const boxBottom = y + h;
-          const overlap = boxBottom - kbTopY;
-          const cushion =
-            10 +
-            (Platform.OS === 'android'
-              ? 12 + Math.min(28, Math.max(0, insets.bottom * 0.45))
-              : 0);
-          const target = overlap > 0 ? -(overlap + cushion) : 0;
-          kbOffset.stopAnimation();
-          Animated.timing(kbOffset, {
-            toValue: target,
-            duration,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }).start();
-        });
-      };
-
-      if (Platform.OS === 'android') {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(applyMeasure);
-        });
-      } else {
-        applyMeasure();
-      }
     };
 
-    const onHide = (e: { duration?: number }) => {
+    const onHide = () => {
       setCommentComposerKbOpen(false);
       commentComposerKbOpenRef.current = false;
-      notifyParentFeedScrollLock();
-      kbOffset.stopAnimation();
-      Animated.timing(kbOffset, {
-        toValue: 0,
-        duration: Platform.OS === 'ios' ? (e.duration ?? 250) : 220,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }).start();
     };
 
-    const showSub = Keyboard.addListener(showEvent, onShow as any);
-    const hideSub = Keyboard.addListener(hideEvent, onHide as any);
+    const showSub = Keyboard.addListener(showEvent, onShow);
+    const hideSub = Keyboard.addListener(hideEvent, onHide);
     return () => {
       showSub.remove();
       hideSub.remove();
     };
-  }, [kbOffset, windowHeight, insets.bottom, notifyParentFeedScrollLock]);
+  }, [commentComposerOpen]);
 
-  const handleCommentComposerFocus = useCallback(() => {
-    setCommentComposerFocused(true);
-    commentComposerFocusedRef.current = true;
-    notifyParentFeedScrollLock();
-  }, [notifyParentFeedScrollLock]);
-
-  const handleCommentComposerBlur = useCallback(() => {
-    setCommentComposerFocused(false);
-    commentComposerFocusedRef.current = false;
-    notifyParentFeedScrollLock();
-  }, [notifyParentFeedScrollLock]);
+  const handleComposerSend = useCallback(
+    (text: string) => {
+      void handleAddComment(text);
+      closeCommentComposer();
+    },
+    [handleAddComment, closeCommentComposer],
+  );
 
   const reflectionTitleUsesLongLayout = isLongText || readingMode || previewMode;
 
@@ -1527,22 +1474,6 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
       ),
     [commentsPanelInnerH, previewBottomStackH],
   );
-
-  const previewMaxPillHeight = useMemo(() => {
-    // Derivado de la ALTURA DEL PANEL (no del propio stack, que sería circular):
-    // dejamos sitio para «ver más», los huecos y una línea del comentario destacado.
-    const chrome =
-      (previewShowsSeeMore
-        ? COMMENTS_PREVIEW_SEE_MORE_MIN_HEIGHT + COMMENTS_PREVIEW_SECTION_GAP
-        : 0) +
-      (topComment || previewShowsSeeMore ? COMMENTS_PREVIEW_SECTION_GAP : 0) +
-      6; /* newCommentRow paddingTop */
-    const minCommentClip = topComment ? 28 : 0;
-    return Math.max(
-      INBOX.minHeight,
-      commentsPanelInnerH - chrome - minCommentClip,
-    );
-  }, [commentsPanelInnerH, previewShowsSeeMore, topComment]);
 
   const handlePreviewBottomStackLayout = useCallback((e: LayoutChangeEvent) => {
     const h = Math.ceil(e.nativeEvent.layout.height);
@@ -1640,45 +1571,37 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     [hasMoreComments],
   );
 
-  // Composer (input "Añadir comentario") + banner de respuesta. Reutilizado en
-  // el preview colapsado y en la hoja expandida.
-  const renderComposer = (
-    measure: boolean,
-    options?: { maxPillHeight?: number },
-  ) => {
-    const inner = (
-      <Animated.View
-        style={[
-          styles.newCommentRow,
-          { zIndex: 30, transform: [{ translateY: kbOffset }] },
-        ]}
-      >
-        {replyingTo ? (
-          <View style={threadStyles.replyBanner}>
-            <Text style={threadStyles.replyBannerText}>
-              Respondiendo a @{replyingTo.username.replace(/^@/, '')}
-            </Text>
-            <TouchableOpacity onPress={cancelReply} hitSlop={8}>
-              <Text style={threadStyles.replyBannerCancel}>Cancelar</Text>
-            </TouchableOpacity>
-          </View>
-        ) : null}
-        <NewCommentBox
-          onSend={handleAddComment}
-          clanId={post.author.clanId}
-          maxPillHeight={options?.maxPillHeight}
-          onFocus={handleCommentComposerFocus}
-          onBlur={handleCommentComposerBlur}
-        />
-      </Animated.View>
-    );
-    if (!measure) return inner;
-    return (
-      <View ref={newCommentMeasureRef} collapsable={false}>
-        {inner}
-      </View>
-    );
-  };
+  const commentComposerHorizontalPad =
+    REFLECTION_DETAIL_CONTENT_PAD_H + CP.paddingHorizontal;
+
+  const renderComposerTrigger = () => (
+    <View style={styles.newCommentRow}>
+      <CommentComposerTrigger
+        onPress={openCommentComposer}
+        clanId={post.author.clanId}
+      />
+    </View>
+  );
+
+  const renderOverlayComposer = () => (
+    <>
+      {replyingTo ? (
+        <View style={threadStyles.replyBanner}>
+          <Text style={threadStyles.replyBannerText}>
+            Respondiendo a @{replyingTo.username.replace(/^@/, '')}
+          </Text>
+          <TouchableOpacity onPress={cancelReply} hitSlop={8}>
+            <Text style={threadStyles.replyBannerCancel}>Cancelar</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+      <NewCommentBox
+        autoFocus
+        onSend={handleComposerSend}
+        clanId={post.author.clanId}
+      />
+    </>
+  );
 
   return (
     <>
@@ -1993,7 +1916,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                     <View style={styles.previewSectionGap} />
                   ) : null}
                   <View style={styles.commentsComposerSlot}>
-                    {renderComposer(true, { maxPillHeight: previewMaxPillHeight })}
+                    {!commentsExpanded ? renderComposerTrigger() : null}
                   </View>
                 </View>
               </View>
@@ -2115,15 +2038,39 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
             </View>
           )
         }
-        footer={renderComposer(false)}
+        footer={commentsExpanded ? renderComposerTrigger() : null}
       />
     </View>
+
+      {!previewMode ? (
+        <CommentComposerOverlay
+          visible={commentComposerOpen}
+          onClose={closeCommentComposer}
+          contentPaddingHorizontal={commentComposerHorizontalPad}
+        >
+          {renderOverlayComposer()}
+        </CommentComposerOverlay>
+      ) : null}
 
       <EvoActionSheetModal
         visible={postMoreSheetOpen}
         onClose={() => setPostMoreSheetOpen(false)}
         title={post.title?.trim() ? String(post.title) : 'Publicación'}
         options={postMoreOptions}
+      />
+      <ShareToFriendPicker
+        visible={sharePostPickerOpen}
+        onClose={() => setSharePostPickerOpen(false)}
+        kind="post"
+        postId={livePost.id}
+        title="Enviar publicación"
+      />
+      <ShareToFriendPicker
+        visible={shareProfilePickerOpen}
+        onClose={() => setShareProfilePickerOpen(false)}
+        kind="profile"
+        profileUserId={livePost.author.id}
+        title="Enviar perfil del autor"
       />
       <EvoPickerModal
         visible={reportReasonPickerOpen}

@@ -18,7 +18,9 @@ export type NotificationType =
   | 'follow_request'
   | 'comment'
   | 'comment_reply'
-  | 'upvote_comment';
+  | 'upvote_comment'
+  | 'shared_post'
+  | 'shared_profile';
 
 export type AppNotification = {
   id: string;

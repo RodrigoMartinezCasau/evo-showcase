@@ -1,8 +1,10 @@
-import React, { useState, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
+  Text,
   TextInput,
   TouchableOpacity,
+  Pressable,
   StyleSheet,
   Keyboard,
   Platform,
@@ -23,6 +25,7 @@ type NewCommentBoxProps = {
   maxPillHeight?: number;
   onFocus?: () => void;
   onBlur?: () => void;
+  autoFocus?: boolean;
 };
 
 export const NewCommentBox = React.memo(function NewCommentBox({
@@ -31,6 +34,7 @@ export const NewCommentBox = React.memo(function NewCommentBox({
   maxPillHeight,
   onFocus,
   onBlur,
+  autoFocus = false,
 }: NewCommentBoxProps) {
   const SendSvg = getChatSendButtonByHouse(clanId);
   const [value, setValue] = useState('');
@@ -82,6 +86,14 @@ export const NewCommentBox = React.memo(function NewCommentBox({
   const handleBlur = useCallback(() => {
     onBlur?.();
   }, [onBlur]);
+
+  useEffect(() => {
+    if (!autoFocus) return;
+    const frame = requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [autoFocus]);
 
   return (
     <View
@@ -157,6 +169,67 @@ export const NewCommentBox = React.memo(function NewCommentBox({
   );
 });
 
+/** Tap target en el feed: abre el overlay de comentarios (misma apariencia que el pill). */
+export function CommentComposerTrigger({
+  onPress,
+  clanId,
+}: {
+  onPress: () => void;
+  clanId?: string | null;
+}) {
+  const SendSvg = getChatSendButtonByHouse(clanId);
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel="Añadir comentario"
+    >
+      <View
+        style={[
+          styles.row,
+          {
+            transform: [
+              { translateX: BOX.offsetX },
+              { translateY: BOX.offsetY },
+            ],
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.inputPill,
+            {
+              minHeight: BOX.minHeight,
+              paddingHorizontal: BOX.paddingHorizontal,
+              paddingTop: BOX.paddingVertical,
+              paddingBottom: BOX.paddingVertical + BOX.textBottomInset,
+              borderRadius: BOX.borderRadius,
+              backgroundColor: BOX.backgroundColor,
+              justifyContent: 'center',
+            },
+          ]}
+        >
+          <Text style={styles.placeholder}>Añadir comentario...</Text>
+        </View>
+        <View
+          style={[
+            styles.sendBtn,
+            {
+              width: BTN.size,
+              height: BTN.size,
+              opacity: 0.35,
+              transform: [{ scale: BTN.scale }],
+            },
+          ]}
+        >
+          <SendSvg width={BTN.size} height={BTN.size} />
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
@@ -183,5 +256,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 4,
+  },
+  placeholder: {
+    color: BOX.placeholderColor,
+    fontSize: BOX.fontSize,
+    lineHeight: BOX.lineHeight,
   },
 });

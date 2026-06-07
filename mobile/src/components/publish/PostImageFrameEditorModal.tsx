@@ -7,7 +7,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { CommunityPost } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
@@ -17,6 +17,10 @@ import {
   type PostImageFocusY,
 } from '@evoconn/utils/postImageCoverLayout';
 import { postShowsImageInParaTi, postShowsImageInSiguiendo } from '@evoconn/utils/postImageDisplay';
+import {
+  COMMUNITY_FEED_LIST_PADDING_TOP,
+  computeCommunityFeedSlotHeights,
+} from '@evoconn/constants/communityFeedSlotLayout';
 import { ReflectionDetailItem } from '../ReflectionDetailItem';
 import { CommunityPostCard } from '../CommunityPostCard';
 
@@ -59,6 +63,7 @@ export function PostImageFrameEditorModal({
   onPhotoFullyRemoved,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const safeFrame = useSafeAreaFrame();
   const { width: screenW, height: screenH } = useWindowDimensions();
   const [page, setPage] = useState(0);
   const [draftParaTi, setDraftParaTi] = useState(initialParaTi);
@@ -100,9 +105,16 @@ export function PostImageFrameEditorModal({
     [post, draftParaTi, draftSiguiendo, draftShowSiguiendo],
   );
 
-  const itemHeight = Math.max(
-    320,
-    screenH - insets.top - insets.bottom - HEADER_HEIGHT,
+  const { feedItemHeight, feedCardSlotOuterHeight } = useMemo(
+    () =>
+      computeCommunityFeedSlotHeights({
+        windowHeight: screenH,
+        insetTop: insets.top,
+        insetBottom: insets.bottom,
+        safeFrameHeight: safeFrame.height,
+        screenWidth: screenW,
+      }),
+    [screenH, insets.top, insets.bottom, safeFrame.height, screenW],
   );
 
   const goPrev = useCallback(() => setPage((p) => Math.max(0, p - 1)), []);
@@ -190,11 +202,11 @@ export function PostImageFrameEditorModal({
             </TouchableOpacity>
           </View>
 
-          <View style={[styles.stage, { height: itemHeight, width: screenW }]}>
+          <View style={[styles.stage, { height: feedItemHeight, width: screenW }]}>
             {page === 0 ? (
               <ReflectionDetailItem
                 post={paraTiPost}
-                itemHeight={itemHeight}
+                itemHeight={feedItemHeight}
                 previewMode
                 communityVerticalFeed
                 onAuthorPress={() => {}}
@@ -210,12 +222,20 @@ export function PostImageFrameEditorModal({
                 }
               />
             ) : (
-              <View style={[styles.siguiendoStage, { height: itemHeight }]}>
+              <View
+                style={[
+                  styles.siguiendoStage,
+                  {
+                    height: feedItemHeight,
+                    paddingTop: COMMUNITY_FEED_LIST_PADDING_TOP,
+                  },
+                ]}
+              >
                 <CommunityPostCard
                   post={siguiendoPost}
                   followingFeedStyle
                   showPhraseAuthor={siguiendoPost.type === 'phrase'}
-                  slotOuterHeight={itemHeight}
+                  slotOuterHeight={feedCardSlotOuterHeight}
                   onPress={() => {}}
                   onAuthorPress={() => {}}
                   photoCropInteractive={
@@ -286,6 +306,5 @@ const styles = StyleSheet.create({
   },
   siguiendoStage: {
     justifyContent: 'flex-start',
-    paddingTop: 8,
   },
 });

@@ -446,7 +446,17 @@ export async function fetchHiddenPostIdsByAuthor(authorId: string): Promise<stri
 export async function insertPost(post: SimPost): Promise<void> {
   if (!isRealUserId(post.authorId)) return;
   const { error } = await supabase.from('posts').upsert(simPostToDbRow(post), { onConflict: 'id' });
-  if (error) console.error('[Social] insertPost:', error.message);
+  if (error) {
+    // A schema error (42703 = column does not exist) means the DB migration
+    // hasn't been applied — the post will exist in memory only and disappear
+    // on restart. This must be treated as a hard error, not a silent warning.
+    const isSchemaError = error.code === '42703' || error.message.includes('does not exist');
+    if (isSchemaError) {
+      console.error('[Social] insertPost SCHEMA ERROR — post NOT saved to DB. Apply the pending SQL migration.', error.message);
+    } else {
+      console.error('[Social] insertPost:', error.message);
+    }
+  }
 }
 
 export async function removePost(postId: string): Promise<void> {

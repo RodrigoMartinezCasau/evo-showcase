@@ -19,6 +19,7 @@ import {
   EvoConfirmModal,
   EvoInfoModal,
 } from '@evoconn/components/shared/EvoActionSheetModal';
+import { ShareToFriendPicker } from '@evoconn/components/messaging/ShareToFriendPicker';
 import {
   THREE_DOTS_OFFSET_X,
   THREE_DOTS_OFFSET_Y,
@@ -47,6 +48,7 @@ export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({
   const following = isFollowing(userId);
 
   const [mainOpen, setMainOpen] = useState(false);
+  const [shareInAppOpen, setShareInAppOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportAvatarOpen, setReportAvatarOpen] = useState(false);
   const [blockOpen, setBlockOpen] = useState(false);
@@ -184,9 +186,16 @@ export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({
           },
           {
             key: 'share',
-            label: 'Compartir perfil',
+            label: 'Compartir enlace',
             onPress: () => void handleShare(),
           },
+          ...(isRealUserId(session?.user?.id ?? '')
+            ? [{
+                key: 'shareInApp',
+                label: 'Enviar a un amigo',
+                onPress: () => setShareInAppOpen(true),
+              }]
+            : []),
           ...(avatarUri
             ? [{
                 key: 'reportAvatar',
@@ -282,6 +291,14 @@ export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({
         confirmLabel="Eliminar cuenta"
         destructive
         onConfirm={() => void confirmAdminDeleteUser()}
+      />
+
+      <ShareToFriendPicker
+        visible={shareInAppOpen}
+        onClose={() => setShareInAppOpen(false)}
+        kind="profile"
+        profileUserId={userId}
+        title="Enviar perfil"
       />
 
       <EvoInfoModal

@@ -186,9 +186,11 @@ export function PostImageCover({
       );
     }
 
+    // Mismo render que en modo interactivo: posicionamiento manual sin
+    // resizeMode extra (cover dentro del box desalinearía el encuadre).
     return (
       <View style={photoZoneClip}>
-        <Image source={{ uri }} resizeMode="cover" style={imageStyle} />
+        <Image source={{ uri }} style={imageStyle} />
       </View>
     );
   };

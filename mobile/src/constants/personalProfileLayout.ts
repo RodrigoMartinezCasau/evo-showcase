@@ -39,6 +39,11 @@ export const NOTIFICATIONS_ICON_OFFSET_X = 0;
 export const NOTIFICATIONS_ICON_OFFSET_Y = 0;
 /** Escala del SVG respecto al tamaño base (28 px). */
 export const NOTIFICATIONS_ICON_SCALE = 1.2;
+/**
+ * Ajuste del icono de mensajes (Ionicons) para igualar peso visual con la campana SVG
+ * en el mismo slot (28 × NOTIFICATIONS_ICON_SCALE px).
+ */
+export const MESSAGES_ICON_VISUAL_SCALE = 0.82;
 
 // ── Clan shield position + scale ───────────────────────────────────
 export const SHIELD_OFFSET_X = -30;

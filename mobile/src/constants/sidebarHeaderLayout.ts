@@ -37,6 +37,8 @@ export const SIDEBAR_HEADER_LAYOUT = {
   SIDEBAR_HEADER_NOTIFY_ICON_OFFSET_Y: SIDEBAR_HEADER_CLUSTER_OFFSET_Y,
   /** Suma solo a la campana; positivo = bajar un poco (px). */
   SIDEBAR_HEADER_NOTIFY_ICON_FINE_NUDGE_Y: 1,
+  /** Espacio horizontal entre icono de mensajes y campana en el header del sidebar. */
+  SIDEBAR_HEADER_ICONS_GAP: 4,
 
   SIDEBAR_TITLE_FONT_SIZE: 20,
   SIDEBAR_VERSION_FONT_SIZE: 16,

@@ -260,13 +260,22 @@ export default function LatestPostsScreen() {
     [pathname],
   );
 
-  const listPanelHeight =
-    getMainColumnHeightForFloatingBottomBar(
-      screenH,
-      insets.top,
-      insets.bottom,
-      safeFrame.height,
-    ) - BOTTOM_BAR_LAYOUT.FLOATING_BAR_STACK_SUBHEADER_HEIGHT;
+  // Medir el subcabecero real (con @usuario son 2 líneas y supera los 48px fijos).
+  // Si el feed es más alto de lo que cabe, el compositor queda bajo la barra/teclado.
+  const [headerRowH, setHeaderRowH] = useState(
+    BOTTOM_BAR_LAYOUT.FLOATING_BAR_STACK_SUBHEADER_HEIGHT,
+  );
+
+  const listPanelHeight = useMemo(
+    () =>
+      getMainColumnHeightForFloatingBottomBar(
+        screenH,
+        insets.top,
+        insets.bottom,
+        safeFrame.height,
+      ) - headerRowH,
+    [screenH, insets.top, insets.bottom, safeFrame.height, headerRowH],
+  );
 
   const itemHeight = listPanelHeight;
 
@@ -339,7 +348,13 @@ export default function LatestPostsScreen() {
     <View style={styles.container}>
       <AppTopBar onMenuPress={() => setSidebarOpen(true)} />
 
-      <View style={styles.headerRow}>
+      <View
+        style={styles.headerRow}
+        onLayout={(e) => {
+          const h = Math.ceil(e.nativeEvent.layout.height);
+          if (h > 0) setHeaderRowH((prev) => (prev === h ? prev : h));
+        }}
+      >
         <TouchableOpacity onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={22} color="rgba(255,255,255,0.7)" />
         </TouchableOpacity>

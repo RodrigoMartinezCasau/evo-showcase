@@ -40,6 +40,7 @@ import {
   isRealUserId,
   type BasicProfile,
 } from '@evoconn/services/supabaseSocial';
+import { findConversationWithUser } from '@evoconn/services/supabaseMessaging';
 import {
   navigateToCommunityPost,
   navigateToUserProfile,
@@ -75,6 +76,10 @@ function actionLabel(n: AppNotification): string {
         : 'ha respondido a tu comentario';
     case 'upvote_comment':
       return 'ha dado upvote a tu comentario';
+    case 'shared_post':
+      return 'te ha compartido una publicación';
+    case 'shared_profile':
+      return 'te ha compartido un perfil';
     default:
       return 'ha interactuado contigo';
   }
@@ -148,7 +153,7 @@ export default function NotificationsScreen() {
   const safeFrame = useSafeAreaFrame();
   const { height: screenH } = useWindowDimensions();
   const { notifications, markAllRead, refreshNotifications } = useNotifications();
-  const { users, refreshSocialFromSupabase } = useSimulation();
+  const { users, refreshSocialFromSupabase, activeUserId } = useSimulation();
   const { thoughts } = useThoughts();
   const { requests: incomingRequests, refresh: refreshIncomingRequests, removeRequester } =
     useIncomingFollowRequests();
@@ -283,13 +288,23 @@ export default function NotificationsScreen() {
 
   const handlePressContent = useCallback(
     (n: AppNotification) => {
+      if (n.type === 'shared_post' || n.type === 'shared_profile') {
+        void findConversationWithUser(activeUserId, n.fromUserId).then((conv) => {
+          if (conv?.id) {
+            router.push(`/conversation/${conv.id}`);
+          } else {
+            router.push('/messages');
+          }
+        });
+        return;
+      }
       if (n.targetPostId) {
         navigateToCommunityPost(router, n.targetPostId, n.targetCommentId);
         return;
       }
       navigateToUserProfile(router, n.fromUserId, n.fromUsername);
     },
-    [router],
+    [router, activeUserId],
   );
 
   const renderItem = useCallback(

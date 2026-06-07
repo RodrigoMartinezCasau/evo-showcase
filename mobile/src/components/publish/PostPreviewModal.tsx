@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
   View,
@@ -9,11 +9,15 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { CommunityPost } from '@evoconn/types';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { getClanColor } from '@evoconn/constants/clanColors';
+import {
+  COMMUNITY_FEED_LIST_PADDING_TOP,
+  computeCommunityFeedSlotHeights,
+} from '@evoconn/constants/communityFeedSlotLayout';
 import { useFeedAudio } from '@evoconn/hooks/useFeedAudio';
 import { ReflectionDetailItem } from '../ReflectionDetailItem';
 import { CommunityPostCard } from '../CommunityPostCard';
@@ -32,6 +36,7 @@ const DOT = 6;
  */
 export function PostPreviewModal({ visible, post, onClose }: Props) {
   const insets = useSafeAreaInsets();
+  const safeFrame = useSafeAreaFrame();
   const { width: screenW, height } = useWindowDimensions();
   const audio = useFeedAudio();
   const pagerRef = useRef<ScrollView>(null);
@@ -53,9 +58,16 @@ export function PostPreviewModal({ visible, post, onClose }: Props) {
     return () => audio.stop();
   }, [visible, post, page, audio]);
 
-  const itemHeight = Math.max(
-    320,
-    height - insets.top - insets.bottom - HEADER_HEIGHT,
+  const { feedItemHeight, feedCardSlotOuterHeight } = useMemo(
+    () =>
+      computeCommunityFeedSlotHeights({
+        windowHeight: height,
+        insetTop: insets.top,
+        insetBottom: insets.bottom,
+        safeFrameHeight: safeFrame.height,
+        screenWidth: screenW,
+      }),
+    [height, insets.top, insets.bottom, safeFrame.height, screenW],
   );
 
   const onPagerScrollEnd = useCallback(
@@ -110,10 +122,10 @@ export function PostPreviewModal({ visible, post, onClose }: Props) {
             scrollEventThrottle={16}
             style={styles.pager}
           >
-            <View style={{ width: screenW, height: itemHeight }}>
+            <View style={{ width: screenW, height: feedItemHeight }}>
               <ReflectionDetailItem
                 post={post}
-                itemHeight={itemHeight}
+                itemHeight={feedItemHeight}
                 previewMode
                 communityVerticalFeed
                 onAuthorPress={() => {}}
@@ -122,12 +134,18 @@ export function PostPreviewModal({ visible, post, onClose }: Props) {
               />
             </View>
 
-            <View style={{ width: screenW, height: itemHeight, paddingTop: 8 }}>
+            <View
+              style={{
+                width: screenW,
+                height: feedItemHeight,
+                paddingTop: COMMUNITY_FEED_LIST_PADDING_TOP,
+              }}
+            >
               <CommunityPostCard
                 post={post}
                 followingFeedStyle
                 showPhraseAuthor={post.type === 'phrase'}
-                slotOuterHeight={itemHeight}
+                slotOuterHeight={feedCardSlotOuterHeight}
                 onPress={() => {}}
                 onAuthorPress={() => {}}
               />

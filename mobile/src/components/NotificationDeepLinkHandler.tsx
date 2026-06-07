@@ -11,6 +11,7 @@ import {
   navigateToCommunityPost,
   navigateToUserProfile,
 } from '@evoconn/utils/notificationNavigation';
+import { findConversationWithUser } from '@evoconn/services/supabaseMessaging';
 
 // En Expo Go (SDK 53+) el módulo de push remoto no existe; require() muestra ERROR en consola.
 const IS_EXPO_GO =
@@ -81,6 +82,23 @@ export function NotificationDeepLinkHandler() {
         return;
       }
 
+      if (type === 'shared_post' || type === 'shared_profile') {
+        handledResponseKeysRef.current.add(dedupeKey);
+        const myUserId = session?.user?.id;
+        if (myUserId && fromUserId) {
+          void findConversationWithUser(myUserId, fromUserId).then((conv) => {
+            if (conv?.id) {
+              router.push(`/conversation/${conv.id}`);
+            } else {
+              navigateUnlessCurrent(pathname, '/messages');
+            }
+          });
+        } else {
+          navigateUnlessCurrent(pathname, '/messages');
+        }
+        return;
+      }
+
       if (postId) {
         handledResponseKeysRef.current.add(dedupeKey);
         navigateToCommunityPost(router, postId, commentId);
@@ -101,7 +119,7 @@ export function NotificationDeepLinkHandler() {
         navigateUnlessCurrent(pathname, '/notifications');
       }
     },
-    [router, pathname],
+    [router, pathname, session?.user?.id],
   );
 
   useEffect(() => {
