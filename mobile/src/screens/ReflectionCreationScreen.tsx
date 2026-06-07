@@ -21,6 +21,7 @@ import {
   Keyboard,
   Animated,
   TouchableOpacity,
+  Platform,
 } from 'react-native';
 import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useLocalSearchParams, useRouter, usePathname } from 'expo-router';
@@ -50,6 +51,7 @@ import { getClanColor } from '@evoconn/constants/clanColors';
 import {
   CHAT_SEND_BUTTON_LAYOUT,
   PUBLISH_JUMP_ISLAND_LAYOUT as ISLAND,
+  computePublishJumpIslandBottom,
   REFLECTION_PUBLISH_MIN_CHARS,
 } from '@evoconn/constants/chatInputBarLayout';
 import { useScrollInputAboveKeyboard } from '@evoconn/hooks/useScrollInputAboveKeyboard';
@@ -181,6 +183,14 @@ export default function ReflectionCreationScreen() {
 
   const insets = useSafeAreaInsets();
   const topBarHeight = getAppTopBarLayoutHeight(insets.top);
+  const publishJumpIslandBottom = useMemo(
+    () =>
+      computePublishJumpIslandBottom(
+        Platform.OS === 'android' ? insets.bottom : 0,
+      ) +
+      (Platform.OS === 'android' ? ISLAND.publishJumpIslandAndroidExtraClearance : 0),
+    [insets.bottom],
+  );
   const lastPublishUserIndexRef = useRef(-1);
 
   const {
@@ -702,6 +712,7 @@ export default function ReflectionCreationScreen() {
           pointerEvents="box-none"
           style={[
             styles.islandWrapper,
+            { bottom: publishJumpIslandBottom },
             {
               opacity: islandOpacity,
               transform: [
@@ -1042,7 +1053,6 @@ const styles = StyleSheet.create({
   // ── Publish jump island ──────────────────────────────────────────────────
   islandWrapper: {
     position: 'absolute',
-    bottom: ISLAND.publishJumpIslandBottom,
     left: 0,
     right: 0,
     alignItems: 'center',

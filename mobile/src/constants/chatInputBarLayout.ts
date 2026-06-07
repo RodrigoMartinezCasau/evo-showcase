@@ -37,13 +37,20 @@ export const CHAT_INPUT_LAYOUT = {
  * ── PUBLISH JUMP ISLAND ────────────────────────────────────────────────────
  * Floating clan-colored island that appears when the user's latest reflection
  * scrolls above the visible area.  Tap → scroll back to that reflection.
+ *
+ * Posición vertical: `computePublishJumpIslandBottom(safeAreaBottom)` — anclada
+ * encima de la barra de chat (no usar `bottom` fijo: en Android colapsa con el input).
  */
 export const PUBLISH_JUMP_ISLAND_LAYOUT = {
   /**
-   * Distance from the bottom of the screen.
-   * Decrease to move the island closer to the bottom nav.
-   * Increase to push it further up.
+   * Hueco mínimo entre el borde superior de la barra de escribir y el borde
+   * inferior del botón «¡Publica tu reflexión!» (px).
+   * Subir = isla más arriba; bajar = más pegada al input.
    */
+  publishJumpIslandClearanceAboveInput: 28,
+  /** Margen extra solo en Android (safe area / nav bar variables). iOS: 0. */
+  publishJumpIslandAndroidExtraClearance: 6,
+  /** @deprecated Sustituido por computePublishJumpIslandBottom — referencia ~110 en iPhone. */
   publishJumpIslandBottom: 110,
   /** Horizontal offset from center (positive = right). */
   publishJumpIslandOffsetX: 0,
@@ -67,6 +74,29 @@ export const PUBLISH_JUMP_ISLAND_LAYOUT = {
   fontWeight: '700' as const,
   chevronSize: 16,
 };
+
+/** Altura ocupada por la fila de input (sin safe area ni teclado). */
+export function estimateChatInputBarRowHeight(): number {
+  return (
+    CHAT_BOTTOM_AREA_LAYOUT.paddingTop +
+    CHAT_INPUT_LAYOUT.minHeight +
+    CHAT_BOTTOM_AREA_LAYOUT.paddingBottom +
+    CHAT_INPUT_ISLAND_LAYOUT.extraHeight
+  );
+}
+
+/**
+ * Distancia desde el borde inferior de pantalla hasta el botón «Publica tu reflexión».
+ * Mantiene el mismo aspecto en iOS y evita solaparse con ChatInputBar en Android.
+ */
+export function computePublishJumpIslandBottom(safeAreaBottomInset: number): number {
+  return (
+    safeAreaBottomInset +
+    estimateChatInputBarRowHeight() +
+    PUBLISH_JUMP_ISLAND_LAYOUT.publishJumpIslandClearanceAboveInput -
+    PUBLISH_JUMP_ISLAND_LAYOUT.publishJumpIslandOffsetY
+  );
+}
 
 /**
  * ── REFLECTION PUBLISH ELIGIBILITY ───────────────────────────────────────
