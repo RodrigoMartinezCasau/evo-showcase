@@ -115,15 +115,13 @@ function CommunityPostCardBase({
   /** Siguiendo: la frase entera (sin ellipsis); la tarjeta crece y la foto va debajo. */
   const phraseShowsFullText = followingFeedStyle && isQuoteCard;
 
-  const [phraseTextBottomY, setPhraseTextBottomY] = useState<number | null>(null);
-
-  useEffect(() => {
-    setPhraseTextBottomY(null);
-  }, [post.id, post.body, post.quoteAuthor, cardWidth, followingFeedStyle]);
-
   // Solo en Siguiendo la tarjeta crece para mostrar la foto a ancho completo.
-  // (En Para ti la foto sustituye el fondo de estrellas en ReflectionDetailItem.)
   const hasPhoto = followingFeedStyle && postShowsImageInSiguiendo(post);
+  /** Reflexión + foto: medir texto real para pegar la imagen (evita hueco del tier). */
+  const reflectionPhotoMeasuresText = hasPhoto && isReflection;
+  const measureTextBottom = phraseShowsFullText || reflectionPhotoMeasuresText;
+
+  const [measuredTextBottomY, setMeasuredTextBottomY] = useState<number | null>(null);
 
   const { width: screenWidth } = useWindowDimensions();
   const maxUsableWidth = screenWidth - V.CARD_HORIZONTAL_MARGIN * 2;
@@ -149,6 +147,19 @@ function CommunityPostCardBase({
     () => computeCommunityFeedCardContentLayout(cardWidth, cardTier),
     [cardWidth, cardTier],
   );
+
+  useEffect(() => {
+    setMeasuredTextBottomY(null);
+  }, [
+    post.id,
+    post.body,
+    post.title,
+    post.quoteAuthor,
+    cardWidth,
+    followingFeedStyle,
+    hasPhoto,
+    isReflection,
+  ]);
 
   const bodyMaxLines = getBodyMaxLines(cardTier);
   const smallUpvoted = myVote === 'up';
@@ -200,17 +211,26 @@ function CommunityPostCardBase({
     ? starPanelVInset + feedContent.paddingBottom
     : V.STATS_BOTTOM;
 
-  const onPhraseTextBlockLayout = useCallback(
+  const onTextBlockLayout = useCallback(
     (e: LayoutChangeEvent) => {
-      if (!phraseShowsFullText) return;
+      if (!measureTextBottom) return;
       const h = e.nativeEvent.layout.height;
       if (h <= 0) return;
       const bottom = feedStackMinTopPx + h;
-      setPhraseTextBottomY((prev) =>
+      setMeasuredTextBottomY((prev) =>
         prev != null && Math.abs(prev - bottom) < 1 ? prev : bottom,
       );
     },
-    [phraseShowsFullText, feedStackMinTopPx],
+    [measureTextBottom, feedStackMinTopPx],
+  );
+
+  const statsBlockHeight = useMemo(
+    () =>
+      statsBottomInset +
+      statsRowHeight +
+      V.STATS_TEXT_CLEARANCE_ABOVE_CHIP +
+      feedContent.paddingBottom,
+    [statsBottomInset, statsRowHeight, feedContent.paddingBottom],
   );
 
   const tierTextContentBottomY = useMemo(
@@ -235,30 +255,26 @@ function CommunityPostCardBase({
   );
 
   const textContentBottomY =
-    phraseShowsFullText && phraseTextBottomY != null
-      ? phraseTextBottomY
+    measureTextBottom && measuredTextBottomY != null
+      ? measuredTextBottomY
       : tierTextContentBottomY;
 
   const baseCardHeightForLayout = useMemo(() => {
-    if (phraseShowsFullText && phraseTextBottomY != null) {
-      const statsBlock =
-        statsBottomInset +
-        statsRowHeight +
-        V.STATS_TEXT_CLEARANCE_ABOVE_CHIP +
-        feedContent.paddingBottom;
-      return Math.max(layout.cardHeight, phraseTextBottomY + statsBlock);
+    if (measureTextBottom && measuredTextBottomY != null) {
+      // Con foto: tarjeta compacta (texto + gap + imagen); sin forzar altura del tier.
+      if (hasPhoto) {
+        return measuredTextBottomY + statsBlockHeight;
+      }
+      return Math.max(layout.cardHeight, measuredTextBottomY + statsBlockHeight);
     }
     return layout.cardHeight;
   }, [
-    phraseShowsFullText,
-    phraseTextBottomY,
+    measureTextBottom,
+    measuredTextBottomY,
+    hasPhoto,
     layout.cardHeight,
-    statsBottomInset,
-    statsRowHeight,
-    feedContent.paddingBottom,
+    statsBlockHeight,
   ]);
-
-  const phraseCardExtra = Math.max(0, baseCardHeightForLayout - layout.cardHeight);
 
   const maxCardInnerHeight = useMemo(() => {
     if (slotOuterHeight == null || !(slotOuterHeight > 0)) return undefined;
@@ -268,10 +284,10 @@ function CommunityPostCardBase({
   }, [slotOuterHeight]);
 
   // ── Foto (Siguiendo): debajo del texto; solo el recuadro cede si hay tope ───
-  const phraseLayoutReady = !phraseShowsFullText || phraseTextBottomY != null;
+  const measuredTextLayoutReady = !measureTextBottom || measuredTextBottomY != null;
 
   const photo = useMemo(() => {
-    if (!hasPhoto || !phraseLayoutReady) return null;
+    if (!hasPhoto || !measuredTextLayoutReady) return null;
 
     const padX = feedContent.paddingLeft;
     return computeFollowingFeedPhotoSlotLayout({
@@ -296,24 +312,21 @@ function CommunityPostCardBase({
     statsRowHeight,
     feedContent.paddingLeft,
     maxCardInnerHeight,
-    phraseLayoutReady,
-    phraseShowsFullText,
-    phraseTextBottomY,
+    measuredTextLayoutReady,
   ]);
 
-  const cardExtendExtra = photo
-    ? Math.max(0, photo.cardHeight - layout.cardHeight)
-    : phraseCardExtra;
+  const targetCardHeight = photo?.cardHeight ?? baseCardHeightForLayout;
+  const cardExtendExtra = targetCardHeight - layout.cardHeight;
   const effLayout = useMemo(
     () =>
-      cardExtendExtra > 0
-        ? {
+      cardExtendExtra === 0
+        ? layout
+        : {
             ...layout,
-            cardHeight: layout.cardHeight + cardExtendExtra,
+            cardHeight: targetCardHeight,
             blackBottomPx: layout.blackBottomPx + cardExtendExtra,
-          }
-        : layout,
-    [layout, cardExtendExtra],
+          },
+    [layout, cardExtendExtra, targetCardHeight],
   );
   const photoTopY = photo?.photoTopY ?? 0;
 
@@ -449,7 +462,7 @@ function CommunityPostCardBase({
 
         {/* Title + body — starts after username row with same gap as under title. */}
         <View
-          onLayout={phraseShowsFullText ? onPhraseTextBlockLayout : undefined}
+          onLayout={measureTextBottom ? onTextBlockLayout : undefined}
           style={{
             position: 'absolute',
             top: feedStackMinTopPx,
@@ -459,7 +472,7 @@ function CommunityPostCardBase({
                 ? feedContent.paddingLeft
                 : feedContent.paddingRight
             ),
-            ...(phraseShowsFullText
+            ...(measureTextBottom
               ? {}
               : {
                   bottom: effLayout.cardHeight - textContentBottomY,
@@ -492,7 +505,7 @@ function CommunityPostCardBase({
               },
               isQuoteCard && { fontWeight: '700' as const, fontStyle: 'italic' as const },
             ]}
-            numberOfLines={phraseShowsFullText ? undefined : bodyMaxLines}
+            numberOfLines={measureTextBottom ? undefined : bodyMaxLines}
           >
             {isQuoteCard ? formatPhraseBodyForDisplay(post.body) : post.body}
           </Text>
