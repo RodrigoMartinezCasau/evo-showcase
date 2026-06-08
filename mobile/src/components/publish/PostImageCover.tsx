@@ -1,7 +1,6 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useLayoutEffect } from 'react';
 import {
   View,
-  Image,
   StyleSheet,
   Platform,
   PanResponder,
@@ -9,6 +8,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import {
   computePostImageCoverLayout,
@@ -33,6 +33,13 @@ type Props = {
   onFocusYChange?: (focusY: PostImageFocusY) => void;
   /** Quita la foto solo del display actual (editor de encuadre). */
   onRemoveFromDisplay?: () => void;
+  /**
+   * Medidas del contenedor cuando el padre ya las conoce (p. ej. tarjeta Siguiendo).
+   * Evita esperar a `onLayout` en cold start dentro de FlatList — sin esto la foto
+   * a veces no aparece hasta remontar la celda.
+   */
+  layoutWidth?: number;
+  layoutHeight?: number;
 };
 
 /**
@@ -51,9 +58,9 @@ export function PostImageCover({
   interactive = false,
   onFocusYChange,
   onRemoveFromDisplay,
+  layoutWidth,
+  layoutHeight,
 }: Props) {
-  const [frameW, setFrameW] = React.useState(0);
-  const [frameH, setFrameH] = React.useState(0);
   const panStartFocusY = useRef(DEFAULT_POST_IMAGE_FOCUS_Y);
   const focusYRef = useRef(DEFAULT_POST_IMAGE_FOCUS_Y);
   const scaledHRef = useRef(1);
@@ -70,6 +77,26 @@ export function PostImageCover({
   useEffect(() => {
     onFocusYChangeRef.current = onFocusYChange;
   }, [onFocusYChange]);
+
+  const [layoutFromMeasure, setLayoutFromMeasure] = React.useState({ w: 0, h: 0 });
+
+  useLayoutEffect(() => {
+    if (layoutWidth != null && layoutWidth > 0) {
+      setLayoutFromMeasure((prev) =>
+        prev.w === layoutWidth ? prev : { ...prev, w: layoutWidth },
+      );
+    }
+    if (layoutHeight != null && layoutHeight > 0) {
+      setLayoutFromMeasure((prev) =>
+        prev.h === layoutHeight ? prev : { ...prev, h: layoutHeight },
+      );
+    }
+  }, [layoutWidth, layoutHeight]);
+
+  const frameW =
+    layoutWidth != null && layoutWidth > 0 ? layoutWidth : layoutFromMeasure.w;
+  const frameH =
+    layoutHeight != null && layoutHeight > 0 ? layoutHeight : layoutFromMeasure.h;
 
   const photoZoneH = Math.max(0, frameH - contentTopInset);
 
@@ -150,17 +177,16 @@ export function PostImageCover({
           >
             <Image
               source={{ uri }}
+              cachePolicy="disk"
+              blurRadius={Platform.OS === 'ios' ? 16 : 0}
               style={[
                 imageStyle,
-                {
-                  opacity: Platform.OS === 'ios' ? 0.42 : 0.28,
-                  ...(Platform.OS === 'ios' ? { blurRadius: 16 } : {}),
-                },
+                { opacity: Platform.OS === 'ios' ? 0.42 : 0.28 },
               ]}
             />
           </View>
           <View style={[photoZoneClip, { zIndex: 1 }]} pointerEvents="none">
-            <Image source={{ uri }} style={imageStyle} />
+            <Image source={{ uri }} cachePolicy="disk" style={imageStyle} />
           </View>
           <View
             style={[photoZoneClip, styles.interactivePanLayer]}
@@ -190,7 +216,7 @@ export function PostImageCover({
     // resizeMode extra (cover dentro del box desalinearía el encuadre).
     return (
       <View style={photoZoneClip}>
-        <Image source={{ uri }} style={imageStyle} />
+        <Image source={{ uri }} cachePolicy="disk" style={imageStyle} recyclingKey={uri} />
       </View>
     );
   };
@@ -201,8 +227,11 @@ export function PostImageCover({
       pointerEvents={interactive ? 'box-none' : 'none'}
       onLayout={(e) => {
         const { width, height } = e.nativeEvent.layout;
-        setFrameW(width);
-        setFrameH(height);
+        if (width <= 0 && height <= 0) return;
+        setLayoutFromMeasure((prev) => {
+          if (prev.w === width && prev.h === height) return prev;
+          return { w: width, h: height };
+        });
       }}
     >
       {contentTopInset > 0 ? (

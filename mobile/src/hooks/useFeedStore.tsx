@@ -201,6 +201,13 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
         authorUsername?: string;
         authorRank?: SimPost['authorRank'];
         profile?: BasicProfile;
+        imageUrl?: string | null;
+        imageWidth?: number | null;
+        imageHeight?: number | null;
+        imageCropFocusY?: number | null;
+        imageCropFocusYFollowing?: number | null;
+        imageShowParaTi?: boolean | null;
+        imageShowSiguiendo?: boolean | null;
       }
     >
   >(new Map());
@@ -234,7 +241,14 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
         cached.authorClanId === p.authorClanId &&
         cached.authorUsername === p.authorUsername &&
         cached.authorRank === p.authorRank &&
-        cached.profile === profile
+        cached.profile === profile &&
+        cached.imageUrl === (p.imageUrl ?? null) &&
+        cached.imageWidth === (p.imageWidth ?? null) &&
+        cached.imageHeight === (p.imageHeight ?? null) &&
+        cached.imageCropFocusY === (p.imageCropFocusY ?? null) &&
+        cached.imageCropFocusYFollowing === (p.imageCropFocusYFollowing ?? null) &&
+        cached.imageShowParaTi === (p.imageShowParaTi ?? null) &&
+        cached.imageShowSiguiendo === (p.imageShowSiguiendo ?? null)
       ) {
         next.push(cached.community);
         continue;
@@ -253,6 +267,13 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
         authorUsername: p.authorUsername,
         authorRank: p.authorRank,
         profile,
+        imageUrl: p.imageUrl ?? null,
+        imageWidth: p.imageWidth ?? null,
+        imageHeight: p.imageHeight ?? null,
+        imageCropFocusY: p.imageCropFocusY ?? null,
+        imageCropFocusYFollowing: p.imageCropFocusYFollowing ?? null,
+        imageShowParaTi: p.imageShowParaTi ?? null,
+        imageShowSiguiendo: p.imageShowSiguiendo ?? null,
       });
       next.push(community);
     }

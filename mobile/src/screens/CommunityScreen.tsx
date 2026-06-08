@@ -507,16 +507,18 @@ export default function CommunityScreen() {
     ],
   );
 
-  // #3 Prefetch (caché en disco) de los avatares de los primeros posts de cada
-  // feed, para que al hacer scroll/abrir el detalle ya estén descargados y no
-  // se vea el parpadeo de carga. Additive: solo calienta la caché de expo-image.
+  // Prefetch (caché en disco) avatares + fotos de publicación visibles al abrir
+  // Comunidad, para que en cold start no haya huecos grises hasta hacer scroll.
   useEffect(() => {
     const uris = new Set<string>();
     const collect = (arr: CommunityPost[]) => {
       const n = Math.min(arr.length, 12);
       for (let i = 0; i < n; i++) {
-        const u = arr[i]?.author?.avatarUri?.trim();
-        if (u && /^https?:\/\//i.test(u)) uris.add(u);
+        const post = arr[i];
+        const avatar = post?.author?.avatarUri?.trim();
+        if (avatar && /^https?:\/\//i.test(avatar)) uris.add(avatar);
+        const photo = post?.imageUrl?.trim();
+        if (photo && /^https?:\/\//i.test(photo)) uris.add(photo);
       }
     };
     collect(paratiPanelDisplayData);
@@ -1114,7 +1116,19 @@ export default function CommunityScreen() {
     reset: resetFollowingPagination,
   } = useIncrementalList(followingFeedOrdered, 10);
 
-  // Ventana de montaje anclada a lo visible. `onViewableItemsChanged` y
+  const followingListExtraData = useMemo(
+    () =>
+      `${followingWindowStart}|${listData
+        .slice(0, 24)
+        .map(
+          (p) =>
+            `${p.id}:${p.imageUrl ?? ''}:${p.imageWidth ?? ''}:${p.imageHeight ?? ''}`,
+        )
+        .join(';')}`,
+    [followingWindowStart, listData],
+  );
+
+  // Ventana de montaje anclada a lo visible.
   // `viewabilityConfig` deben ser referencias ESTABLES (FlatList lanza error si
   // cambian entre renders), por eso van en refs.
   const followingViewabilityConfigRef = useRef({ itemVisiblePercentThreshold: 10 });
@@ -1623,7 +1637,7 @@ export default function CommunityScreen() {
               data={listData}
               renderItem={renderMainListItem}
               keyExtractor={(item) => item.id}
-              extraData={followingWindowStart}
+              extraData={followingListExtraData}
               onViewableItemsChanged={onFollowingViewableChangedRef.current}
               viewabilityConfig={followingViewabilityConfigRef.current}
               onEndReached={loadMoreFollowing}
@@ -1631,13 +1645,8 @@ export default function CommunityScreen() {
               initialNumToRender={10}
               maxToRenderPerBatch={8}
               updateCellsBatchingPeriod={50}
-              // Salvavidas de memoria: aunque vayas desbloqueando cientos de posts
-              // de 10 en 10, FlatList solo mantiene MONTADA una ventana pequeña de
-              // tarjetas alrededor de lo visible; las de arriba/abajo se descargan
-              // de verdad (removeClippedSubviews). Así nunca hay "mil tarjetas"
-              // montadas a la vez por mucho que sigas bajando.
               windowSize={5}
-              removeClippedSubviews
+              removeClippedSubviews={Platform.OS !== 'android'}
               ListEmptyComponent={
                 globalVotedFeedLoading && followingSort !== 'recientes' ? (
                   <View style={styles.followingVotedFeedLoading}>

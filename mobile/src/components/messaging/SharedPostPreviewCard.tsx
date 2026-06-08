@@ -28,6 +28,7 @@ export function SharedPostPreviewCard({ post }: Props) {
           imageWidth={post.imageWidth}
           imageHeight={post.imageHeight}
           focusY={post.imageCropFocusY ?? post.imageCropFocusYFollowing ?? 0.5}
+          layoutHeight={SHARED_POST_PREVIEW_HEIGHT}
           imageBorderRadius={CARD_RADIUS}
           scrimOpacity={0.38}
           style={StyleSheet.absoluteFill}

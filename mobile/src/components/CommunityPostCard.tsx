@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useState, useEffect } from 'react';
+import React, { useMemo, useCallback, useState, useRef, useLayoutEffect } from 'react';
 import {
   View,
   Text,
@@ -148,18 +148,40 @@ function CommunityPostCardBase({
     [cardWidth, cardTier],
   );
 
-  useEffect(() => {
+  const measureResetKey = useMemo(
+    () =>
+      [
+        post.id,
+        post.body,
+        post.title,
+        post.quoteAuthor ?? '',
+        cardWidth,
+        followingFeedStyle ? '1' : '0',
+        hasPhoto ? '1' : '0',
+        isReflection ? '1' : '0',
+      ].join('\0'),
+    [
+      post.id,
+      post.body,
+      post.title,
+      post.quoteAuthor,
+      cardWidth,
+      followingFeedStyle,
+      hasPhoto,
+      isReflection,
+    ],
+  );
+  const prevMeasureResetKeyRef = useRef<string | null>(null);
+
+  useLayoutEffect(() => {
+    if (prevMeasureResetKeyRef.current === null) {
+      prevMeasureResetKeyRef.current = measureResetKey;
+      return;
+    }
+    if (prevMeasureResetKeyRef.current === measureResetKey) return;
+    prevMeasureResetKeyRef.current = measureResetKey;
     setMeasuredTextBottomY(null);
-  }, [
-    post.id,
-    post.body,
-    post.title,
-    post.quoteAuthor,
-    cardWidth,
-    followingFeedStyle,
-    hasPhoto,
-    isReflection,
-  ]);
+  }, [measureResetKey]);
 
   const bodyMaxLines = getBodyMaxLines(cardTier);
   const smallUpvoted = myVote === 'up';
@@ -283,11 +305,10 @@ function CommunityPostCardBase({
     );
   }, [slotOuterHeight]);
 
-  // ── Foto (Siguiendo): debajo del texto; solo el recuadro cede si hay tope ───
-  const measuredTextLayoutReady = !measureTextBottom || measuredTextBottomY != null;
-
+  // ── Foto (Siguiendo): estimación del tier al primer frame; la medición real
+  // refina posición en el siguiente layout (no bloquear foto en cold start).
   const photo = useMemo(() => {
-    if (!hasPhoto || !measuredTextLayoutReady) return null;
+    if (!hasPhoto) return null;
 
     const padX = feedContent.paddingLeft;
     return computeFollowingFeedPhotoSlotLayout({
@@ -312,7 +333,6 @@ function CommunityPostCardBase({
     statsRowHeight,
     feedContent.paddingLeft,
     maxCardInnerHeight,
-    measuredTextLayoutReady,
   ]);
 
   const targetCardHeight = photo?.cardHeight ?? baseCardHeightForLayout;
@@ -545,6 +565,8 @@ function CommunityPostCardBase({
               imageWidth={post.imageWidth}
               imageHeight={post.imageHeight}
               focusY={followingPhotoFocusY}
+              layoutWidth={photo.innerW}
+              layoutHeight={photo.displayH}
               imageBorderRadius={Math.round(innerGrayPanelBorderRadius * 0.55)}
               scrimOpacity={0}
               interactive={!!photoCropInteractive}
