@@ -832,7 +832,13 @@ function Footer() {
                 </a>
               </li>
               <li>
-                <a href="#">Substack</a>
+                <a
+                  href="https://x.com/EvoConn"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  X / Twitter
+                </a>
               </li>
             </ul>
           </div>

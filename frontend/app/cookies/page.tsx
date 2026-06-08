@@ -50,7 +50,7 @@ export default function CookiesPage() {
             <p style={{ opacity: 0.85 }}>
               Fuente: sección 9 (“Cookies y almacenamiento local”) de la{' '}
               <a
-                href="https://docs.google.com/document/d/e/2PACX-1vTpn9XyiqyZS-6Jxx7k3TeyewkMe0e6Jodo5lymcFeoo3SjF8iBQ1CiGX5-wHQr4RPriTpnmwFF0NmQ/pub"
+                href="/privacy"
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{ textDecoration: 'underline' }}
@@ -94,7 +94,7 @@ export default function CookiesPage() {
             <p style={{ opacity: 0.95 }}>
               Read the official document here:{' '}
               <a
-                href="https://docs.google.com/document/d/e/2PACX-1vTpn9XyiqyZS-6Jxx7k3TeyewkMe0e6Jodo5lymcFeoo3SjF8iBQ1CiGX5-wHQr4RPriTpnmwFF0NmQ/pub"
+                href="/privacy"
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{ textDecoration: 'underline' }}
