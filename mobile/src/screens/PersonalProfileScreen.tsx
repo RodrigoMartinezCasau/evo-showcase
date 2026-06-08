@@ -487,15 +487,7 @@ export default function PersonalProfileScreen() {
               rank={profileWithClan.rank}
               avatarUri={profileWithClan.avatarUri}
               companionBelowHeight={identityCompanionBelowHeight}
-              onShieldPress={
-                profileWithClan.clanId
-                  ? () =>
-                      navigateUnlessCurrent(
-                        pathname,
-                        `/clan/${String(profileWithClan.clanId).trim().toLowerCase()}`,
-                      )
-                  : undefined
-              }
+              onAvatarPress={() => navigateUnlessCurrent(pathname, '/profile-editor')}
             />
             <PersonalInsigniaPhrase
               phrase={insigniaPhrase}

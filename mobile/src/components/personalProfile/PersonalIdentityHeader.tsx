@@ -56,6 +56,9 @@ type Props = {
   clanId: string | null;
   rank: Rank;
   avatarUri?: string | null;
+  /** Perfil propio: p. ej. abrir editor de foto / usuario. */
+  onAvatarPress?: () => void;
+  /** Perfil ajeno: p. ej. ir al clan del usuario. */
   onShieldPress?: () => void;
   hideShareButton?: boolean;
   onSharePress?: () => void;
@@ -72,6 +75,7 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
   clanId,
   rank,
   avatarUri,
+  onAvatarPress,
   onShieldPress,
   hideShareButton = true,
   onSharePress,
@@ -131,13 +135,17 @@ export const PersonalIdentityHeader = React.memo(function PersonalIdentityHeader
   const clanOffsetX = useTightTextOffsets ? 0 : CLAN_OFFSET_X * textOffsetScale;
   const clanOffsetY = useTightTextOffsets ? 0 : CLAN_OFFSET_Y * textOffsetScale;
 
+  const handleAvatarPress = onAvatarPress ?? onShieldPress;
+
   return (
     <View style={[styles.container, { height: containerHeight }]}>
       <TouchableOpacity
-        activeOpacity={onShieldPress ? 0.7 : 1}
-        onPress={onShieldPress}
-        disabled={!onShieldPress}
+        activeOpacity={handleAvatarPress ? 0.85 : 1}
+        onPress={handleAvatarPress}
+        disabled={!handleAvatarPress}
         hitSlop={8}
+        accessibilityRole={handleAvatarPress ? 'button' : undefined}
+        accessibilityLabel={onAvatarPress ? 'Editar perfil' : undefined}
         style={[
           styles.shieldWrap,
           PROFILE_HEADER_AVATAR_ON_LEFT ? styles.shieldWrapLeft : styles.shieldWrapRight,
