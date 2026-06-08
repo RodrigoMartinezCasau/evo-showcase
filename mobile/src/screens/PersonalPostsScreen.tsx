@@ -1,22 +1,19 @@
 /**
  * PersonalPostsScreen — full 2-column grid of the user's own posts.
- * Opens when the user taps the "Publicaciones" counter in the personal profile.
+ * Opens when the user taps the "Publicaciones" counter or "ver más" in the personal profile.
  *
  * Layout: AppTopBar + clan ReflectionBackground + FlatList 2-col + BottomCommunityTabs.
- * Uses PersonalProfileContext for live posts, hide, and delete.
+ * Tap a card → visor vertical (/latest-posts), mismo formato que Para ti.
  */
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback } from 'react';
 import {
   View,
   Text,
   FlatList,
   StyleSheet,
-  Animated,
-  Easing,
   useWindowDimensions,
 } from 'react-native';
-import { useRouter, usePathname } from 'expo-router';
-import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { evoconnColors } from '@evoconn/theme/colors';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
@@ -25,7 +22,6 @@ import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
 import { useActiveClan } from '@evoconn/debug/DebugClanContext';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
-import { ProfileDetailPanel } from '@evoconn/components/ProfileDetailPanel';
 import { getAppShellScrollableBodyHeight } from '@evoconn/constants/appShellLayout';
 import {
   PERSONAL_POSTS_CARD_SCALE,
@@ -36,58 +32,39 @@ import {
 import { PersonalRecentPostCard } from '@evoconn/components/personalProfile/PersonalRecentPostCard';
 import { PersonalPostsTotalStats } from '@evoconn/components/personalProfile/PersonalPostsTotalStats';
 import { usePersonalProfile } from '@evoconn/hooks/PersonalProfileContext';
+import { useSimulation } from '@evoconn/hooks/SimulationContext';
+import { isRealUserId } from '@evoconn/services/supabaseSocial';
+import { useAuth } from '../../mobile/lib/AuthContext';
 import type { CommunityPost } from '@evoconn/types';
-
-const ANIM_DURATION = 200;
 
 export default function PersonalPostsScreen() {
   const router = useRouter();
-  const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const safeFrame = useSafeAreaFrame();
   const { width: screenW, height: screenH } = useWindowDimensions();
   const activeClan = useActiveClan(mockCurrentUser.clanId);
   const { thoughts } = useThoughts();
+  const { session } = useAuth();
+  const { recordPostView } = useSimulation();
 
   const { posts, isHidden, toggleHidePost, deletePost } = usePersonalProfile();
 
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
 
-  // ─── Detail feed overlay ──────────────────────────────────────────
-  const slideAnim = useRef(new Animated.Value(0)).current;
-  const contentHeightRef = useRef(0);
-  const [detailFeed, setDetailFeed] = React.useState<{
-    data: CommunityPost[];
-    initialIndex: number;
-  } | null>(null);
+  const profileUserId =
+    (session?.user?.id && isRealUserId(session.user.id) ? session.user.id : null) ??
+    mockCurrentUser.id;
 
-  const openDetailFeed = useCallback(
+  const openPostInVerticalFeed = useCallback(
     (post: CommunityPost) => {
-      const idx = posts.findIndex(p => p.id === post.id);
-      setDetailFeed({ data: posts, initialIndex: idx >= 0 ? idx : 0 });
-      slideAnim.setValue(0);
-      requestAnimationFrame(() => {
-        Animated.timing(slideAnim, {
-          toValue: 1,
-          duration: ANIM_DURATION,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }).start();
+      recordPostView(post.id);
+      router.push({
+        pathname: '/latest-posts',
+        params: { postId: post.id, userId: profileUserId },
       });
     },
-    [posts, slideAnim],
+    [router, profileUserId, recordPostView],
   );
-
-  const closeDetailFeed = useCallback(() => {
-    Animated.timing(slideAnim, {
-      toValue: 0,
-      duration: ANIM_DURATION,
-      easing: Easing.inOut(Easing.cubic),
-      useNativeDriver: true,
-    }).start(({ finished }) => {
-      if (finished) setDetailFeed(null);
-    });
-  }, [slideAnim]);
 
   const handleMenuAction = useCallback(
     (action: 'hide' | 'delete', postId: string) => {
@@ -104,7 +81,6 @@ export default function PersonalPostsScreen() {
     [router],
   );
 
-  // ─── Layout ───────────────────────────────────────────────────────
   const contentHeight = getAppShellScrollableBodyHeight(
     screenH,
     insets.top,
@@ -112,9 +88,8 @@ export default function PersonalPostsScreen() {
     safeFrame.height,
   );
 
-  // ─── Column widths ─────────────────────────────────────────────────
-  const H_PADDING  = 16;
-  const colWidth   = Math.floor(
+  const H_PADDING = 16;
+  const colWidth = Math.floor(
     ((screenW - H_PADDING * 2 - PERSONAL_POSTS_COLUMN_GAP) / 2) * PERSONAL_POSTS_CARD_SCALE,
   );
 
@@ -123,14 +98,14 @@ export default function PersonalPostsScreen() {
       <PersonalRecentPostCard
         post={item}
         cardWidth={colWidth}
-        onPress={openDetailFeed}
+        onPress={openPostInVerticalFeed}
         onMenuAction={handleMenuAction}
         isHidden={isHidden(item.id)}
         noMarginRight
         gridStatsScale={PERSONAL_POSTS_GRID_STATS_SCALE}
       />
     ),
-    [colWidth, openDetailFeed, handleMenuAction, isHidden],
+    [colWidth, openPostInVerticalFeed, handleMenuAction, isHidden],
   );
 
   const ListHeader = <PersonalPostsTotalStats posts={posts} />;
@@ -145,14 +120,11 @@ export default function PersonalPostsScreen() {
     <View style={styles.container}>
       <AppTopBar onMenuPress={() => setSidebarOpen(true)} />
 
-      <View
-        style={[styles.contentWrap, { height: contentHeight }]}
-        onLayout={e => { contentHeightRef.current = e.nativeEvent.layout.height; }}
-      >
+      <View style={[styles.contentWrap, { height: contentHeight }]}>
         <ReflectionBackground clan={activeClan}>
           <FlatList
             data={posts}
-            keyExtractor={item => item.id}
+            keyExtractor={(item) => item.id}
             renderItem={renderItem}
             numColumns={2}
             columnWrapperStyle={{ gap: PERSONAL_POSTS_COLUMN_GAP }}
@@ -166,21 +138,6 @@ export default function PersonalPostsScreen() {
             showsVerticalScrollIndicator={false}
           />
         </ReflectionBackground>
-
-        {detailFeed !== null && (
-          <ProfileDetailPanel
-            data={detailFeed.data}
-            initialIndex={detailFeed.initialIndex}
-            itemHeight={contentHeightRef.current}
-            slideAnim={slideAnim}
-            screenW={screenW}
-            onClose={closeDetailFeed}
-            onAuthorPress={() => closeDetailFeed()}
-            onClanPress={(clanId) =>
-              navigateUnlessCurrent(pathname, `/clan/${clanId}`)
-            }
-          />
-        )}
       </View>
 
       <AppShellBottomTabsWrap>

@@ -6,8 +6,9 @@
  *    Usado en flujos donde el push es correcto (community → secundaria).
  *
  * 2. `navigateUnlessCurrent` — versión "inteligente" que aplica:
- *    a) Si target es Comunidad `/(tabs)` desde cualquier secundaria → colapsa
- *       el stack a Comunidad (`router.dismissAll`).
+ *    a) Si target es Comunidad `/(tabs)` desde cualquier secundaria → vuelve a
+ *       Comunidad con `replace` (sin `dismissAll`, que dispara POP_TO_TOP si
+ *       frase/reflexión reemplazaron tabs).
  *    b) Si target es una pantalla MAIN (clan, racha, perfil, frases, etc.) y
  *       NO estamos en Comunidad → colapsa el stack a Comunidad y empuja la
  *       nueva pantalla. Resultado: stack = [Comunidad, nueva].
@@ -23,6 +24,8 @@
  */
 import { router } from 'expo-router';
 import type { Href } from 'expo-router';
+import { Platform } from 'react-native';
+import { requestCommunityTab } from '@evoconn/utils/communityPostDeepLink';
 
 // ─── Overlay de carga instantáneo (ver NavLoadingContext) ──────────────────────
 // El provider registra aquí su `show` para que la navegación a pantallas
@@ -133,18 +136,10 @@ export function pushUnlessCurrent(currentPathname: string | undefined, targetHre
   router.push(targetHref as Href);
 }
 
-/** Colapsa el stack a la raíz (Comunidad). Best-effort: si `dismissAll` no
- *  existe en esta versión de expo-router, hace `replace('/(tabs)')`. */
+/** Vuelve a Comunidad. Solo `replace`: ni `dismissAll` (POP_TO_TOP) ni `dismiss`
+ *  (POP) funcionan cuando frase/reflexión reemplazaron tabs y no hay pantalla
+ *  anterior en el stack raíz. */
 function collapseToHome(): void {
-  const r = router as unknown as { dismissAll?: () => void };
-  try {
-    if (typeof r.dismissAll === 'function') {
-      r.dismissAll();
-      return;
-    }
-  } catch {
-    // fall through to replace fallback
-  }
   router.replace('/(tabs)' as Href);
 }
 
@@ -163,7 +158,13 @@ export function navigateUnlessCurrent(
   const toMain = isMainScreenPath(targetHref);
 
   if (toHome) {
-    collapseToHome();
+    requestCommunityTab('para-ti');
+    if (Platform.OS === 'android') {
+      showNavLoadingOverlayHold();
+    }
+    deferTwoFrames(() => {
+      collapseToHome();
+    });
     return;
   }
 

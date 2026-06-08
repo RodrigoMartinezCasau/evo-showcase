@@ -30,7 +30,11 @@ import { DetailActionColumn } from './DetailActionColumn';
 import type { DetailActionColumnHandle } from './DetailActionColumn';
 import { CommentThreadBlock } from './CommentThreadBlock';
 import { CommentsSheet, type CommentsSheetHandle } from './CommentsSheet';
-import { NewCommentBox, CommentComposerTrigger } from './NewCommentBox';
+import {
+  NewCommentBox,
+  CommentComposerTrigger,
+  type NewCommentBoxHandle,
+} from './NewCommentBox';
 import { CommentComposerOverlay } from './CommentComposerOverlay';
 import {
   REFLECTION_PANEL_LAYOUT as RP,
@@ -1582,6 +1586,12 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
   const commentComposerHorizontalPad =
     REFLECTION_DETAIL_CONTENT_PAD_H + CP.paddingHorizontal;
 
+  const composerInputRef = useRef<NewCommentBoxHandle>(null);
+
+  const focusComposerInput = useCallback(() => {
+    composerInputRef.current?.focus();
+  }, []);
+
   const renderComposerTrigger = () => (
     <View style={styles.newCommentRow}>
       <CommentComposerTrigger
@@ -1604,6 +1614,7 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
         </View>
       ) : null}
       <NewCommentBox
+        ref={composerInputRef}
         autoFocus
         onSend={handleComposerSend}
         clanId={post.author.clanId}
@@ -1924,7 +1935,9 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
                     <View style={styles.previewSectionGap} />
                   ) : null}
                   <View style={styles.commentsComposerSlot}>
-                    {!commentsExpanded ? renderComposerTrigger() : null}
+                    {!commentsExpanded && !commentComposerOpen
+                      ? renderComposerTrigger()
+                      : null}
                   </View>
                 </View>
               </View>
@@ -2046,15 +2059,18 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
             </View>
           )
         }
-        footer={commentsExpanded ? renderComposerTrigger() : null}
+        footer={
+          commentsExpanded && !commentComposerOpen ? renderComposerTrigger() : null
+        }
       />
     </View>
 
-      {!previewMode ? (
+      {!previewMode && commentComposerOpen ? (
         <CommentComposerOverlay
-          visible={commentComposerOpen}
+          visible
           onClose={closeCommentComposer}
           contentPaddingHorizontal={commentComposerHorizontalPad}
+          onShow={focusComposerInput}
         >
           {renderOverlayComposer()}
         </CommentComposerOverlay>

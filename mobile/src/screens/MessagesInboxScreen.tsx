@@ -62,7 +62,7 @@ export default function MessagesInboxScreen() {
   const insets = useSafeAreaInsets();
   const safeFrame = useSafeAreaFrame();
   const { height: screenH } = useWindowDimensions();
-  const { inbox, loading, refreshInbox, markAllInboxRead } = useMessages();
+  const { inbox, loading, refreshInbox } = useMessages();
   const { activeUserId } = useSimulation();
   const { thoughts } = useThoughts();
   const ready = useDeferredRender();
@@ -71,15 +71,8 @@ export default function MessagesInboxScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      let cancelled = false;
-      void (async () => {
-        await refreshInbox();
-        if (!cancelled) await markAllInboxRead();
-      })();
-      return () => {
-        cancelled = true;
-      };
-    }, [refreshInbox, markAllInboxRead]),
+      void refreshInbox();
+    }, [refreshInbox]),
   );
 
   useEffect(() => {

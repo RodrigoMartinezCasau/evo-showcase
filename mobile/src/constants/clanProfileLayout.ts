@@ -36,6 +36,7 @@ export const CLAN_PHILOSOPHY_WIDTH: number | undefined = undefined;
 export const CLAN_PHILOSOPHY_HEIGHT: number | undefined = undefined;
 
 // ── Top members section ────────────────────────────────────────────
+export const CLAN_TOP_MEMBERS_COUNT = 5;
 export const CLAN_MEMBERS_OFFSET_X = 0;
 export const CLAN_MEMBERS_OFFSET_Y = 0;
 export const CLAN_MEMBERS_LABEL_FONT_SIZE = 14;

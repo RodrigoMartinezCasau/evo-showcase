@@ -30,7 +30,6 @@ export type MessagesContextValue = {
   refreshInbox: () => Promise<void>;
   sendSharedItem: (args: SendSharedItemArgs) => Promise<{ ok: boolean; error?: string }>;
   markConversationRead: (conversationId: string) => Promise<void>;
-  markAllInboxRead: () => Promise<void>;
 };
 
 const MessagesCtx = createContext<MessagesContextValue | null>(null);
@@ -128,20 +127,6 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     [activeUserId, refreshInbox],
   );
 
-  const markAllInboxRead = useCallback(async (): Promise<void> => {
-    if (!isRealUserId(activeUserId)) return;
-    const rows = await fetchSharedInbox(activeUserId);
-    const withUnread = rows.filter((row) => row.unreadCount > 0);
-    if (withUnread.length === 0) {
-      setUnreadCount(0);
-      return;
-    }
-    await Promise.all(
-      withUnread.map((row) => markSharedConversationRead(row.conversation.id)),
-    );
-    await refreshInbox();
-  }, [activeUserId, refreshInbox]);
-
   const value = useMemo<MessagesContextValue>(
     () => ({
       inbox,
@@ -150,9 +135,8 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
       refreshInbox,
       sendSharedItem,
       markConversationRead,
-      markAllInboxRead,
     }),
-    [inbox, unreadCount, loading, refreshInbox, sendSharedItem, markConversationRead, markAllInboxRead],
+    [inbox, unreadCount, loading, refreshInbox, sendSharedItem, markConversationRead],
   );
 
   return <MessagesCtx.Provider value={value}>{children}</MessagesCtx.Provider>;

@@ -3,6 +3,16 @@ import { View, Text, StyleSheet, TouchableOpacity, useWindowDimensions } from 'r
 import type { ClanId } from '@evoconn/constants/clanColors';
 import type { Rank } from '@evoconn/types';
 import { PhilosophyClanBadge } from '@evoconn/components/philosophyProfile/PhilosophyClanBadge';
+import { PhilosophyInfoHelpButton } from '@evoconn/components/philosophyProfile/PhilosophyInfoHelpButton';
+
+const CLAN_BADGES_HELP_STEPS = [
+  'Cada vez que pasas por un clan se guarda una medalla de ese clan en tu grid.',
+  'El reborde de la medalla depende del rango que hayas alcanzado en ese clan.',
+  'Aprendiz: reborde negro metálico.',
+  'Maestro: reborde dorado.',
+  'Filósofo: reborde completo — máximo conocimiento en ese pensamiento.',
+  'Completa tu grid filosófico visitando todos los clanes y alcanzando el rango más alto en cada uno.',
+];
 
 type BadgeEntry = {
   clanId: ClanId;
@@ -40,7 +50,14 @@ export const ClanBadgesRecordCard = React.memo(function ClanBadgesRecordCard({
 
   return (
     <View style={styles.card}>
-      <Text style={styles.sectionTitle}>Medallas de clan</Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.sectionTitle}>Medallas de clan</Text>
+        <PhilosophyInfoHelpButton
+          title="Cómo funcionan las medallas de clan"
+          steps={CLAN_BADGES_HELP_STEPS}
+          accessibilityLabel="Información sobre medallas de clan"
+        />
+      </View>
       <View style={styles.grid}>
         {BADGE_ROWS.map((row, rowIndex) => (
           <View key={`row-${rowIndex}`} style={styles.badgeRow}>
@@ -77,6 +94,11 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 12,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   sectionTitle: {
     color: '#FFFFFF',
     fontSize: 11,
@@ -84,6 +106,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     textTransform: 'uppercase',
     opacity: 0.7,
+    flex: 1,
   },
   grid: {
     gap: 12,

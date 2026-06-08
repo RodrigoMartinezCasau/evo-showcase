@@ -20,6 +20,7 @@
  *     carries `clan_id`, `rank`, and now `clan_percentages`).
  */
 import { supabase } from '../../mobile/lib/supabase';
+import { CLAN_TOP_MEMBERS_COUNT } from '@evoconn/constants/clanProfileLayout';
 import {
   ALL_CLAN_IDS,
   CLAN_LABELS,
@@ -282,7 +283,7 @@ export async function fetchClanMembers(
   clanId: string,
   options: { limit?: number; excludeUserId?: string | null } = {},
 ): Promise<ClanMemberSummary[]> {
-  const { limit = 10, excludeUserId = null } = options;
+  const { limit = CLAN_TOP_MEMBERS_COUNT, excludeUserId = null } = options;
 
   let query = supabase
     .from('profiles')

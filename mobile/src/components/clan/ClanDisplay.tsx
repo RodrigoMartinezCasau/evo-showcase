@@ -60,6 +60,7 @@ import {
   CLAN_DISPLAY_POST_CARD_RATIO,
   CLAN_DISPLAY_POST_CARD_MIN_W,
 } from '@evoconn/constants/clanDisplayLayout';
+import { CLAN_TOP_MEMBERS_COUNT } from '@evoconn/constants/clanProfileLayout';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
 import { ClanCardFeedRimOverlay } from '@evoconn/components/ClanCardFeedRimOverlay';
 import {
@@ -188,6 +189,7 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
     let cancelled = false;
     void (async () => {
       const list = await fetchClanMembers(clanId, {
+        limit: CLAN_TOP_MEMBERS_COUNT,
         excludeUserId:
           authProfile?.id && isRealUserId(authProfile.id) ? authProfile.id : null,
       });
@@ -236,12 +238,12 @@ export function ClanDisplay({ clanId, bottomPadding = 120 }: Props) {
     );
     members.push(...filteredSim);
 
-    // Solo los 10 con mayor % de este clan, mostrados de mayor a menor.
+    // Solo los 5 con mayor % de este clan, mostrados de mayor a menor.
     const pctOf = (m: { _clanPct?: string }) =>
       m._clanPct != null ? parseFloat(m._clanPct) || 0 : 0;
     return members
       .sort((a, b) => pctOf(b) - pctOf(a))
-      .slice(0, 10);
+      .slice(0, CLAN_TOP_MEMBERS_COUNT);
   }, [
     authProfile,
     realUserClanId,

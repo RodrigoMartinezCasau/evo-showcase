@@ -14,7 +14,7 @@ import {
   StyleSheet,
   useWindowDimensions,
 } from 'react-native';
-import { useRouter, usePathname } from 'expo-router';
+import { useRouter, usePathname, useFocusEffect } from 'expo-router';
 import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -128,9 +128,16 @@ export default function PersonalFollowersScreen() {
     unfollowBack,
     isFollowingBack,
     primeProfiles,
+    refreshFollowers,
   } = usePersonalProfile();
 
   const ready = useDeferredRender();
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshFollowers();
+    }, [refreshFollowers]),
+  );
 
   const { visibleData, hasMore, loadMore } = useIncrementalList(
     followers,
@@ -214,6 +221,11 @@ export default function PersonalFollowersScreen() {
             }}
             ItemSeparatorComponent={() => <View style={styles.separator} />}
             ListFooterComponent={hasMore ? <ClanLoadingDot inline /> : null}
+            ListEmptyComponent={
+              <View style={styles.emptyWrap}>
+                <Text style={styles.emptyText}>Aún no tienes seguidores</Text>
+              </View>
+            }
           />
         )}
       </View>
@@ -321,5 +333,13 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
     backgroundColor: 'rgba(255,255,255,0.06)',
     marginLeft: 16 + AVATAR_SIZE + 12,
+  },
+  emptyWrap: {
+    paddingVertical: 48,
+    alignItems: 'center',
+  },
+  emptyText: {
+    color: 'rgba(255,255,255,0.35)',
+    fontSize: 14,
   },
 });

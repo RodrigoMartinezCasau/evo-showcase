@@ -8,6 +8,13 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
+import { PhilosophyInfoHelpButton } from '@evoconn/components/philosophyProfile/PhilosophyInfoHelpButton';
+
+const RANK_HELP_STEPS = [
+  'Para subir de rango, mejora el porcentaje filosófico de tu clan principal.',
+  'Publica reflexiones o frases enfocadas en ese pensamiento filosófico.',
+  'Infórmate, reflexiona y mejora con el tiempo para alcanzar Maestro (40%) y Filósofo (50%).',
+];
 import {
   RANK_BAR_GRADIENT_START,
   RANK_BAR_GRADIENT_END,
@@ -77,7 +84,14 @@ export const DetailedRankCard = React.memo(function DetailedRankCard({
 
   return (
     <View style={styles.card}>
-      <Text style={styles.sectionTitle}>Rango filosófico</Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.sectionTitle}>Rango filosófico</Text>
+        <PhilosophyInfoHelpButton
+          title="Cómo subir de rango"
+          steps={RANK_HELP_STEPS}
+          accessibilityLabel="Información sobre rango filosófico"
+        />
+      </View>
 
       <View style={styles.rankRow}>
         <Text style={styles.pctBig}>{dominantPct}%</Text>
@@ -144,6 +158,11 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 10,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   sectionTitle: {
     color: '#FFFFFF',
     fontSize: 11,
@@ -151,6 +170,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     textTransform: 'uppercase',
     opacity: 0.7,
+    flex: 1,
   },
   rankRow: {
     flexDirection: 'row',

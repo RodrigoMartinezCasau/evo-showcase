@@ -182,17 +182,20 @@ export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({
           {
             key: 'follow',
             label: following ? 'Dejar de seguir' : 'Seguir',
+            icon: following ? 'close-outline' : 'person-add-outline',
             onPress: () => toggleFollow(userId),
           },
           {
             key: 'share',
             label: 'Compartir enlace',
+            icon: 'share-outline',
             onPress: () => void handleShare(),
           },
           ...(isRealUserId(session?.user?.id ?? '')
             ? [{
                 key: 'shareInApp',
-                label: 'Enviar a un amigo',
+                label: 'Enviar perfil',
+                icon: 'paper-plane-outline' as const,
                 onPress: () => setShareInAppOpen(true),
               }]
             : []),
@@ -200,6 +203,7 @@ export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({
             ? [{
                 key: 'reportAvatar',
                 label: 'Denunciar foto de perfil',
+                icon: 'image-outline' as const,
                 destructive: true,
                 onPress: () => setReportAvatarOpen(true),
               }]
@@ -207,12 +211,14 @@ export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({
           {
             key: 'report',
             label: 'Denunciar perfil',
+            icon: 'flag-outline',
             destructive: true,
             onPress: () => setReportOpen(true),
           },
           {
             key: 'block',
             label: 'Bloquear usuario',
+            icon: 'ban-outline',
             destructive: true,
             onPress: () => setBlockOpen(true),
           },
@@ -220,6 +226,7 @@ export const ProfileMoreMenu = React.memo(function ProfileMoreMenu({
             ? [{
                 key: 'adminDeleteUser',
                 label: 'Eliminar cuenta (admin)',
+                icon: 'trash-outline' as const,
                 destructive: true,
                 onPress: () => setAdminDeleteOpen(true),
               }]

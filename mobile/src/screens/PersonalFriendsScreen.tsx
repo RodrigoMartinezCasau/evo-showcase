@@ -15,7 +15,7 @@ import {
   StyleSheet,
   useWindowDimensions,
 } from 'react-native';
-import { useRouter, usePathname } from 'expo-router';
+import { useRouter, usePathname, useFocusEffect } from 'expo-router';
 import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
 import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -99,9 +99,15 @@ export default function PersonalFriendsScreen() {
   const { thoughts } = useThoughts();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
 
-  const { friends, unfollowUser, primeProfiles } = usePersonalProfile();
+  const { friends, friendsCount, unfollowUser, primeProfiles, refreshFriends } = usePersonalProfile();
 
   const ready = useDeferredRender();
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshFriends();
+    }, [refreshFriends]),
+  );
 
   const { visibleData, hasMore, loadMore } = useIncrementalList(
     friends,
@@ -150,7 +156,9 @@ export default function PersonalFriendsScreen() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={22} color="rgba(255,255,255,0.7)" />
         </TouchableOpacity>
-        <Text style={styles.screenTitle}>AMIGOS</Text>
+        <Text style={styles.screenTitle}>
+          AMIGOS{friendsCount > 0 ? ` · ${friendsCount}` : ''}
+        </Text>
       </View>
 
       <View style={{ height: listPanelHeight, overflow: 'hidden' }}>

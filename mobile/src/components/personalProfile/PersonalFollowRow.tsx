@@ -28,6 +28,7 @@ function formatCount(n: number): string {
 }
 
 export const PersonalFollowRow = React.memo(function PersonalFollowRow({
+  userId,
   clanId,
   followersCount,
   followingCount,
@@ -79,7 +80,11 @@ export const PersonalFollowRow = React.memo(function PersonalFollowRow({
 
       {!hideMoreMenu && onShareProfile ? (
         <View style={styles.trailingSlot}>
-          <PersonalProfileMoreMenu clanId={clanId} onShareProfile={onShareProfile} />
+          <PersonalProfileMoreMenu
+            userId={userId}
+            clanId={clanId}
+            onShareProfile={onShareProfile}
+          />
         </View>
       ) : null}
     </View>

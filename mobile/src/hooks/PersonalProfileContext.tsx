@@ -31,7 +31,8 @@ import {
   type SimPost,
   type SimUser,
 } from '@evoconn/data/simulation/simulatedNetwork';
-import { fetchProfilesBatch, setPostHidden, isRealUserId, type BasicProfile } from '@evoconn/services/supabaseSocial';
+import { fetchProfilesBatch, fetchFollowers, setPostHidden, isRealUserId, type BasicProfile } from '@evoconn/services/supabaseSocial';
+import { fetchMutualFriends } from '@evoconn/services/supabaseMessaging';
 import { registerFollowProfilePrimer } from '@evoconn/hooks/followProfilePrime';
 import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
 import { useBlockedUsers } from '@evoconn/hooks/BlockedUsersContext';
@@ -77,6 +78,16 @@ function toFollowListEntry(
     clanId: null,
     rank: 'aprendiz',
     avatarUri: null,
+  };
+}
+
+function basicProfileToFollowingEntry(p: BasicProfile): FollowingEntry {
+  return {
+    id: p.id,
+    username: p.username,
+    clanId: p.clanId,
+    rank: (p.rank ?? 'aprendiz') as FollowingEntry['rank'],
+    avatarUri: p.avatarUri ?? null,
   };
 }
 
@@ -145,17 +156,21 @@ type PersonalProfileContextValue = {
 
   // ── Followers ──
   followers: FollowerEntry[];
-  followingBackIds: Set<string>;
-  followBack: (id: string) => void;
-  unfollowBack: (id: string) => void;
-  isFollowingBack: (id: string) => boolean;
+  refreshFollowers: () => void;
 
   // ── Following ──
   following: FollowingEntry[];
   unfollowUser: (id: string) => void;
 
+  followingBackIds: Set<string>;
+  followBack: (id: string) => void;
+  unfollowBack: (id: string) => void;
+  isFollowingBack: (id: string) => boolean;
+
   // ── Mutual friends (following ∩ followers) ──
   friends: FollowingEntry[];
+  friendsCount: number;
+  refreshFriends: () => void;
 
   /** Pide a Supabase los perfiles que falten para estos IDs (página visible). */
   primeProfiles: (ids: string[]) => void;
@@ -178,11 +193,78 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
   const sim = useSimulation();
   const taste = useRecommendationTaste();
   const { isBlocked } = useBlockedUsers();
-  const { activeUserId, users, posts: simPosts, followGraph, savedMap, hiddenMap } = sim;
+  const { activeUserId, users, posts: simPosts, followGraph, savedMap, hiddenMap, activeFollowersCount } = sim;
 
   // Cache of Supabase profiles for real UUID users not in SIM_USERS_BY_ID.
   const [profileCache, setProfileCache] = useState<Record<string, BasicProfile>>({});
+  const [supabaseFriends, setSupabaseFriends] = useState<FollowingEntry[]>([]);
+  const [supabaseFollowerIds, setSupabaseFollowerIds] = useState<string[]>([]);
   const fetchingRef = useRef<Set<string>>(new Set());
+  const friendsFetchGenRef = useRef(0);
+  const followersFetchGenRef = useRef(0);
+
+  const followingKey = useMemo(
+    () => [...(followGraph[activeUserId] ?? [])].sort().join(','),
+    [followGraph, activeUserId],
+  );
+
+  const graphFollowersKey = useMemo(
+    () =>
+      Object.entries(followGraph)
+        .filter(([, followingSet]) => followingSet.has(activeUserId))
+        .map(([uid]) => uid)
+        .sort()
+        .join(','),
+    [followGraph, activeUserId],
+  );
+
+  const refreshFollowers = useCallback(() => {
+    if (!isRealUserId(activeUserId)) {
+      setSupabaseFollowerIds([]);
+      return;
+    }
+    const gen = ++followersFetchGenRef.current;
+    void fetchFollowers(activeUserId)
+      .then((ids) => {
+        if (followersFetchGenRef.current !== gen) return;
+        setSupabaseFollowerIds(ids);
+      })
+      .catch(() => {
+        if (followersFetchGenRef.current !== gen) return;
+        setSupabaseFollowerIds([]);
+      });
+  }, [activeUserId]);
+
+  useEffect(() => {
+    refreshFollowers();
+  }, [refreshFollowers, activeFollowersCount, graphFollowersKey]);
+
+  const refreshFriends = useCallback(() => {
+    if (!isRealUserId(activeUserId)) {
+      setSupabaseFriends([]);
+      return;
+    }
+    const gen = ++friendsFetchGenRef.current;
+    void fetchMutualFriends(activeUserId)
+      .then((profiles) => {
+        if (friendsFetchGenRef.current !== gen) return;
+        setSupabaseFriends(profiles.map(basicProfileToFollowingEntry));
+        if (profiles.length === 0) return;
+        setProfileCache((prev) => {
+          const next = { ...prev };
+          for (const p of profiles) next[p.id] = p;
+          return next;
+        });
+      })
+      .catch(() => {
+        if (friendsFetchGenRef.current !== gen) return;
+        setSupabaseFriends([]);
+      });
+  }, [activeUserId]);
+
+  useEffect(() => {
+    refreshFriends();
+  }, [refreshFriends, followingKey, activeFollowersCount]);
 
   const fetchMissingProfiles = useCallback(
     (candidates: string[]) => {
@@ -288,12 +370,21 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
   );
 
   // ── Followers ──────────────────────────────────────────────────────────────
-  const followers = useMemo<FollowerEntry[]>(() => {
+  const localFollowers = useMemo<FollowerEntry[]>(() => {
     return Object.entries(followGraph)
       .filter(([, followingSet]) => followingSet.has(activeUserId))
       .filter(([uid]) => !isBlocked(uid))
       .map(([uid]) => toFollowListEntry(uid, users, profileCache));
   }, [followGraph, activeUserId, users, profileCache, isBlocked]);
+
+  const followers = useMemo<FollowerEntry[]>(() => {
+    if (isRealUserId(activeUserId)) {
+      return supabaseFollowerIds
+        .filter((uid) => !isBlocked(uid))
+        .map((uid) => toFollowListEntry(uid, users, profileCache));
+    }
+    return localFollowers;
+  }, [activeUserId, supabaseFollowerIds, localFollowers, users, profileCache, isBlocked]);
 
   // ── Following ──────────────────────────────────────────────────────────────
   const following = useMemo<FollowingEntry[]>(() => {
@@ -330,10 +421,19 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
   );
 
   // ── Mutual friends ─────────────────────────────────────────────────────────
-  const friends = useMemo<FollowingEntry[]>(() => {
+  const localFriends = useMemo<FollowingEntry[]>(() => {
     const followerIdSet = new Set(followers.map(f => f.id));
     return following.filter(u => followerIdSet.has(u.id) && !isBlocked(u.id));
   }, [followers, following, isBlocked]);
+
+  const friends = useMemo<FollowingEntry[]>(() => {
+    if (isRealUserId(activeUserId)) {
+      return supabaseFriends.filter(u => !isBlocked(u.id));
+    }
+    return localFriends;
+  }, [activeUserId, supabaseFriends, localFriends, isBlocked]);
+
+  const friendsCount = friends.length;
 
   // ── Saved posts ────────────────────────────────────────────────────────────
   const savedPostIds = useMemo<Set<string>>(
@@ -386,6 +486,7 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
       toggleHidePost,
       isHidden,
       followers,
+      refreshFollowers,
       followingBackIds,
       followBack,
       unfollowBack,
@@ -393,6 +494,8 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
       following,
       unfollowUser,
       friends,
+      friendsCount,
+      refreshFriends,
       primeProfiles: fetchMissingProfiles,
       savedPosts,
       savedPostIds,
@@ -402,8 +505,8 @@ export function PersonalProfileProvider({ children }: { children: React.ReactNod
     }),
     [
       posts, hiddenPostIds, deletePost, toggleHidePost, isHidden,
-      followers, followingBackIds, followBack, unfollowBack, isFollowingBack,
-      following, unfollowUser, friends, fetchMissingProfiles,
+      followers, refreshFollowers, followingBackIds, followBack, unfollowBack, isFollowingBack,
+      following, unfollowUser, friends, friendsCount, refreshFriends, fetchMissingProfiles,
       savedPosts, savedPostIds, savePost, unsavePost, isSaved,
     ],
   );

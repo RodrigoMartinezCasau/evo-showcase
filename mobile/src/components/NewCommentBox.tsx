@@ -1,4 +1,12 @@
-import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import React, {
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+  useEffect,
+  forwardRef,
+  useImperativeHandle,
+} from 'react';
 import {
   View,
   Text,
@@ -17,6 +25,10 @@ import {
 import { getChatSendButtonByHouse } from '@evoconn/utils/getChatSendButtonByHouse';
 import { clampMessageInput, MESSAGE_MAX_CHARS } from '@evoconn/utils/messageWordLimit';
 
+export type NewCommentBoxHandle = {
+  focus: () => void;
+};
+
 type NewCommentBoxProps = {
   onSend: (text: string) => void;
   /** Clan id of the post author — selects the correct enviar-1 SVG. */
@@ -28,14 +40,18 @@ type NewCommentBoxProps = {
   autoFocus?: boolean;
 };
 
-export const NewCommentBox = React.memo(function NewCommentBox({
-  onSend,
-  clanId,
-  maxPillHeight,
-  onFocus,
-  onBlur,
-  autoFocus = false,
-}: NewCommentBoxProps) {
+const NewCommentBoxInner = forwardRef<NewCommentBoxHandle, NewCommentBoxProps>(
+  function NewCommentBox(
+    {
+      onSend,
+      clanId,
+      maxPillHeight,
+      onFocus,
+      onBlur,
+      autoFocus = false,
+    }: NewCommentBoxProps,
+    ref,
+  ) {
   const SendSvg = getChatSendButtonByHouse(clanId);
   const [value, setValue] = useState('');
   const inputRef = useRef<TextInput>(null);
@@ -87,12 +103,30 @@ export const NewCommentBox = React.memo(function NewCommentBox({
     onBlur?.();
   }, [onBlur]);
 
+  useImperativeHandle(
+    ref,
+    () => ({
+      focus: () => inputRef.current?.focus(),
+    }),
+    [],
+  );
+
   useEffect(() => {
     if (!autoFocus) return;
+    let cancelled = false;
+    const focusInput = () => {
+      if (!cancelled) inputRef.current?.focus();
+    };
+    focusInput();
     const frame = requestAnimationFrame(() => {
-      inputRef.current?.focus();
+      requestAnimationFrame(focusInput);
     });
-    return () => cancelAnimationFrame(frame);
+    const retry = setTimeout(focusInput, 48);
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+      clearTimeout(retry);
+    };
   }, [autoFocus]);
 
   return (
@@ -167,7 +201,10 @@ export const NewCommentBox = React.memo(function NewCommentBox({
       </TouchableOpacity>
     </View>
   );
-});
+  },
+);
+
+export const NewCommentBox = React.memo(NewCommentBoxInner);
 
 /** Tap target en el feed: abre el overlay de comentarios (misma apariencia que el pill). */
 export function CommentComposerTrigger({
@@ -182,6 +219,8 @@ export function CommentComposerTrigger({
   return (
     <Pressable
       onPress={onPress}
+      delayPressIn={0}
+      android_ripple={{ color: 'rgba(255,255,255,0.08)' }}
       accessibilityRole="button"
       accessibilityLabel="Añadir comentario"
     >

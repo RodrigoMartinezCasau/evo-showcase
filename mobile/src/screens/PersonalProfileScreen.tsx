@@ -363,8 +363,8 @@ export default function PersonalProfileScreen() {
   );
 
   const handleSeeMoreRecentPosts = useCallback(() => {
-    router.push({ pathname: '/latest-posts', params: { userId: profileWithClan.id } });
-  }, [router, profileWithClan.id]);
+    router.push('/personal-posts');
+  }, [router]);
 
   const handlePostMenuAction = useCallback(
     (action: 'hide' | 'delete', postId: string) => {
