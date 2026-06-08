@@ -713,6 +713,35 @@
 .ts-slide.is-11  { --ts-cover-img-w: 80%; }
 .ts-slide.is-916 { --ts-cover-img-w: 82%; }
 
+/* Logos de tienda (Paso 0) — reemplazan el número grande */
+.ts-step-logos {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 30px;
+}
+.ts-step-logos img {
+  width: auto;
+  height: 104px;
+  display: block;
+  filter: drop-shadow(0 10px 24px rgba(0,0,0,0.55)) drop-shadow(0 0 22px rgba(112,0,255,0.25));
+}
+.ts-slide.is-916 .ts-step-logos img { height: 152px; }
+.ts-slide.is-916 .ts-step-logos { gap: 42px; }
+
+/* Tutorial "foto": portada con FOTO real (no botón) */
+#tut-foto .ts-cover-image img { width: auto; }
+#tut-foto .ts-slide.is-11  .ts-cover-image img { height: 164px; }
+#tut-foto .ts-slide.is-916 .ts-cover-image img { height: 392px; }
+#tut-foto .ts-cover-image::before {
+  background: radial-gradient(circle, rgba(112,0,255,0.38), rgba(112,0,255,0.16) 55%, transparent 72%);
+}
+#tut-foto .ts-cover-image img {
+  filter:
+    drop-shadow(0 16px 40px rgba(0,0,0,0.7))
+    drop-shadow(0 0 30px rgba(112,0,255,0.42));
+}
+
 /* ════════════════════ comp-slides.css ════════════════════ */
 /* EVO — "Cómo funciona la competición entre clanes"
    Reuses the cosmic .ts-slide shell + atmosphere from tutorial-slides.css.

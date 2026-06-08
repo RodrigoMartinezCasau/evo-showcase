@@ -406,7 +406,17 @@ function TutorialSlide({ spec, chrome }: { spec: TutorialSlideSpec; chrome: TutC
             ) : (
               <>
                 <p className="ts-step-kicker">{spec.stepKicker}</p>
-                {spec.stepButtonSrc ? (
+                {spec.stepLogos ? (
+                  <div className="ts-step-row">
+                    <span className="ts-step-rule left" />
+                    <div className="ts-step-logos">
+                      {spec.stepLogos.map((src, i) => (
+                        <img key={i} src={T + src} alt="" draggable={false} />
+                      ))}
+                    </div>
+                    <span className="ts-step-rule right" />
+                  </div>
+                ) : spec.stepButtonSrc ? (
                   <div className="ts-step-button">
                     <span className="ts-step-button-hint">{chrome.buttonHint}</span>
                     <img src={T + spec.stepButtonSrc} alt="" draggable={false} />

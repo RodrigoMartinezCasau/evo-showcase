@@ -1,5 +1,5 @@
 // EVO — Centro de tutoriales (Info): diccionario ES / EN.
-// Todo el "chrome" de la página + el contenido de los 4 tutoriales (incluidos
+// Todo el "chrome" de la página + el contenido de los 5 tutoriales (incluidos
 // los textos internos de cada slide) viven aquí para poder traducirlos.
 
 import type { Lang } from '../lib/clans';
@@ -20,6 +20,7 @@ export type TutorialSlideSpec = {
   stepHeadline?: string;
   stepDesc?: string;
   stepButtonSrc?: string;
+  stepLogos?: string[];
   stepShotSrc?: string;
   resultEyebrow?: string;
   resultTitleLines?: string[];
@@ -262,18 +263,74 @@ const TUTORIALS_ES: Tutorial[] = [
         noteDesc: 'Si un clan es enorme pero la mayoría no participa, su media baja y sale perjudicado. Vale más un clan pequeño y activo que uno grande y dormido.' },
     ],
   },
+  {
+    id: 'foto',
+    cat: 'Publicaciones',
+    title: 'Cómo añadir una foto a tu publicación',
+    accent: 'foto',
+    desc: 'Acompaña tus frases y reflexiones con una imagen de tu galería y, si quieres, música. Disponible con la última actualización.',
+    tags: ['foto', 'imagen', 'publicación', 'música', 'actualizar'],
+    search: 'foto imagen galería publicación frase reflexión actualizar app store play store nueva publicar añadir foto ajustar encuadre para ti siguiendo música audio canción sin audio publicar flecha última actualización',
+    slides: [
+      { type: 'tutorial', kind: 'cover', step: 1, count: 9,
+        coverVisual: 'image', coverImageSrc: 'post-img-tutorial/cover-post.jpg',
+        coverKicker: 'Un mini-tutorial',
+        coverTitleLines: ['Cómo añadir una foto', 'a tu publicación.'],
+        coverAccentWord: 'foto' },
+      { type: 'tutorial', kind: 'step', step: 2, count: 9, stepNum: '00',
+        stepKicker: 'Paso 00 · Actualiza',
+        stepHeadline: 'Actualiza la app en el App Store o Play Store.',
+        stepDesc: 'La función de fotos solo está en la última versión — asegúrate de tenerla al día.',
+        stepLogos: ['post-img-tutorial/logo-appstore.png', 'post-img-tutorial/logo-playstore.png'] },
+      { type: 'tutorial', kind: 'step', step: 3, count: 9, stepNum: '01',
+        stepKicker: 'Paso 01 · Crear',
+        stepHeadline: 'Crea una nueva reflexión o frase.',
+        stepDesc: 'Desde el menú, abre Nueva reflexión o Nueva frase.',
+        stepShotSrc: 'post-img-tutorial/real-01.png' },
+      { type: 'tutorial', kind: 'step', step: 4, count: 9, stepNum: '02',
+        stepKicker: 'Paso 02 · Publicar',
+        stepHeadline: 'Pulsa el botón de publicar.',
+        stepDesc: 'Dentro de la reflexión o frase, toca publicar para abrir las opciones.',
+        stepShotSrc: 'post-img-tutorial/real-02.png' },
+      { type: 'tutorial', kind: 'step', step: 5, count: 9, stepNum: '03',
+        stepKicker: 'Paso 03 · Foto',
+        stepHeadline: 'Pulsa Añadir foto.',
+        stepDesc: 'En tu publicación aparece la nueva opción Añadir foto.',
+        stepShotSrc: 'post-img-tutorial/real-03.png' },
+      { type: 'tutorial', kind: 'step', step: 6, count: 9, stepNum: '04',
+        stepKicker: 'Paso 04 · Galería',
+        stepHeadline: 'Elige la foto de tu galería.',
+        stepDesc: 'Selecciona desde el carrete la imagen que quieres adjuntar.',
+        stepShotSrc: 'post-img-tutorial/real-04.png' },
+      { type: 'tutorial', kind: 'step', step: 7, count: 9, stepNum: '05',
+        stepKicker: 'Paso 05 · Ajustar',
+        stepHeadline: 'Ajusta cómo se verá.',
+        stepDesc: 'Encuádrala para Para ti y para Siguiendo — son dos vistas distintas.',
+        stepShotSrc: 'post-img-tutorial/real-05.png' },
+      { type: 'tutorial', kind: 'step', step: 8, count: 9, stepNum: '06',
+        stepKicker: 'Paso 06 · Música',
+        stepHeadline: 'Elige música y publica.',
+        stepDesc: 'Añade una canción (o ninguna) y pulsa la flecha para publicar.',
+        stepShotSrc: 'post-img-tutorial/real-06.png' },
+      { type: 'tutorial', kind: 'result', step: 9, count: 9,
+        resultEyebrow: 'Listo',
+        resultTitleLines: ['Tu publicación sale', 'con foto y música.'],
+        resultAccentWord: 'con foto',
+        resultDesc: 'Aparece en el feed tal y como la encuadraste, en Para ti y en Siguiendo.' },
+    ],
+  },
 ];
 
 const DICT_ES: TutDict = {
   nav: { active: 'Info / Ayuda', download: 'Descargar', back: 'Volver a la web' },
   hero: { eyebrow: 'Evo · Guías', title: '¿En qué necesitas ayuda?', titleAccent: 'ayuda',
     sub: 'Cada guía, paso a paso. Busca tu duda o desliza por los tutoriales.' },
-  search: { placeholder: 'Busca: clan, widget, borrar, competición…', clear: 'Borrar búsqueda', ariaSearch: 'Buscar tutoriales' },
-  chips: ['clan', 'widgets', 'borrar', 'competición', 'reflexiones', 'perfil'],
+  search: { placeholder: 'Busca: clan, widget, borrar, foto, competición…', clear: 'Borrar búsqueda', ariaSearch: 'Buscar tutoriales' },
+  chips: ['clan', 'widgets', 'borrar', 'foto', 'competición', 'reflexiones'],
   meta: { one: 'tutorial', many: 'tutoriales', forWord: 'para' },
   empty: {
     title: (q) => `Sin resultados para “${q}”.`,
-    sub: 'Prueba con otra palabra: clan, widget, borrar o competición.',
+    sub: 'Prueba con otra palabra: clan, widget, borrar, foto o competición.',
     reset: 'Ver todos los tutoriales',
   },
   footer: { left: '© MMXXVI Evo · Centro de ayuda', right: 'evo.app · @evo' },
@@ -281,7 +338,7 @@ const DICT_ES: TutDict = {
   langToggle: { label: 'ES', other: 'EN' },
   tutorials: TUTORIALS_ES,
   metaTitle: 'Evo · Centro de tutoriales',
-  metaDesc: 'Todas las guías de EVO, paso a paso: clanes, widgets, publicaciones y competición.',
+  metaDesc: 'Todas las guías de EVO, paso a paso: clanes, widgets, publicaciones, fotos y competición.',
 };
 
 // ──────────────────────────────────────────────────────────────────
@@ -440,18 +497,74 @@ const TUTORIALS_EN: Tutorial[] = [
         noteDesc: 'If a clan is huge but most members don’t take part, its average drops and it loses out. A small, active clan beats a large, sleepy one.' },
     ],
   },
+  {
+    id: 'foto',
+    cat: 'Posts',
+    title: 'How to add a photo to your post',
+    accent: 'photo',
+    desc: 'Pair your phrases and reflections with an image from your gallery and, if you like, music. Available with the latest update.',
+    tags: ['photo', 'image', 'post', 'music', 'update'],
+    search: 'photo image gallery post phrase reflection update app store play store new publish add photo adjust crop for you following music audio song no audio publish arrow latest update',
+    slides: [
+      { type: 'tutorial', kind: 'cover', step: 1, count: 9,
+        coverVisual: 'image', coverImageSrc: 'post-img-tutorial/cover-post.jpg',
+        coverKicker: 'A mini-tutorial',
+        coverTitleLines: ['How to add a photo', 'to your post.'],
+        coverAccentWord: 'photo' },
+      { type: 'tutorial', kind: 'step', step: 2, count: 9, stepNum: '00',
+        stepKicker: 'Step 00 · Update',
+        stepHeadline: 'Update the app on the App Store or Play Store.',
+        stepDesc: 'The photo feature is only in the latest version — make sure you’re up to date.',
+        stepLogos: ['post-img-tutorial/logo-appstore.png', 'post-img-tutorial/logo-playstore.png'] },
+      { type: 'tutorial', kind: 'step', step: 3, count: 9, stepNum: '01',
+        stepKicker: 'Step 01 · Create',
+        stepHeadline: 'Create a new reflection or phrase.',
+        stepDesc: 'From the menu, open New reflection or New phrase.',
+        stepShotSrc: 'post-img-tutorial/real-01.png' },
+      { type: 'tutorial', kind: 'step', step: 4, count: 9, stepNum: '02',
+        stepKicker: 'Step 02 · Publish',
+        stepHeadline: 'Tap the publish button.',
+        stepDesc: 'Inside the reflection or phrase, tap publish to open the options.',
+        stepShotSrc: 'post-img-tutorial/real-02.png' },
+      { type: 'tutorial', kind: 'step', step: 5, count: 9, stepNum: '03',
+        stepKicker: 'Step 03 · Photo',
+        stepHeadline: 'Tap Add photo.',
+        stepDesc: 'The new Add photo option appears on your post.',
+        stepShotSrc: 'post-img-tutorial/real-03.png' },
+      { type: 'tutorial', kind: 'step', step: 6, count: 9, stepNum: '04',
+        stepKicker: 'Step 04 · Gallery',
+        stepHeadline: 'Choose a photo from your gallery.',
+        stepDesc: 'Select the image you want to attach from your camera roll.',
+        stepShotSrc: 'post-img-tutorial/real-04.png' },
+      { type: 'tutorial', kind: 'step', step: 7, count: 9, stepNum: '05',
+        stepKicker: 'Step 05 · Adjust',
+        stepHeadline: 'Adjust how it will look.',
+        stepDesc: 'Crop it for For you and Following — they are two different views.',
+        stepShotSrc: 'post-img-tutorial/real-05.png' },
+      { type: 'tutorial', kind: 'step', step: 8, count: 9, stepNum: '06',
+        stepKicker: 'Step 06 · Music',
+        stepHeadline: 'Choose music and publish.',
+        stepDesc: 'Add a song (or none) and tap the arrow to publish.',
+        stepShotSrc: 'post-img-tutorial/real-06.png' },
+      { type: 'tutorial', kind: 'result', step: 9, count: 9,
+        resultEyebrow: 'Done',
+        resultTitleLines: ['Your post goes live', 'with photo and music.'],
+        resultAccentWord: 'with photo',
+        resultDesc: 'It appears in the feed exactly as you cropped it, in For you and Following.' },
+    ],
+  },
 ];
 
 const DICT_EN: TutDict = {
   nav: { active: 'Info / Help', download: 'Download', back: 'Back to the site' },
   hero: { eyebrow: 'Evo · Guides', title: 'What do you need help with?', titleAccent: 'help',
     sub: 'Every guide, step by step. Search your question or swipe through the tutorials.' },
-  search: { placeholder: 'Search: clan, widget, delete, competition…', clear: 'Clear search', ariaSearch: 'Search tutorials' },
-  chips: ['clan', 'widgets', 'delete', 'competition', 'reflections', 'profile'],
+  search: { placeholder: 'Search: clan, widget, delete, photo, competition…', clear: 'Clear search', ariaSearch: 'Search tutorials' },
+  chips: ['clan', 'widgets', 'delete', 'photo', 'competition', 'reflections'],
   meta: { one: 'tutorial', many: 'tutorials', forWord: 'for' },
   empty: {
     title: (q) => `No results for “${q}”.`,
-    sub: 'Try another word: clan, widget, delete or competition.',
+    sub: 'Try another word: clan, widget, delete, photo or competition.',
     reset: 'See all tutorials',
   },
   footer: { left: '© MMXXVI Evo · Help center', right: 'evo.app · @evo' },
@@ -459,7 +572,7 @@ const DICT_EN: TutDict = {
   langToggle: { label: 'EN', other: 'ES' },
   tutorials: TUTORIALS_EN,
   metaTitle: 'Evo · Tutorials center',
-  metaDesc: 'Every EVO guide, step by step: clans, widgets, posts and competition.',
+  metaDesc: 'Every EVO guide, step by step: clans, widgets, posts, photos and competition.',
 };
 
 export function getTutDict(lang: Lang): TutDict {
