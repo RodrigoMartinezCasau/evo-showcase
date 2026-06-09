@@ -125,7 +125,7 @@ async def beta_protection_middleware(request: Request, call_next):
         if method != "POST":
             return False
         # Core LLM pipelines
-        if p in {"/debate", "/debate/chat", "/creator", "/phrase/intro"}:
+        if p in {"/debate", "/debate/chat", "/creator", "/phrase/intro", "/assistant/chat"}:
             return True
         # POST /debates only generates a short title (cheap LLM call) — does NOT
         # count toward daily quota. The real generation cost is in /debates/{id}/chat.
@@ -207,6 +207,26 @@ class ChatResponse(BaseModel):
     check_report: dict
     kb_candidate_count: int = 0
     kb_candidates: list[dict] = []
+
+
+class VoiceAssistantChatRequest(BaseModel):
+    message: str
+    voice: str | None = None
+    screen_context: str | None = None
+
+
+class VoiceAssistantPreviewRequest(BaseModel):
+    voice: str | None = None
+    text: str | None = None
+
+
+class VoiceAssistantChatResponse(BaseModel):
+    reply: str
+    audio_base64: str | None = None
+
+
+class VoiceAssistantPreviewResponse(BaseModel):
+    audio_base64: str | None = None
 
 
 class ValidateRequest(BaseModel):
@@ -636,6 +656,46 @@ def chat(payload: ChatRequest):
         kb_candidate_count=kb_debug.get("kb_candidate_count", 0),
         kb_candidates=kb_debug.get("kb_candidates", []),
     )
+
+
+@app.post("/assistant/chat", response_model=VoiceAssistantChatResponse)
+def assistant_chat(payload: VoiceAssistantChatRequest):
+    """Asistente de voz Evo: respuesta breve (OpenAI) + TTS opcional."""
+    from voice_assistant import run_voice_assistant_turn
+
+    msg = (payload.message or "").strip()
+    if not msg:
+        raise HTTPException(status_code=400, detail="message is required and cannot be empty")
+    voice = (payload.voice or "").strip() or None
+    try:
+        screen_ctx = (payload.screen_context or "").strip() or None
+        reply, audio_b64 = run_voice_assistant_turn(msg, voice=voice, screen_context=screen_ctx)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except RuntimeError as e:
+        if "openai_rate_limit" in str(e):
+            raise HTTPException(status_code=429, detail="OpenAI rate limit. Try again shortly.")
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        logger.exception("assistant_chat failed")
+        raise HTTPException(status_code=500, detail=f"Assistant error: {e}")
+
+    return VoiceAssistantChatResponse(reply=reply, audio_base64=audio_b64)
+
+
+@app.post("/assistant/preview-tts", response_model=VoiceAssistantPreviewResponse)
+def assistant_preview_tts(payload: VoiceAssistantPreviewRequest):
+    """Muestra de voz TTS (Ajustes). No consume cuota diaria de IA."""
+    from voice_assistant import run_voice_assistant_preview
+
+    voice = (payload.voice or "").strip() or None
+    sample = (payload.text or "").strip() or None
+    try:
+        audio_b64 = run_voice_assistant_preview(voice=voice, text=sample)
+    except Exception as e:
+        logger.exception("assistant_preview_tts failed")
+        raise HTTPException(status_code=500, detail=f"Preview error: {e}")
+    return VoiceAssistantPreviewResponse(audio_base64=audio_b64)
 
 
 @app.post("/validate", response_model=ValidateResponse)

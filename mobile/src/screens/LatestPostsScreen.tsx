@@ -15,7 +15,7 @@ import {
   ActivityIndicator,
   Keyboard,
 } from 'react-native';
-import { useRouter, useLocalSearchParams, usePathname } from 'expo-router';
+import { useRouter, useLocalSearchParams, usePathname, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AppTopBar, AppShellBottomTabsWrap, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
@@ -47,6 +47,8 @@ import { enrichPostsAuthorAvatar } from '@evoconn/utils/enrichPostsAuthorAvatar'
 import { otherProfileCache, formatProfileUsername } from '@evoconn/state/otherProfileCache';
 import { supabase } from '../../mobile/lib/supabase';
 import { useAuth } from '../../mobile/lib/AuthContext';
+import { useVoiceAssistantScreenContextOwner } from '@evoconn/hooks/VoiceAssistantScreenContext';
+import { syncVoiceAssistantCommunityPost } from '@evoconn/utils/voiceAssistantScreenContext';
 
 function applyProfileUsernameToPosts(
   posts: CommunityPost[],
@@ -298,6 +300,10 @@ export default function LatestPostsScreen() {
   const recordPostViewRef = useRef(recordPostView);
   recordPostViewRef.current = recordPostView;
 
+  const vaScreen = useVoiceAssistantScreenContextOwner();
+  const vaScreenRef = useRef(vaScreen);
+  vaScreenRef.current = vaScreen;
+
   const verticalFeedVisiblePostIdRef = useRef<string | null>(null);
   const verticalFeedViewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
   const onVerticalFeedViewableItemsChanged = useRef(
@@ -309,6 +315,7 @@ export default function LatestPostsScreen() {
       if (prev !== null && prev !== post.id) {
         Keyboard.dismiss();
       }
+      syncVoiceAssistantCommunityPost(vaScreenRef.current, post, 'publicaciones recientes');
       recordPostViewRef.current(post.id);
       // Audio adjunto del post visible (volumen elegido al publicar).
       feedAudioRef.current.playForPost(post);
@@ -324,13 +331,20 @@ export default function LatestPostsScreen() {
     const post = data[Math.min(initialIndex, data.length - 1)];
     if (post) {
       initialAudioPlayedRef.current = true;
+      syncVoiceAssistantCommunityPost(vaScreenRef.current, post, 'publicaciones recientes');
       recordPostViewRef.current(post.id);
       feedAudioRef.current.playForPost(post);
     }
   }, [data, initialIndex]);
 
-  // Detener el audio al salir del visor (desmontar la pantalla).
-  useEffect(() => () => feedAudioRef.current.stop(), []);
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        feedAudioRef.current.stop();
+        vaScreenRef.current.clearScreenContext(vaScreenRef.current.ownerId);
+      };
+    }, []),
+  );
 
   return (
     <View style={styles.container}>

@@ -20,6 +20,8 @@ import {
   COMMUNITY_DETAIL_PREFETCH_POSTS_ANDROID,
   COMMUNITY_DETAIL_UPDATE_CELLS_PERIOD_ANDROID,
 } from '@evoconn/constants/communityDetailFeed';
+import { useVoiceAssistantScreenContextOwner } from '@evoconn/hooks/VoiceAssistantScreenContext';
+import { syncVoiceAssistantCommunityPost } from '@evoconn/utils/voiceAssistantScreenContext';
 
 type Props = {
   data: CommunityPost[];
@@ -124,6 +126,10 @@ export function ProfileDetailPanel({
   const feedAudioRef = useRef(feedAudio);
   feedAudioRef.current = feedAudio;
 
+  const vaScreen = useVoiceAssistantScreenContextOwner();
+  const vaScreenRef = useRef(vaScreen);
+  vaScreenRef.current = vaScreen;
+
   const verticalFeedVisiblePostIdRef = useRef<string | null>(null);
   const verticalFeedViewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
   const onVerticalFeedViewableItemsChanged = useRef(
@@ -135,6 +141,7 @@ export function ProfileDetailPanel({
       if (prev !== null && prev !== post.id) {
         Keyboard.dismiss();
       }
+      syncVoiceAssistantCommunityPost(vaScreenRef.current, post, 'publicación en perfil');
       // Audio adjunto del post visible (volumen elegido al publicar).
       feedAudioRef.current.playForPost(post);
     },
@@ -149,12 +156,19 @@ export function ProfileDetailPanel({
     const post = data[Math.min(initialIndex, data.length - 1)];
     if (post) {
       initialAudioPlayedRef.current = true;
+      syncVoiceAssistantCommunityPost(vaScreenRef.current, post, 'publicación en perfil');
       feedAudioRef.current.playForPost(post);
     }
   }, [data, initialIndex]);
 
   // Detener el audio al cerrar el panel (desmontar).
-  useEffect(() => () => feedAudioRef.current.stop(), []);
+  useEffect(
+    () => () => {
+      feedAudioRef.current.stop();
+      vaScreenRef.current.clearScreenContext(vaScreenRef.current.ownerId);
+    },
+    [],
+  );
 
   return (
     <GestureHandlerRootView style={StyleSheet.absoluteFillObject}>

@@ -2065,9 +2065,9 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
       />
     </View>
 
-      {!previewMode && commentComposerOpen ? (
+      {!previewMode ? (
         <CommentComposerOverlay
-          visible
+          visible={commentComposerOpen}
           onClose={closeCommentComposer}
           contentPaddingHorizontal={commentComposerHorizontalPad}
           onShow={focusComposerInput}

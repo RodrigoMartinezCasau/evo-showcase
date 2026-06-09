@@ -26,7 +26,8 @@ export function setApiBaseUrl(url: string) {
 }
 
 export function getApiBaseUrl(): string {
-  return _apiUrl;
+  // Siempre resolver en runtime (simulador ↔ IP LAN del .env, cambios de .env sin reinicio de módulo).
+  return getDefaultApiUrl();
 }
 
 function withApiKey(init?: RequestInit & { requestId?: string }): RequestInit {

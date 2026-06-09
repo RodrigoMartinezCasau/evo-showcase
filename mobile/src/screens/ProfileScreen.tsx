@@ -29,6 +29,8 @@ import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContex
 import { useClassification } from '@evoconn/hooks/ClassificationContext';
 import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
 import { useDeferredRender } from '@evoconn/hooks/useDeferredRender';
+import { useVoiceAssistantFocusedScreenContext } from '@evoconn/hooks/VoiceAssistantScreenContext';
+import { profileToScreenSnapshot } from '@evoconn/utils/voiceAssistantScreenContext';
 import { ClanLoadingDot } from '@evoconn/components/shared/ClanLoadingDot';
 import { getAppShellScrollableBodyHeight } from '@evoconn/constants/appShellLayout';
 import {
@@ -473,6 +475,23 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
     data: CommunityPost[];
     initialIndex: number;
   } | null>(null);
+
+  const voiceAssistantScreenSnapshot = useMemo(() => {
+    if (!ready || detailFeed) return null;
+    return profileToScreenSnapshot({
+      screenLabel: 'Perfil de usuario',
+      username: profileWithLiveFollowers.username,
+      clanId: profileWithLiveFollowers.clanId,
+      rank: profileWithLiveFollowers.rank,
+      percentages: profileWithLiveFollowers.philosophyPercentages ?? [],
+      reflectionCount: liveReflectionCount,
+      phraseCount: liveQuoteCount,
+      insigniaPhrase: profileWithLiveFollowers.insigniaPhrase,
+      isOwnProfile: false,
+    });
+  }, [ready, detailFeed, profileWithLiveFollowers, liveReflectionCount, liveQuoteCount]);
+
+  useVoiceAssistantFocusedScreenContext(voiceAssistantScreenSnapshot);
 
   const openDetailFeed = useCallback(
     (posts: CommunityPost[], postId: string) => {

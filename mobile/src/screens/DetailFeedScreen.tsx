@@ -48,6 +48,8 @@ import {
   parseFollowingSortParam,
 } from '@evoconn/constants/followingFeedSort';
 import { sanitizeRouteId } from '@evoconn/utils/sanitizeRouteId';
+import { useVoiceAssistantScreenContextOwner } from '@evoconn/hooks/VoiceAssistantScreenContext';
+import { syncVoiceAssistantCommunityPost } from '@evoconn/utils/voiceAssistantScreenContext';
 
 type FeedMode = 'following' | 'foryou';
 
@@ -262,6 +264,9 @@ export default function DetailFeedScreen() {
   const feedAudioRef = useRef(feedAudio);
   feedAudioRef.current = feedAudio;
   const screenFocusedRef = useRef(false);
+  const vaScreen = useVoiceAssistantScreenContextOwner();
+  const vaScreenRef = useRef(vaScreen);
+  vaScreenRef.current = vaScreen;
 
   useFocusEffect(
     useCallback(() => {
@@ -269,6 +274,7 @@ export default function DetailFeedScreen() {
       return () => {
         screenFocusedRef.current = false;
         feedAudioRef.current.stop();
+        vaScreenRef.current.clearScreenContext(vaScreenRef.current.ownerId);
       };
     }, []),
   );
@@ -278,8 +284,16 @@ export default function DetailFeedScreen() {
     feedAudioRef.current.playForPost(post);
   }, []);
 
+  const syncVisiblePostContext = useCallback((post: CommunityPost | undefined) => {
+    syncVoiceAssistantCommunityPost(vaScreenRef.current, post, 'visor de publicaciones');
+  }, []);
+
   const detailPagerVisiblePostIdRef = useRef<string | null>(null);
   const detailPagerViewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
+  const playAudioForPostRef = useRef(playAudioForPost);
+  playAudioForPostRef.current = playAudioForPost;
+  const syncVisiblePostContextRef = useRef(syncVisiblePostContext);
+  syncVisiblePostContextRef.current = syncVisiblePostContext;
   const onDetailPagerViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: Array<{ item?: CommunityPost }> }) => {
       const post = viewableItems[0]?.item;
@@ -289,8 +303,9 @@ export default function DetailFeedScreen() {
       if (prev !== null && prev !== post.id) {
         Keyboard.dismiss();
       }
+      syncVisiblePostContextRef.current(post);
       // Audio adjunto del post visible (volumen elegido al publicar).
-      playAudioForPost(post);
+      playAudioForPostRef.current(post);
     },
   ).current;
 
@@ -303,9 +318,10 @@ export default function DetailFeedScreen() {
     const post = data[Math.min(initialIndex, data.length - 1)];
     if (post) {
       initialAudioPlayedRef.current = true;
+      syncVisiblePostContext(post);
       playAudioForPost(post);
     }
-  }, [data, initialIndex, playAudioForPost]);
+  }, [data, initialIndex, playAudioForPost, syncVisiblePostContext]);
 
   // Respaldo por desmontaje (p. ej. pop del stack); el foco ya para el audio al salir.
   useEffect(() => () => feedAudioRef.current.stop(), []);

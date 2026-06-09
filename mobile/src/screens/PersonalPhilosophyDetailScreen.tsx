@@ -13,7 +13,7 @@
  * AI blocks each cost 1 use per generation/reload.
  * Results are persisted on the backend and restored on reopen.
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   ScrollView,
@@ -26,6 +26,8 @@ import { evoconnColors } from '@evoconn/theme/colors';
 import { mockCurrentUser } from '@evoconn/data/mockUser';
 import { getPersonalProfile } from '@evoconn/data/mockPersonalProfile';
 import { useAuth } from '../../mobile/lib/AuthContext';
+import { useVoiceAssistantFocusedScreenContext } from '@evoconn/hooks/VoiceAssistantScreenContext';
+import { profileToScreenSnapshot } from '@evoconn/utils/voiceAssistantScreenContext';
 import { AppTopBar, AppShellBottomTabsWrap, BottomCommunityTabs, SidebarDrawer } from '@evoconn/components';
 import type { TabId } from '@evoconn/components/BottomCommunityTabs';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
@@ -178,6 +180,21 @@ export default function PersonalPhilosophyDetailScreen() {
   const remainingUsesRef = useRef(remainingUses);
   remainingUsesRef.current = remainingUses;
   const clanId = effectiveClanId ?? activeClan;
+
+  const voiceAssistantScreenSnapshot = useMemo(() => {
+    if (!ready) return null;
+    return profileToScreenSnapshot({
+      screenLabel: 'Detalle de pensamiento filosófico',
+      username: profile.username,
+      clanId,
+      rank: profile.rank,
+      percentages: profile.philosophyPercentages,
+      isOwnProfile: true,
+      includeAllPercentages: true,
+    });
+  }, [ready, profile, clanId]);
+
+  useVoiceAssistantFocusedScreenContext(voiceAssistantScreenSnapshot);
 
   /** Same quota as enviar reflexión/frase: 1 uso local + log remoto por generación. */
   const consumeAiUse = useCallback(() => {

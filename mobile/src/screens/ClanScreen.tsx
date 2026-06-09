@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { View, StyleSheet, useWindowDimensions } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
@@ -13,6 +13,8 @@ import { evoconnColors } from '@evoconn/theme/colors';
 import { ClanDisplay } from '@evoconn/components/clan/ClanDisplay';
 import { useDeferredRender } from '@evoconn/hooks/useDeferredRender';
 import { ClanLoadingDot } from '@evoconn/components/shared/ClanLoadingDot';
+import { useVoiceAssistantFocusedScreenContext } from '@evoconn/hooks/VoiceAssistantScreenContext';
+import { clanToScreenSnapshot } from '@evoconn/utils/voiceAssistantScreenContext';
 
 export default function ClanScreen() {
   const { id }    = useLocalSearchParams<{ id: string }>();
@@ -25,6 +27,11 @@ export default function ClanScreen() {
   const clanId = id ?? 'estoico';
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const ready = useDeferredRender();
+  const voiceAssistantScreenSnapshot = useMemo(
+    () => (ready ? clanToScreenSnapshot(clanId) : null),
+    [ready, clanId],
+  );
+  useVoiceAssistantFocusedScreenContext(voiceAssistantScreenSnapshot);
 
   const handleBottomTabChange = useCallback((tab: TabId) => {
     router.navigate({ pathname: '/(tabs)', params: { tab } });

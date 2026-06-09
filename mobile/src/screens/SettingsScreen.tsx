@@ -30,6 +30,8 @@ import { CLAN_TO_COLOR } from '@evoconn/constants/clanColors';
 import { UserAvatarFrame } from '@evoconn/components/shared/UserAvatarFrame';
 import { useDebugStats } from '@evoconn/debug/DebugStatsContext';
 import { useEvoPreferences } from '@evoconn/hooks/EvoPreferencesContext';
+import { useVoiceAssistantPreferences } from '@evoconn/hooks/VoiceAssistantPreferencesContext';
+import { getVoiceAssistantVoiceOption } from '@evoconn/constants/voiceAssistantVoices';
 import { useAuth } from '../../mobile/lib/AuthContext';
 import { isRealUserId, setProfilePrivate } from '@evoconn/services/supabaseSocial';
 import { EvoInfoModal } from '@evoconn/components/shared/EvoActionSheetModal';
@@ -348,6 +350,8 @@ export default function SettingsScreen({
 
   // ── Haptics toggle (persisted via EvoPreferencesContext) ──────────────────
   const { hapticsEnabled, setHapticsEnabled } = useEvoPreferences();
+  const { voiceId } = useVoiceAssistantPreferences();
+  const assistantVoiceLabel = getVoiceAssistantVoiceOption(voiceId).label;
 
   const handleBottomTabChange = useCallback(
     (tab: TabId) => { router.navigate({ pathname: '/(tabs)', params: { tab } }); },
@@ -405,6 +409,15 @@ export default function SettingsScreen({
       rows: [
         { id: 'lang',   label: 'Idioma',        value: 'Español', icon: 'globe-outline',         iconBg: IC.cyan, type: 'info' },
         { id: 'notifs', label: 'Notificaciones',                  icon: 'notifications-outline', iconBg: IC.pink, type: 'toggle', onToggleKey: 'notifications' },
+        {
+          id: 'assistant-voice',
+          label: 'Voz del asistente',
+          value: assistantVoiceLabel,
+          icon: 'mic-outline',
+          iconBg: IC.teal,
+          type: 'navigate',
+          onPress: () => router.push('/settings-voice-assistant'),
+        },
       ],
     },
     {
@@ -497,7 +510,7 @@ export default function SettingsScreen({
         },
       ],
     },
-  ], [remainingUses, userEmail, userPhone, deletingAccount, confirmDeleteAccount, router, profile?.id]);
+  ], [remainingUses, userEmail, userPhone, deletingAccount, confirmDeleteAccount, router, profile?.id, assistantVoiceLabel]);
 
   const handleHapticsToggle = useCallback((val: boolean) => setHapticsEnabled(val), [setHapticsEnabled]);
 

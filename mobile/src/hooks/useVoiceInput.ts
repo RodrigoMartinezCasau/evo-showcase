@@ -17,6 +17,7 @@ import { Alert } from 'react-native';
 // requireOptionalNativeModule returns null if the native module is not linked,
 // instead of throwing an uncaught native exception like require() would.
 import { requireOptionalNativeModule } from 'expo';
+import * as Device from 'expo-device';
 import { messageLimitReached, truncateTranscriptToFit } from '@evoconn/utils/messageWordLimit';
 
 export type VoiceState = 'idle' | 'recording' | 'transcribing';
@@ -27,6 +28,16 @@ type Options = {
   getCurrentText?: () => string;
   maxWords?: number;
   maxChars?: number;
+  /** Grabación continua hasta stopRecording (asistente: pulsar para parar). */
+  holdToTalk?: boolean;
+  /** Corta la grabación automáticamente tras N segundos (asistente: 60). */
+  maxRecordingSeconds?: number;
+  /**
+   * En simulador / sin micrófono: no inventar frases de prueba.
+   * El asistente de voz debe usar esto para no mandar texto falso al LLM.
+   */
+  blockSimulatedTranscript?: boolean;
+  onSimulatedTranscriptBlocked?: () => void;
 };
 
 export type UseVoiceInputResult = {
@@ -40,11 +51,8 @@ export type UseVoiceInputResult = {
   cancelRecording: () => void;
 };
 
-// ─── In __DEV__ (simulator / Expo Go) always use simulation ──────────────────
-// The iOS Simulator does not support Speech Recognition and the native module
-// hangs forever if called there. Force the simulation path in dev mode so the
-// UX works correctly during development.
-const FORCE_SIMULATION = __DEV__;
+// Simulador: sin Speech Recognition fiable. Dispositivo físico: STT nativo aunque sea __DEV__.
+const FORCE_SIMULATION = __DEV__ && !Device.isDevice;
 
 // ─── Native module (null when not linked) ─────────────────────────────────────
 
@@ -58,6 +66,28 @@ type SpeechModule = {
 
 // Evaluated once at module load — safe even if native module is absent.
 const speechModule = requireOptionalNativeModule<SpeechModule>('ExpoSpeechRecognition');
+
+/** STT nativo (expo-speech-recognition linkeado). No existe en Expo Go. */
+export const hasNativeSpeechRecognition =
+  !FORCE_SIMULATION && speechModule !== null;
+
+/** Mensaje cuando no hay STT real (simulador o Expo Go en iPhone). */
+export function speechRecognitionUnavailableMessage(): string | null {
+  if (hasNativeSpeechRecognition) return null;
+  if (__DEV__ && !Device.isDevice) {
+    return (
+      'En el simulador no hay micrófono real: no se envía tu voz al asistente. ' +
+      'Prueba en un iPhone con la app instalada vía npx expo run:ios --device.'
+    );
+  }
+  return (
+    'El micrófono del asistente no funciona en Expo Go: falta el módulo nativo de voz.\n\n' +
+    'Conecta el iPhone al Mac y ejecuta:\n' +
+    'cd mobile/mobile\n' +
+    'npx expo run:ios --device\n\n' +
+    'Deja el backend en marcha en el Mac (uvicorn … --host 0.0.0.0).'
+  );
+}
 
 // ─── Simulation fallback phrases ──────────────────────────────────────────────
 
@@ -77,7 +107,16 @@ function nextSimPhrase() {
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
-export function useVoiceInput({ onTranscriptReady, getCurrentText, maxWords, maxChars }: Options): UseVoiceInputResult {
+export function useVoiceInput({
+  onTranscriptReady,
+  getCurrentText,
+  maxWords,
+  maxChars,
+  holdToTalk = false,
+  maxRecordingSeconds,
+  blockSimulatedTranscript = false,
+  onSimulatedTranscriptBlocked,
+}: Options): UseVoiceInputResult {
   const [voiceState, setVoiceState]   = useState<VoiceState>('idle');
   const [interimText, setInterimText] = useState('');
   const [elapsedSeconds, setElapsed]  = useState(0);
@@ -85,6 +124,7 @@ export function useVoiceInput({ onTranscriptReady, getCurrentText, maxWords, max
 
   const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null);
   const volumeRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+  const maxDurationRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const listenersRef = useRef<Array<{ remove: () => void }>>([]);
   const cancelledRef = useRef(false);
   const simStopRef   = useRef<(() => void) | null>(null);
@@ -106,7 +146,17 @@ export function useVoiceInput({ onTranscriptReady, getCurrentText, maxWords, max
   const clearTimers = useCallback(() => {
     if (timerRef.current)  { clearInterval(timerRef.current);  timerRef.current  = null; }
     if (volumeRef.current) { clearInterval(volumeRef.current); volumeRef.current = null; }
+    if (maxDurationRef.current) { clearTimeout(maxDurationRef.current); maxDurationRef.current = null; }
   }, []);
+
+  const scheduleMaxDurationStop = useCallback(() => {
+    if (!maxRecordingSeconds || maxRecordingSeconds <= 0) return;
+    maxDurationRef.current = setTimeout(() => {
+      maxDurationRef.current = null;
+      stopNativeRef.current?.();
+      simStopRef.current?.();
+    }, maxRecordingSeconds * 1000);
+  }, [maxRecordingSeconds]);
 
   const removeListeners = useCallback(() => {
     listenersRef.current.forEach((l) => l.remove());
@@ -148,6 +198,7 @@ export function useVoiceInput({ onTranscriptReady, getCurrentText, maxWords, max
     setVoiceState('recording');
     setInterimText('');
     startAnimations();
+    scheduleMaxDurationStop();
 
     // Capture interim text AND the final transcript from the result event.
     // expo-speech-recognition does NOT emit a separate 'finalresult' event —
@@ -200,8 +251,12 @@ export function useVoiceInput({ onTranscriptReady, getCurrentText, maxWords, max
       }),
     );
 
-    speechModule.start({ lang: 'es-ES', interimResults: true, continuous: false });
-  }, [startAnimations, clearTimers, removeListeners, onTranscriptReady, getCurrentText, maxWords, maxChars, wordLimitReached]);
+    speechModule.start({
+      lang: 'es-ES',
+      interimResults: true,
+      continuous: holdToTalk,
+    });
+  }, [startAnimations, scheduleMaxDurationStop, clearTimers, removeListeners, onTranscriptReady, getCurrentText, maxWords, maxChars, wordLimitReached, holdToTalk]);
 
   const stopNative = useCallback(() => {
     speechModule?.stop();
@@ -227,8 +282,10 @@ export function useVoiceInput({ onTranscriptReady, getCurrentText, maxWords, max
     setVoiceState('recording');
     setInterimText('');
     startAnimations();
+    scheduleMaxDurationStop();
 
-    const autoStopTimer = setTimeout(() => simStopRef.current?.(), 30_000);
+    const simMaxMs = (maxRecordingSeconds && maxRecordingSeconds > 0 ? maxRecordingSeconds : 30) * 1000;
+    const autoStopTimer = setTimeout(() => simStopRef.current?.(), simMaxMs);
 
     simStopRef.current = () => {
       clearTimeout(autoStopTimer);
@@ -242,15 +299,30 @@ export function useVoiceInput({ onTranscriptReady, getCurrentText, maxWords, max
       setVoiceState('transcribing');
       setTimeout(() => {
         if (!cancelledRef.current) {
-          const base = getCurrentText?.() ?? '';
-          const phrase = nextSimPhrase();
-          const slice = truncateTranscriptToFit(base, phrase, maxWords, maxChars);
-          if (slice) onTranscriptReady(slice);
+          if (blockSimulatedTranscript) {
+            onSimulatedTranscriptBlocked?.();
+          } else {
+            const base = getCurrentText?.() ?? '';
+            const phrase = nextSimPhrase();
+            const slice = truncateTranscriptToFit(base, phrase, maxWords, maxChars);
+            if (slice) onTranscriptReady(slice);
+          }
         }
         setVoiceState('idle'); setInterimText('');
       }, 700);
     };
-  }, [startAnimations, clearTimers, onTranscriptReady, getCurrentText, maxWords, maxChars]);
+  }, [
+    startAnimations,
+    clearTimers,
+    onTranscriptReady,
+    getCurrentText,
+    maxWords,
+    maxChars,
+    blockSimulatedTranscript,
+    onSimulatedTranscriptBlocked,
+    scheduleMaxDurationStop,
+    maxRecordingSeconds,
+  ]);
 
   const stopSimulation  = useCallback(() => simStopRef.current?.(), []);
   const cancelSimulation = useCallback(() => {
@@ -262,7 +334,7 @@ export function useVoiceInput({ onTranscriptReady, getCurrentText, maxWords, max
   // PUBLIC API
   // ═══════════════════════════════════════════════════════════════════════════
 
-  const useNative = !FORCE_SIMULATION && speechModule !== null;
+  const useNative = hasNativeSpeechRecognition;
 
   const startRecording = useCallback(async () => {
     if (useNative) { await startNative(); }
@@ -284,7 +356,7 @@ export function useVoiceInput({ onTranscriptReady, getCurrentText, maxWords, max
     interimText,
     elapsedSeconds,
     volumeLevel,
-    isAvailable: true,
+    isAvailable: useNative,
     startRecording,
     stopRecording,
     cancelRecording,

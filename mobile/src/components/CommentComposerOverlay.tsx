@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Modal,
@@ -7,13 +7,11 @@ import {
   Animated,
   Pressable,
   Keyboard,
-  Dimensions,
-  InteractionManager,
-  type KeyboardEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CHAT_INPUT_ISLAND_LAYOUT as ISLAND } from '@evoconn/constants/chatInputBarLayout';
 import { COMMENT_COMPOSER_KEYBOARD_LAYOUT as KB } from '@evoconn/constants/newCommentBoxLayout';
+import { useKeyboardAnim } from './ChatInputBar';
 
 type CommentComposerOverlayProps = {
   visible: boolean;
@@ -25,58 +23,16 @@ type CommentComposerOverlayProps = {
   onShow?: () => void;
 };
 
-/** iOS: altura del teclado desde el borde inferior de ventana. */
-function resolveIosKeyboardHeight(e: KeyboardEvent): number {
-  const windowHeight = Dimensions.get('window').height;
-  return Math.max(0, windowHeight - e.endCoordinates.screenY);
-}
-
-function useIosCommentComposerKeyboardAnim(active: boolean) {
-  const anim = useRef(new Animated.Value(0)).current;
-  const keyboardHeightRef = useRef(0);
-
-  useEffect(() => {
-    if (!active || Platform.OS !== 'ios') {
-      anim.stopAnimation();
-      anim.setValue(0);
-      keyboardHeightRef.current = 0;
-      return;
-    }
-
-    const animateToKeyboardFrame = (e: KeyboardEvent) => {
-      const keyboardHeight = resolveIosKeyboardHeight(e);
-      const isOpening = keyboardHeight > keyboardHeightRef.current;
-      const speed = isOpening ? ISLAND.keyboardOpenSpeed : ISLAND.keyboardCloseSpeed;
-      const baseDuration = e.duration ?? 250;
-      const duration = Math.max(ISLAND.keyboardMinDurationMs, baseDuration / speed);
-
-      anim.stopAnimation();
-      keyboardHeightRef.current = keyboardHeight;
-      Animated.timing(anim, {
-        toValue: keyboardHeight,
-        duration,
-        useNativeDriver: true,
-      }).start();
-    };
-
-    const onFrameChange = Keyboard.addListener(
-      'keyboardWillChangeFrame',
-      animateToKeyboardFrame,
-    );
-    return () => onFrameChange.remove();
-  }, [active, anim]);
-
-  return anim;
-}
-
 /** Evita que el mismo tap que abrió el modal dispare el cierre del backdrop. */
 const DISMISS_ARM_DELAY_MS = 320;
 
 /**
+ * Modal + barra anclada abajo.
  *
- * iOS: animación de altura de teclado (igual que ChatInputBar).
- * Android: sin traslación manual — `adjustResize` redimensiona la ventana del
- * Modal y la barra queda pegada al teclado. Moverla otra vez la empuja lejos.
+ * iOS: el Modal NO redimensiona la ventana → movemos la barra con `translateY`
+ *      (igual que `ChatInputBar`).
+ * Android: `adjustResize` YA redimensiona la ventana del Modal → la barra queda
+ *          pegada al teclado si NO aplicamos otra `translateY` (doble salto).
  */
 export function CommentComposerOverlay({
   visible,
@@ -86,7 +42,7 @@ export function CommentComposerOverlay({
   onShow,
 }: CommentComposerOverlayProps) {
   const insets = useSafeAreaInsets();
-  const iosKeyboardAnim = useIosCommentComposerKeyboardAnim(visible);
+  const keyboardAnim = useKeyboardAnim();
   const [dismissArmed, setDismissArmed] = useState(false);
 
   useEffect(() => {
@@ -105,29 +61,31 @@ export function CommentComposerOverlay({
   }, [visible]);
 
   const handleModalShow = () => {
-    InteractionManager.runAfterInteractions(() => {
-      requestAnimationFrame(() => onShow?.());
-    });
+    const focus = () => onShow?.();
+    focus();
+    requestAnimationFrame(focus);
+    setTimeout(focus, 48);
+    setTimeout(focus, 120);
   };
 
-  const keyboardGapOffset = iosKeyboardAnim.interpolate({
-    inputRange: [0, KB.keyboardBubbleGapBlendPx],
-    outputRange: [0, KB.keyboardBubbleGapOffsetY],
+  const keyboardGapOffset = keyboardAnim.interpolate({
+    inputRange: [0, ISLAND.keyboardBubbleGapBlendPx],
+    outputRange: [0, ISLAND.keyboardBubbleGapOffsetY],
     extrapolate: 'clamp',
   });
-  const keyboardExtraLift = iosKeyboardAnim.interpolate({
+  const keyboardExtraLift = keyboardAnim.interpolate({
     inputRange: [0, KB.keyboardBubbleGapBlendPx],
     outputRange: [0, KB.keyboardExtraLiftOffsetY],
     extrapolate: 'clamp',
   });
-  const keyboardIosHomeLift = iosKeyboardAnim.interpolate({
+  const keyboardIosHomeLift = keyboardAnim.interpolate({
     inputRange: [0, KB.keyboardBubbleGapBlendPx],
     outputRange: [0, insets.bottom * KB.keyboardIosHomeIndicatorLiftRatio],
     extrapolate: 'clamp',
   });
 
   const iosTranslateY = Animated.add(
-    Animated.multiply(iosKeyboardAnim, -1),
+    Animated.multiply(keyboardAnim, -1),
     Animated.subtract(
       keyboardGapOffset,
       Animated.add(keyboardExtraLift, keyboardIosHomeLift),
@@ -140,26 +98,22 @@ export function CommentComposerOverlay({
     onClose();
   };
 
-  const barWrapper = visible ? (
-    <View
-      collapsable={false}
-      pointerEvents="box-none"
-      style={[
-        styles.outerWrapper,
-        contentPaddingHorizontal > 0 && {
-          paddingHorizontal: contentPaddingHorizontal,
-        },
-        Platform.OS === 'android' && [
-          styles.androidBarDock,
-          { paddingBottom: Math.max(insets.bottom, KB.contentPaddingBottom) },
-        ],
-      ]}
-    >
-      <View pointerEvents="auto" style={styles.content}>
-        {children}
-      </View>
+  const barInner = (
+    <View pointerEvents="auto" style={styles.content}>
+      {children}
     </View>
-  ) : null;
+  );
+
+  const barWrapperStyle = [
+    styles.outerWrapper,
+    contentPaddingHorizontal > 0 && {
+      paddingHorizontal: contentPaddingHorizontal,
+    },
+    Platform.OS === 'android' && [
+      styles.androidBarDock,
+      { paddingBottom: Math.max(insets.bottom, KB.contentPaddingBottom) },
+    ],
+  ] as const;
 
   return (
     <Modal
@@ -179,13 +133,16 @@ export function CommentComposerOverlay({
         />
         {Platform.OS === 'ios' ? (
           <Animated.View
+            collapsable={false}
             pointerEvents="box-none"
-            style={{ transform: [{ translateY: iosTranslateY }] }}
+            style={[...barWrapperStyle, { transform: [{ translateY: iosTranslateY }] }]}
           >
-            {barWrapper}
+            {barInner}
           </Animated.View>
         ) : (
-          barWrapper
+          <View collapsable={false} pointerEvents="box-none" style={barWrapperStyle}>
+            {barInner}
+          </View>
         )}
       </View>
     </Modal>
@@ -209,7 +166,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     overflow: 'visible',
   },
-  /** Fondo sólido para que no se vea contenido del feed entre barra y teclado. */
   androidBarDock: {
     backgroundColor: '#0b0b0f',
   },

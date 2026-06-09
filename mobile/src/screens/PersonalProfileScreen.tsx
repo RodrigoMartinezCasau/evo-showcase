@@ -60,6 +60,8 @@ import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { useAuth } from '../../mobile/lib/AuthContext';
 import { fetchFollowCounts, isRealUserId } from '@evoconn/services/supabaseSocial';
 import { useFocusEffect } from '@react-navigation/native';
+import { useVoiceAssistantFocusedScreenContext } from '@evoconn/hooks/VoiceAssistantScreenContext';
+import { profileToScreenSnapshot } from '@evoconn/utils/voiceAssistantScreenContext';
 import { supabase } from '../../mobile/lib/supabase';
 import type { CommunityPost } from '@evoconn/types';
 
@@ -322,6 +324,31 @@ export default function PersonalProfileScreen() {
     data: CommunityPost[];
     initialIndex: number;
   } | null>(null);
+
+  const voiceAssistantScreenSnapshot = useMemo(() => {
+    if (!ready || !heavyReady || detailFeed) return null;
+    return profileToScreenSnapshot({
+      screenLabel: 'Mi perfil',
+      username: profileWithClan.username,
+      clanId: profileWithClan.clanId,
+      rank: profileWithClan.rank,
+      percentages: profileWithClan.philosophyPercentages,
+      reflectionCount,
+      phraseCount,
+      insigniaPhrase,
+      isOwnProfile: true,
+    });
+  }, [
+    ready,
+    heavyReady,
+    detailFeed,
+    profileWithClan,
+    reflectionCount,
+    phraseCount,
+    insigniaPhrase,
+  ]);
+
+  useVoiceAssistantFocusedScreenContext(voiceAssistantScreenSnapshot);
 
   const openDetailFeed = useCallback(
     (posts: CommunityPost[], postId: string) => {
