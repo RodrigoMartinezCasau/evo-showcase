@@ -183,6 +183,50 @@ backend sigue siendo agnóstico de Evo:
 Fuera de este sprint: repost y acciones con confirmación (Sprint 4), voto negativo
 (pendiente de datos de uso), comentar/follow/config (sprints 2-4).
 
+## Acciones de configuración (v2 — Sprint 2)
+
+Cinco acciones que operan sobre el estado del usuario, no sobre un post visible
+(manifest v1.3.0): `make_account_public`, `make_account_private`,
+`change_assistant_voice`, `enable_notifications`, `disable_notifications`.
+
+- **Confirmación ligera por modal** (`components/ActionConfirmationModal.tsx`):
+  las acciones de privacidad declaran `requireConfirmation: true` +
+  `confirmationMessageTemplate` en el manifest. Flujo: el LLM responde con la
+  pregunta de confirmación como reply (se lee en voz alta) → el cliente NO
+  ejecuta → modal nativo Confirmar/Cancelar → Confirmar ejecuta, Cancelar (o
+  tocar fuera) habla "Cancelado." y registra `action_cancelled`. La fuente de
+  verdad es el `requireConfirmation` del MANIFEST, nunca el del LLM (que solo
+  viaja como señal); el texto del modal es el canónico del manifest. La
+  confirmación por voz bidireccional llega en Sprint 4.
+- **El modal espera FUERA del turno**: el watchdog mata cualquier `thinking`
+  > 20 s, así que el turno termina hablando la pregunta y la acción queda en
+  `pendingConfirmationRef` (`useVoiceAssistant`); la ejecución ocurre después,
+  desde los botones del modal, con la telemetría del turno original.
+- **Precheck antes del modal** (`precheckManifestAction`): contexto +
+  idempotencia se evalúan ANTES de pedir confirmación. "haz mi cuenta privada"
+  cuando ya es privada → "Tu cuenta ya es privada", sin modal.
+- **El intent manda sobre los parámetros del LLM**: los handlers compartidos
+  (`setAccountPrivacy`, `toggleNotifications`) reciben el intent del manifest
+  como tercer argumento y derivan de ÉL el valor (público/privado, on/off).
+  Un `parameters.isPrivate` contradictorio del LLM no puede invertir la acción.
+- **Feedback con la voz nueva**: `changeAssistantVoice` devuelve
+  `data.useNewVoiceForFeedback`; el hook sintetiza el mensaje de éxito con la
+  voz recién elegida vía `/assistant/preview-tts` (sin cuota) para que el
+  usuario la oiga al instante. "Ya estoy usando la voz de X" si pide la activa.
+- **Permiso del sistema**: al activar notificaciones, el puente garantiza el
+  permiso del SO (pide el diálogo nativo si aún se puede); si está denegado →
+  "Necesitas permitir notificaciones en los ajustes de tu teléfono primero."
+  En Expo Go (sin módulo) se aplica solo la preferencia local (misma clave
+  `@evo/notifications_enabled` que Ajustes).
+- **Puente de configuración** (`handlers/configBridge.ts` +
+  `useRegisterAgentConfig` en `VoiceAssistantLayer`): privacidad vía
+  `profile.is_private` + `setProfilePrivate` + `refreshProfile`; voz vía
+  `VoiceAssistantPreferencesContext`; notificaciones vía AsyncStorage +
+  expo-notifications (require protegido, como `pushNotifications.ts`).
+
+Fuera de este sprint: cerrar sesión y confirmación por voz (Sprint 4),
+creación con prefill (Sprint 3), relaciones y búsqueda (Sprints 4-5).
+
 ## Límites y protecciones (v1)
 
 - Timeout del turno: 15 s, sin reintentos automáticos (cada retry = otra generación LLM+TTS).
@@ -192,8 +236,9 @@ Fuera de este sprint: repost y acciones con confirmación (Sprint 4), voto negat
   con mensaje al usuario y evento `agent_watchdog_reset`.
 - Rate limit backend: 10 req/min por usuario + cuota diaria de usos IA (1 uso por turno).
 - Lock de invocación: mientras un turno está en `thinking` no se acepta otro.
-- Navegación (v1) + interacciones simples sin confirmación (v2 Sprint 1). Las acciones
-  con efectos visibles para terceros (publicar, repost, seguir) llegan con confirmación.
+- Navegación (v1) + interacciones simples sin confirmación (v2 Sprint 1) + configuración
+  con confirmación por modal para cambios sensibles (v2 Sprint 2). Las acciones con
+  efectos visibles para terceros (publicar, repost, seguir) llegan con confirmación por voz.
 
 ## Postmortem: orbe colgado en "pensando" (jun 2026)
 

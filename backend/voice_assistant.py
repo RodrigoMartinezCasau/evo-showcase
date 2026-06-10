@@ -145,15 +145,26 @@ REGLAS PARA ACCIONES:
   incluye "Publicaciones visibles en pantalla" o una publicación abierta. Si el usuario las pide
   sin ese contexto, NO ejecutes; responde con action type none explicando qué falta,
   ej.: "Para dar like, abre primero una publicación."
-- Estas acciones NO requieren confirmación: si la petición es clara, ejecuta directamente.
-- Con acción execute: reply de máximo 1 frase, confirmatoria, sin preguntas.
-- La acción se aplica a la publicación que el usuario está viendo (la marcada como
-  POST EN PANTALLA AHORA); no necesitas identificarla tú, el cliente lo resuelve.
+- Si la acción declara parámetros, rellénalos en "parameters" según su descripción.
+  Los parámetros opcionales pueden omitirse si el usuario no los especifica.
+- Con acción execute: reply de máximo 1 frase, sin preguntas (salvo confirmación, abajo).
+- Las acciones sobre publicaciones se aplican a la que el usuario está viendo (la marcada
+  como POST EN PANTALLA AHORA); no necesitas identificarla tú, el cliente lo resuelve.
+
+REGLAS PARA ACCIONES CON CONFIRMACIÓN:
+- Las acciones marcadas con [requiere confirmación] son sensibles: NO se ejecutan
+  directamente; la app mostrará un diálogo de confirmación al usuario.
+- Para esas acciones incluye en tu respuesta "requireConfirmation": true y
+  "confirmationMessage" con el texto de confirmación indicado en la lista, y tu reply
+  debe SER esa misma pregunta de confirmación (se leerá en voz alta), ej.:
+{{"reply": "<pregunta de confirmación>", "action": {{"type": "execute", "intent": "<intent>", "parameters": {{}}, "requireConfirmation": true, "confirmationMessage": "<pregunta de confirmación>"}}}}
+- Las acciones SIN esa marca no requieren confirmación: si la petición es clara,
+  ejecuta directamente con reply confirmatorio.
 
 ACCIONES QUE TODAVÍA NO PUEDES HACER (responde con action type none):
 Comentar, repostear, votar negativo, publicar o escribir contenido POR el usuario,
-seguir o dejar de seguir a alguien, bloquear, denunciar, cambiar ajustes o la privacidad
-de la cuenta, enviar mensajes o compartir, eliminar publicaciones.
+seguir o dejar de seguir a alguien, bloquear, denunciar, enviar mensajes o compartir,
+eliminar publicaciones, cerrar sesión, y cualquier ajuste que no esté en la lista de acciones.
 Si el usuario pide cualquiera de estas, responde EXACTAMENTE con esta idea:
 "Eso todavía no puedo hacerlo por voz, pero estará disponible pronto."
 MATIZ IMPORTANTE: "quiero crear/escribir una reflexión o frase" SÍ es navegación a la pantalla
@@ -183,7 +194,16 @@ def _build_actions_list(manifest_actions: list[dict]) -> str:
         if not intent:
             continue
         suffix = " [requiere publicación visible]" if a.get("requires_visible_post") else ""
+        if a.get("requires_confirmation"):
+            suffix += " [requiere confirmación]"
         lines.append(f"- intent='{intent}' ({label}){suffix} → ejemplos: {', '.join(examples)}")
+        confirmation = str(a.get("confirmation_message") or "").strip()
+        if confirmation:
+            lines.append(f"    confirmación: \"{confirmation}\"")
+        params = a.get("parameters")
+        if isinstance(params, dict):
+            for name, desc in params.items():
+                lines.append(f"    parámetro '{name}': {str(desc).strip()}")
     return "\n".join(lines)
 
 
@@ -324,7 +344,16 @@ def _parse_agent_json(
         if params is not None and not isinstance(params, dict):
             _log.warning("voice_assistant: parameters no es objeto para intent %r", intent)
             return reply, None
-        return reply, {"type": "execute", "intent": intent, "parameters": params or {}}
+        action: dict = {"type": "execute", "intent": intent, "parameters": params or {}}
+        # Confirmación ligera (v2 Sprint 2): preservar los campos hacia el
+        # cliente. Son informativos — el cliente exige la confirmación desde
+        # su manifest aunque el LLM los omita.
+        if action_raw.get("requireConfirmation") is True:
+            action["requireConfirmation"] = True
+        confirmation_message = str(action_raw.get("confirmationMessage") or "").strip()
+        if confirmation_message:
+            action["confirmationMessage"] = confirmation_message
+        return reply, action
 
     # 'none' o tipo desconocido: degradar a solo respuesta hablada.
     return reply, None

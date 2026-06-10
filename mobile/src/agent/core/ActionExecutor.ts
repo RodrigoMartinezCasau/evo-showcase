@@ -11,8 +11,13 @@ import { router } from 'expo-router';
 
 import { evoManifest } from '../manifest/evo.manifest';
 import { ACTION_HANDLERS, IDEMPOTENCY_CHECKERS } from '../handlers';
-import { runManifestAction } from './actionEngine';
+import { precheckManifestAction, runManifestAction, type ActionPrecheck } from './actionEngine';
 import type { AgentAction, AgentScreenContext, ActionResult } from './types';
+
+const REGISTRIES = {
+  handlers: ACTION_HANDLERS,
+  idempotencyCheckers: IDEMPOTENCY_CHECKERS,
+};
 
 function parseRouteToHref(route: string): { pathname: string; params: Record<string, string> } {
   const [pathname, query = ''] = route.split('?');
@@ -39,12 +44,18 @@ export const ActionExecutor = {
       return ActionExecutor.executeNavigation(action);
     }
     if (action.type === 'execute') {
-      return runManifestAction(action, evoManifest.actions, context, {
-        handlers: ACTION_HANDLERS,
-        idempotencyCheckers: IDEMPOTENCY_CHECKERS,
-      });
+      return runManifestAction(action, evoManifest.actions, context, REGISTRIES);
     }
     return { success: false, error: `Action type not implemented: ${action.type}` };
+  },
+
+  /**
+   * Valida una acción 'execute' SIN ejecutarla (contexto + idempotencia).
+   * Lo usa el flujo de confirmación: si la acción ya está aplicada o el
+   * contexto no cumple, el turno responde directamente sin mostrar el modal.
+   */
+  async precheck(action: AgentAction, context: AgentScreenContext = {}): Promise<ActionPrecheck> {
+    return precheckManifestAction(action, evoManifest.actions, context, REGISTRIES);
   },
 
   executeNavigation(action: AgentAction): ActionResult {

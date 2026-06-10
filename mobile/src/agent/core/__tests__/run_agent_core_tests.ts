@@ -25,8 +25,13 @@ import {
   type FeedScreenContext,
   type VisiblePost,
 } from '../feedContext';
-import { runManifestAction, validateActionContext, type ActionRegistries } from '../actionEngine';
-import type { AgentScreenContext } from '../types';
+import {
+  precheckManifestAction,
+  runManifestAction,
+  validateActionContext,
+  type ActionRegistries,
+} from '../actionEngine';
+import { parseAgentAction, type AgentScreenContext } from '../types';
 import type { ActionIntent } from '../../manifest/types';
 import {
   setAgentInteractionBridge,
@@ -44,6 +49,23 @@ import {
   isPostNotLiked,
   isPostNotSaved,
 } from '../../handlers/interactions/idempotency';
+import {
+  setAgentConfigBridge,
+  type AgentConfigBridge,
+  type NotificationsPermission,
+} from '../../handlers/configBridge';
+import { setAccountPrivacyHandler } from '../../handlers/config/setAccountPrivacy';
+import {
+  changeAssistantVoiceHandler,
+  normalizeRequestedVoiceId,
+} from '../../handlers/config/changeAssistantVoice';
+import { toggleNotificationsHandler } from '../../handlers/config/toggleNotifications';
+import {
+  areNotificationsAlreadyDisabled,
+  areNotificationsAlreadyEnabled,
+  isAccountAlreadyPrivate,
+  isAccountAlreadyPublic,
+} from '../../handlers/config/idempotency';
 
 let passed = 0;
 
@@ -337,6 +359,191 @@ async function main() {
 
   const noPost = await likeVisiblePostHandler({}, {});
   check('handlers: sin post visible → error con mensaje', noPost.success === false && !!noPost.message);
+
+  // ── Sprint 2 (v2): parse de confirmación ────────────────────────────────────
+  const confirmedAction = parseAgentAction({
+    type: 'execute',
+    intent: 'make_account_private',
+    parameters: { isPrivate: true },
+    requireConfirmation: true,
+    confirmationMessage: '¿Seguro que quieres hacer tu cuenta privada?',
+  });
+  check('parse: preserva requireConfirmation', confirmedAction?.requireConfirmation === true);
+  check(
+    'parse: preserva confirmationMessage',
+    confirmedAction?.confirmationMessage === '¿Seguro que quieres hacer tu cuenta privada?',
+  );
+  const noConfirmAction = parseAgentAction({ type: 'execute', intent: 'like_post' });
+  check('parse: sin confirmación → undefined', noConfirmAction?.requireConfirmation === undefined);
+  const junkConfirm = parseAgentAction({
+    type: 'execute',
+    intent: 'like_post',
+    requireConfirmation: 'yes',
+    confirmationMessage: '   ',
+  });
+  check(
+    'parse: confirmación con tipos basura → undefined',
+    junkConfirm?.requireConfirmation === undefined && junkConfirm?.confirmationMessage === undefined,
+  );
+
+  // ── Sprint 2 (v2): precheck (contexto + idempotencia, sin ejecutar) ─────────
+  handlerCalls = 0;
+  const preReady = await precheckManifestAction(
+    execAction,
+    [testAction],
+    feedCtx([makePost(0)]),
+    makeRegistries(false),
+  );
+  check('precheck: ready si todo cumple', preReady.kind === 'ready' && handlerCalls === 0);
+  const preIdem = await precheckManifestAction(
+    execAction,
+    [testAction],
+    feedCtx([makePost(0)]),
+    makeRegistries(true),
+  );
+  check(
+    'precheck: done idempotente sin llamar handler',
+    preIdem.kind === 'done' && preIdem.result.idempotent === true && handlerCalls === 0,
+  );
+  const preNoCtx = await precheckManifestAction(execAction, [testAction], {}, makeRegistries(false));
+  check(
+    'precheck: done con error si falta contexto',
+    preNoCtx.kind === 'done' && preNoCtx.result.success === false && !!preNoCtx.result.message,
+  );
+
+  // ── Sprint 2 (v2): engine pasa el intent al handler ─────────────────────────
+  let intentSeen: string | undefined;
+  const intentRegistries: ActionRegistries = {
+    handlers: {
+      likeVisiblePost: async (_p, _c, intent) => {
+        intentSeen = intent;
+        return { success: true };
+      },
+    },
+    idempotencyCheckers: {},
+  };
+  await runManifestAction(execAction, [testAction], feedCtx([makePost(0)]), intentRegistries);
+  check('engine: handler recibe el intent del manifest', intentSeen === 'like_post');
+
+  // ── Sprint 2 (v2): handlers de configuración con puente falso ───────────────
+  const makeConfigBridge = (init: {
+    isPrivate: boolean | null;
+    voice: string;
+    notifs: boolean;
+    permission: NotificationsPermission;
+    failPrivacyWrite?: boolean;
+  }) => {
+    const state = { ...init };
+    const bridge: AgentConfigBridge = {
+      getIsPrivate: () => state.isPrivate,
+      setAccountPrivacy: async (v) => {
+        if (state.failPrivacyWrite) return false;
+        state.isPrivate = v;
+        return true;
+      },
+      getAssistantVoice: () => state.voice,
+      setAssistantVoice: (id) => void (state.voice = id),
+      getNotificationsEnabled: async () => state.notifs,
+      setNotificationsEnabled: async (v) => void (state.notifs = v),
+      ensureNotificationsSystemPermission: async () => state.permission,
+    };
+    return { bridge, state };
+  };
+
+  // Privacidad: el intent manda sobre el parámetro del LLM.
+  const cfg1 = makeConfigBridge({ isPrivate: false, voice: 'nova', notifs: true, permission: 'granted' });
+  setAgentConfigBridge(cfg1.bridge);
+  const toPrivate = await setAccountPrivacyHandler(
+    { isPrivate: false }, // parámetro contradictorio a propósito
+    {},
+    'make_account_private',
+  );
+  check('privacy: intent gana al parámetro', toPrivate.success === true && cfg1.state.isPrivate === true);
+  check('privacy: mensaje de privada', toPrivate.message === 'Hecho, tu cuenta ahora es privada.');
+  check('privacy: ya privada (idempotencia)', (await isAccountAlreadyPrivate({})).alreadyApplied === true);
+  check('privacy: no es pública', (await isAccountAlreadyPublic({})).alreadyApplied === false);
+
+  const toPublic = await setAccountPrivacyHandler({}, {}, 'make_account_public');
+  check('privacy: a pública por intent', toPublic.success === true && cfg1.state.isPrivate === false);
+  check('privacy: ya pública (idempotencia)', (await isAccountAlreadyPublic({})).alreadyApplied === true);
+
+  const cfgFail = makeConfigBridge({
+    isPrivate: false,
+    voice: 'nova',
+    notifs: true,
+    permission: 'granted',
+    failPrivacyWrite: true,
+  });
+  setAgentConfigBridge(cfgFail.bridge);
+  const privFail = await setAccountPrivacyHandler({}, {}, 'make_account_private');
+  check('privacy: escritura fallida → error con mensaje', privFail.success === false && !!privFail.message);
+
+  // Voz: especificada, alternar, ya activa, desconocida.
+  check('voice: normaliza fyodor', normalizeRequestedVoiceId('Fyodor') === 'onyx');
+  check('voice: normaliza masculina', normalizeRequestedVoiceId('masculina') === 'onyx');
+  check('voice: normaliza jane con acento raro', normalizeRequestedVoiceId(' JANE ') === 'nova');
+  check('voice: desconocida → null', normalizeRequestedVoiceId('siri') === null);
+
+  const cfgVoice = makeConfigBridge({ isPrivate: false, voice: 'nova', notifs: true, permission: 'granted' });
+  setAgentConfigBridge(cfgVoice.bridge);
+  const toFyodor = await changeAssistantVoiceHandler({ voiceId: 'fyodor' }, {});
+  check('voice: cambia a la especificada', toFyodor.success === true && cfgVoice.state.voice === 'onyx');
+  check('voice: feedback con voz nueva', toFyodor.data?.useNewVoiceForFeedback === true);
+  check('voice: mensaje con nombre', toFyodor.message === 'Listo, ahora hablo con la voz de Fyodor.');
+
+  const sameVoice = await changeAssistantVoiceHandler({ voiceId: 'fyodor' }, {});
+  check(
+    'voice: ya activa → noChange sin feedback nuevo',
+    sameVoice.success === true &&
+      sameVoice.idempotent === true &&
+      sameVoice.data?.noChange === true &&
+      sameVoice.message === 'Ya estoy usando la voz de Fyodor.',
+  );
+
+  const toggled = await changeAssistantVoiceHandler({}, {});
+  check('voice: genérico alterna a la otra', toggled.success === true && cfgVoice.state.voice === 'nova');
+
+  const unknownVoice = await changeAssistantVoiceHandler({ voiceId: 'siri' }, {});
+  check(
+    'voice: voz desconocida → error con mensaje',
+    unknownVoice.success === false && unknownVoice.message === 'Solo tengo las voces de Jane y Fyodor.',
+  );
+
+  // Notificaciones: permiso del sistema y derivación por intent.
+  const cfgNotif = makeConfigBridge({ isPrivate: false, voice: 'nova', notifs: false, permission: 'granted' });
+  setAgentConfigBridge(cfgNotif.bridge);
+  check('notifs: aún desactivadas', (await areNotificationsAlreadyDisabled({})).alreadyApplied === true);
+  const enable = await toggleNotificationsHandler({ enabled: false }, {}, 'enable_notifications');
+  check('notifs: intent gana al parámetro', enable.success === true && cfgNotif.state.notifs === true);
+  check('notifs: ya activadas (idempotencia)', (await areNotificationsAlreadyEnabled({})).alreadyApplied === true);
+
+  const disable = await toggleNotificationsHandler({}, {}, 'disable_notifications');
+  check('notifs: desactivar', disable.success === true && cfgNotif.state.notifs === false);
+
+  cfgNotif.state.permission = 'denied';
+  const enableDenied = await toggleNotificationsHandler({}, {}, 'enable_notifications');
+  check(
+    'notifs: sin permiso del sistema → mensaje de ajustes',
+    enableDenied.success === false &&
+      enableDenied.message === 'Necesitas permitir notificaciones en los ajustes de tu teléfono primero.' &&
+      cfgNotif.state.notifs === false,
+  );
+  const disableDenied = await toggleNotificationsHandler({}, {}, 'disable_notifications');
+  check('notifs: desactivar no exige permiso', disableDenied.success === true);
+
+  cfgNotif.state.permission = 'unavailable';
+  cfgNotif.state.notifs = false;
+  const enableExpoGo = await toggleNotificationsHandler({}, {}, 'enable_notifications');
+  check(
+    'notifs: entorno sin módulo (Expo Go) → preferencia local igualmente',
+    enableExpoGo.success === true && cfgNotif.state.notifs === true,
+  );
+
+  // Sin puente registrado: error con mensaje, idempotencia no bloquea.
+  setAgentConfigBridge(null);
+  const noCfgBridge = await setAccountPrivacyHandler({}, {}, 'make_account_private');
+  check('config: sin puente → error con mensaje', noCfgBridge.success === false && !!noCfgBridge.message);
+  check('config: idempotencia sin puente no bloquea', (await isAccountAlreadyPublic({})).alreadyApplied === false);
 
   console.log(`\n${passed} tests OK`);
 }

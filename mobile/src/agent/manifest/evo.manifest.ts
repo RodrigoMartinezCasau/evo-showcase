@@ -7,7 +7,7 @@
  */
 import type { AppManifest } from './types';
 
-export const EVO_MANIFEST_VERSION = '1.2.0';
+export const EVO_MANIFEST_VERSION = '1.3.0';
 
 export const evoManifest: AppManifest = {
   appId: 'com.evoconn.evo',
@@ -231,6 +231,119 @@ export const evoManifest: AppManifest = {
         'quítala de mis guardados',
       ],
     },
+
+    // ── v2 Sprint 2: configuración (privacidad, voz, notificaciones) ─────────
+    {
+      intent: 'make_account_public',
+      label: 'Hacer cuenta pública',
+      category: 'config',
+      handler: 'setAccountPrivacy',
+      requireConfirmation: true,
+      confirmationMessageTemplate:
+        '¿Seguro que quieres hacer tu cuenta pública? Cualquier persona podrá ver tus publicaciones y tu perfil.',
+      parameters: {
+        isPrivate: {
+          type: 'boolean',
+          required: true,
+          description: 'false para hacer la cuenta pública',
+        },
+      },
+      contextRequirements: { requiresAuth: true },
+      idempotencyCheck: 'isAccountAlreadyPublic',
+      examples: [
+        'haz mi cuenta pública',
+        'quita la privacidad',
+        'que todos vean mi perfil',
+        'desactiva la cuenta privada',
+        'cuenta pública',
+      ],
+    },
+    {
+      intent: 'make_account_private',
+      label: 'Hacer cuenta privada',
+      category: 'config',
+      handler: 'setAccountPrivacy',
+      requireConfirmation: true,
+      confirmationMessageTemplate:
+        '¿Seguro que quieres hacer tu cuenta privada? Solo tus seguidores aprobados podrán ver tus publicaciones.',
+      parameters: {
+        isPrivate: {
+          type: 'boolean',
+          required: true,
+          description: 'true para hacer la cuenta privada',
+        },
+      },
+      contextRequirements: { requiresAuth: true },
+      idempotencyCheck: 'isAccountAlreadyPrivate',
+      examples: [
+        'haz mi cuenta privada',
+        'activa la privacidad',
+        'que solo mis seguidores vean mi perfil',
+        'pon mi cuenta en privado',
+        'cuenta privada',
+      ],
+    },
+    {
+      intent: 'change_assistant_voice',
+      label: 'Cambiar voz del asistente',
+      category: 'config',
+      handler: 'changeAssistantVoice',
+      requireConfirmation: false,
+      parameters: {
+        voiceId: {
+          type: 'string',
+          required: false,
+          description:
+            'Voz deseada: "jane" (femenina, cálida) o "fyodor" (masculina, grave). Vacío si el usuario no especifica cuál (se alterna a la otra).',
+        },
+      },
+      contextRequirements: { requiresAuth: true },
+      // Sin idempotencyCheck: el handler ya lee la voz actual para alternar y
+      // resuelve él mismo el caso "esa voz ya está activa".
+      examples: [
+        'cambia tu voz',
+        'usa la voz de Fyodor',
+        'cambia a Jane',
+        'quiero la otra voz',
+        'pon la voz masculina',
+        'pon la voz femenina',
+      ],
+    },
+    {
+      intent: 'enable_notifications',
+      label: 'Activar notificaciones',
+      category: 'config',
+      handler: 'toggleNotifications',
+      requireConfirmation: false,
+      parameters: {
+        enabled: { type: 'boolean', required: true, description: 'true para activar' },
+      },
+      contextRequirements: { requiresAuth: true },
+      idempotencyCheck: 'areNotificationsAlreadyEnabled',
+      examples: [
+        'activa las notificaciones',
+        'enciende los avisos',
+        'quiero recibir notificaciones',
+      ],
+    },
+    {
+      intent: 'disable_notifications',
+      label: 'Desactivar notificaciones',
+      category: 'config',
+      handler: 'toggleNotifications',
+      requireConfirmation: false,
+      parameters: {
+        enabled: { type: 'boolean', required: true, description: 'false para desactivar' },
+      },
+      contextRequirements: { requiresAuth: true },
+      idempotencyCheck: 'areNotificationsAlreadyDisabled',
+      examples: [
+        'desactiva las notificaciones',
+        'apaga los avisos',
+        'no quiero notificaciones',
+        'silencia las notificaciones',
+      ],
+    },
   ],
 
   policies: {
@@ -256,19 +369,43 @@ export function manifestRoutesForBackend(): Array<{
 
 /**
  * Payload compacto de las acciones del manifest para el backend.
- * `requires_visible_post` permite al LLM avisar al usuario si el contexto no
- * cumple ("para dar like, abre primero una publicación") sin ejecutar.
+ * - `requires_visible_post` permite al LLM avisar si el contexto no cumple
+ *   ("para dar like, abre primero una publicación") sin ejecutar.
+ * - `requires_confirmation` + `confirmation_message` instruyen al LLM para
+ *   incluir la confirmación en su respuesta (el cliente la exige igualmente
+ *   desde el manifest, pase lo que pase con el LLM).
+ * - `parameters` (nombre → descripción) para que el LLM sepa qué rellenar.
  */
 export function manifestActionsForBackend(): Array<{
   intent: string;
   label: string;
   examples: string[];
   requires_visible_post: boolean;
+  requires_confirmation: boolean;
+  confirmation_message?: string;
+  parameters?: Record<string, string>;
 }> {
-  return evoManifest.actions.map((a) => ({
-    intent: a.intent,
-    label: a.label,
-    examples: a.examples,
-    requires_visible_post: a.contextRequirements?.requiresVisiblePost === true,
-  }));
+  return evoManifest.actions.map((a) => {
+    const paramEntries = Object.entries(a.parameters);
+    return {
+      intent: a.intent,
+      label: a.label,
+      examples: a.examples,
+      requires_visible_post: a.contextRequirements?.requiresVisiblePost === true,
+      requires_confirmation: a.requireConfirmation,
+      ...(a.confirmationMessageTemplate
+        ? { confirmation_message: a.confirmationMessageTemplate }
+        : {}),
+      ...(paramEntries.length > 0
+        ? {
+            parameters: Object.fromEntries(
+              paramEntries.map(([name, spec]) => [
+                name,
+                `${spec.type}${spec.required ? '' : ' (opcional)'} — ${spec.description}`,
+              ]),
+            ),
+          }
+        : {}),
+    };
+  });
 }

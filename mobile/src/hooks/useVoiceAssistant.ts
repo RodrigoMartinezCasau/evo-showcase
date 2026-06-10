@@ -14,15 +14,18 @@ import { usePathname } from 'expo-router';
 import {
   ActionExecutor,
   combineContexts,
+  evoManifest,
   grantAssistantConsent,
   hasConsentedToAssistant,
   logAgentEvent,
   sanitizeForLLM,
+  type AgentAction,
+  type AgentScreenContext,
 } from '@evoconn/agent';
 import { useDebugStats } from '@evoconn/debug/DebugStatsContext';
 import { useDailyUsesGate } from '@evoconn/hooks/useDailyUsesGate';
 import * as FileSystem from 'expo-file-system/legacy';
-import { createAudioPlayer, setAudioModeAsync, setIsAudioActiveAsync, type AudioPlayer } from 'expo-audio';
+import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
 import * as Speech from 'expo-speech';
 
 import {
@@ -41,7 +44,16 @@ import {
   useVoiceAssistantScreenContextReader,
   useVoiceAssistantScreenSnapshotReader,
 } from '@evoconn/hooks/VoiceAssistantScreenContext';
-import { isAssistantTimeoutError, sendVoiceAssistantTurn } from '@evoconn/services/voiceAssistantApi';
+import {
+  fetchAssistantTtsBase64,
+  isAssistantTimeoutError,
+  sendVoiceAssistantTurn,
+} from '@evoconn/services/voiceAssistantApi';
+import { normalizeVoiceAssistantVoiceId } from '@evoconn/constants/voiceAssistantVoices';
+import {
+  applyVoiceAssistantPlayerVolume,
+  ensureVoiceAssistantSpeakAudioMode,
+} from '@evoconn/utils/voiceAssistantAudio';
 import { showOutOfUsesAlert } from '@evoconn/utils/dailyUsesGate';
 import { CLAN_LABELS } from '@evoconn/services/clanClassifier';
 import { useAuth } from '../../mobile/lib/AuthContext';
@@ -75,19 +87,6 @@ const MAX_LISTENING_SECONDS = 60;
 type Options = {
   enabled?: boolean;
 };
-
-async function ensurePlaybackAudioMode(): Promise<void> {
-  try {
-    await setIsAudioActiveAsync(true);
-    await setAudioModeAsync({
-      playsInSilentMode: true,
-      shouldPlayInBackground: false,
-      interruptionMode: 'mixWithOthers',
-    });
-  } catch {
-    /* noop */
-  }
-}
 
 async function waitForPlayerLoaded(player: AudioPlayer, timeoutMs = 12_000): Promise<void> {
   if (player.isLoaded) return;
@@ -149,6 +148,24 @@ export function useVoiceAssistant({ enabled = true }: Options = {}) {
   const { totalUnlocked } = useQuotes();
   const [phase, setPhase] = useState<VoiceAssistantPhase>('idle');
   const [consentModalVisible, setConsentModalVisible] = useState(false);
+  /**
+   * Acción 'execute' sensible esperando confirmación por modal (Sprint 2).
+   * Se resuelve FUERA del turno: el turno termina hablando la pregunta de
+   * confirmación (así el watchdog de 'thinking' no la mata) y la ejecución
+   * ocurre después, desde los botones del modal.
+   */
+  const [pendingConfirmationMessage, setPendingConfirmationMessage] = useState<string | null>(null);
+  const pendingConfirmationRef = useRef<{
+    action: AgentAction;
+    context: AgentScreenContext;
+    userMessage: string;
+    routeAtInvocation: string;
+    latencyMs: number;
+    latencySttMs: number | null;
+    wasTruncated: boolean;
+    contextChars: number;
+    redactions: string[];
+  } | null>(null);
   const phaseRef = useRef<VoiceAssistantPhase>('idle');
   const abortRef = useRef<AbortController | null>(null);
   const playerRef = useRef<AudioPlayer | null>(null);
@@ -233,6 +250,7 @@ export function useVoiceAssistant({ enabled = true }: Options = {}) {
           language: 'es-ES',
           rate: 0.88,
           pitch: 0.92,
+          volume: 1,
           onDone: () => {
             speechEndResolverRef.current = null;
             resolve();
@@ -259,7 +277,7 @@ export function useVoiceAssistant({ enabled = true }: Options = {}) {
 
       setPhaseSafe('speaking');
       stopSpeech();
-      await ensurePlaybackAudioMode();
+      await ensureVoiceAssistantSpeakAudioMode();
 
       if (__DEV__) {
         // eslint-disable-next-line no-console
@@ -277,6 +295,7 @@ export function useVoiceAssistant({ enabled = true }: Options = {}) {
           player.replace(uri);
           await waitForPlayerLoaded(player);
           if (phaseRef.current !== 'speaking') return;
+          applyVoiceAssistantPlayerVolume(player);
           player.play();
           await waitForPlaybackToFinish(player);
           disposePlayer();
@@ -404,41 +423,121 @@ export function useVoiceAssistant({ enabled = true }: Options = {}) {
             redactionsApplied: redactions,
           });
         } else if (action && action.type === 'execute') {
-          const actionStartedAt = Date.now();
-          logTurn(turnId, 'action exec start', action.intent ?? action.type);
-          const result = await ActionExecutor.execute(action, {
+          const executeContext: AgentScreenContext = {
             feed: screenSnapshotAtInvocation?.feed,
-          });
-          const latencyActionMs = Date.now() - actionStartedAt;
-          logTurn(
-            turnId,
-            'action exec end',
-            `success=${result.success}, idempotent=${result.idempotent === true}${result.error ? `, ${result.error}` : ''}`,
-          );
-          void logAgentEvent({
-            eventType: result.idempotent
-              ? 'action_idempotent'
-              : result.success
-                ? 'action_executed'
-                : 'action_failed',
-            userMessage: msg,
-            intentDetected: action.intent ?? null,
-            actionExecuted: {
-              type: action.type,
-              intent: action.intent ?? null,
-              ...(result.error ? { error: result.error } : {}),
-            },
-            currentRoute: routeAtInvocation,
-            latencyMs,
-            latencySttMs: sttLatencyMs,
-            latencyActionMs,
-            wasTruncated,
-            contextChars,
-            redactionsApplied: redactions,
-          });
-          if ((result.idempotent || !result.success) && result.message) {
-            spokenReply = result.message;
-            spokenAudio = null;
+          };
+          // Fuente de verdad de la confirmación: el MANIFEST, nunca el LLM
+          // (validación doble — el backend instruye, el cliente exige).
+          const manifestAction = evoManifest.actions.find((a) => a.intent === action.intent);
+          const needsConfirmation = manifestAction?.requireConfirmation === true;
+
+          if (needsConfirmation) {
+            // Precheck (contexto + idempotencia) ANTES de molestar con el
+            // modal: "haz mi cuenta privada" ya privada → respuesta directa.
+            const pre = await ActionExecutor.precheck(action, executeContext);
+            if (pre.kind === 'done') {
+              const result = pre.result;
+              logTurn(
+                turnId,
+                'action precheck done',
+                `idempotent=${result.idempotent === true}${result.error ? `, ${result.error}` : ''}`,
+              );
+              void logAgentEvent({
+                eventType: result.idempotent
+                  ? 'action_idempotent'
+                  : result.success
+                    ? 'action_executed'
+                    : 'action_failed',
+                userMessage: msg,
+                intentDetected: action.intent ?? null,
+                actionExecuted: {
+                  type: action.type,
+                  intent: action.intent ?? null,
+                  ...(result.error ? { error: result.error } : {}),
+                },
+                currentRoute: routeAtInvocation,
+                latencyMs,
+                latencySttMs: sttLatencyMs,
+                wasTruncated,
+                contextChars,
+                redactionsApplied: redactions,
+              });
+              if (result.message) {
+                spokenReply = result.message;
+                spokenAudio = null;
+              }
+            } else {
+              // Mensaje canónico del manifest; el del LLM solo como fallback.
+              const confirmationMessage =
+                manifestAction?.confirmationMessageTemplate ??
+                action.confirmationMessage ??
+                '¿Confirmar esta acción?';
+              pendingConfirmationRef.current = {
+                action,
+                context: executeContext,
+                userMessage: msg,
+                routeAtInvocation,
+                latencyMs,
+                latencySttMs: sttLatencyMs,
+                wasTruncated,
+                contextChars,
+                redactions,
+              };
+              setPendingConfirmationMessage(confirmationMessage);
+              logTurn(turnId, 'confirmation modal shown', action.intent);
+              // Se habla la pregunta de confirmación (el prompt instruye al
+              // LLM a que su reply SEA la pregunta; si se desvió, el modal
+              // muestra el texto canónico igualmente).
+              spokenReply = reply;
+            }
+          } else {
+            const actionStartedAt = Date.now();
+            logTurn(turnId, 'action exec start', action.intent ?? action.type);
+            const result = await ActionExecutor.execute(action, executeContext);
+            const latencyActionMs = Date.now() - actionStartedAt;
+            logTurn(
+              turnId,
+              'action exec end',
+              `success=${result.success}, idempotent=${result.idempotent === true}${result.error ? `, ${result.error}` : ''}`,
+            );
+            void logAgentEvent({
+              eventType: result.idempotent
+                ? 'action_idempotent'
+                : result.success
+                  ? 'action_executed'
+                  : 'action_failed',
+              userMessage: msg,
+              intentDetected: action.intent ?? null,
+              actionExecuted: {
+                type: action.type,
+                intent: action.intent ?? null,
+                ...(result.error ? { error: result.error } : {}),
+              },
+              currentRoute: routeAtInvocation,
+              latencyMs,
+              latencySttMs: sttLatencyMs,
+              latencyActionMs,
+              wasTruncated,
+              contextChars,
+              redactionsApplied: redactions,
+            });
+            if ((result.idempotent || !result.success) && result.message) {
+              spokenReply = result.message;
+              spokenAudio = null;
+            } else if (
+              result.success &&
+              result.message &&
+              result.data?.useNewVoiceForFeedback === true
+            ) {
+              // Cambio de voz: el feedback debe sonar CON la voz nueva (el
+              // audio del LLM viene con la antigua). Síntesis corta sin cuota;
+              // si falla, speakReply degrada al TTS del dispositivo.
+              const newVoice = normalizeVoiceAssistantVoiceId(
+                typeof result.data.voiceId === 'string' ? result.data.voiceId : null,
+              );
+              spokenReply = result.message;
+              spokenAudio = await fetchAssistantTtsBase64(newVoice, result.message);
+            }
           }
         } else {
           void logAgentEvent({
@@ -701,6 +800,78 @@ export function useVoiceAssistant({ enabled = true }: Options = {}) {
     void logAgentEvent({ eventType: 'agent_consent_declined', currentRoute: pathnameRef.current });
   }, []);
 
+  /**
+   * Habla el resultado de una acción confirmada (fuera del turno): intenta
+   * el TTS de OpenAI con la voz activa y degrada al TTS del dispositivo.
+   */
+  const speakActionFeedback = useCallback(
+    async (text: string) => {
+      const audio = await fetchAssistantTtsBase64(voiceId, text);
+      await speakReply(text, audio);
+    },
+    [speakReply, voiceId],
+  );
+
+  /** El usuario pulsó "Confirmar" en el modal: ejecutar la acción pendiente. */
+  const confirmPendingAction = useCallback(async () => {
+    const pending = pendingConfirmationRef.current;
+    pendingConfirmationRef.current = null;
+    setPendingConfirmationMessage(null);
+    if (!pending) return;
+
+    const { action, context } = pending;
+    const actionStartedAt = Date.now();
+    logTurn(invocationIdRef.current, 'confirmed action exec start', action.intent);
+    const result = await ActionExecutor.execute(action, context);
+    const latencyActionMs = Date.now() - actionStartedAt;
+    logTurn(
+      invocationIdRef.current,
+      'confirmed action exec end',
+      `success=${result.success}${result.error ? `, ${result.error}` : ''}`,
+    );
+    void logAgentEvent({
+      eventType: result.idempotent
+        ? 'action_idempotent'
+        : result.success
+          ? 'action_executed'
+          : 'action_failed',
+      userMessage: pending.userMessage,
+      intentDetected: action.intent ?? null,
+      actionExecuted: {
+        type: action.type,
+        intent: action.intent ?? null,
+        confirmed: true,
+        ...(result.error ? { error: result.error } : {}),
+      },
+      currentRoute: pending.routeAtInvocation,
+      latencyMs: pending.latencyMs,
+      latencySttMs: pending.latencySttMs,
+      latencyActionMs,
+      wasTruncated: pending.wasTruncated,
+      contextChars: pending.contextChars,
+      redactionsApplied: pending.redactions,
+    });
+    if (result.message) await speakActionFeedback(result.message);
+  }, [speakActionFeedback]);
+
+  /** El usuario canceló (botón, toque fuera o atrás): no se ejecuta nada. */
+  const cancelPendingAction = useCallback(() => {
+    const pending = pendingConfirmationRef.current;
+    pendingConfirmationRef.current = null;
+    setPendingConfirmationMessage(null);
+    if (!pending) return;
+    logTurn(invocationIdRef.current, 'action cancelled', pending.action.intent);
+    void logAgentEvent({
+      eventType: 'action_cancelled',
+      userMessage: pending.userMessage,
+      intentDetected: pending.action.intent ?? null,
+      actionExecuted: { type: pending.action.type, intent: pending.action.intent ?? null },
+      currentRoute: pending.routeAtInvocation,
+    });
+    // Feedback inmediato y barato: TTS del dispositivo (frase de una palabra).
+    void speakReply('Cancelado.', null);
+  }, [speakReply]);
+
   return {
     phase,
     isListening,
@@ -713,5 +884,9 @@ export function useVoiceAssistant({ enabled = true }: Options = {}) {
     consentModalVisible,
     acceptConsent,
     declineConsent,
+    confirmationModalVisible: pendingConfirmationMessage !== null,
+    confirmationMessage: pendingConfirmationMessage ?? '',
+    confirmPendingAction,
+    cancelPendingAction,
   };
 }

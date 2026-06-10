@@ -11,13 +11,22 @@ import type { ActionResult, AgentAction, AgentScreenContext } from './types';
 export interface ActionRegistries {
   handlers: Record<
     string,
-    (params: Record<string, unknown>, context: AgentScreenContext) => Promise<ActionResult>
+    (
+      params: Record<string, unknown>,
+      context: AgentScreenContext,
+      intent?: string,
+    ) => Promise<ActionResult>
   >;
   idempotencyCheckers: Record<
     string,
     (context: AgentScreenContext) => Promise<{ alreadyApplied: boolean; message?: string }>
   >;
 }
+
+/** Resultado del precheck de una acción (antes de confirmar/ejecutar). */
+export type ActionPrecheck =
+  | { kind: 'ready'; actionConfig: ActionIntent }
+  | { kind: 'done'; result: ActionResult };
 
 /** Valida los contextRequirements de la acción contra el contexto actual. */
 export function validateActionContext(
@@ -46,31 +55,40 @@ export function validateActionContext(
 }
 
 /**
- * Ejecuta una acción 'execute' validada por parseAgentAction.
- * Nunca lanza: cualquier fallo degrada a ActionResult con error + message.
+ * Fase previa a ejecutar (y a pedir confirmación): manifest lookup →
+ * validación de contexto → idempotencia. Si devuelve 'done', el turno
+ * termina con ese resultado SIN pedir confirmación ni llamar al handler
+ * (p. ej. "haz mi cuenta privada" cuando ya es privada → mensaje directo,
+ * sin molestar con el modal).
  */
-export async function runManifestAction(
+export async function precheckManifestAction(
   action: AgentAction,
   manifestActions: ActionIntent[],
   context: AgentScreenContext,
   registries: ActionRegistries,
-): Promise<ActionResult> {
+): Promise<ActionPrecheck> {
   const intent = action.intent?.trim();
   if (!intent) {
-    return { success: false, error: 'No intent specified' };
+    return { kind: 'done', result: { success: false, error: 'No intent specified' } };
   }
 
   const actionConfig = manifestActions.find((a) => a.intent === intent);
   if (!actionConfig) {
-    return { success: false, error: `Unknown action intent: ${intent}` };
+    return {
+      kind: 'done',
+      result: { success: false, error: `Unknown action intent: ${intent}` },
+    };
   }
 
   const contextValidation = validateActionContext(actionConfig, context);
   if (!contextValidation.ok) {
     return {
-      success: false,
-      error: contextValidation.reason,
-      message: contextValidation.userMessage,
+      kind: 'done',
+      result: {
+        success: false,
+        error: contextValidation.reason,
+        message: contextValidation.userMessage,
+      },
     };
   }
 
@@ -80,21 +98,44 @@ export async function runManifestAction(
       try {
         const result = await checker(context);
         if (result.alreadyApplied) {
-          return { success: true, idempotent: true, message: result.message };
+          return {
+            kind: 'done',
+            result: { success: true, idempotent: true, message: result.message },
+          };
         }
       } catch {
         // Un checker roto no debe bloquear la acción: se ejecuta igualmente
-        // (los handlers de este sprint son reversibles).
+        // (las acciones declaradas hasta ahora son reversibles).
       }
     }
   }
 
+  return { kind: 'ready', actionConfig };
+}
+
+/**
+ * Ejecuta una acción 'execute' validada por parseAgentAction.
+ * Nunca lanza: cualquier fallo degrada a ActionResult con error + message.
+ * El intent viaja como tercer argumento del handler para que los handlers
+ * compartidos (setAccountPrivacy, toggleNotifications) deriven el valor del
+ * intent declarado y no dependan de parámetros generados por el LLM.
+ */
+export async function runManifestAction(
+  action: AgentAction,
+  manifestActions: ActionIntent[],
+  context: AgentScreenContext,
+  registries: ActionRegistries,
+): Promise<ActionResult> {
+  const pre = await precheckManifestAction(action, manifestActions, context, registries);
+  if (pre.kind === 'done') return pre.result;
+
+  const { actionConfig } = pre;
   const handler = registries.handlers[actionConfig.handler];
   if (!handler) {
     return { success: false, error: `Handler not found: ${actionConfig.handler}` };
   }
   try {
-    return await handler(action.parameters ?? {}, context);
+    return await handler(action.parameters ?? {}, context, actionConfig.intent);
   } catch (e) {
     return {
       success: false,

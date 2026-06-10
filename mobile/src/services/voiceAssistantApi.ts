@@ -216,6 +216,35 @@ export async function sendVoiceAssistantTurn(
   };
 }
 
+/**
+ * Sintetiza un texto corto con una voz concreta y devuelve el MP3 en base64
+ * (null si falla — el caller degrada al TTS del dispositivo). Lo usa el
+ * feedback de change_assistant_voice: "ahora hablo con la voz de Fyodor"
+ * debe sonar CON la voz nueva. Reutiliza /assistant/preview-tts (sin cuota).
+ */
+export async function fetchAssistantTtsBase64(
+  voice: VoiceAssistantVoiceId,
+  text: string,
+): Promise<string | null> {
+  const apiBase = getApiBaseUrl();
+  try {
+    const res = await fetchWithRetry(
+      `${apiBase}/assistant/preview-tts`,
+      {
+        method: 'POST',
+        headers: mergeApiHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ voice, text }),
+      },
+      { timeoutMs: 12_000, attempts: 1, apiBase },
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as { audio_base64?: string | null };
+    return data.audio_base64?.length ? data.audio_base64 : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function previewVoiceAssistantTts(voice: VoiceAssistantVoiceId): Promise<void> {
   const apiBase = getApiBaseUrl();
   const url = `${apiBase}/assistant/preview-tts`;

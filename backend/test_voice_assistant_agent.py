@@ -202,6 +202,52 @@ check(
     ("ok", None),
 )
 
+# ── Sprint 2 (v2): confirmación ligera ────────────────────────────────────────
+VALID_CONFIG_ACTIONS = VALID_ACTIONS | {"make_account_private", "change_assistant_voice"}
+
+check(
+    "execute preserva requireConfirmation + confirmationMessage",
+    _parse_agent_json(
+        '{"reply": "¿Seguro?", "action": {"type": "execute", "intent": "make_account_private",'
+        ' "parameters": {"isPrivate": true}, "requireConfirmation": true,'
+        ' "confirmationMessage": "¿Seguro que quieres hacer tu cuenta privada?"}}',
+        VALID,
+        VALID_CONFIG_ACTIONS,
+    ),
+    (
+        "¿Seguro?",
+        {
+            "type": "execute",
+            "intent": "make_account_private",
+            "parameters": {"isPrivate": True},
+            "requireConfirmation": True,
+            "confirmationMessage": "¿Seguro que quieres hacer tu cuenta privada?",
+        },
+    ),
+)
+
+check(
+    "requireConfirmation con tipo basura → se omite",
+    _parse_agent_json(
+        '{"reply": "ok", "action": {"type": "execute", "intent": "make_account_private",'
+        ' "requireConfirmation": "yes", "confirmationMessage": "   "}}',
+        VALID,
+        VALID_CONFIG_ACTIONS,
+    ),
+    ("ok", {"type": "execute", "intent": "make_account_private", "parameters": {}}),
+)
+
+check(
+    "execute con parámetros de voz",
+    _parse_agent_json(
+        '{"reply": "Listo.", "action": {"type": "execute", "intent": "change_assistant_voice",'
+        ' "parameters": {"voiceId": "fyodor"}}}',
+        VALID,
+        VALID_CONFIG_ACTIONS,
+    ),
+    ("Listo.", {"type": "execute", "intent": "change_assistant_voice", "parameters": {"voiceId": "fyodor"}}),
+)
+
 # ── System prompt: incluye navegación solo si hay manifest ────────────────────
 routes = [{"intent": "my_profile", "label": "Mi perfil", "examples": ["mi perfil"]}]
 with_manifest = _build_system_prompt(routes, "/feed")
@@ -236,5 +282,35 @@ assert "CAPACIDAD DE EJECUTAR ACCIONES" not in without_actions
 assert "dar o quitar like" in without_actions
 PASSED += 1
 print("  ok: system prompt sin acciones (legacy v1)")
+
+# ── System prompt: acciones con confirmación y parámetros (Sprint 2) ──────────
+config_actions = actions + [
+    {
+        "intent": "make_account_private",
+        "label": "Hacer cuenta privada",
+        "examples": ["haz mi cuenta privada"],
+        "requires_visible_post": False,
+        "requires_confirmation": True,
+        "confirmation_message": "¿Seguro que quieres hacer tu cuenta privada?",
+        "parameters": {"isPrivate": "boolean — true para hacer la cuenta privada"},
+    },
+    {
+        "intent": "change_assistant_voice",
+        "label": "Cambiar voz del asistente",
+        "examples": ["cambia tu voz"],
+        "requires_confirmation": False,
+        "parameters": {"voiceId": "string (opcional) — jane o fyodor"},
+    },
+]
+with_config = _build_system_prompt(routes, "/feed", config_actions)
+assert "[requiere confirmación]" in with_config
+assert "¿Seguro que quieres hacer tu cuenta privada?" in with_config
+assert "parámetro 'voiceId'" in with_config
+assert "REGLAS PARA ACCIONES CON CONFIRMACIÓN" in with_config
+# La privacidad ya no figura como acción no soportada:
+assert "cambiar ajustes o la privacidad" not in with_config
+assert "cerrar sesión" in with_config
+PASSED += 1
+print("  ok: system prompt con acciones de configuración")
 
 print(f"\n{PASSED} tests OK")

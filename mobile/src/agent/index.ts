@@ -14,13 +14,21 @@ export type {
   ActionResult,
   AgentScreenContext,
 } from './core/types';
-export { runManifestAction, validateActionContext } from './core/actionEngine';
+export {
+  precheckManifestAction,
+  runManifestAction,
+  validateActionContext,
+} from './core/actionEngine';
+export type { ActionPrecheck } from './core/actionEngine';
 export { useRegisterAgentInteractions } from './handlers/useRegisterAgentInteractions';
 export {
   setAgentInteractionBridge,
   getAgentInteractionBridge,
 } from './handlers/interactionBridge';
 export type { AgentInteractionBridge } from './handlers/interactionBridge';
+export { useRegisterAgentConfig } from './handlers/useRegisterAgentConfig';
+export { setAgentConfigBridge, getAgentConfigBridge } from './handlers/configBridge';
+export type { AgentConfigBridge, NotificationsPermission } from './handlers/configBridge';
 export { logAgentEvent } from './core/agentAnalytics';
 export type { AgentEventType } from './core/agentAnalytics';
 export {
@@ -29,6 +37,7 @@ export {
   revokeAssistantConsent,
 } from './core/consent';
 export { AssistantConsentModal } from './components/AssistantConsentModal';
+export { ActionConfirmationModal } from './components/ActionConfirmationModal';
 export { combineContexts, truncateContext, MAX_CONTEXT_CHARS } from './core/contextLimits';
 export { sanitizeForLLM } from './core/sanitization';
 export type { SanitizationResult, RedactionType } from './core/sanitization';

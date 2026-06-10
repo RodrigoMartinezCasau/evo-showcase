@@ -26,7 +26,9 @@ export type AgentEventType =
   /** Acción type 'execute' falló (handler, contexto o puente). */
   | 'action_failed'
   /** Acción no ejecutada porque ya estaba aplicada (idempotencia). */
-  | 'action_idempotent';
+  | 'action_idempotent'
+  /** El usuario canceló una acción en el modal de confirmación (Sprint 2). */
+  | 'action_cancelled';
 
 export interface AgentEventParams {
   eventType: AgentEventType;

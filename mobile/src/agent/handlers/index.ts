@@ -19,24 +19,46 @@ import {
   isPostNotSaved,
   type IdempotencyResult,
 } from './interactions/idempotency';
+import { setAccountPrivacyHandler } from './config/setAccountPrivacy';
+import { changeAssistantVoiceHandler } from './config/changeAssistantVoice';
+import { toggleNotificationsHandler } from './config/toggleNotifications';
+import {
+  areNotificationsAlreadyDisabled,
+  areNotificationsAlreadyEnabled,
+  isAccountAlreadyPrivate,
+  isAccountAlreadyPublic,
+} from './config/idempotency';
 
 export type ActionHandler = (
   params: Record<string, unknown>,
   context: AgentScreenContext,
+  /** Intent del manifest — los handlers compartidos derivan su valor de aquí. */
+  intent?: string,
 ) => Promise<ActionResult>;
 
 export type IdempotencyChecker = (context: AgentScreenContext) => Promise<IdempotencyResult>;
 
 export const ACTION_HANDLERS: Record<string, ActionHandler> = {
+  // Sprint 1: interacciones sobre el post visible
   likeVisiblePost: likeVisiblePostHandler,
   unlikeVisiblePost: unlikeVisiblePostHandler,
   saveVisiblePost: saveVisiblePostHandler,
   unsaveVisiblePost: unsaveVisiblePostHandler,
+  // Sprint 2: configuración
+  setAccountPrivacy: setAccountPrivacyHandler,
+  changeAssistantVoice: changeAssistantVoiceHandler,
+  toggleNotifications: toggleNotificationsHandler,
 };
 
 export const IDEMPOTENCY_CHECKERS: Record<string, IdempotencyChecker> = {
+  // Sprint 1
   isPostAlreadyLiked,
   isPostNotLiked,
   isPostAlreadySaved,
   isPostNotSaved,
+  // Sprint 2
+  isAccountAlreadyPublic,
+  isAccountAlreadyPrivate,
+  areNotificationsAlreadyEnabled,
+  areNotificationsAlreadyDisabled,
 };

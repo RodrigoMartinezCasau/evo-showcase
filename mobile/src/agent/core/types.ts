@@ -9,10 +9,12 @@ export interface AgentAction {
   /** Intent del manifest (obligatorio para navigate/execute). */
   intent?: string;
   parameters?: Record<string, unknown>;
-  confirmation?: {
-    required: boolean;
-    message: string;
-  };
+  /**
+   * Confirmación ligera (v2 Sprint 2). Informativo: el cliente NUNCA se fía
+   * solo de esto — la fuente de verdad es requireConfirmation del manifest.
+   */
+  requireConfirmation?: boolean;
+  confirmationMessage?: string;
 }
 
 /** Respuesta completa del backend del agente. */
@@ -71,6 +73,11 @@ export function parseAgentAction(raw: unknown): AgentAction | null {
     parameters:
       obj.parameters && typeof obj.parameters === 'object'
         ? (obj.parameters as Record<string, unknown>)
+        : undefined,
+    requireConfirmation: obj.requireConfirmation === true ? true : undefined,
+    confirmationMessage:
+      typeof obj.confirmationMessage === 'string' && obj.confirmationMessage.trim()
+        ? obj.confirmationMessage.trim()
         : undefined,
   };
 }
