@@ -46,6 +46,8 @@ export interface ActionResult {
 export interface AgentScreenContext {
   /** Presente si la pantalla actual es un feed con publicaciones visibles. */
   feed?: import('./feedContext').FeedScreenContext;
+  /** Presente si la pantalla actual es un perfil de usuario (Sprint 5). */
+  profile?: import('./profileContext').VisibleProfile;
 }
 
 const VALID_ACTION_TYPES = new Set<AgentAction['type']>(['navigate', 'execute', 'none']);

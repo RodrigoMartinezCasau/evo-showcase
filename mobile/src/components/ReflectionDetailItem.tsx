@@ -74,6 +74,7 @@ import {
   type BasicProfile,
 } from '@evoconn/services/supabaseSocial';
 import { useBlockedUsers } from '@evoconn/hooks/BlockedUsersContext';
+import { registerAgentPostUi } from '@evoconn/agent';
 import { useAuth } from '../../mobile/lib/AuthContext';
 import { useIsAdmin } from '@evoconn/hooks/useIsAdmin';
 import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
@@ -1587,10 +1588,35 @@ export const ReflectionDetailItem = React.memo(function ReflectionDetailItem({
     REFLECTION_DETAIL_CONTENT_PAD_H + CP.paddingHorizontal;
 
   const composerInputRef = useRef<NewCommentBoxHandle>(null);
+  /** Prefill del agente de voz: texto pendiente de sembrar al abrir el composer. */
+  const agentComposerDraftRef = useRef<string | null>(null);
 
   const focusComposerInput = useCallback(() => {
+    const draft = agentComposerDraftRef.current;
+    if (draft) {
+      agentComposerDraftRef.current = null;
+      composerInputRef.current?.setText(draft);
+    }
     composerInputRef.current?.focus();
   }, []);
+
+  // Agente de voz (Sprint 3/4): expone cómo abrir el composer de comentarios
+  // con texto inicial y el selector de motivos de denuncia de ESTE post.
+  useEffect(() => {
+    if (previewMode) return;
+    return registerAgentPostUi(post.id, {
+      openCommentComposer: (initialText: string) => {
+        if (commentComposerOpenRef.current) {
+          composerInputRef.current?.setText(initialText);
+          composerInputRef.current?.focus();
+          return;
+        }
+        agentComposerDraftRef.current = initialText;
+        openCommentComposer();
+      },
+      openReportPicker: () => setReportReasonPickerOpen(true),
+    });
+  }, [post.id, previewMode, openCommentComposer]);
 
   const renderComposerTrigger = () => (
     <View style={styles.newCommentRow}>

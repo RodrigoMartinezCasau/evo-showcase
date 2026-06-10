@@ -66,6 +66,38 @@ import {
   isAccountAlreadyPrivate,
   isAccountAlreadyPublic,
 } from '../../handlers/config/idempotency';
+import {
+  classifyConfirmationReply,
+  isAffirmative,
+  isNegative,
+} from '../confirmationSpeech';
+import { getTargetProfile, type VisibleProfile } from '../profileContext';
+import { setAgentAppBridge, type AgentAppBridge } from '../../handlers/appBridge';
+import { registerAgentPostUi } from '../../handlers/postUiRegistry';
+import {
+  prefillCommentHandler,
+  prefillPhraseHandler,
+  prefillReflectionHandler,
+} from '../../handlers/creation/creationActions';
+import {
+  blockVisibleProfileHandler,
+  followVisibleProfileHandler,
+  unfollowVisibleProfileHandler,
+} from '../../handlers/social/relationshipActions';
+import { repostVisiblePostHandler } from '../../handlers/social/repostActions';
+import { reportVisiblePostHandler } from '../../handlers/social/reportActions';
+import { logoutHandler } from '../../handlers/social/sessionActions';
+import {
+  isAlreadyFollowingProfile,
+  isNotFollowingProfile,
+  isPostAlreadyReposted,
+  isProfileAlreadyBlocked,
+} from '../../handlers/social/idempotency';
+import {
+  findUserProfileHandler,
+  openSearchWithQueryHandler,
+  resolveUserMatches,
+} from '../../handlers/search/searchActions';
 
 let passed = 0;
 
@@ -544,6 +576,227 @@ async function main() {
   const noCfgBridge = await setAccountPrivacyHandler({}, {}, 'make_account_private');
   check('config: sin puente → error con mensaje', noCfgBridge.success === false && !!noCfgBridge.message);
   check('config: idempotencia sin puente no bloquea', (await isAccountAlreadyPublic({})).alreadyApplied === false);
+
+  // ── Sprint 4 (v2): detección afirmativo/negativo (confirmación por voz) ─────
+  check('confirm: "sí" afirmativo', isAffirmative('Sí'));
+  check('confirm: "vale, hazlo" afirmativo', isAffirmative('vale, hazlo'));
+  check('confirm: "sí, claro." con puntuación', classifyConfirmationReply('Sí, claro.') === 'affirmative');
+  check('confirm: "no" negativo', isNegative('No'));
+  check('confirm: "mejor no" negativo', classifyConfirmationReply('mejor no') === 'negative');
+  check('confirm: "espera un momento" negativo', classifyConfirmationReply('espera un momento') === 'negative');
+  check('confirm: negación gana al empate', classifyConfirmationReply('no, vale, déjalo') === 'negative');
+  check('confirm: texto vacío ambiguo', classifyConfirmationReply('') === 'ambiguous');
+  check('confirm: sin señal → ambiguo', classifyConfirmationReply('qué hora es') === 'ambiguous');
+  check('confirm: "nosotros" no es "no"', classifyConfirmationReply('nosotros veremos') === 'ambiguous');
+  check('confirm: "claro que sí" afirmativo', classifyConfirmationReply('claro que sí') === 'affirmative');
+  check('confirm: "cancela eso" negativo', classifyConfirmationReply('cancela eso') === 'negative');
+
+  // ── Sprint 5 (v2): perfil visible (contexto + validación) ───────────────────
+  const makeProfile = (over: Partial<VisibleProfile> = {}): VisibleProfile => ({
+    profile_id: 'u-1',
+    profile_username: 'marco',
+    profile_is_own: false,
+    ...over,
+  });
+  const profCtx = (over: Partial<VisibleProfile> = {}): AgentScreenContext => ({
+    profile: makeProfile(over),
+  });
+
+  check('profile: target ok en perfil ajeno', getTargetProfile(makeProfile())?.profile_id === 'u-1');
+  check('profile: target null si es el propio', getTargetProfile(makeProfile({ profile_is_own: true })) === null);
+  check('profile: target null sin perfil', getTargetProfile(undefined) === null);
+  check('profile: target null sin id', getTargetProfile(makeProfile({ profile_id: ' ' })) === null);
+
+  const profileAction: ActionIntent = {
+    intent: 'follow_user',
+    label: 'Seguir',
+    category: 'relationship',
+    handler: 'followVisibleProfile',
+    requireConfirmation: false,
+    parameters: {},
+    contextRequirements: { requiresVisibleProfile: true, requiresAuth: true },
+    examples: ['síguelo'],
+  };
+  check('engine: perfil visible válido', validateActionContext(profileAction, profCtx()).ok === true);
+  const noProfVal = validateActionContext(profileAction, {});
+  check('engine: sin perfil visible → mensaje', !noProfVal.ok && noProfVal.userMessage.includes('perfil'));
+  const ownProfVal = validateActionContext(profileAction, profCtx({ profile_is_own: true }));
+  check('engine: perfil propio rechazado', !ownProfVal.ok && ownProfVal.userMessage.includes('propio'));
+
+  // ── Sprints 3+4+5 (v2): handlers con puente de app falso ────────────────────
+  const makeAppBridge = (init?: {
+    following?: string[];
+    pending?: string[];
+    blocked?: string[];
+    reposted?: string[];
+    privateUsers?: string[];
+    searchResults?: Array<{ id: string; username: string }>;
+  }) => {
+    const following = new Set(init?.following ?? []);
+    const pending = new Set(init?.pending ?? []);
+    const blocked = new Set(init?.blocked ?? []);
+    const reposted = new Set(init?.reposted ?? []);
+    const privateUsers = new Set(init?.privateUsers ?? []);
+    const calls: string[] = [];
+    const bridge: AgentAppBridge = {
+      openReflectionComposer: (prefill) => void calls.push(`reflection:${prefill ?? ''}`),
+      openPhraseComposer: (prefill, author) =>
+        void calls.push(`phrase:${prefill ?? ''}|${author ?? ''}`),
+      isFollowing: (id) => following.has(id),
+      isFollowPending: (id) => pending.has(id),
+      toggleFollow: (id) => {
+        if (following.has(id)) {
+          following.delete(id);
+        } else if (pending.has(id)) {
+          pending.delete(id);
+        } else if (privateUsers.has(id)) {
+          pending.add(id);
+        } else {
+          following.add(id);
+        }
+      },
+      isBlocked: (id) => blocked.has(id),
+      blockUser: async (id) => {
+        blocked.add(id);
+        calls.push(`block:${id}`);
+        return true;
+      },
+      isReposted: (id) => reposted.has(id),
+      repost: (id) => void reposted.add(id),
+      logout: async () => void calls.push('logout'),
+      searchUsers: async () => init?.searchResults ?? [],
+      openProfile: (id, username) => void calls.push(`profile:${id}:${username ?? ''}`),
+      openSearch: (query) => void calls.push(`search:${query ?? ''}`),
+    };
+    return { bridge, calls, following, pending, blocked, reposted };
+  };
+
+  // Sprint 3: creación con prefill.
+  const app1 = makeAppBridge();
+  setAgentAppBridge(app1.bridge);
+  const refl = await prefillReflectionHandler({ content: 'La libertad...' });
+  check('prefill reflexión: navega con contenido', refl.success === true && app1.calls.includes('reflection:La libertad...'));
+  const reflEmpty = await prefillReflectionHandler({});
+  check('prefill reflexión: sin contenido también abre', reflEmpty.success === true && app1.calls.includes('reflection:'));
+  const phrase = await prefillPhraseHandler({ phraseText: 'Dios ha muerto', author: 'Nietzsche' });
+  check('prefill frase: texto y autor', phrase.success === true && app1.calls.includes('phrase:Dios ha muerto|Nietzsche'));
+
+  const noPostComment = await prefillCommentHandler({ commentText: 'gran reflexión' }, {});
+  check('prefill comentario: sin post → mensaje de abrir publicación',
+    noPostComment.success === false && noPostComment.message === 'Para comentar, abre primero la publicación.');
+  const noTextComment = await prefillCommentHandler({}, feedCtx([makePost(0)], 0));
+  check('prefill comentario: sin texto → pide repetir', noTextComment.success === false && !!noTextComment.message);
+  const unregistered = await prefillCommentHandler({ commentText: 'hola' }, feedCtx([makePost(0)], 0));
+  check('prefill comentario: post sin UI registrada → mensaje', unregistered.success === false && !!unregistered.message);
+
+  let composerText: string | null = null;
+  let reportOpened = false;
+  const unregister = registerAgentPostUi('post-0', {
+    openCommentComposer: (t) => void (composerText = t),
+    openReportPicker: () => void (reportOpened = true),
+  });
+  const comment = await prefillCommentHandler({ commentText: 'gran reflexión' }, feedCtx([makePost(0)], 0));
+  check('prefill comentario: abre composer con texto', comment.success === true && composerText === 'gran reflexión');
+
+  // Sprint 4: denuncia (abre el modal existente, no denuncia directamente).
+  const report = await reportVisiblePostHandler({}, feedCtx([makePost(0)], 0));
+  check('report: abre el selector de motivos', report.success === true && reportOpened === true);
+  unregister();
+  const reportGone = await reportVisiblePostHandler({}, feedCtx([makePost(0)], 0));
+  check('report: tarjeta desmontada → mensaje', reportGone.success === false && !!reportGone.message);
+
+  // Sprint 4: relaciones sobre el perfil visible.
+  const app2 = makeAppBridge({ privateUsers: ['u-priv'] });
+  setAgentAppBridge(app2.bridge);
+  const follow = await followVisibleProfileHandler({}, profCtx());
+  check('follow: sigue a cuenta pública', follow.success === true && app2.following.has('u-1'));
+  const followAgain = await followVisibleProfileHandler({}, profCtx());
+  check('follow: ya siguiendo → idempotente', followAgain.idempotent === true && followAgain.message === 'Ya sigues a marco.');
+  check('follow: checker idempotencia', (await isAlreadyFollowingProfile(profCtx())).alreadyApplied === true);
+
+  const followPriv = await followVisibleProfileHandler(
+    {},
+    profCtx({ profile_id: 'u-priv', profile_username: 'ana', profile_is_private: true }),
+  );
+  check('follow: cuenta privada → solicitud', followPriv.success === true && app2.pending.has('u-priv'));
+  check('follow: mensaje de solicitud', !!followPriv.message?.includes('solicitud'));
+
+  const unfollow = await unfollowVisibleProfileHandler({}, profCtx());
+  check('unfollow: deja de seguir', unfollow.success === true && !app2.following.has('u-1'));
+  const unfollowAgain = await unfollowVisibleProfileHandler({}, profCtx());
+  check('unfollow: no seguía → idempotente', unfollowAgain.idempotent === true && unfollowAgain.message === 'No seguías a marco.');
+  check('unfollow: checker idempotencia', (await isNotFollowingProfile(profCtx())).alreadyApplied === true);
+
+  const block = await blockVisibleProfileHandler({}, profCtx());
+  check('block: bloquea con flujo de moderación', block.success === true && app2.blocked.has('u-1'));
+  const blockAgain = await blockVisibleProfileHandler({}, profCtx());
+  check('block: ya bloqueado → idempotente', blockAgain.idempotent === true);
+  check('block: checker idempotencia', (await isProfileAlreadyBlocked(profCtx())).alreadyApplied === true);
+
+  const followNoProfile = await followVisibleProfileHandler({}, {});
+  check('relaciones: sin perfil visible → mensaje', followNoProfile.success === false && !!followNoProfile.message);
+
+  // Sprint 4: repost.
+  const repost = await repostVisiblePostHandler({}, feedCtx([makePost(0)], 0));
+  check('repost: republica', repost.success === true && app2.reposted.has('post-0'));
+  const repostAgain = await repostVisiblePostHandler({}, feedCtx([makePost(0)], 0));
+  check('repost: ya reposteado → idempotente', repostAgain.idempotent === true && repostAgain.message === 'Ya habías republicado esto.');
+  check('repost: checker idempotencia', (await isPostAlreadyReposted(feedCtx([makePost(0)], 0))).alreadyApplied === true);
+  const repostNoPost = await repostVisiblePostHandler({}, {});
+  check('repost: sin post → mensaje', repostNoPost.success === false && !!repostNoPost.message);
+
+  // Sprint 4: logout.
+  const logout = await logoutHandler();
+  check('logout: usa el flujo del puente', logout.success === true && app2.calls.includes('logout'));
+
+  // Sprint 5: resolución de usuarios por nombre.
+  const users = [
+    { id: '1', username: 'marco' },
+    { id: '2', username: 'marcos_f' },
+    { id: '3', username: 'marcelo' },
+  ];
+  check('search: match exacto gana', (() => {
+    const r = resolveUserMatches('Marco', users);
+    return r.kind === 'unique' && r.user.id === '1';
+  })());
+  check('search: único resultado', (() => {
+    const r = resolveUserMatches('sofia', [{ id: '9', username: 'sofia_p' }]);
+    return r.kind === 'unique' && r.user.id === '9';
+  })());
+  check('search: múltiples sin exacto', resolveUserMatches('marc', users).kind === 'multiple');
+  check('search: sin resultados', resolveUserMatches('nadie', []).kind === 'none');
+  check('search: máx 3 sugerencias', (() => {
+    const many = Array.from({ length: 6 }, (_, i) => ({ id: String(i), username: `pepe${i}` }));
+    const r = resolveUserMatches('pep', many);
+    return r.kind === 'multiple' && r.users.length === 3;
+  })());
+
+  const appSearch = makeAppBridge({ searchResults: users });
+  setAgentAppBridge(appSearch.bridge);
+  const goProfile = await findUserProfileHandler({ searchQuery: '@marco' });
+  check('search: navega al perfil con match exacto',
+    goProfile.success === true && appSearch.calls.includes('profile:1:marco'));
+  const multi = await findUserProfileHandler({ searchQuery: 'marc' });
+  check('search: varios → pregunta con nombres',
+    multi.success === false && !!multi.message?.includes('@marco') && !!multi.message?.includes('@marcelo'));
+  const appEmpty = makeAppBridge({ searchResults: [] });
+  setAgentAppBridge(appEmpty.bridge);
+  const none = await findUserProfileHandler({ searchQuery: 'fantasma' });
+  check('search: sin match → mensaje claro',
+    none.success === false && !!none.message?.includes('No he encontrado'));
+  const noQuery = await findUserProfileHandler({});
+  check('search: sin query → pide repetir', noQuery.success === false && !!noQuery.message);
+
+  const openSearch = await openSearchWithQueryHandler({ searchQuery: 'estoicos' });
+  check('search: abre buscador con query', openSearch.success === true && appEmpty.calls.includes('search:estoicos'));
+
+  // Sin puente de app registrado: degradación con mensaje.
+  setAgentAppBridge(null);
+  const noAppBridge = await prefillReflectionHandler({ content: 'x' });
+  check('app: sin puente → error con mensaje', noAppBridge.success === false && !!noAppBridge.message);
+  const noAppFollow = await followVisibleProfileHandler({}, profCtx());
+  check('app: follow sin puente → error con mensaje', noAppFollow.success === false && !!noAppFollow.message);
+  check('app: idempotencia sin puente no bloquea', (await isAlreadyFollowingProfile(profCtx())).alreadyApplied === false);
 
   console.log(`\n${passed} tests OK`);
 }

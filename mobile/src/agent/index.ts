@@ -29,6 +29,21 @@ export type { AgentInteractionBridge } from './handlers/interactionBridge';
 export { useRegisterAgentConfig } from './handlers/useRegisterAgentConfig';
 export { setAgentConfigBridge, getAgentConfigBridge } from './handlers/configBridge';
 export type { AgentConfigBridge, NotificationsPermission } from './handlers/configBridge';
+export { useRegisterAgentApp } from './handlers/useRegisterAgentApp';
+export { setAgentAppBridge, getAgentAppBridge } from './handlers/appBridge';
+export type { AgentAppBridge, AgentUserSearchResult } from './handlers/appBridge';
+export { registerAgentPostUi, getAgentPostUi } from './handlers/postUiRegistry';
+export type { AgentPostUiHandlers } from './handlers/postUiRegistry';
+export {
+  AFFIRMATIVE_WORDS,
+  NEGATIVE_WORDS,
+  isAffirmative,
+  isNegative,
+  classifyConfirmationReply,
+} from './core/confirmationSpeech';
+export type { ConfirmationReply } from './core/confirmationSpeech';
+export { getTargetProfile } from './core/profileContext';
+export type { VisibleProfile } from './core/profileContext';
 export { logAgentEvent } from './core/agentAnalytics';
 export type { AgentEventType } from './core/agentAnalytics';
 export {

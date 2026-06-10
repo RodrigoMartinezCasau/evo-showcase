@@ -272,7 +272,7 @@ assert "like_post" in with_actions
 assert "[requiere publicación visible]" in with_actions
 # Con acciones disponibles, like ya NO está en la lista de no soportadas:
 assert "dar o quitar like" not in with_actions
-assert "Comentar, repostear, votar negativo" in with_actions
+assert "Votar negativo, publicar contenido POR el usuario" in with_actions
 PASSED += 1
 print("  ok: system prompt con acciones")
 
@@ -309,8 +309,97 @@ assert "parámetro 'voiceId'" in with_config
 assert "REGLAS PARA ACCIONES CON CONFIRMACIÓN" in with_config
 # La privacidad ya no figura como acción no soportada:
 assert "cambiar ajustes o la privacidad" not in with_config
-assert "cerrar sesión" in with_config
+# Sprint 4: cerrar sesión ya es una acción soportada (no está en la lista de no soportadas).
+assert "cerrar sesión" not in with_config
 PASSED += 1
 print("  ok: system prompt con acciones de configuración")
+
+# ── Sprints 3+4+5 (v2): creación, relaciones, búsqueda ─────────────────────────
+VALID_V3_ACTIONS = VALID_CONFIG_ACTIONS | {
+    "create_reflection_prefill",
+    "create_comment_prefill",
+    "follow_user",
+    "repost_post",
+    "logout",
+    "find_user_profile",
+}
+
+check(
+    "execute creación con parámetros de prefill",
+    _parse_agent_json(
+        '{"reply": "Te abro una reflexión sobre la libertad.", "action": {"type": "execute",'
+        ' "intent": "create_reflection_prefill", "parameters": {"content": "La libertad"}}}',
+        VALID,
+        VALID_V3_ACTIONS,
+    ),
+    (
+        "Te abro una reflexión sobre la libertad.",
+        {"type": "execute", "intent": "create_reflection_prefill", "parameters": {"content": "La libertad"}},
+    ),
+)
+
+check(
+    "execute búsqueda de perfil por nombre",
+    _parse_agent_json(
+        '{"reply": "Voy.", "action": {"type": "execute", "intent": "find_user_profile",'
+        ' "parameters": {"searchQuery": "marco"}}}',
+        VALID,
+        VALID_V3_ACTIONS,
+    ),
+    ("Voy.", {"type": "execute", "intent": "find_user_profile", "parameters": {"searchQuery": "marco"}}),
+)
+
+check(
+    "execute logout con confirmación preservada",
+    _parse_agent_json(
+        '{"reply": "¿Seguro que quieres cerrar sesión?", "action": {"type": "execute", "intent": "logout",'
+        ' "requireConfirmation": true, "confirmationMessage": "¿Seguro que quieres cerrar sesión?"}}',
+        VALID,
+        VALID_V3_ACTIONS,
+    ),
+    (
+        "¿Seguro que quieres cerrar sesión?",
+        {
+            "type": "execute",
+            "intent": "logout",
+            "parameters": {},
+            "requireConfirmation": True,
+            "confirmationMessage": "¿Seguro que quieres cerrar sesión?",
+        },
+    ),
+)
+
+# System prompt: marca de perfil visible + bloques de creación y búsqueda.
+v3_actions = config_actions + [
+    {
+        "intent": "follow_user",
+        "label": "Seguir al usuario del perfil visible",
+        "examples": ["síguelo"],
+        "requires_visible_post": False,
+        "requires_visible_profile": True,
+    },
+    {
+        "intent": "create_reflection_prefill",
+        "label": "Crear reflexión con contenido",
+        "examples": ["escribe una reflexión sobre la libertad"],
+        "parameters": {"content": "string (opcional) — texto o tema de partida"},
+    },
+]
+with_v3 = _build_system_prompt(routes, "/feed", v3_actions)
+assert "[requiere perfil visible]" in with_v3
+assert "ACCIONES DE CREACIÓN" in with_v3
+assert "NUNCA generes tú el contenido completo" in with_v3
+assert "ACCIONES SOBRE EL PERFIL VISIBLE" in with_v3
+assert "BÚSQUEDA Y PERFILES POR NOMBRE" in with_v3
+# El aviso legacy de "no puedo buscar perfiles" NO aparece con acciones v2:
+assert "todavía no puedo buscar perfiles" not in with_v3
+PASSED += 1
+print("  ok: system prompt con acciones de Sprints 3+4+5")
+
+# Cliente v1 (solo navegación): mantiene el aviso de perfiles no soportados.
+legacy_prompt = _build_system_prompt(routes, "/feed")
+assert "todavía no puedo buscar perfiles" in legacy_prompt
+PASSED += 1
+print("  ok: aviso legacy de perfiles para clientes v1")
 
 print(f"\n{PASSED} tests OK")

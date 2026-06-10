@@ -293,8 +293,19 @@ const FEED_CLIP_SUBVIEWS  = IS_ANDROID;
 export default function CommunityScreen() {
   const router = useRouter();
   const pathname = usePathname();
-  const { tab: tabParam, postId: postIdParam, commentId: commentIdParam, nav: navParam } =
-    useLocalSearchParams<{ tab?: string; postId?: string; commentId?: string; nav?: string }>();
+  const {
+    tab: tabParam,
+    postId: postIdParam,
+    commentId: commentIdParam,
+    nav: navParam,
+    searchQuery: searchQueryParam,
+  } = useLocalSearchParams<{
+    tab?: string;
+    postId?: string;
+    commentId?: string;
+    nav?: string;
+    searchQuery?: string;
+  }>();
   const insets = useSafeAreaInsets();
   const safeFrame = useSafeAreaFrame();
   const { width: screenW, height: screenH } = useWindowDimensions();
@@ -1725,7 +1736,13 @@ export default function CommunityScreen() {
           ]}
         >
           {activeTab === 'search' ? (
-            <SearchScreen onUserPress={handleAuthorPress} onClanPress={handleClanPress} />
+            <SearchScreen
+              onUserPress={handleAuthorPress}
+              onClanPress={handleClanPress}
+              initialQuery={
+                Array.isArray(searchQueryParam) ? searchQueryParam[0] : searchQueryParam
+              }
+            />
           ) : (
             <FlatList
               data={listData}

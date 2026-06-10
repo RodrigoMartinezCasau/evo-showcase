@@ -31,6 +31,8 @@ import { ReflectionBackground } from '@evoconn/components/ReflectionBackground';
 import { useDeferredRender } from '@evoconn/hooks/useDeferredRender';
 import { useVoiceAssistantFocusedScreenContext } from '@evoconn/hooks/VoiceAssistantScreenContext';
 import { profileToScreenSnapshot } from '@evoconn/utils/voiceAssistantScreenContext';
+import { useFollowState } from '@evoconn/hooks/useFollowState';
+import { useBlockedUsers } from '@evoconn/hooks/BlockedUsersContext';
 import { ClanLoadingDot } from '@evoconn/components/shared/ClanLoadingDot';
 import { getAppShellScrollableBodyHeight } from '@evoconn/constants/appShellLayout';
 import {
@@ -476,6 +478,12 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
     initialIndex: number;
   } | null>(null);
 
+  // Estado de relación para el agente de voz (Sprint 5): follow/block.
+  const { isFollowPending: agentIsFollowPending } = useFollowState();
+  const { isBlocked: agentIsBlocked } = useBlockedUsers();
+  const agentFollowPending = userId ? agentIsFollowPending(userId) : false;
+  const agentBlocked = userId ? agentIsBlocked(userId) : false;
+
   const voiceAssistantScreenSnapshot = useMemo(() => {
     if (!ready || detailFeed) return null;
     return profileToScreenSnapshot({
@@ -488,8 +496,25 @@ function OtherUserProfileView({ userId, router, initialUsername }: { userId: str
       phraseCount: liveQuoteCount,
       insigniaPhrase: profileWithLiveFollowers.insigniaPhrase,
       isOwnProfile: false,
+      // Contexto estructurado para acciones de relación por voz (Sprint 5).
+      profileId: userId || undefined,
+      isPrivate: targetIsPrivate,
+      isFollowing: iFollowTargetNow,
+      isFollowPending: agentFollowPending,
+      isBlocked: agentBlocked,
     });
-  }, [ready, detailFeed, profileWithLiveFollowers, liveReflectionCount, liveQuoteCount]);
+  }, [
+    ready,
+    detailFeed,
+    profileWithLiveFollowers,
+    liveReflectionCount,
+    liveQuoteCount,
+    userId,
+    targetIsPrivate,
+    iFollowTargetNow,
+    agentFollowPending,
+    agentBlocked,
+  ]);
 
   useVoiceAssistantFocusedScreenContext(voiceAssistantScreenSnapshot);
 

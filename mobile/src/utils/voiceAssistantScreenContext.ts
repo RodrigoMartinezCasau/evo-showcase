@@ -3,6 +3,7 @@ import {
   buildFeedScreenContextText,
   type FeedScreenContext,
   type VisiblePost,
+  type VisibleProfile,
 } from '@evoconn/agent';
 import { normalizeAppPathname } from '@evoconn/constants/voiceAssistantLayout';
 import { ANIM_CLANS, type AnimClanId } from '@evoconn/constants/evoAnimationClans';
@@ -16,6 +17,11 @@ export type VoiceAssistantScreenSnapshot = {
    * agente necesitan el post objetivo con su id, no solo el texto del LLM.
    */
   feed?: FeedScreenContext;
+  /**
+   * Contexto estructurado del perfil visible (Sprint 5): las acciones de
+   * relación (follow/unfollow/block) necesitan el id del perfil objetivo.
+   */
+  profile?: VisibleProfile;
 };
 
 const MAX_CONTEXT_CHARS = 3500;
@@ -111,6 +117,15 @@ export type ProfileScreenContextInput = {
   isOwnProfile?: boolean;
   /** En la pantalla de detalle filosófico se envían los 8 clanes. */
   includeAllPercentages?: boolean;
+  /**
+   * Id del usuario del perfil (Sprint 5): si se pasa, el snapshot incluye el
+   * contexto estructurado para acciones de relación (follow/block/…).
+   */
+  profileId?: string;
+  isPrivate?: boolean;
+  isFollowing?: boolean;
+  isFollowPending?: boolean;
+  isBlocked?: boolean;
 };
 
 const RANK_LABELS: Record<string, string> = {
@@ -167,7 +182,37 @@ export function profileToScreenSnapshot(input: ProfileScreenContextInput): Voice
     );
   }
 
-  return { kind: 'perfil', text: clip(lines.join('\n')) };
+  // Estado de relación, legible para el LLM (perfiles ajenos).
+  if (!input.isOwnProfile && input.profileId) {
+    if (input.isFollowing != null) {
+      lines.push(
+        input.isFollowing
+          ? 'El usuario que pregunta YA sigue a este perfil.'
+          : input.isFollowPending
+            ? 'El usuario que pregunta tiene una solicitud de seguimiento pendiente a este perfil.'
+            : 'El usuario que pregunta NO sigue a este perfil.',
+      );
+    }
+    if (input.isPrivate) lines.push('Esta cuenta es privada.');
+    if (input.isBlocked) lines.push('El usuario que pregunta tiene bloqueado a este perfil.');
+  }
+
+  // Contexto estructurado para acciones de relación (Sprint 5).
+  const profile: VisibleProfile | undefined = input.profileId
+    ? {
+        profile_id: input.profileId,
+        profile_username: input.username,
+        profile_is_own: input.isOwnProfile === true,
+        ...(input.isPrivate != null ? { profile_is_private: input.isPrivate } : {}),
+        ...(input.isFollowing != null ? { profile_is_following: input.isFollowing } : {}),
+        ...(input.isFollowPending != null
+          ? { profile_is_follow_pending: input.isFollowPending }
+          : {}),
+        ...(input.isBlocked != null ? { profile_is_blocked: input.isBlocked } : {}),
+      }
+    : undefined;
+
+  return { kind: 'perfil', text: clip(lines.join('\n')), ...(profile ? { profile } : {}) };
 }
 
 export function clanToScreenSnapshot(clanId: string): VoiceAssistantScreenSnapshot {

@@ -7,7 +7,7 @@
  */
 import type { AppManifest } from './types';
 
-export const EVO_MANIFEST_VERSION = '1.3.0';
+export const EVO_MANIFEST_VERSION = '1.4.0';
 
 export const evoManifest: AppManifest = {
   appId: 'com.evoconn.evo',
@@ -344,6 +344,237 @@ export const evoManifest: AppManifest = {
         'silencia las notificaciones',
       ],
     },
+
+    // ── v2 Sprint 3: creación con prefill (NUNCA publica; el usuario revisa) ──
+    {
+      intent: 'create_reflection_prefill',
+      label: 'Crear reflexión con contenido',
+      category: 'content',
+      handler: 'prefillReflection',
+      requireConfirmation: false,
+      parameters: {
+        content: {
+          type: 'string',
+          required: false,
+          description:
+            'Texto de partida o tema de la reflexión, extraído de lo que dijo el usuario (nunca generado por ti)',
+        },
+      },
+      contextRequirements: { requiresAuth: true },
+      examples: [
+        'escribe una reflexión sobre la libertad',
+        'nueva reflexión que diga',
+        'quiero reflexionar sobre',
+        'ayúdame a escribir una reflexión',
+      ],
+    },
+    {
+      intent: 'create_phrase_prefill',
+      label: 'Crear frase con contenido',
+      category: 'content',
+      handler: 'prefillPhrase',
+      requireConfirmation: false,
+      parameters: {
+        phraseText: {
+          type: 'string',
+          required: false,
+          description: 'Texto literal de la frase que dijo el usuario',
+        },
+        author: {
+          type: 'string',
+          required: false,
+          description: 'Autor de la frase si el usuario lo menciona',
+        },
+      },
+      contextRequirements: { requiresAuth: true },
+      examples: [
+        'comparte la frase el hombre es la medida de todas las cosas de Protágoras',
+        'nueva frase de Nietzsche que diga',
+        'quiero publicar una frase que dice',
+      ],
+    },
+    {
+      intent: 'create_comment_prefill',
+      label: 'Comentar publicación con texto',
+      category: 'content',
+      handler: 'prefillComment',
+      requireConfirmation: false,
+      parameters: {
+        commentText: {
+          type: 'string',
+          required: true,
+          description: 'Texto del comentario que dijo el usuario, literal',
+        },
+      },
+      contextRequirements: { requiresVisiblePost: true, requiresAuth: true },
+      examples: [
+        'comenta gran reflexión',
+        'responde a esto diciendo que estoy de acuerdo',
+        'escribe un comentario que diga',
+        'coméntale qué interesante',
+      ],
+    },
+
+    // ── v2 Sprint 4: relaciones, repost y sesión ─────────────────────────────
+    {
+      intent: 'follow_user',
+      label: 'Seguir al usuario del perfil visible',
+      category: 'relationship',
+      handler: 'followVisibleProfile',
+      requireConfirmation: false,
+      parameters: {
+        targetUsername: {
+          type: 'string',
+          required: false,
+          description:
+            'Nombre que dijo el usuario (informativo; la acción opera sobre el perfil visible)',
+        },
+      },
+      contextRequirements: { requiresVisibleProfile: true, requiresAuth: true },
+      idempotencyCheck: 'isAlreadyFollowingProfile',
+      examples: [
+        'sigue a este usuario',
+        'síguelo',
+        'quiero seguir a esta persona',
+        'dale a seguir',
+      ],
+    },
+    {
+      intent: 'unfollow_user',
+      label: 'Dejar de seguir al usuario del perfil visible',
+      category: 'relationship',
+      handler: 'unfollowVisibleProfile',
+      requireConfirmation: true,
+      confirmationMessageTemplate: '¿Seguro que quieres dejar de seguir a este usuario?',
+      parameters: {
+        targetUsername: {
+          type: 'string',
+          required: false,
+          description:
+            'Nombre que dijo el usuario (informativo; la acción opera sobre el perfil visible)',
+        },
+      },
+      contextRequirements: { requiresVisibleProfile: true, requiresAuth: true },
+      idempotencyCheck: 'isNotFollowingProfile',
+      examples: [
+        'deja de seguir a este usuario',
+        'deja de seguirlo',
+        'unfollow',
+        'ya no quiero seguirle',
+      ],
+    },
+    {
+      intent: 'block_user',
+      label: 'Bloquear al usuario del perfil visible',
+      category: 'relationship',
+      handler: 'blockVisibleProfile',
+      requireConfirmation: true,
+      doubleConfirmation: true,
+      confirmationMessageTemplate:
+        '¿Seguro que quieres bloquear a este usuario? Esto impedirá toda interacción entre vosotros.',
+      parameters: {
+        targetUsername: {
+          type: 'string',
+          required: false,
+          description:
+            'Nombre que dijo el usuario (informativo; la acción opera sobre el perfil visible)',
+        },
+      },
+      contextRequirements: { requiresVisibleProfile: true, requiresAuth: true },
+      idempotencyCheck: 'isProfileAlreadyBlocked',
+      examples: [
+        'bloquea a este usuario',
+        'bloquéalo',
+        'no quiero ver nada de esta persona',
+      ],
+    },
+    {
+      intent: 'report_post',
+      label: 'Denunciar la publicación visible',
+      category: 'interaction',
+      handler: 'reportVisiblePost',
+      // El modal de denuncia (elegir motivo) YA es la confirmación.
+      requireConfirmation: false,
+      parameters: {},
+      contextRequirements: { requiresVisiblePost: true, requiresAuth: true },
+      examples: [
+        'denuncia esto',
+        'denuncia esta publicación',
+        'reporta este post',
+        'esto incumple las normas',
+      ],
+    },
+    {
+      intent: 'repost_post',
+      label: 'Republicar la publicación visible',
+      category: 'interaction',
+      handler: 'repostVisiblePost',
+      requireConfirmation: true,
+      confirmationMessageTemplate: '¿Quieres republicar esta publicación en tu perfil?',
+      parameters: {},
+      contextRequirements: { requiresVisiblePost: true, requiresAuth: true },
+      idempotencyCheck: 'isPostAlreadyReposted',
+      examples: [
+        'republica esto',
+        'comparte esto en mi feed',
+        'haz repost',
+        'repostea esta publicación',
+      ],
+    },
+    {
+      intent: 'logout',
+      label: 'Cerrar sesión',
+      category: 'config',
+      handler: 'logout',
+      requireConfirmation: true,
+      confirmationMessageTemplate: '¿Seguro que quieres cerrar sesión?',
+      parameters: {},
+      contextRequirements: { requiresAuth: true },
+      examples: ['cierra sesión', 'cerrar sesión', 'salir de mi cuenta', 'log out'],
+    },
+
+    // ── v2 Sprint 5: búsqueda y perfiles por nombre ──────────────────────────
+    {
+      intent: 'find_user_profile',
+      label: 'Ir al perfil de un usuario por nombre',
+      category: 'navigation',
+      handler: 'findUserProfile',
+      requireConfirmation: false,
+      parameters: {
+        searchQuery: {
+          type: 'string',
+          required: true,
+          description: 'Nombre o username que dijo el usuario (sin la arroba)',
+        },
+      },
+      contextRequirements: { requiresAuth: true },
+      examples: [
+        'llévame al perfil de Marco',
+        'abre el perfil de @sofia',
+        'busca a Lucía y abre su perfil',
+        've al perfil de ese usuario que se llama Andrés',
+      ],
+    },
+    {
+      intent: 'search_content',
+      label: 'Buscar con texto pre-rellenado',
+      category: 'navigation',
+      handler: 'openSearchWithQuery',
+      requireConfirmation: false,
+      parameters: {
+        searchQuery: {
+          type: 'string',
+          required: true,
+          description: 'Texto a buscar (en Evo la búsqueda cubre usuarios y clanes)',
+        },
+      },
+      contextRequirements: { requiresAuth: true },
+      examples: [
+        'busca usuarios que se llamen Pablo',
+        'busca estoicos',
+        'encuentra gente del clan humanista',
+      ],
+    },
   ],
 
   policies: {
@@ -381,6 +612,7 @@ export function manifestActionsForBackend(): Array<{
   label: string;
   examples: string[];
   requires_visible_post: boolean;
+  requires_visible_profile?: boolean;
   requires_confirmation: boolean;
   confirmation_message?: string;
   parameters?: Record<string, string>;
@@ -392,6 +624,9 @@ export function manifestActionsForBackend(): Array<{
       label: a.label,
       examples: a.examples,
       requires_visible_post: a.contextRequirements?.requiresVisiblePost === true,
+      ...(a.contextRequirements?.requiresVisibleProfile === true
+        ? { requires_visible_profile: true }
+        : {}),
       requires_confirmation: a.requireConfirmation,
       ...(a.confirmationMessageTemplate
         ? { confirmation_message: a.confirmationMessageTemplate }

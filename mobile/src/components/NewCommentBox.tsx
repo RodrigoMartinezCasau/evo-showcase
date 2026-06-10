@@ -27,6 +27,8 @@ import { clampMessageInput, MESSAGE_MAX_CHARS } from '@evoconn/utils/messageWord
 
 export type NewCommentBoxHandle = {
   focus: () => void;
+  /** Prefill programático (agente de voz): sustituye el texto del campo. */
+  setText: (text: string) => void;
 };
 
 type NewCommentBoxProps = {
@@ -107,6 +109,7 @@ const NewCommentBoxInner = forwardRef<NewCommentBoxHandle, NewCommentBoxProps>(
     ref,
     () => ({
       focus: () => inputRef.current?.focus(),
+      setText: (text: string) => setValue(clampMessageInput(text)),
     }),
     [],
   );

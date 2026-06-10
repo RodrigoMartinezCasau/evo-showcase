@@ -13,6 +13,7 @@ import { Alert } from 'react-native';
 import { usePathname } from 'expo-router';
 import {
   ActionExecutor,
+  classifyConfirmationReply,
   combineContexts,
   evoManifest,
   grantAssistantConsent,
@@ -80,9 +81,19 @@ const THINKING_WATCHDOG_MS = 20_000;
  */
 const ASSISTANT_USES_DISABLED_FOR_TESTING = true;
 
-export type VoiceAssistantPhase = 'idle' | 'listening' | 'thinking' | 'speaking';
+/**
+ * 'confirming' (Sprint 4): ventana de escucha de confirmación por voz tras
+ * hablar la pregunta. Fase SEPARADA de 'thinking' a propósito: el watchdog de
+ * thinking no debe matarla, y el ciclo de turno normal no aplica.
+ */
+export type VoiceAssistantPhase = 'idle' | 'listening' | 'thinking' | 'speaking' | 'confirming';
 
 const MAX_LISTENING_SECONDS = 60;
+
+/** Ventana de respuesta por voz a una confirmación (Sprint 4). */
+const CONFIRMATION_VOICE_WINDOW_MS = 8_000;
+/** Margen tras cerrar la grabación de confirmación para que llegue el transcript. */
+const CONFIRMATION_TRANSCRIPT_GRACE_MS = 3_000;
 
 type Options = {
   enabled?: boolean;
@@ -165,7 +176,22 @@ export function useVoiceAssistant({ enabled = true }: Options = {}) {
     wasTruncated: boolean;
     contextChars: number;
     redactions: string[];
+    /** 2 para acciones con doubleConfirmation (bloquear); 1 para el resto. */
+    remainingConfirmations: number;
   } | null>(null);
+  /** Ventana de confirmación por voz activa: los transcripts van a ella, no a un turno nuevo. */
+  const confirmationVoiceActiveRef = useRef(false);
+  /** Ya se repreguntó una vez tras respuesta ambigua (máximo un reintento). */
+  const confirmationReaskedRef = useRef(false);
+  const confirmationTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  /** Cross-refs para romper el ciclo handleTranscript ↔ helpers de confirmación. */
+  const beginConfirmationWindowRef = useRef<(() => void) | null>(null);
+  const confirmPendingActionRef = useRef<(() => Promise<void>) | null>(null);
+  const cancelPendingActionRef = useRef<(() => void) | null>(null);
+  const pendingConfirmationMessageRef = useRef<string | null>(null);
+  useEffect(() => {
+    pendingConfirmationMessageRef.current = pendingConfirmationMessage;
+  }, [pendingConfirmationMessage]);
   const phaseRef = useRef<VoiceAssistantPhase>('idle');
   const abortRef = useRef<AbortController | null>(null);
   const playerRef = useRef<AudioPlayer | null>(null);
@@ -425,6 +451,7 @@ export function useVoiceAssistant({ enabled = true }: Options = {}) {
         } else if (action && action.type === 'execute') {
           const executeContext: AgentScreenContext = {
             feed: screenSnapshotAtInvocation?.feed,
+            profile: screenSnapshotAtInvocation?.profile,
           };
           // Fuente de verdad de la confirmación: el MANIFEST, nunca el LLM
           // (validación doble — el backend instruye, el cliente exige).
@@ -482,7 +509,9 @@ export function useVoiceAssistant({ enabled = true }: Options = {}) {
                 wasTruncated,
                 contextChars,
                 redactions,
+                remainingConfirmations: manifestAction?.doubleConfirmation === true ? 2 : 1,
               };
+              confirmationReaskedRef.current = false;
               setPendingConfirmationMessage(confirmationMessage);
               logTurn(turnId, 'confirmation modal shown', action.intent);
               // Se habla la pregunta de confirmación (el prompt instruye al
@@ -555,6 +584,12 @@ export function useVoiceAssistant({ enabled = true }: Options = {}) {
         logTurn(turnId, 'speak start');
         await speakReply(spokenReply, spokenAudio);
         logTurn(turnId, 'speak end / turno completado');
+        // Confirmación por voz (Sprint 4): tras hablar la pregunta, escucha
+        // la respuesta durante unos segundos. El modal sigue visible como
+        // fallback táctil y su decisión siempre manda.
+        if (pendingConfirmationRef.current) {
+          beginConfirmationWindowRef.current?.();
+        }
       } catch (e) {
         if (controller.signal.aborted) {
           logTurn(turnId, 'descartado', 'error tras abort (cancelación o watchdog)');
@@ -613,12 +648,22 @@ export function useVoiceAssistant({ enabled = true }: Options = {}) {
     handleTranscriptRef.current = handleTranscript;
   }, [handleTranscript]);
 
+  const handleConfirmationTranscriptRef = useRef<((text: string) => Promise<void>) | null>(null);
+
   const onTranscriptReady = useCallback((text: string) => {
+    // Mientras haya una confirmación pendiente (ventana activa o transcript
+    // tardío con el modal aún visible), el transcript responde a la pregunta
+    // — nunca arranca un turno nuevo contra el backend.
+    if (confirmationVoiceActiveRef.current || pendingConfirmationRef.current) {
+      void handleConfirmationTranscriptRef.current?.(text);
+      return;
+    }
     void handleTranscriptRef.current(text);
   }, []);
 
   const {
     voiceState,
+    interimText,
     volumeLevel,
     startRecording,
     stopRecording,
@@ -642,6 +687,108 @@ export function useVoiceAssistant({ enabled = true }: Options = {}) {
     setPhaseSafe('thinking');
     stopRecording();
   }, [setPhaseSafe, stopRecording]);
+
+  // ── Confirmación por voz (Sprint 4) ───────────────────────────────────────
+  // Fase 'confirming' FUERA del ciclo de turno: no dispara el watchdog de
+  // 'thinking' y los transcripts se enrutan a la pregunta pendiente.
+
+  const clearConfirmationTimers = useCallback(() => {
+    for (const t of confirmationTimersRef.current) clearTimeout(t);
+    confirmationTimersRef.current = [];
+  }, []);
+
+  /**
+   * Cierra la ventana de escucha SIN resolver la confirmación: el modal sigue
+   * visible y el usuario puede decidir con los botones (timeout, error STT…).
+   */
+  const endConfirmationVoiceWindow = useCallback(
+    (reason: string) => {
+      if (!confirmationVoiceActiveRef.current) return;
+      confirmationVoiceActiveRef.current = false;
+      clearConfirmationTimers();
+      cancelRecording();
+      logTurn(invocationIdRef.current, 'confirmation voice window end', reason);
+      if (phaseRef.current === 'confirming') setPhaseSafe('idle');
+    },
+    [cancelRecording, clearConfirmationTimers, setPhaseSafe],
+  );
+
+  /** Abre la ventana de escucha de la confirmación pendiente (8 s + margen). */
+  const beginConfirmationVoiceWindow = useCallback(() => {
+    if (!pendingConfirmationRef.current) return;
+    if (confirmationVoiceActiveRef.current) return;
+    // Sin STT nativo (simulador/Expo Go): el modal táctil es el único camino.
+    if (!hasNativeSpeechRecognition) return;
+    confirmationVoiceActiveRef.current = true;
+    setPhaseSafe('confirming');
+    logTurn(invocationIdRef.current, 'confirmation voice window start');
+    void startRecording();
+    const stopTimer = setTimeout(() => {
+      // Fin de ventana: cierra la grabación; si el usuario dijo algo, el
+      // transcript llega en el margen de gracia. Si no, se mantiene el modal.
+      stopRecording();
+      const graceTimer = setTimeout(
+        () => endConfirmationVoiceWindow('timeout sin transcript'),
+        CONFIRMATION_TRANSCRIPT_GRACE_MS,
+      );
+      confirmationTimersRef.current.push(graceTimer);
+    }, CONFIRMATION_VOICE_WINDOW_MS);
+    confirmationTimersRef.current.push(stopTimer);
+  }, [endConfirmationVoiceWindow, setPhaseSafe, startRecording, stopRecording]);
+
+  useEffect(() => {
+    beginConfirmationWindowRef.current = beginConfirmationVoiceWindow;
+  }, [beginConfirmationVoiceWindow]);
+
+  /** Resuelve el transcript de la ventana de confirmación. */
+  const handleConfirmationTranscript = useCallback(
+    async (text: string) => {
+      confirmationVoiceActiveRef.current = false;
+      clearConfirmationTimers();
+      const trimmed = text.trim();
+      if (phaseRef.current === 'confirming') setPhaseSafe('idle');
+      // El usuario pudo decidir con el modal mientras llegaba el transcript.
+      if (!pendingConfirmationRef.current) return;
+
+      if (trimmed.length < 2) {
+        // Ruido/transcript vacío → como timeout: el modal sigue disponible.
+        return;
+      }
+      const reply = classifyConfirmationReply(trimmed);
+      logTurn(invocationIdRef.current, 'confirmation voice reply', `${reply}: "${trimmed}"`);
+      if (reply === 'affirmative') {
+        await confirmPendingActionRef.current?.();
+        return;
+      }
+      if (reply === 'negative') {
+        cancelPendingActionRef.current?.();
+        return;
+      }
+      // Ambiguo: repreguntar UNA vez y volver a escuchar; después, solo modal.
+      if (!confirmationReaskedRef.current) {
+        confirmationReaskedRef.current = true;
+        const question =
+          pendingConfirmationMessageRef.current ?? '¿Confirmas la acción? Di sí o no.';
+        await speakReply(`No te he entendido. ${question}`, null);
+        if (pendingConfirmationRef.current) beginConfirmationVoiceWindow();
+      }
+    },
+    [beginConfirmationVoiceWindow, clearConfirmationTimers, setPhaseSafe, speakReply],
+  );
+
+  useEffect(() => {
+    handleConfirmationTranscriptRef.current = handleConfirmationTranscript;
+  }, [handleConfirmationTranscript]);
+
+  // Atajo de latencia: si el texto interino ya es un sí/no claro, cierra la
+  // grabación al instante (el transcript final llega en el evento 'end').
+  useEffect(() => {
+    if (!confirmationVoiceActiveRef.current) return;
+    const t = interimText.trim();
+    if (t.length < 2) return;
+    if (classifyConfirmationReply(t) === 'ambiguous') return;
+    stopRecording();
+  }, [interimText, stopRecording]);
 
   const beginListening = useCallback(async () => {
     if (!enabled) return;
@@ -752,26 +899,37 @@ export function useVoiceAssistant({ enabled = true }: Options = {}) {
   const cancelAll = useCallback(() => {
     pendingEndRef.current = false;
     awaitingTranscriptRef.current = false;
+    // Cierra la escucha de confirmación si estaba abierta; el modal pendiente
+    // sigue visible para que el usuario decida con los botones.
+    endConfirmationVoiceWindow('cancelAll');
     abortRef.current?.abort();
     cancelRecording();
     stopSpeech();
     setPhaseSafe('idle');
-  }, [cancelRecording, setPhaseSafe, stopSpeech]);
+  }, [cancelRecording, endConfirmationVoiceWindow, setPhaseSafe, stopSpeech]);
 
   useEffect(() => () => {
     pendingEndRef.current = false;
     awaitingTranscriptRef.current = false;
+    confirmationVoiceActiveRef.current = false;
+    for (const t of confirmationTimersRef.current) clearTimeout(t);
+    confirmationTimersRef.current = [];
     abortRef.current?.abort();
     cancelRecording();
     stopSpeech();
   }, [cancelRecording, stopSpeech]);
 
   const isListening = phase === 'listening' && (voiceState === 'recording' || voiceState === 'transcribing');
-  const showWaveform = phase === 'listening' && voiceState === 'recording';
+  // La waveform también se muestra durante la escucha de confirmación por voz.
+  const showWaveform =
+    (phase === 'listening' || phase === 'confirming') && voiceState === 'recording';
   const showThinking = phase === 'thinking' || (phase === 'listening' && voiceState === 'transcribing');
 
   const toggleListening = useCallback(async () => {
     if (!enabled || showThinking) return;
+    // Durante la confirmación, la decisión es del modal o de la voz — el orbe
+    // no arranca turnos nuevos (el backdrop del modal ya bloquea el toque).
+    if (phaseRef.current === 'confirming') return;
     if (phaseRef.current === 'listening') {
       endListening();
       return;
@@ -812,12 +970,35 @@ export function useVoiceAssistant({ enabled = true }: Options = {}) {
     [speakReply, voiceId],
   );
 
-  /** El usuario pulsó "Confirmar" en el modal: ejecutar la acción pendiente. */
+  /**
+   * El usuario confirmó (botón del modal O respuesta afirmativa por voz).
+   * Acciones con doubleConfirmation (bloquear) piden una segunda confirmación
+   * antes de ejecutar de verdad.
+   */
   const confirmPendingAction = useCallback(async () => {
+    endConfirmationVoiceWindow('confirmación resuelta');
     const pending = pendingConfirmationRef.current;
+    if (!pending) {
+      setPendingConfirmationMessage(null);
+      return;
+    }
+
+    if (pending.remainingConfirmations > 1) {
+      pending.remainingConfirmations -= 1;
+      confirmationReaskedRef.current = false;
+      const secondQuestion =
+        'Es una acción seria. ¿Lo confirmas definitivamente?';
+      setPendingConfirmationMessage(secondQuestion);
+      logTurn(invocationIdRef.current, 'double confirmation requested', pending.action.intent);
+      // Se habla la segunda pregunta y se reabre la ventana de voz; el modal
+      // sigue visible con el texto nuevo como fallback táctil.
+      await speakReply(secondQuestion, null);
+      if (pendingConfirmationRef.current) beginConfirmationVoiceWindow();
+      return;
+    }
+
     pendingConfirmationRef.current = null;
     setPendingConfirmationMessage(null);
-    if (!pending) return;
 
     const { action, context } = pending;
     const actionStartedAt = Date.now();
@@ -852,10 +1033,11 @@ export function useVoiceAssistant({ enabled = true }: Options = {}) {
       redactionsApplied: pending.redactions,
     });
     if (result.message) await speakActionFeedback(result.message);
-  }, [speakActionFeedback]);
+  }, [beginConfirmationVoiceWindow, endConfirmationVoiceWindow, speakActionFeedback, speakReply]);
 
-  /** El usuario canceló (botón, toque fuera o atrás): no se ejecuta nada. */
+  /** El usuario canceló (botón, toque fuera, atrás o "no" por voz): no se ejecuta nada. */
   const cancelPendingAction = useCallback(() => {
+    endConfirmationVoiceWindow('confirmación cancelada');
     const pending = pendingConfirmationRef.current;
     pendingConfirmationRef.current = null;
     setPendingConfirmationMessage(null);
@@ -870,7 +1052,14 @@ export function useVoiceAssistant({ enabled = true }: Options = {}) {
     });
     // Feedback inmediato y barato: TTS del dispositivo (frase de una palabra).
     void speakReply('Cancelado.', null);
-  }, [speakReply]);
+  }, [endConfirmationVoiceWindow, speakReply]);
+
+  // Cross-refs: la ventana de confirmación por voz resuelve con las MISMAS
+  // funciones que los botones del modal (la decisión táctil siempre manda).
+  useEffect(() => {
+    confirmPendingActionRef.current = confirmPendingAction;
+    cancelPendingActionRef.current = cancelPendingAction;
+  }, [confirmPendingAction, cancelPendingAction]);
 
   return {
     phase,

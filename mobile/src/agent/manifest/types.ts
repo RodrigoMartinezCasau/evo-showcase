@@ -56,6 +56,11 @@ export interface ActionIntent {
   requireConfirmation: boolean;
   /** Plantilla del mensaje de confirmación (Sprint 4). */
   confirmationMessageTemplate?: string;
+  /**
+   * Acciones serias (bloquear): tras la primera confirmación se pide una
+   * segunda antes de ejecutar. Solo tiene efecto con requireConfirmation.
+   */
+  doubleConfirmation?: boolean;
   /** Parámetros que el LLM puede rellenar (vacío en las acciones simples). */
   parameters: Record<string, ParameterSpec>;
   /** Requisitos de contexto que valida el ActionExecutor antes de ejecutar. */

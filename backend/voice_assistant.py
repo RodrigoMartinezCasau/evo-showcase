@@ -107,10 +107,6 @@ cada línea describe una publicación: autor, clan, tipo (frase/reflexión), mé
 
 {actions_block}
 
-PERFILES DE OTROS USUARIOS:
-Si pide ir al perfil de otra persona ("llévame al perfil de Juan"), responde sin navegar:
-"Puedo llevarte a tu perfil, pero todavía no puedo buscar perfiles de otros usuarios por voz. Estará disponible pronto."
-
 CONVERSACIONES Y CHATS CONCRETOS:
 Si pide abrir una conversación concreta (con una persona o un chat anterior con la IA),
 responde sin navegar: "Puedo abrirte la bandeja de mensajes, pero todavía no puedo entrar en
@@ -129,7 +125,12 @@ Si el usuario pide cualquiera de estas, responde EXACTAMENTE con esta idea:
 MATIZ IMPORTANTE: "quiero crear/escribir una reflexión o frase" SÍ es navegación a la pantalla
 de creación (intents create_reflection / create_phrase) — el usuario la escribe él mismo.
 Solo es acción no soportada si pide que TÚ escribas o publiques el contenido por él
-(ej. "escribe una reflexión sobre X y publícala")."""
+(ej. "escribe una reflexión sobre X y publícala").
+
+PERFILES DE OTROS USUARIOS:
+Si pide ir al perfil de otra persona ("llévame al perfil de Juan"), responde sin navegar:
+"Puedo llevarte a tu perfil, pero todavía no puedo buscar perfiles de otros usuarios por voz. Estará disponible pronto."
+"""
 
 # Bloque de acciones cuando el cliente SÍ envía manifest_actions (v2).
 ACTIONS_BLOCK_TEMPLATE = """CAPACIDAD DE EJECUTAR ACCIONES:
@@ -153,7 +154,8 @@ REGLAS PARA ACCIONES:
 
 REGLAS PARA ACCIONES CON CONFIRMACIÓN:
 - Las acciones marcadas con [requiere confirmación] son sensibles: NO se ejecutan
-  directamente; la app mostrará un diálogo de confirmación al usuario.
+  directamente; la app mostrará un diálogo de confirmación al usuario (y escuchará
+  su respuesta por voz).
 - Para esas acciones incluye en tu respuesta "requireConfirmation": true y
   "confirmationMessage" con el texto de confirmación indicado en la lista, y tu reply
   debe SER esa misma pregunta de confirmación (se leerá en voz alta), ej.:
@@ -161,16 +163,41 @@ REGLAS PARA ACCIONES CON CONFIRMACIÓN:
 - Las acciones SIN esa marca no requieren confirmación: si la petición es clara,
   ejecuta directamente con reply confirmatorio.
 
+ACCIONES DE CREACIÓN (create_reflection_prefill, create_phrase_prefill, create_comment_prefill):
+Cuando el usuario pide crear contenido (reflexión, frase, comentario):
+- Extrae el contenido o el tema de LO QUE ÉL DICE y pásalo en los parámetros.
+- NUNCA generes tú el contenido completo. Tu trabajo es extraer lo que el usuario
+  quiere decir, no escribir por él.
+- Si da contenido literal ("reflexión que diga X", "comenta: gran post"), pásalo tal cual.
+- Si da solo un tema ("reflexión sobre la libertad"), pasa el tema; la app pondrá un
+  punto de partida mínimo.
+- Estas acciones NO publican nada: solo abren la pantalla con el texto preparado para
+  que el usuario lo revise, lo edite y lo publique él mismo.
+- reply ejemplo: "Te abro una nueva reflexión sobre la libertad. Revisa y publica cuando quieras."
+- Si el usuario solo quiere abrir la pantalla SIN contenido ("nueva reflexión"), usa la
+  navegación normal (intents create_reflection / create_phrase).
+
+ACCIONES SOBRE EL PERFIL VISIBLE (follow_user, unfollow_user, block_user):
+- Solo tienen sentido si el contexto incluye el perfil de OTRO usuario en pantalla
+  (las marcadas con [requiere perfil visible]). Si no, responde con action type none
+  explicando qué falta, ej.: "Para seguirle, abre primero su perfil."
+- El cliente resuelve sobre qué perfil se actúa; tú no necesitas identificarlo.
+
+BÚSQUEDA Y PERFILES POR NOMBRE (find_user_profile, search_content):
+- "llévame al perfil de [nombre]", "abre el perfil de @[username]", "busca a [nombre] y
+  abre su perfil" → find_user_profile con searchQuery = el nombre dicho (sin la arroba).
+  La app busca al usuario; si hay varios o ninguno, ella misma se lo dirá al usuario.
+- "busca [algo]", "encuentra usuarios que..." → search_content con searchQuery.
+- La búsqueda de Evo cubre usuarios y clanes; no existe búsqueda de publicaciones por
+  tema. Si piden "publicaciones sobre X", dilo y ofrece buscar usuarios o clanes.
+
 ACCIONES QUE TODAVÍA NO PUEDES HACER (responde con action type none):
-Comentar, repostear, votar negativo, publicar o escribir contenido POR el usuario,
-seguir o dejar de seguir a alguien, bloquear, denunciar, enviar mensajes o compartir,
-eliminar publicaciones, cerrar sesión, y cualquier ajuste que no esté en la lista de acciones.
+Votar negativo, publicar contenido POR el usuario, enviar mensajes o compartir por chat,
+eliminar publicaciones, denunciar a un usuario desde su perfil, y cualquier ajuste que
+no esté en la lista de acciones.
 Si el usuario pide cualquiera de estas, responde EXACTAMENTE con esta idea:
 "Eso todavía no puedo hacerlo por voz, pero estará disponible pronto."
-MATIZ IMPORTANTE: "quiero crear/escribir una reflexión o frase" SÍ es navegación a la pantalla
-de creación (intents create_reflection / create_phrase) — el usuario la escribe él mismo.
-Solo es acción no soportada si pide que TÚ escribas o publiques el contenido por él
-(ej. "escribe una reflexión sobre X y publícala")."""
+"""
 
 
 def _build_routes_list(manifest_routes: list[dict]) -> str:
@@ -194,6 +221,8 @@ def _build_actions_list(manifest_actions: list[dict]) -> str:
         if not intent:
             continue
         suffix = " [requiere publicación visible]" if a.get("requires_visible_post") else ""
+        if a.get("requires_visible_profile"):
+            suffix += " [requiere perfil visible]"
         if a.get("requires_confirmation"):
             suffix += " [requiere confirmación]"
         lines.append(f"- intent='{intent}' ({label}){suffix} → ejemplos: {', '.join(examples)}")

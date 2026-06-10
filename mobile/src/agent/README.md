@@ -227,6 +227,90 @@ Cinco acciones que operan sobre el estado del usuario, no sobre un post visible
 Fuera de este sprint: cerrar sesión y confirmación por voz (Sprint 4),
 creación con prefill (Sprint 3), relaciones y búsqueda (Sprints 4-5).
 
+## Creación, relaciones, repost, logout y búsqueda (v2 — Sprints 3+4+5)
+
+Manifest v1.4.0. Trece acciones nuevas en cuatro frentes.
+
+### Creación con prefill (Sprint 3) — el agente NUNCA publica
+
+`create_reflection_prefill`, `create_phrase_prefill`, `create_comment_prefill`
+(`handlers/creation/creationActions.ts`). Solo navegan/abren el composer con el
+contenido pre-rellenado; el usuario revisa y publica a mano. Sin confirmación.
+
+- Reflexión y frase: params de expo-router (`/reflection?prefill=...`,
+  `/phrase?prefill=...&prefillAuthor=...`). `ChatInputBar` acepta `initialText`
+  (se consume una sola vez y nunca pisa texto ya escrito por el usuario). En
+  frases, el autor se siembra en el draft del primer bloque de publicación.
+- Comentario: el composer es un componente, no una ruta. `handlers/postUiRegistry.ts`
+  permite a cada `ReflectionDetailItem` montado registrar `openCommentComposer(texto)`
+  y `openReportPicker()`; el handler los invoca para el post enfocado del snapshot.
+  Sin post visible → "Para comentar, abre primero la publicación."
+- Prompt backend: bloque `ACCIONES DE CREACIÓN` — el LLM extrae el contenido o
+  tema, NUNCA genera la reflexión completa por el usuario.
+
+### Confirmación por VOZ bidireccional (Sprint 4)
+
+Sobre el modal del Sprint 2 (que sigue como fallback visual) se añade escucha
+por voz: tras hablar la pregunta de confirmación, el hook entra en fase
+**`confirming`** (distinta de `thinking` → no dispara el watchdog) y graba
+durante 8 s (`CONFIRMATION_VOICE_WINDOW_MS`).
+
+- `core/confirmationSpeech.ts` (lógica pura): `isAffirmative` / `isNegative` /
+  `classifyConfirmationReply`. La negación gana en caso de empate; sin señal →
+  ambiguo. Coincidencia por palabra completa ("nosotros" no es "no").
+- Afirmativo → ejecuta; negativo → cancela; ambiguo → repregunta UNA vez y
+  vuelve a escuchar; timeout → el modal queda visible y manda el toque.
+- Respuesta rápida: si el `interimText` ya es claramente sí/no se corta la
+  grabación sin esperar los 8 s. Un transcript tardío (3 s de gracia) se
+  enruta igualmente a la confirmación, no a un turno nuevo.
+- `doubleConfirmation` en el manifest (bloquear usuario): dos rondas de
+  pregunta-respuesta antes de ejecutar (`remainingConfirmations`).
+- El toque en el modal siempre tiene prioridad sobre la voz.
+
+### Relaciones, repost y logout (Sprint 4)
+
+`follow_user` (sin confirmación; cuenta privada → solicitud), `unfollow_user`
+(confirmación), `block_user` (doble confirmación; usa el flujo de moderación
+existente de Evo vía puente, jamás lo salta), `report_post` (abre el selector
+de motivos existente — el modal ES la confirmación, el agente no denuncia),
+`repost_post` (confirmación) y `logout` (confirmación).
+
+- Las acciones de relación exigen **perfil visible**
+  (`contextRequirements.requiresVisibleProfile`, validado en `actionEngine`):
+  operan sobre el perfil ajeno en pantalla, nunca sobre el propio.
+- `core/profileContext.ts`: `VisibleProfile` (`profile_id`, `profile_username`,
+  `profile_is_own/_private/_following/_follow_pending/_blocked`) +
+  `getTargetProfile`. `ProfileScreen` lo reporta en el snapshot vía
+  `profileToScreenSnapshot`.
+- Idempotencia viva (`handlers/social/idempotency.ts`): "sigue" cuando ya
+  sigue → "Ya sigues a X"; repost repetido → "Ya habías republicado esto".
+
+### Búsqueda y perfiles por nombre (Sprint 5)
+
+- `find_user_profile` (`handlers/search/searchActions.ts`): busca en Supabase
+  vía puente y resuelve con `resolveUserMatches` — match exacto de username
+  gana; único → navega al perfil; múltiples → "¿Te refieres a @x, @y o @z?"
+  (máx 3, el usuario aclara en el siguiente turno); ninguno → "No he
+  encontrado ningún usuario con ese nombre."
+- `open_search`: navega a la pestaña de búsqueda con la query pre-rellenada
+  (`CommunityScreen` acepta `searchQuery` y la pasa a `SearchScreen`).
+
+### Puente de app (`handlers/appBridge.ts`)
+
+`AgentAppBridge` agrupa todo lo que estas acciones necesitan de Evo
+(composers, follow/block, repost, logout, búsqueda, navegación a perfil).
+`useRegisterAgentApp()` (montado en `VoiceAssistantLayer`) lo implementa con
+los hooks/servicios reales (`useFollowState`, `useBlockedUsers`, Supabase,
+expo-router). Los handlers siguen siendo puros y testeables con un puente falso.
+
+### Backend
+
+Prompt v2: bloques `ACCIONES DE CREACIÓN`, `ACCIONES SOBRE EL PERFIL VISIBLE`
+(con marca `[requiere perfil visible]` por acción) y `BÚSQUEDA Y PERFILES POR
+NOMBRE`; reglas de confirmación ampliadas para voz. Los avisos legacy ("no
+puedo buscar perfiles", "no puedo cerrar sesión") solo se muestran a clientes
+v1 sin `manifest_actions`.
+
 ## Límites y protecciones (v1)
 
 - Timeout del turno: 15 s, sin reintentos automáticos (cada retry = otra generación LLM+TTS).
@@ -237,8 +321,9 @@ creación con prefill (Sprint 3), relaciones y búsqueda (Sprints 4-5).
 - Rate limit backend: 10 req/min por usuario + cuota diaria de usos IA (1 uso por turno).
 - Lock de invocación: mientras un turno está en `thinking` no se acepta otro.
 - Navegación (v1) + interacciones simples sin confirmación (v2 Sprint 1) + configuración
-  con confirmación por modal para cambios sensibles (v2 Sprint 2). Las acciones con
-  efectos visibles para terceros (publicar, repost, seguir) llegan con confirmación por voz.
+  con confirmación por modal (v2 Sprint 2) + creación con prefill, relaciones, repost,
+  logout y búsqueda con confirmación por voz + modal (v2 Sprints 3-5). Publicar contenido
+  POR el usuario sigue fuera de alcance por diseño: la creación es solo prefill.
 
 ## Postmortem: orbe colgado en "pensando" (jun 2026)
 

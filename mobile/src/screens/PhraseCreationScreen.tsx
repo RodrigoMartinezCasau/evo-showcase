@@ -187,8 +187,23 @@ function migratePhraseThreadMessages(
 
 export default function PhraseCreationScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ phraseId?: string }>();
+  const params = useLocalSearchParams<{
+    phraseId?: string;
+    prefill?: string;
+    prefillAuthor?: string;
+  }>();
   const phraseId = Array.isArray(params.phraseId) ? params.phraseId[0] : params.phraseId;
+  // Prefill del agente de voz (Sprint 3): texto de la frase como punto de
+  // partida y autor sugerido. Solo aplica en frases nuevas (sin phraseId).
+  const prefillParam = Array.isArray(params.prefill) ? params.prefill[0] : params.prefill;
+  const prefillText = !phraseId && prefillParam?.trim() ? prefillParam.trim() : undefined;
+  const prefillAuthorParam = Array.isArray(params.prefillAuthor)
+    ? params.prefillAuthor[0]
+    : params.prefillAuthor;
+  /** Autor pendiente de sembrar en el primer PublishBlock (se consume una vez). */
+  const pendingPrefillAuthorRef = useRef<string | null>(
+    !phraseId && prefillAuthorParam?.trim() ? prefillAuthorParam.trim() : null,
+  );
 
   const {
     thoughts,
@@ -264,6 +279,22 @@ export default function PhraseCreationScreen() {
       prev[assistantIndex] === text ? prev : { ...prev, [assistantIndex]: text },
     );
   }, []);
+
+  /**
+   * Prefill de autor (agente de voz): cuando aparece el primer turno assistant
+   * (su PublishBlock trae el campo de autor), siembra el borrador una sola vez.
+   * El usuario puede editarlo o borrarlo antes de publicar.
+   */
+  const seedPrefillAuthorIfPending = useCallback(
+    (assistantIndex: number) => {
+      const author = pendingPrefillAuthorRef.current;
+      if (!author || assistantIndex < 0) return;
+      if (authorDraftByIndexRef.current[assistantIndex]?.trim()) return;
+      pendingPrefillAuthorRef.current = null;
+      onAuthorDraftChange(assistantIndex, author.slice(0, PUBLISH_AUTHOR_MAX_LEN));
+    },
+    [onAuthorDraftChange],
+  );
 
   const notesDebounceRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   /** Tracks which threads have already had the intro fetch fired (prevents
@@ -852,7 +883,9 @@ export default function PhraseCreationScreen() {
 
   useEffect(() => {
     lastPublishAssistantIndexRef.current = lastPublishAssistantIndex;
-  }, [lastPublishAssistantIndex]);
+    // Sembrar el autor del prefill en cuanto exista un PublishBlock activo.
+    seedPrefillAuthorIfPending(lastPublishAssistantIndex);
+  }, [lastPublishAssistantIndex, seedPrefillAuthorIfPending]);
 
   return (
     <GestureHandlerRootView style={styles.gestureRoot}>
@@ -1077,6 +1110,7 @@ export default function PhraseCreationScreen() {
         clanColor={clanColor}
         inputCursorColor={phraseCursorColor}
         aiUsesAvailable={hasAiUses}
+        initialText={prefillText}
       />
 
       {!sidebarOpen ? (

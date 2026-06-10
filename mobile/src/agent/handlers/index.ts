@@ -28,6 +28,26 @@ import {
   isAccountAlreadyPrivate,
   isAccountAlreadyPublic,
 } from './config/idempotency';
+import {
+  prefillCommentHandler,
+  prefillPhraseHandler,
+  prefillReflectionHandler,
+} from './creation/creationActions';
+import {
+  blockVisibleProfileHandler,
+  followVisibleProfileHandler,
+  unfollowVisibleProfileHandler,
+} from './social/relationshipActions';
+import { repostVisiblePostHandler } from './social/repostActions';
+import { reportVisiblePostHandler } from './social/reportActions';
+import { logoutHandler } from './social/sessionActions';
+import {
+  isAlreadyFollowingProfile,
+  isNotFollowingProfile,
+  isPostAlreadyReposted,
+  isProfileAlreadyBlocked,
+} from './social/idempotency';
+import { findUserProfileHandler, openSearchWithQueryHandler } from './search/searchActions';
 
 export type ActionHandler = (
   params: Record<string, unknown>,
@@ -48,6 +68,20 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
   setAccountPrivacy: setAccountPrivacyHandler,
   changeAssistantVoice: changeAssistantVoiceHandler,
   toggleNotifications: toggleNotificationsHandler,
+  // Sprint 3: creación con prefill (el agente nunca publica por el usuario)
+  prefillReflection: prefillReflectionHandler,
+  prefillPhrase: prefillPhraseHandler,
+  prefillComment: prefillCommentHandler,
+  // Sprint 4: relaciones, repost, denuncia y sesión
+  followVisibleProfile: followVisibleProfileHandler,
+  unfollowVisibleProfile: unfollowVisibleProfileHandler,
+  blockVisibleProfile: blockVisibleProfileHandler,
+  repostVisiblePost: repostVisiblePostHandler,
+  reportVisiblePost: reportVisiblePostHandler,
+  logout: logoutHandler,
+  // Sprint 5: búsqueda y perfiles por nombre
+  findUserProfile: findUserProfileHandler,
+  openSearchWithQuery: openSearchWithQueryHandler,
 };
 
 export const IDEMPOTENCY_CHECKERS: Record<string, IdempotencyChecker> = {
@@ -61,4 +95,9 @@ export const IDEMPOTENCY_CHECKERS: Record<string, IdempotencyChecker> = {
   isAccountAlreadyPrivate,
   areNotificationsAlreadyEnabled,
   areNotificationsAlreadyDisabled,
+  // Sprint 4
+  isAlreadyFollowingProfile,
+  isNotFollowingProfile,
+  isProfileAlreadyBlocked,
+  isPostAlreadyReposted,
 };

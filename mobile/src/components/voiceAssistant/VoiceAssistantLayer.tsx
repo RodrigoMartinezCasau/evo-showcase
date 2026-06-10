@@ -5,7 +5,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '../../../mobile/lib/AuthContext';
 import { useEntryAnimPlaying } from '../../../mobile/lib/animationState';
-import { useRegisterAgentConfig, useRegisterAgentInteractions } from '@evoconn/agent';
+import {
+  useRegisterAgentApp,
+  useRegisterAgentConfig,
+  useRegisterAgentInteractions,
+} from '@evoconn/agent';
 import { warmUpBackend } from '@evoconn/services/debateApi';
 import {
   isVoiceAssistantHiddenPath,
@@ -52,6 +56,9 @@ export function VoiceAssistantLayer() {
   // Puente de configuración (privacidad/voz/notificaciones por voz): bajo
   // AuthProvider y VoiceAssistantPreferencesProvider.
   useRegisterAgentConfig();
+  // Puente de capacidades de app (Sprints 3+4+5): creación con prefill,
+  // relaciones, repost, logout y búsqueda — bajo Follow/Blocked/Simulation.
+  useRegisterAgentApp();
   const chromeReady = useVoiceAssistantChromeReady();
   const [keyboardOpen, setKeyboardOpen] = useState(false);
 

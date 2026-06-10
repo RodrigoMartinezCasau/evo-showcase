@@ -47,6 +47,24 @@ export function validateActionContext(
     }
   }
 
+  if (reqs.requiresVisibleProfile) {
+    const profile = context.profile;
+    if (!profile?.profile_id?.trim()) {
+      return {
+        ok: false,
+        reason: 'No visible profile in context',
+        userMessage: 'Para hacer eso necesito que estés viendo el perfil de ese usuario.',
+      };
+    }
+    if (profile.profile_is_own) {
+      return {
+        ok: false,
+        reason: 'Visible profile is own profile',
+        userMessage: 'Esa acción no se puede hacer sobre tu propio perfil.',
+      };
+    }
+  }
+
   // requiresAuth: en Evo el orbe solo existe con sesión iniciada
   // (VoiceAssistantLayer exige session), así que se cumple por construcción.
   // En el SDK multi-app este check consultará al host.

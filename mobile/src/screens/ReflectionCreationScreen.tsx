@@ -133,8 +133,12 @@ type ChatBubble = DebateMessage & { revealed?: string; introPhase?: IntroPhase }
 export default function ReflectionCreationScreen() {
   const router = useRouter();
   const pathname = usePathname();
-  const params = useLocalSearchParams<{ thoughtId?: string }>();
+  const params = useLocalSearchParams<{ thoughtId?: string; prefill?: string }>();
   const thoughtId = Array.isArray(params.thoughtId) ? params.thoughtId[0] : params.thoughtId;
+  // Prefill del agente de voz (Sprint 3): texto de partida en el campo de
+  // escritura. Solo aplica en reflexiones nuevas; el usuario revisa y envía.
+  const prefillParam = Array.isArray(params.prefill) ? params.prefill[0] : params.prefill;
+  const prefillText = !thoughtId && prefillParam?.trim() ? prefillParam.trim() : undefined;
 
   const { thoughts, createThought, updateThought, loadThread } = useThoughts();
   const { recordInput: recordClassificationInput } = useClassification();
@@ -783,6 +787,7 @@ export default function ReflectionCreationScreen() {
         clanColor={clanColor}
         inputCursorColor={clanColor}
         aiUsesAvailable={hasAiUses}
+        initialText={prefillText}
       />
 
       {!sidebarOpen ? (

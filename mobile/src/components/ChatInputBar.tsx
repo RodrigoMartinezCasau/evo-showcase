@@ -260,6 +260,11 @@ type ChatInputBarProps = {
   inputCursorColor?: string;
   /** false = no enviar (reflexión/frase); botón con candado y aviso. */
   aiUsesAvailable?: boolean;
+  /**
+   * Texto inicial del campo (prefill del agente de voz). Solo se aplica si el
+   * campo está vacío — nunca pisa texto que el usuario ya haya escrito.
+   */
+  initialText?: string;
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -272,11 +277,22 @@ export function ChatInputBar({
   clanColor = '#c7ff02',
   inputCursorColor = clanColor,
   aiUsesAvailable = true,
+  initialText,
 }: ChatInputBarProps) {
   const insets = useSafeAreaInsets();
   const [text, setText] = useState('');
   const textRef = useRef('');
   textRef.current = text;
+
+  // Prefill (agente de voz): se aplica cuando llega un initialText nuevo y el
+  // campo está vacío. consumedInitialTextRef evita re-aplicarlo tras borrar.
+  const consumedInitialTextRef = useRef<string | null>(null);
+  useEffect(() => {
+    const incoming = initialText?.trim();
+    if (!incoming || consumedInitialTextRef.current === incoming) return;
+    consumedInitialTextRef.current = incoming;
+    setText((prev) => (prev.trim() ? prev : clampMessageInput(incoming)));
+  }, [initialText]);
   const welcomeOpacity = useRef(new Animated.Value(1)).current;
 
   // The TextInput auto-grows from minHeight to maxInputHeight thanks to

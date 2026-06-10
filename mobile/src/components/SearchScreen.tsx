@@ -70,13 +70,15 @@ const SEARCH_PROFILE_ICON_OFFSET_Y  = 0;   // positive = down
 type SearchScreenProps = {
   onUserPress: (userId: string, username?: string) => void;
   onClanPress: (clanId: string) => void;
+  /** Query pre-rellenada (agente de voz, Sprint 5): se aplica al llegar. */
+  initialQuery?: string;
 };
 
 type SearchListItem =
   | { kind: 'clan'; key: string; score: number; clan: ScoredClan }
   | { kind: 'user'; key: string; score: number; user: ScoredUser };
 
-export function SearchScreen({ onUserPress, onClanPress }: SearchScreenProps) {
+export function SearchScreen({ onUserPress, onClanPress, initialQuery }: SearchScreenProps) {
   const { profile } = useAuth();
   const { followGraph } = useSimulation();
   const { isBlocked } = useBlockedUsers();
@@ -94,6 +96,17 @@ export function SearchScreen({ onUserPress, onClanPress }: SearchScreenProps) {
     const t = setTimeout(() => inputRef.current?.focus(), 100);
     return () => clearTimeout(t);
   }, []);
+
+  // Prefill del agente de voz: aplica la query y dispara la búsqueda sin
+  // esperar al debounce. Se consume cada valor nuevo una sola vez.
+  const appliedInitialQueryRef = useRef<string | null>(null);
+  useEffect(() => {
+    const incoming = initialQuery?.trim();
+    if (!incoming || appliedInitialQueryRef.current === incoming) return;
+    appliedInitialQueryRef.current = incoming;
+    setQuery(incoming);
+    setDebouncedQuery(incoming);
+  }, [initialQuery]);
 
   // Hidratar búsquedas recientes desde AsyncStorage (sobreviven a cerrar la app).
   useEffect(() => {
