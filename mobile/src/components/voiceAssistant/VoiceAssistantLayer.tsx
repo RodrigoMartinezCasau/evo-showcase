@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '../../../mobile/lib/AuthContext';
 import { useEntryAnimPlaying } from '../../../mobile/lib/animationState';
+import { useRegisterAgentInteractions } from '@evoconn/agent';
 import { warmUpBackend } from '@evoconn/services/debateApi';
 import {
   isVoiceAssistantHiddenPath,
@@ -45,6 +46,9 @@ export function VoiceAssistantLayer() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { session, loading } = useAuth();
+  // Puente de interacciones del agente (like/guardar por voz): vive aquí
+  // porque esta capa está bajo FeedProvider y PersonalProfileProvider.
+  useRegisterAgentInteractions();
   const chromeReady = useVoiceAssistantChromeReady();
   const [keyboardOpen, setKeyboardOpen] = useState(false);
 

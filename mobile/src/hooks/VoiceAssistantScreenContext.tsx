@@ -22,6 +22,8 @@ type VoiceAssistantScreenContextValue = {
   setScreenContext: (ownerId: symbol, snapshot: VoiceAssistantScreenSnapshot) => void;
   clearScreenContext: (ownerId: symbol) => void;
   getScreenContextText: () => string | null;
+  /** Snapshot estructurado registrado (o null) — para acciones del agente. */
+  getScreenSnapshot: () => VoiceAssistantScreenSnapshot | null;
 };
 
 const VoiceAssistantScreenContext = createContext<VoiceAssistantScreenContextValue | null>(null);
@@ -46,9 +48,11 @@ export function VoiceAssistantScreenContextProvider({ children }: { children: Re
     return mergeScreenContextText(entryRef.current?.snapshot.text, pathnameRef.current);
   }, []);
 
+  const getScreenSnapshot = useCallback(() => entryRef.current?.snapshot ?? null, []);
+
   const value = useMemo(
-    () => ({ setScreenContext, clearScreenContext, getScreenContextText }),
-    [clearScreenContext, getScreenContextText, setScreenContext],
+    () => ({ setScreenContext, clearScreenContext, getScreenContextText, getScreenSnapshot }),
+    [clearScreenContext, getScreenContextText, getScreenSnapshot, setScreenContext],
   );
 
   return (
@@ -93,6 +97,12 @@ export function useVoiceAssistantScreenContextOwner() {
 export function useVoiceAssistantScreenContextReader(): () => string | null {
   const { getScreenContextText } = useVoiceAssistantScreenContextApi();
   return getScreenContextText;
+}
+
+/** Lector del snapshot estructurado (acciones del agente sobre el post visible). */
+export function useVoiceAssistantScreenSnapshotReader(): () => VoiceAssistantScreenSnapshot | null {
+  const { getScreenSnapshot } = useVoiceAssistantScreenContextApi();
+  return getScreenSnapshot;
 }
 
 /**

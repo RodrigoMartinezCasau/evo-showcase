@@ -64,6 +64,11 @@ from rate_limit import check_rate_limit, startup_note as rate_limit_startup_note
 
 TESTER_API_KEY = os.environ.get("TESTER_API_KEY") or ""
 
+# TESTEO del agente de voz: con ASSISTANT_QUOTA_DISABLED=1 en .env,
+# /assistant/chat NO consume usos diarios (el rate limit por minuto sigue activo).
+# QUITAR / poner a 0 antes de lanzar a usuarios reales.
+ASSISTANT_QUOTA_DISABLED = (os.environ.get("ASSISTANT_QUOTA_DISABLED") or "").strip().lower() in {"1", "true", "yes"}
+
 
 def _get_client_ip(request: Request) -> str:
     """Return client IP, honoring X-Forwarded-For (Vercel/Proxies)."""
@@ -124,8 +129,11 @@ async def beta_protection_middleware(request: Request, call_next):
     def _is_generation_endpoint(p: str, method: str) -> bool:
         if method != "POST":
             return False
+        # Asistente de voz: exento de cuota durante el testeo (flag arriba)
+        if p == "/assistant/chat":
+            return not ASSISTANT_QUOTA_DISABLED
         # Core LLM pipelines
-        if p in {"/debate", "/debate/chat", "/creator", "/phrase/intro", "/assistant/chat"}:
+        if p in {"/debate", "/debate/chat", "/creator", "/phrase/intro"}:
             return True
         # POST /debates only generates a short title (cheap LLM call) — does NOT
         # count toward daily quota. The real generation cost is in /debates/{id}/chat.
@@ -213,6 +221,12 @@ class VoiceAssistantChatRequest(BaseModel):
     message: str
     voice: str | None = None
     screen_context: str | None = None
+    # Agente v1: navegación por voz (manifest declarado por el cliente)
+    current_route: str | None = None
+    manifest_version: str | None = None
+    manifest_routes: list[dict] | None = None
+    # Agente v2: acciones ejecutables (like, guardar…) declaradas por el cliente
+    manifest_actions: list[dict] | None = None
 
 
 class VoiceAssistantPreviewRequest(BaseModel):
@@ -223,6 +237,10 @@ class VoiceAssistantPreviewRequest(BaseModel):
 class VoiceAssistantChatResponse(BaseModel):
     reply: str
     audio_base64: str | None = None
+    # Acción estructurada para el ActionExecutor del cliente (o None)
+    action: dict | None = None
+    # True si el LLM cortó la respuesta por max_tokens (instrumentación)
+    was_truncated: bool = False
 
 
 class VoiceAssistantPreviewResponse(BaseModel):
@@ -669,7 +687,14 @@ def assistant_chat(payload: VoiceAssistantChatRequest):
     voice = (payload.voice or "").strip() or None
     try:
         screen_ctx = (payload.screen_context or "").strip() or None
-        reply, audio_b64 = run_voice_assistant_turn(msg, voice=voice, screen_context=screen_ctx)
+        reply, audio_b64, action, was_truncated = run_voice_assistant_turn(
+            msg,
+            voice=voice,
+            screen_context=screen_ctx,
+            current_route=(payload.current_route or "").strip() or None,
+            manifest_routes=payload.manifest_routes,
+            manifest_actions=payload.manifest_actions,
+        )
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except RuntimeError as e:
@@ -680,7 +705,9 @@ def assistant_chat(payload: VoiceAssistantChatRequest):
         logger.exception("assistant_chat failed")
         raise HTTPException(status_code=500, detail=f"Assistant error: {e}")
 
-    return VoiceAssistantChatResponse(reply=reply, audio_base64=audio_b64)
+    return VoiceAssistantChatResponse(
+        reply=reply, audio_base64=audio_b64, action=action, was_truncated=was_truncated,
+    )
 
 
 @app.post("/assistant/preview-tts", response_model=VoiceAssistantPreviewResponse)

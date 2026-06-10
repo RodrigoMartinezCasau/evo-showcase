@@ -1,10 +1,21 @@
 import type { CommunityPost } from '@evoconn/types';
+import {
+  buildFeedScreenContextText,
+  type FeedScreenContext,
+  type VisiblePost,
+} from '@evoconn/agent';
 import { normalizeAppPathname } from '@evoconn/constants/voiceAssistantLayout';
 import { ANIM_CLANS, type AnimClanId } from '@evoconn/constants/evoAnimationClans';
+import { timeAgo } from '@evoconn/utils/timeAgo';
 
 export type VoiceAssistantScreenSnapshot = {
   kind: string;
   text: string;
+  /**
+   * Contexto estructurado del feed (v2): las acciones type 'execute' del
+   * agente necesitan el post objetivo con su id, no solo el texto del LLM.
+   */
+  feed?: FeedScreenContext;
 };
 
 const MAX_CONTEXT_CHARS = 3500;
@@ -41,6 +52,14 @@ export function communityPostToScreenSnapshot(
   return {
     kind: 'publicacion',
     text: clip(lines.join('\n')),
+    // Contexto estructurado: el post abierto es el objetivo de acciones de
+    // voz ("dale like", "guarda esto") también fuera del feed de tarjetas.
+    feed: {
+      type: 'feed',
+      feedType: 'para-ti',
+      visiblePosts: [communityPostToVisiblePost(post)],
+      focusedPostIndex: 0,
+    },
   };
 }
 
@@ -160,6 +179,45 @@ export function clanToScreenSnapshot(clanId: string): VoiceAssistantScreenSnapsh
         'El usuario explora frases y contenido asociado a este clan filosófico en Evo.',
     ),
   };
+}
+
+function communityPostToVisiblePost(post: CommunityPost): VisiblePost {
+  return {
+    post_id: post.id,
+    post_type: post.type,
+    author_username: post.author.username,
+    author_clan: post.author.clanId ? clanLabelFromId(post.author.clanId) : undefined,
+    // El recorte a 200 chars lo aplica buildFeedScreenContextText.
+    content_preview: post.type === 'phrase' && post.quoteAuthor?.trim()
+      ? `${post.body.trim()} — ${post.quoteAuthor.trim()}`
+      : [post.title?.trim(), post.body.trim()].filter(Boolean).join(': '),
+    has_image: !!post.imageUrl,
+    likes_count: post.voteStats.up,
+    created_at_relative: timeAgo(post.createdAt),
+  };
+}
+
+/**
+ * Snapshot del feed con las publicaciones visibles en el viewport (Bloque B).
+ * `posts` debe ser un snapshot del momento (no se actualiza durante el turno).
+ * Los límites (máx. 5 posts, 200 chars/post) los aplica el módulo del agente.
+ */
+export function feedPostsToScreenSnapshot(
+  feedType: 'para-ti' | 'siguiendo',
+  posts: CommunityPost[],
+  focusedPostId?: string | null,
+): VoiceAssistantScreenSnapshot {
+  const visiblePosts = posts.filter((p) => p?.id).map(communityPostToVisiblePost);
+  const focusedIdx = focusedPostId
+    ? visiblePosts.findIndex((p) => p.post_id === focusedPostId)
+    : -1;
+  const ctx: FeedScreenContext = {
+    type: 'feed',
+    feedType,
+    visiblePosts,
+    focusedPostIndex: focusedIdx >= 0 ? focusedIdx : undefined,
+  };
+  return { kind: 'feed', text: clip(buildFeedScreenContextText(ctx)), feed: ctx };
 }
 
 export function syncVoiceAssistantCommunityPost(

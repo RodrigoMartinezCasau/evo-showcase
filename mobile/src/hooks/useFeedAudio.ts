@@ -71,6 +71,12 @@ let audioModeReady = false;
 let appStateSubscribed = false;
 /** Pausa global iniciada por el usuario (botón del visor). Persiste al deslizar. */
 let userPaused = false;
+/**
+ * Pausa temporal mientras el asistente de voz graba/habla: la música del post
+ * se cuela por el micrófono y degrada el reconocimiento de voz. Se reanuda
+ * sola al terminar el turno (si el usuario no la tenía pausada).
+ */
+let voiceSuspended = false;
 
 // ── Estado observable (useSyncExternalStore) ────────────────────────────────
 const stateListeners = new Set<() => void>();
@@ -129,7 +135,7 @@ function ensureAppStateSubscription() {
     if (!p) return;
     try {
       if (state === 'active') {
-        if (!userPaused) p.play();
+        if (!userPaused && !voiceSuspended) p.play();
       } else {
         p.pause();
       }
@@ -137,6 +143,31 @@ function ensureAppStateSubscription() {
       /* noop */
     }
   });
+}
+
+/** Pausa la música del feed mientras el asistente de voz escucha/habla. */
+export function suspendFeedAudioForVoiceAssistant(): void {
+  voiceSuspended = true;
+  const p = player;
+  if (!p) return;
+  try {
+    p.pause();
+  } catch {
+    /* noop */
+  }
+}
+
+/** Reanuda la música del feed al terminar el turno de voz (si procede). */
+export function resumeFeedAudioAfterVoiceAssistant(): void {
+  if (!voiceSuspended) return;
+  voiceSuspended = false;
+  const p = player;
+  if (!p || userPaused) return;
+  try {
+    p.play();
+  } catch {
+    /* noop */
+  }
 }
 
 function playForPost(post: CommunityPost) {
@@ -200,8 +231,8 @@ function playForPost(post: CommunityPost) {
 
       p.volume = volume;
       // Respeta la pausa global del usuario: prepara la pista pero no suena
-      // hasta que el usuario reanude.
-      if (!userPaused) p.play();
+      // hasta que el usuario reanude (ni mientras el asistente de voz escucha).
+      if (!userPaused && !voiceSuspended) p.play();
       if (__DEV__) console.log('[FeedAudio] play() called, paused=', userPaused, 'isLoaded=', p.isLoaded);
     } catch (e) {
       if (__DEV__) console.warn('[FeedAudio] playForPost error:', e);

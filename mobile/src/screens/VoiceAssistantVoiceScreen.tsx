@@ -12,6 +12,13 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
+import {
+  AssistantConsentModal,
+  grantAssistantConsent,
+  hasConsentedToAssistant,
+  logAgentEvent,
+  revokeAssistantConsent,
+} from '@evoconn/agent';
 import { evoconnColors } from '@evoconn/theme/colors';
 import {
   VOICE_ASSISTANT_VOICES,
@@ -30,6 +37,51 @@ export default function VoiceAssistantVoiceScreen() {
   const { voiceId, setVoiceId } = useVoiceAssistantPreferences();
   const [previewingId, setPreviewingId] = useState<VoiceAssistantVoiceId | null>(null);
   const previewGenRef = useRef(0);
+  const [consented, setConsented] = useState<boolean | null>(null);
+  const [consentModalVisible, setConsentModalVisible] = useState(false);
+
+  useEffect(() => {
+    void hasConsentedToAssistant().then(setConsented);
+  }, []);
+
+  const handleRevokeConsent = useCallback(() => {
+    Alert.alert(
+      'Revocar consentimiento',
+      'El asistente de voz dejará de funcionar hasta que vuelva a aceptar el envío de datos a proveedores externos. ¿Desea revocarlo?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Revocar',
+          style: 'destructive',
+          onPress: () => {
+            void revokeAssistantConsent()
+              .then(() => {
+                setConsented(false);
+                Alert.alert(
+                  'Consentimiento revocado',
+                  'El asistente volverá a pedir su consentimiento la próxima vez que lo use.',
+                );
+              })
+              .catch(() => {
+                Alert.alert('Error', 'No se pudo revocar el consentimiento. Inténtelo de nuevo.');
+              });
+          },
+        },
+      ],
+    );
+  }, []);
+
+  const handleGrantConsent = useCallback(() => {
+    setConsentModalVisible(false);
+    void grantAssistantConsent()
+      .then(() => {
+        setConsented(true);
+        void logAgentEvent({ eventType: 'agent_consent_granted', currentRoute: '/settings-voice-assistant' });
+      })
+      .catch(() => {
+        Alert.alert('Error', 'No se pudo guardar el consentimiento. Inténtelo de nuevo.');
+      });
+  }, []);
 
   const playPreview = useCallback(async (id: VoiceAssistantVoiceId) => {
     const gen = ++previewGenRef.current;
@@ -101,7 +153,37 @@ export default function VoiceAssistantVoiceScreen() {
             </View>
           );
         })}
+
+        <Text style={styles.sectionTitle}>Privacidad</Text>
+        <View style={styles.consentCard}>
+          <View style={styles.consentRow}>
+            <Text style={styles.rowLabel}>Asistente de voz activado</Text>
+            <Text style={[styles.consentState, consented ? styles.consentOn : styles.consentOff]}>
+              {consented === null ? '…' : consented ? 'Sí' : 'No'}
+            </Text>
+          </View>
+          <Text style={styles.consentHint}>
+            Al usar el asistente se envía a proveedores externos de IA (OpenAI) la transcripción
+            de su voz, el contenido visible de la pantalla y datos básicos de su perfil. El audio
+            no sale del dispositivo.
+          </Text>
+          {consented ? (
+            <TouchableOpacity style={styles.consentBtn} onPress={handleRevokeConsent}>
+              <Text style={styles.consentBtnDanger}>Revocar consentimiento</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.consentBtn} onPress={() => setConsentModalVisible(true)}>
+              <Text style={styles.consentBtnText}>Activar asistente</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </ScrollView>
+
+      <AssistantConsentModal
+        visible={consentModalVisible}
+        onAccept={handleGrantConsent}
+        onDecline={() => setConsentModalVisible(false)}
+      />
     </View>
   );
 }
@@ -154,4 +236,43 @@ const styles = StyleSheet.create({
   },
   previewBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: DIVIDER, marginLeft: 16 },
+  sectionTitle: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 13,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginTop: 28,
+    marginBottom: 8,
+    marginLeft: 4,
+  },
+  consentCard: {
+    backgroundColor: CARD_BG,
+    borderRadius: 12,
+    padding: 16,
+  },
+  consentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  consentState: { fontSize: 15, fontWeight: '700' },
+  consentOn: { color: evoconnColors.neonGreen },
+  consentOff: { color: 'rgba(255,255,255,0.45)' },
+  consentHint: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 14,
+  },
+  consentBtn: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  consentBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  consentBtnDanger: { color: '#ff6b6b', fontSize: 14, fontWeight: '600' },
 });

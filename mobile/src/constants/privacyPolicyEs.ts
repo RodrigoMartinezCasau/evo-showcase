@@ -70,6 +70,8 @@ El audio captado se procesa localmente en el dispositivo para obtener la transcr
 El texto resultante de la transcripción solo se envía a nuestro backend si usted decide explícitamente publicar o enviar ese contenido.
 Puede revocar el permiso de micrófono en cualquier momento desde los ajustes del dispositivo, aunque ello impedirá utilizar el dictado por voz.
 
+Asistente de voz de la aplicación. Evo incluye un asistente de voz opcional que puede responder preguntas y navegar por la aplicación siguiendo sus instrucciones habladas. Su uso requiere su consentimiento explícito, que se le solicita la primera vez que activa el asistente. Cuando usted utiliza el asistente, se envían a proveedores externos de inteligencia artificial (OpenAI, LLC y, en su caso, Anthropic, PBC, como subencargados del tratamiento a través de nuestra API propia) los siguientes datos: la transcripción de lo que usted dice, una descripción del contenido visible en la pantalla en la que se encuentra y datos básicos de su perfil (clan filosófico, porcentajes, estadísticas de uso) necesarios para contextualizar la respuesta. El audio de su voz no sale del dispositivo: la transcripción se realiza localmente mediante las APIs del sistema operativo. Antes del envío, la aplicación aplica un filtrado automático que redacta patrones de datos sensibles (direcciones de correo, teléfonos, tarjetas, IBAN, DNI) presentes en el contexto de pantalla. Puede revocar el consentimiento en cualquier momento desde Ajustes → Voz del asistente; tras revocarlo, el asistente no enviará ningún dato hasta que vuelva a otorgarlo.
+
 2.7 Funciones sociales y datos asociados
 La aplicación incluye las siguientes funciones sociales, cuyos datos asociados se almacenan en Supabase:
 Feeds «Para ti» y «Siguiendo».

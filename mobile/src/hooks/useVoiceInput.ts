@@ -168,7 +168,11 @@ export function useVoiceInput({
   const startAnimations = useCallback(() => {
     setElapsed(0);
     timerRef.current  = setInterval(() => setElapsed((s) => s + 1), 1000);
-    volumeRef.current = setInterval(() => setVolume(Math.random()), 140);
+    // Volumen constante mientras se graba: la waveform genera su propio ruido
+    // internamente (hilo de UI). El setInterval anterior con Math.random() cada
+    // 140 ms re-renderizaba todo el árbol del orbe a 7 Hz y lageaba las
+    // pantallas pesadas (Para ti / Siguiendo / Notificaciones).
+    setVolume(0.85);
   }, []);
 
   // ═══════════════════════════════════════════════════════════════════════════

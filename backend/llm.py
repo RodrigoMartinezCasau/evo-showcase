@@ -41,11 +41,17 @@ class OpenAIClient(LLMClient):
                 from openai import OpenAI
             except ImportError:
                 raise RuntimeError("Install openai: pip install openai")
-            self._sdk_client = (
-                OpenAI(api_key=self._api_key, base_url=self._base_url)
-                if self._base_url
-                else OpenAI(api_key=self._api_key)
-            )
+            # timeout explícito: el default del SDK es 600 s, y una conexión
+            # colgada retiene el thread del request ~10 min (ver el incidente
+            # del asistente de voz: el backend entero dejaba de responder).
+            kwargs: dict = {
+                "api_key": self._api_key,
+                "timeout": 45,
+                "max_retries": 1,
+            }
+            if self._base_url:
+                kwargs["base_url"] = self._base_url
+            self._sdk_client = OpenAI(**kwargs)
         return self._sdk_client
 
     def complete(self, system: str | None, user: str, language: str | None = None, max_tokens: int | None = None, prompt_id: str | None = None) -> str:
@@ -73,6 +79,41 @@ class OpenAIClient(LLMClient):
                 raise RuntimeError("openai_rate_limit") from e
             raise
         return (r.choices[0].message.content or "").strip()
+
+    def complete_with_meta(
+        self,
+        system: str | None,
+        user: str,
+        language: str | None = None,
+        max_tokens: int | None = None,
+        prompt_id: str | None = None,
+    ) -> tuple[str, str | None]:
+        """
+        Como complete(), pero devuelve también finish_reason ('stop', 'length'…)
+        para poder detectar respuestas truncadas por max_tokens.
+        """
+        lang_prepend = _language_instruction(language)
+        system_content = (lang_prepend + (system or "")) if lang_prepend else system
+        client = self._get_client()
+        msgs = []
+        if system_content:
+            msgs.append({"role": "system", "content": system_content})
+        msgs.append({"role": "user", "content": user})
+        kwargs = {
+            "model": self._model,
+            "messages": msgs,
+            "max_tokens": max_tokens if max_tokens is not None else MAX_TOKENS_DEBATE,
+            "temperature": 0.7,
+        }
+        try:
+            r = client.chat.completions.create(**kwargs)
+        except Exception as e:
+            err = str(e).lower()
+            if "rate limit" in err or "429" in err:
+                raise RuntimeError("openai_rate_limit") from e
+            raise
+        choice = r.choices[0]
+        return (choice.message.content or "").strip(), getattr(choice, "finish_reason", None)
 
     def complete_stream(
         self,

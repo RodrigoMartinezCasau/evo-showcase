@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, View, ActivityIndicator } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
+import { AssistantConsentModal } from '@evoconn/agent';
 import { VoiceWaveform } from '@evoconn/components/VoiceWaveform';
 import { getClanColor } from '@evoconn/constants/clanColors';
 import { VOICE_ASSISTANT_LAYOUT } from '@evoconn/constants/voiceAssistantLayout';
@@ -30,6 +31,9 @@ export function VoiceAssistantOrb({ enabled = true }: Props) {
     volumeLevel,
     toggleListening,
     isBusy,
+    consentModalVisible,
+    acceptConsent,
+    declineConsent,
   } = useVoiceAssistant({ enabled });
 
   const handlePress = () => {
@@ -42,6 +46,12 @@ export function VoiceAssistantOrb({ enabled = true }: Props) {
     VOICE_ASSISTANT_LAYOUT;
 
   return (
+    <>
+    <AssistantConsentModal
+      visible={consentModalVisible}
+      onAccept={() => void acceptConsent()}
+      onDecline={declineConsent}
+    />
     <Pressable
       onPress={handlePress}
       disabled={!enabled || showThinking}
@@ -74,6 +84,7 @@ export function VoiceAssistantOrb({ enabled = true }: Props) {
         )}
       </View>
     </Pressable>
+    </>
   );
 }
 

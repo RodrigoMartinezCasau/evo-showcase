@@ -16,6 +16,8 @@ import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-g
 import { runOnJS } from 'react-native-reanimated';
 import { useRouter, useLocalSearchParams, usePathname, useFocusEffect } from 'expo-router';
 import { navigateUnlessCurrent } from '@evoconn/utils/navigationDuplicateGuard';
+import { useVoiceAssistantScreenContextOwner } from '@evoconn/hooks/VoiceAssistantScreenContext';
+import { feedPostsToScreenSnapshot } from '@evoconn/utils/voiceAssistantScreenContext';
 import { useNavLoading } from '@evoconn/hooks/NavLoadingContext';
 import { useSafeAreaInsets, useSafeAreaFrame } from 'react-native-safe-area-context';
 import {
@@ -454,6 +456,21 @@ export default function CommunityScreen() {
   feedAudioRef.current = feedAudio;
   /** Solo true mientras Comunidad está enfocada y el visor Para ti / detalle está activo. */
   const feedAudioEnabledRef = useRef(false);
+
+  // ── Asistente de voz: publicaciones visibles en el feed (Bloque B) ────────
+  // Los handlers de viewability viven en refs estables (FlatList lo exige),
+  // así que todo el estado del contexto va también en refs y la función de
+  // sincronización se invoca vía vaSyncRef. setScreenContext solo escribe un
+  // ref en el provider (no provoca re-renders): es seguro llamarlo al scrollar.
+  const vaScreen = useVoiceAssistantScreenContextOwner();
+  const vaScreenRef = useRef(vaScreen);
+  vaScreenRef.current = vaScreen;
+  /** Tarjetas visibles en la lista de Siguiendo (en orden). */
+  const vaFollowingVisibleRef = useRef<CommunityPost[]>([]);
+  /** Post a pantalla completa en el visor Para ti / detalle. */
+  const vaViewerPostRef = useRef<CommunityPost | null>(null);
+  const vaFocusedRef = useRef(false);
+  const vaSyncRef = useRef<() => void>(() => {});
 
   // Quitar al instante posts de autores bloqueados del panel Para Ti ya montado.
   useEffect(() => {
@@ -1116,6 +1133,69 @@ export default function CommunityScreen() {
     reset: resetFollowingPagination,
   } = useIncrementalList(followingFeedOrdered, 10);
 
+  // ── Asistente de voz: sincronización del contexto del feed ────────────────
+  const vaActiveTabRef = useRef(activeTab);
+  vaActiveTabRef.current = activeTab;
+  const vaDetailOpenRef = useRef(false);
+  vaDetailOpenRef.current = detailFeed !== null;
+  const vaFollowingDataRef = useRef<CommunityPost[]>([]);
+  vaFollowingDataRef.current = listData;
+  const vaParatiDataRef = useRef<CommunityPost[]>([]);
+  vaParatiDataRef.current = paratiPanelDisplayData;
+
+  /**
+   * Publica en VoiceAssistantScreenContext lo que el usuario tiene delante:
+   * - Visor a pantalla completa (Para ti o detalle): el post visible.
+   * - Pestaña Siguiendo (tarjetas): las publicaciones visibles del viewport.
+   * - Pestaña Búsqueda o pantalla sin foco: se limpia el contexto.
+   * El lector del asistente toma snapshot al invocar, no en tiempo real.
+   */
+  const syncVoiceAssistantFeedContext = useCallback(() => {
+    const api = vaScreenRef.current;
+    if (!vaFocusedRef.current || vaActiveTabRef.current === 'search') {
+      api.clearScreenContext(api.ownerId);
+      return;
+    }
+    const tab = vaActiveTabRef.current;
+    if (tab === 'para-ti' || vaDetailOpenRef.current) {
+      // Pager a pantalla completa: un único post visible. Fallback al primero
+      // del panel si la viewability todavía no ha disparado tras el montaje.
+      const post = vaViewerPostRef.current ?? (tab === 'para-ti' ? vaParatiDataRef.current[0] : null);
+      const feedType = tab === 'para-ti' ? 'para-ti' : 'siguiendo';
+      api.setScreenContext(
+        api.ownerId,
+        feedPostsToScreenSnapshot(feedType, post ? [post] : [], post?.id ?? null),
+      );
+      return;
+    }
+    // Lista de tarjetas de Siguiendo. Fallback a las primeras cargadas si
+    // todavía no hubo evento de viewability.
+    const visible =
+      vaFollowingVisibleRef.current.length > 0
+        ? vaFollowingVisibleRef.current
+        : vaFollowingDataRef.current.slice(0, 3);
+    api.setScreenContext(api.ownerId, feedPostsToScreenSnapshot('siguiendo', visible));
+  }, []);
+  vaSyncRef.current = syncVoiceAssistantFeedContext;
+
+  // Cambios de pestaña / abrir-cerrar el visor / hidratación del feed.
+  useEffect(() => {
+    vaSyncRef.current();
+  }, [activeTab, detailFeed, paratiPanelMounted, listData]);
+
+  // Solo mientras Comunidad tiene foco: al navegar a otra pantalla se limpia
+  // (la otra pantalla registra su propio contexto o cae al label de ruta).
+  useFocusEffect(
+    useCallback(() => {
+      vaFocusedRef.current = true;
+      vaSyncRef.current();
+      return () => {
+        vaFocusedRef.current = false;
+        vaScreenRef.current.clearScreenContext(vaScreenRef.current.ownerId);
+      };
+    }, []),
+  );
+
   const followingListExtraData = useMemo(
     () =>
       `${followingWindowStart}|${listData
@@ -1133,7 +1213,7 @@ export default function CommunityScreen() {
   // cambian entre renders), por eso van en refs.
   const followingViewabilityConfigRef = useRef({ itemVisiblePercentThreshold: 10 });
   const onFollowingViewableChangedRef = useRef(
-    ({ viewableItems }: { viewableItems: { index: number | null }[] }) => {
+    ({ viewableItems }: { viewableItems: { index: number | null; item?: CommunityPost }[] }) => {
       if (viewableItems.length === 0) return;
       let first = Number.POSITIVE_INFINITY;
       let last = Number.NEGATIVE_INFINITY;
@@ -1143,6 +1223,16 @@ export default function CommunityScreen() {
         if (v.index > last) last = v.index;
       }
       if (!Number.isFinite(first)) return;
+
+      // Asistente de voz: snapshot de las tarjetas visibles (en orden).
+      const visiblePosts = viewableItems
+        .filter((v) => v.index != null && v.item?.id)
+        .sort((a, b) => (a.index as number) - (b.index as number))
+        .map((v) => v.item as CommunityPost);
+      if (visiblePosts.length > 0) {
+        vaFollowingVisibleRef.current = visiblePosts;
+        vaSyncRef.current();
+      }
       // Centramos la ventana en lo visible: la mitad por encima y la mitad por
       // debajo, para que al subir o bajar las cercanas sigan montadas.
       const center = Math.floor((first + last) / 2);
@@ -1459,6 +1549,10 @@ export default function CommunityScreen() {
         }
         visibleAuthorIdRef.current = id;
         setVisibleAuthorId(id);
+
+        // Asistente de voz: el post a pantalla completa es el contexto actual.
+        vaViewerPostRef.current = post;
+        vaSyncRef.current();
       }
     },
     [],

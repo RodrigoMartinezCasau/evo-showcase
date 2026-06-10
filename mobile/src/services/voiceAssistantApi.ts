@@ -4,6 +4,13 @@
  */
 import * as Device from 'expo-device';
 import {
+  EVO_MANIFEST_VERSION,
+  manifestActionsForBackend,
+  manifestRoutesForBackend,
+  parseAgentAction,
+  type AgentAction,
+} from '@evoconn/agent';
+import {
   getVoiceAssistantVoiceOption,
   type VoiceAssistantVoiceId,
 } from '@evoconn/constants/voiceAssistantVoices';
@@ -16,7 +23,18 @@ export type VoiceAssistantTurnResponse = {
   reply: string;
   /** MP3 en base64 (OpenAI TTS); puede venir vacío si TTS falló en servidor. */
   audio_base64?: string | null;
+  /** Acción validada del agente (navegación) o null si no hay nada que ejecutar. */
+  action: AgentAction | null;
+  /** True si el LLM cortó la respuesta por max_tokens (instrumentación). */
+  wasTruncated: boolean;
 };
+
+/**
+ * Timeout del turno del asistente. Medido en real: 3.4-10.8 s (LLM + TTS);
+ * con 10 s había falsos timeouts en turnos legítimos lentos. El watchdog
+ * del hook (20 s) sigue siendo la red de seguridad final.
+ */
+const ASSISTANT_TURN_TIMEOUT_MS = 15_000;
 
 async function getApiErrorMessage(res: Response): Promise<string> {
   let body: { detail?: string; error?: string; message?: string; remaining?: number } = {};
@@ -60,13 +78,25 @@ function networkErrorMessage(err: unknown, apiBaseUrl?: string): string {
   return msg;
 }
 
+/** Marcador de timeout del asistente — el hook lo distingue del resto de errores. */
+export const ASSISTANT_TIMEOUT_ERROR = 'assistant_timeout';
+
+/** True si el error es el timeout del request del asistente. */
+export function isAssistantTimeoutError(err: unknown): boolean {
+  return err instanceof Error && err.message === ASSISTANT_TIMEOUT_ERROR;
+}
+
 async function fetchWithTimeout(
   url: string,
   init: RequestInit,
   timeoutMs: number,
 ): Promise<Response> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
   const extSignal = init.signal;
   if (extSignal) {
     if (extSignal.aborted) controller.abort();
@@ -74,6 +104,10 @@ async function fetchWithTimeout(
   }
   try {
     return await fetch(url, { ...init, signal: controller.signal });
+  } catch (e) {
+    // Distinguir timeout (mostrar mensaje + evento) de cancelación del usuario (silenciosa).
+    if (timedOut) throw new Error(ASSISTANT_TIMEOUT_ERROR);
+    throw e;
   } finally {
     clearTimeout(timer);
   }
@@ -81,12 +115,14 @@ async function fetchWithTimeout(
 
 function isRetryableFetchError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
+  // Los aborts (timeout o cancelación del usuario) NUNCA se reintentan:
+  // reintentar dispararía otra generación LLM+TTS que nadie espera ya.
+  if (msg === ASSISTANT_TIMEOUT_ERROR || msg.toLowerCase().includes('abort')) return false;
   return (
     msg.includes('fetch') ||
     msg.includes('Network') ||
     msg.includes('Failed to connect') ||
-    msg.includes('network') ||
-    msg.includes('abort')
+    msg.includes('network')
   );
 }
 
@@ -127,6 +163,8 @@ export async function sendVoiceAssistantTurn(
     signal?: AbortSignal;
     voice?: VoiceAssistantVoiceId;
     screenContext?: string;
+    /** Pathname actual (expo-router) para que el LLM sepa dónde está el usuario. */
+    currentRoute?: string;
   },
 ): Promise<VoiceAssistantTurnResponse> {
   const apiBase = getApiBaseUrl();
@@ -134,9 +172,14 @@ export async function sendVoiceAssistantTurn(
   const body: Record<string, unknown> = {
     message: message.trim(),
     voice: options?.voice,
+    manifest_version: EVO_MANIFEST_VERSION,
+    manifest_routes: manifestRoutesForBackend(),
+    manifest_actions: manifestActionsForBackend(),
   };
   const ctx = options?.screenContext?.trim();
   if (ctx) body.screen_context = ctx;
+  const route = options?.currentRoute?.trim();
+  if (route) body.current_route = route;
 
   const init: RequestInit = {
     method: 'POST',
@@ -145,18 +188,31 @@ export async function sendVoiceAssistantTurn(
     signal: options?.signal,
   };
 
-  const res = await fetchWithRetry(url, init, { timeoutMs: 45_000, apiBase });
+  // attempts: 1 — un turno de voz no se reintenta solo: cada intento dispara
+  // otra generación LLM+TTS (coste + latencia) que el usuario ya no espera.
+  const res = await fetchWithRetry(url, init, {
+    timeoutMs: ASSISTANT_TURN_TIMEOUT_MS,
+    attempts: 1,
+    apiBase,
+  });
 
   if (!res.ok) {
     throw new Error(await getApiErrorMessage(res));
   }
 
-  const data = (await res.json()) as VoiceAssistantTurnResponse;
+  const data = (await res.json()) as {
+    reply?: string;
+    audio_base64?: string | null;
+    action?: unknown;
+    was_truncated?: boolean;
+  };
   void logAiUsageEvent({ source: 'voice_assistant', model: 'gpt-4o-mini' });
 
   return {
     reply: (data.reply ?? '').trim(),
     audio_base64: data.audio_base64 ?? null,
+    action: parseAgentAction(data.action),
+    wasTruncated: data.was_truncated === true,
   };
 }
 

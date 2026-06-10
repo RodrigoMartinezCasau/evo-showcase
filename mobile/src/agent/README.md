@@ -1,0 +1,213 @@
+# Módulo del agente in-app de Evo
+
+Agente de voz que responde preguntas con contexto de pantalla y **ejecuta acciones de
+navegación** dentro de la app ("llévame a mi perfil" → navega a `/my-profile`).
+Evo es el cliente cero: este módulo está diseñado para convertirse en el SDK B2B
+que cualquier app pueda integrar declarando su propio manifest.
+
+## Arquitectura
+
+```
+Usuario habla → STT nativo (expo-speech-recognition)
+  → useVoiceAssistant (hook orquestador, fuera de este módulo)
+  → POST /assistant/chat  { message, screen_context, current_route, manifest_routes }
+      backend (FastAPI): system prompt = conocimiento app + rutas del manifest
+      LLM devuelve JSON { reply, action } → backend valida intents → TTS del reply
+  → cliente: parseAgentAction() revalida → ActionExecutor.execute()
+  → expo-router navega → se reproduce el audio
+  → logAgentEvent() → Supabase (agent_usage_events)
+```
+
+### Estructura
+
+| Carpeta | Qué contiene | ¿Reutilizable entre apps? |
+|---|---|---|
+| `core/` | Tipos de acción, validación, ejecutor, analytics | Sí (futuro SDK) |
+| `manifest/` | Tipos del manifest + manifest concreto de Evo | Tipos sí; `evo.manifest.ts` no |
+| `index.ts` | Exports públicos — **el resto de Evo solo importa de aquí** | — |
+
+## Decisiones arquitectónicas clave
+
+1. **El manifest viaja al backend en cada request** (no está hardcodeado en el servidor).
+   El backend no sabe nada de las rutas de Evo: recibe `manifest_routes` y las inyecta en
+   el system prompt. Esto permite evolucionar el manifest sin redeploy del backend y es la
+   base del modelo multi-tenant (cada app cliente envía el suyo). Coste: ~1-2 KB/request.
+
+2. **Doble validación de acciones.** El backend rechaza intents que no estén en el manifest
+   recibido (`_parse_agent_json`), y el cliente vuelve a validar (`parseAgentAction`) y solo
+   ejecuta intents declarados (`ActionExecutor`). El LLM nunca puede inyectar rutas libres:
+   elige de una lista cerrada.
+
+3. **Degradación segura.** Si el JSON del LLM es inválido o el intent no existe, el turno
+   degrada a "respuesta hablada sin acción". Nunca se ejecuta una acción dudosa.
+
+4. **El manifest es declarativo.** Solo datos. Nada de lógica ni handlers dentro del manifest.
+
+5. **Analytics fire-and-forget.** `logAgentEvent` jamás bloquea ni rompe el flujo de voz
+   (si la tabla no existe o falla la red, se ignora en silencio).
+
+## Cómo añadir un intent de navegación
+
+1. Añade la entrada en `manifest/evo.manifest.ts` → `routes`:
+
+```ts
+{
+  intent: 'frases_domains',                 // id estable, snake_case
+  label: 'Dominios de frases',              // legible para humanos y para el prompt
+  route: '/phrases-domains',                // href real de expo-router (carpeta mobile/mobile/app)
+  examples: ['dominios de frases', 'explorar frases'], // frases típicas del usuario
+}
+```
+
+2. No hay paso 2. El backend recibe el manifest en el siguiente request y el
+   `ActionExecutor` resuelve la ruta desde el propio manifest.
+
+Reglas:
+- La ruta debe existir en `mobile/mobile/app/` (expo-router). Verifícalo.
+- Query params soportados: `'/(tabs)?tab=para-ti'` (se convierten a `{ pathname, params }`).
+- `'BACK'` es el único marker especial (router.back con fallback a tabs).
+- Nunca hardcodear rutas fuera del manifest.
+
+## Cómo testear localmente
+
+Backend (sin app, valida LLM + JSON + validación de intents):
+
+```bash
+cd backend && source .venv/bin/activate
+uvicorn main:app --reload --port 8000
+# Tests unitarios del parser (sin red):
+python3 test_voice_assistant_agent.py
+# Turno completo contra el LLM real:
+curl -s -X POST http://127.0.0.1:8000/assistant/chat \
+  -H "Content-Type: application/json" -H "x-user-id: <uuid>" \
+  -d '{"message": "llévame a mi perfil", "current_route": "/", "manifest_version": "1.0.0",
+       "manifest_routes": [{"intent": "my_profile", "label": "Mi perfil", "examples": ["mi perfil"]}]}'
+```
+
+En dispositivo: el micrófono requiere build nativo (`npx expo run:ios --device`),
+no funciona en Expo Go ni simulador. Ver sección "Asistente de voz" en `COMMANDS.md`.
+
+## Instrumentación
+
+Tabla `agent_usage_events` (SQL: `supabase_agent_usage_events.sql` en la raíz del repo).
+Eventos: `agent_invoked`, `navigation_executed`, `navigation_failed`, `question_only`,
+`agent_timeout`, `agent_stt_empty`, `agent_stt_failed`, `agent_watchdog_reset`,
+`agent_consent_granted`, `agent_consent_declined`.
+Latencias separadas: `latency_ms` (HTTP completo), `latency_stt_ms` (parar de hablar → texto),
+`latency_action_ms` (respuesta → navegación). `was_truncated` marca respuestas cortadas
+por `max_tokens` (instrumentado también en logs del backend con contadores).
+`context_chars` registra la longitud final del contexto enviado (calibra `MAX_CONTEXT_CHARS`)
+y `redactions_applied` los tipos de datos sensibles redactados (nunca los valores).
+
+## Privacidad (v1.1)
+
+- **Consentimiento explícito** (`core/consent.ts` + `components/AssistantConsentModal.tsx`):
+  la primera vez que el usuario pulsa el orbe se muestra un modal que explica qué datos
+  viajan a proveedores externos. Sin aceptación no se inicia el STT ni sale nada del
+  dispositivo. Revocable desde Ajustes → Voz del asistente. Persistido en AsyncStorage
+  (`@evo/assistant_consent_v1`), fail-closed si el storage falla.
+- **Tope de contexto** (`core/contextLimits.ts`): el contexto combinado se limita a
+  `MAX_CONTEXT_CHARS` (1500). Los datos del usuario tienen prioridad; el contexto de
+  pantalla absorbe el recorte (`combineContexts`).
+- **Saneado de datos sensibles** (`core/sanitization.ts`): última barrera antes del LLM.
+  Redacta emails, teléfonos, tarjetas, IBAN y DNI del contexto que añade la app
+  (NUNCA de la transcripción del usuario). Tipos redactados → `redactions_applied`.
+
+## Publicaciones visibles en el feed (v1.2)
+
+`core/feedContext.ts` — lógica pura que limita y formatea las publicaciones visibles
+para el LLM ("léeme esta publicación", "¿de qué trata el post de @fulano?"):
+
+- Máximo **5 posts** (los más centrados en el viewport, `selectMostCentered`) y
+  **200 chars** de preview por post (`clipPostPreview`). Estos límites se aplican
+  ANTES del tope general de 1500 chars de `contextLimits.ts`.
+- `CommunityScreen` registra el snapshot vía `feedPostsToScreenSnapshot`
+  (`utils/voiceAssistantScreenContext.ts`): pestaña Siguiendo → tarjetas visibles
+  (`onViewableItemsChanged`); Para ti / visor detalle → el post a pantalla completa,
+  marcado como `[POST EN PANTALLA AHORA]`. Se limpia al perder el foco o en Búsqueda.
+- El lector del asistente toma el snapshot al invocar el turno (no se actualiza en
+  tiempo real durante el turno).
+- Feed vacío → texto explícito "Todavía no hay publicaciones cargadas" (el LLM no
+  inventa posts). Imágenes: solo metadato `con imagen adjunta`, nunca se envían.
+- `has_my_like` y `comments_count` son opcionales: `CommunityPost` no expone esos
+  datos hoy; se rellenarán cuando existan (v2, acciones sobre posts vía `post_id`).
+- El system prompt del backend (`voice_assistant.py`) instruye cómo resolver
+  referencias ("esta publicación", "el post de X"), preguntar ante ambigüedad y no
+  decir nunca el `post_id` en voz alta.
+
+Tests de estos módulos (sin React Native ni red):
+
+```bash
+npx --yes tsx mobile/src/agent/core/__tests__/run_agent_core_tests.ts
+```
+
+## Acciones de interacción simples (v2 — Sprint 1)
+
+Primeras acciones type `execute`: **like, unlike, guardar y quitar de guardados** sobre
+el post visible. Sin confirmación (reversibles, sin parámetros del usuario).
+
+Arquitectura — igual que las rutas, las acciones se declaran en el manifest y el
+backend sigue siendo agnóstico de Evo:
+
+- **Manifest** (`manifest/evo.manifest.ts`, v1.2.0): cada `ActionIntent` declara
+  `category`, `handler` (nombre, no función), `contextRequirements`
+  (`requiresVisiblePost`, `requiresAuth`), `idempotencyCheck` y `examples`.
+  `manifestActionsForBackend()` viaja en cada turno (`manifest_actions`).
+- **Motor** (`core/actionEngine.ts`, lógica pura y testeable):
+  manifest lookup → `validateActionContext` → idempotencia → handler. Cualquier
+  fallo degrada a `ActionResult` con `error` (telemetría) + `message` (hablado).
+- **Handlers** (`handlers/interactions/`): registrados por nombre en
+  `handlers/index.ts` (`ACTION_HANDLERS`, `IDEMPOTENCY_CHECKERS`). Operan sobre el
+  post enfocado del snapshot (`getFocusedPost`) capturado AL INVOCAR el turno
+  (si el usuario hace scroll mientras el backend responde, la acción aplica al
+  post que estaba viendo al hablar).
+- **Puente de interacciones** (`handlers/interactionBridge.ts`): los votos/guardados
+  de Evo viven en contextos de React (`useFeedStore`, `usePersonalProfile`);
+  `useRegisterAgentInteractions()` (montado en `VoiceAssistantLayer`) registra
+  funciones imperativas que los handlers consumen. Mismo flujo exacto que los
+  botones de la UI (el corazón/guardar se actualizan solos).
+- **Idempotencia**: los checkers comprueban el estado VIVO del puente (no el
+  snapshot, que puede quedar obsoleto si el usuario tocó el corazón con el dedo
+  mientras hablaba). "dale like" dos veces → "Ya le habías dado like" sin ejecutar.
+- **Voz coherente**: si la acción resulta idempotente o falla, el reply del LLM
+  ("Listo, le he dado like") sería falso — el hook habla el `message` real del
+  handler con el TTS del dispositivo en su lugar.
+- **Backend**: `manifest_actions` añade el bloque `CAPACIDAD DE EJECUTAR ACCIONES`
+  al prompt (con `[requiere publicación visible]`) y retira like/guardar de la
+  lista de "no soportadas"; clientes v1 sin acciones conservan el prompt legacy.
+  `_parse_agent_json` valida `type: execute` contra los intents declarados y
+  degrada a `none` ante cualquier rareza (intent inventado, parameters no-objeto).
+- **Telemetría**: eventos `action_executed` / `action_failed` / `action_idempotent`
+  con `latency_action_ms` y el error técnico dentro de `action_executed` (jsonb).
+
+Fuera de este sprint: repost y acciones con confirmación (Sprint 4), voto negativo
+(pendiente de datos de uso), comentar/follow/config (sprints 2-4).
+
+## Límites y protecciones (v1)
+
+- Timeout del turno: 15 s, sin reintentos automáticos (cada retry = otra generación LLM+TTS).
+  Medido en real: un turno legítimo tarda 3.4–10.8 s (LLM + TTS).
+- Watchdog de fase: `thinking` nunca puede durar más de 20 s — si el STT nativo no emite
+  `end`/`error`, o cualquier path de error no resetea la fase, el watchdog libera el orbe
+  con mensaje al usuario y evento `agent_watchdog_reset`.
+- Rate limit backend: 10 req/min por usuario + cuota diaria de usos IA (1 uso por turno).
+- Lock de invocación: mientras un turno está en `thinking` no se acepta otro.
+- Navegación (v1) + interacciones simples sin confirmación (v2 Sprint 1). Las acciones
+  con efectos visibles para terceros (publicar, repost, seguir) llegan con confirmación.
+
+## Postmortem: orbe colgado en "pensando" (jun 2026)
+
+Síntoma: tras 3-5 invocaciones el orbe quedaba en `thinking` para siempre, sin error visible.
+Causas raíz encontradas (todas corregidas):
+
+1. **Backend — cliente OpenAI sin timeout** (`voice_assistant.py`, `llm.py`): el SDK usa
+   600 s + 2 reintentos por defecto y se creaba un cliente nuevo por llamada. Una conexión
+   TTS colgada retenía el thread ~10 min; los reintentos del usuario se acumulaban y el
+   backend entero dejaba de responder (incluso `/health`). Fix: cliente único reutilizado,
+   TTS `timeout=10, max_retries=0` (degrada a TTS del dispositivo), chat `timeout=45, max_retries=1`.
+2. **Cliente — STT sin respuesta**: `requestStopRecording` pone `thinking` ANTES de tener el
+   transcript; si el módulo nativo no emite `end` ni `error`, nadie reseteaba la fase y el
+   orbe ignoraba pulsaciones. Fix: watchdog de 20 s.
+3. **Backend — parser**: el LLM a veces antepone texto al JSON (`Vamos.{json}`); el parse
+   fallaba, el TTS leía el JSON en voz alta y la navegación se perdía. Fix: extracción de
+   JSON embebido balanceado (`_extract_embedded_json`).
