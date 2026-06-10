@@ -11,6 +11,10 @@ import { useBlockedUsers } from '@evoconn/hooks/BlockedUsersContext';
 import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { useRecommendationTaste } from '@evoconn/hooks/RecommendationTasteContext';
 import { searchSupabaseUsers } from '@evoconn/services/supabaseSocial';
+import {
+  getFeedAudioStateForAgent,
+  setFeedAudioPausedByAgent,
+} from '@evoconn/hooks/useFeedAudio';
 import { supabase } from '../../../mobile/lib/supabase';
 import { setAgentAppBridge, type AgentAppBridge } from './appBridge';
 
@@ -85,6 +89,11 @@ export function useRegisterAgentApp(): void {
         }
         router.replace('/welcome' as never);
       },
+
+      // ── Música del feed ─────────────────────────────────────────────────
+      // Singleton a nivel de módulo (useFeedAudio), no necesita context.
+      getFeedAudioState: () => getFeedAudioStateForAgent(),
+      setFeedAudioPaused: (paused) => setFeedAudioPausedByAgent(paused),
 
       // ── Búsqueda y perfiles ─────────────────────────────────────────────
       searchUsers: async (query) => {

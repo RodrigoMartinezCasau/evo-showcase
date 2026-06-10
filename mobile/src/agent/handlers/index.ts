@@ -48,6 +48,12 @@ import {
   isProfileAlreadyBlocked,
 } from './social/idempotency';
 import { findUserProfileHandler, openSearchWithQueryHandler } from './search/searchActions';
+import {
+  isMusicAlreadyPaused,
+  isMusicAlreadyPlaying,
+  pauseFeedMusicHandler,
+  resumeFeedMusicHandler,
+} from './interactions/musicActions';
 
 export type ActionHandler = (
   params: Record<string, unknown>,
@@ -82,6 +88,9 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
   // Sprint 5: búsqueda y perfiles por nombre
   findUserProfile: findUserProfileHandler,
   openSearchWithQuery: openSearchWithQueryHandler,
+  // Música del feed
+  pauseFeedMusic: pauseFeedMusicHandler,
+  resumeFeedMusic: resumeFeedMusicHandler,
 };
 
 export const IDEMPOTENCY_CHECKERS: Record<string, IdempotencyChecker> = {
@@ -100,4 +109,7 @@ export const IDEMPOTENCY_CHECKERS: Record<string, IdempotencyChecker> = {
   isNotFollowingProfile,
   isProfileAlreadyBlocked,
   isPostAlreadyReposted,
+  // Música del feed
+  isMusicAlreadyPaused,
+  isMusicAlreadyPlaying,
 };

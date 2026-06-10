@@ -64,10 +64,12 @@ from rate_limit import check_rate_limit, startup_note as rate_limit_startup_note
 
 TESTER_API_KEY = os.environ.get("TESTER_API_KEY") or ""
 
-# TESTEO del agente de voz: con ASSISTANT_QUOTA_DISABLED=1 en .env,
-# /assistant/chat NO consume usos diarios (el rate limit por minuto sigue activo).
-# QUITAR / poner a 0 antes de lanzar a usuarios reales.
-ASSISTANT_QUOTA_DISABLED = (os.environ.get("ASSISTANT_QUOTA_DISABLED") or "").strip().lower() in {"1", "true", "yes"}
+# TESTEO del agente de voz: /assistant/chat NO consume usos diarios POR DEFECTO
+# (el rate limit por minuto sigue activo). El default es exento porque el deploy
+# es git push y la env var no está configurada en Railway; el cliente va en sync
+# (ASSISTANT_USES_DISABLED_FOR_TESTING en useVoiceAssistant.ts).
+# PONER ASSISTANT_QUOTA_DISABLED=0 antes de lanzar a usuarios reales.
+ASSISTANT_QUOTA_DISABLED = (os.environ.get("ASSISTANT_QUOTA_DISABLED") or "1").strip().lower() in {"1", "true", "yes"}
 
 
 def _get_client_ip(request: Request) -> str:

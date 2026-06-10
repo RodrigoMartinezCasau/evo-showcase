@@ -145,6 +145,36 @@ function ensureAppStateSubscription() {
   });
 }
 
+/**
+ * Estado de la música del feed para el agente de voz ("pausa la música").
+ * `paused` refleja la preferencia del usuario (userPaused), NO la suspensión
+ * temporal del turno de voz (voiceSuspended), que se gestiona sola.
+ */
+export function getFeedAudioStateForAgent(): { hasTrack: boolean; paused: boolean } {
+  return { hasTrack: currentPostId !== null, paused: userPaused };
+}
+
+/**
+ * Pausa o reanuda la música del feed en nombre del usuario (agente de voz).
+ * Misma semántica que el botón de pausa del visor: fija la preferencia global
+ * `userPaused`, así que al terminar el turno de voz (que suspende la música
+ * temporalmente) la decisión del usuario se respeta.
+ */
+export function setFeedAudioPausedByAgent(paused: boolean): void {
+  if (userPaused === paused) return;
+  userPaused = paused;
+  const p = player;
+  if (p) {
+    try {
+      if (paused) p.pause();
+      else if (!voiceSuspended) p.play();
+    } catch {
+      /* noop */
+    }
+  }
+  refreshSnapshot();
+}
+
 /** Pausa la música del feed mientras el asistente de voz escucha/habla. */
 export function suspendFeedAudioForVoiceAssistant(): void {
   voiceSuspended = true;

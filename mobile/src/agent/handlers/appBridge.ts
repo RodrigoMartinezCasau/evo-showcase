@@ -49,6 +49,15 @@ export interface AgentAppBridge {
   /** Cierra sesión con el flujo existente de Evo (signOut + /welcome). */
   logout(): Promise<void>;
 
+  // ── Música del feed ───────────────────────────────────────────────────────
+  /**
+   * Estado de la música de la publicación visible: `hasTrack` (hay pista
+   * activa en el visor) y `paused` (el usuario la tiene pausada).
+   */
+  getFeedAudioState(): { hasTrack: boolean; paused: boolean };
+  /** Pausa (true) o reanuda (false) la música del feed, como el botón del visor. */
+  setFeedAudioPaused(paused: boolean): void;
+
   // ── Búsqueda y perfiles (Sprint 5) ────────────────────────────────────────
   /** Busca usuarios reales por username (Supabase, máx. ~30). */
   searchUsers(query: string): Promise<AgentUserSearchResult[]>;

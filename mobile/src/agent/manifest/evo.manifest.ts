@@ -7,7 +7,7 @@
  */
 import type { AppManifest } from './types';
 
-export const EVO_MANIFEST_VERSION = '1.4.0';
+export const EVO_MANIFEST_VERSION = '1.5.0';
 
 export const evoManifest: AppManifest = {
   appId: 'com.evoconn.evo',
@@ -229,6 +229,43 @@ export const evoManifest: AppManifest = {
         'ya no la quiero guardar',
         'desguardar',
         'quítala de mis guardados',
+      ],
+    },
+
+    {
+      intent: 'pause_music',
+      label: 'Pausar la música de la publicación',
+      category: 'interaction',
+      handler: 'pauseFeedMusic',
+      requireConfirmation: false,
+      parameters: {},
+      // No exige post en el snapshot: la música es estado vivo del reproductor
+      // global; el handler comprueba si hay pista sonando.
+      contextRequirements: { requiresAuth: true },
+      idempotencyCheck: 'isMusicAlreadyPaused',
+      examples: [
+        'pausa la música',
+        'para la música',
+        'quita la canción',
+        'silencia la música',
+        'detén la música',
+      ],
+    },
+    {
+      intent: 'resume_music',
+      label: 'Reanudar la música de la publicación',
+      category: 'interaction',
+      handler: 'resumeFeedMusic',
+      requireConfirmation: false,
+      parameters: {},
+      contextRequirements: { requiresAuth: true },
+      idempotencyCheck: 'isMusicAlreadyPlaying',
+      examples: [
+        'reanuda la música',
+        'pon la música otra vez',
+        'dale play a la música',
+        'que vuelva a sonar la canción',
+        'quita la pausa de la música',
       ],
     },
 

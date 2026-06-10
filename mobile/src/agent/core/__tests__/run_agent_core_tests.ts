@@ -98,6 +98,12 @@ import {
   openSearchWithQueryHandler,
   resolveUserMatches,
 } from '../../handlers/search/searchActions';
+import {
+  isMusicAlreadyPaused,
+  isMusicAlreadyPlaying,
+  pauseFeedMusicHandler,
+  resumeFeedMusicHandler,
+} from '../../handlers/interactions/musicActions';
 
 let passed = 0;
 
@@ -631,12 +637,14 @@ async function main() {
     reposted?: string[];
     privateUsers?: string[];
     searchResults?: Array<{ id: string; username: string }>;
+    audio?: { hasTrack: boolean; paused: boolean };
   }) => {
     const following = new Set(init?.following ?? []);
     const pending = new Set(init?.pending ?? []);
     const blocked = new Set(init?.blocked ?? []);
     const reposted = new Set(init?.reposted ?? []);
     const privateUsers = new Set(init?.privateUsers ?? []);
+    const audio = init?.audio ?? { hasTrack: false, paused: false };
     const calls: string[] = [];
     const bridge: AgentAppBridge = {
       openReflectionComposer: (prefill) => void calls.push(`reflection:${prefill ?? ''}`),
@@ -663,12 +671,14 @@ async function main() {
       },
       isReposted: (id) => reposted.has(id),
       repost: (id) => void reposted.add(id),
+      getFeedAudioState: () => ({ ...audio }),
+      setFeedAudioPaused: (paused) => void (audio.paused = paused),
       logout: async () => void calls.push('logout'),
       searchUsers: async () => init?.searchResults ?? [],
       openProfile: (id, username) => void calls.push(`profile:${id}:${username ?? ''}`),
       openSearch: (query) => void calls.push(`search:${query ?? ''}`),
     };
-    return { bridge, calls, following, pending, blocked, reposted };
+    return { bridge, calls, following, pending, blocked, reposted, audio };
   };
 
   // Sprint 3: creación con prefill.
@@ -789,6 +799,28 @@ async function main() {
 
   const openSearch = await openSearchWithQueryHandler({ searchQuery: 'estoicos' });
   check('search: abre buscador con query', openSearch.success === true && appEmpty.calls.includes('search:estoicos'));
+
+  // Música del feed: pausar y reanudar la pista de la publicación visible.
+  const appMusic = makeAppBridge({ audio: { hasTrack: true, paused: false } });
+  setAgentAppBridge(appMusic.bridge);
+  const pause = await pauseFeedMusicHandler();
+  check('música: pausa la pista activa', pause.success === true && appMusic.audio.paused === true);
+  const pauseAgain = await pauseFeedMusicHandler();
+  check('música: ya pausada → idempotente', pauseAgain.idempotent === true);
+  check('música: checker pausada', (await isMusicAlreadyPaused()).alreadyApplied === true);
+  const resume = await resumeFeedMusicHandler();
+  check('música: reanuda la pista', resume.success === true && appMusic.audio.paused === false);
+  const resumeAgain = await resumeFeedMusicHandler();
+  check('música: ya sonando → idempotente', resumeAgain.idempotent === true);
+  check('música: checker sonando', (await isMusicAlreadyPlaying()).alreadyApplied === true);
+
+  const appNoMusic = makeAppBridge();
+  setAgentAppBridge(appNoMusic.bridge);
+  const pauseNoTrack = await pauseFeedMusicHandler();
+  check('música: sin pista → mensaje claro', pauseNoTrack.success === false && !!pauseNoTrack.message?.includes('no hay música'));
+  const resumeNoTrack = await resumeFeedMusicHandler();
+  check('música: reanudar sin pista → mensaje', resumeNoTrack.success === false && !!resumeNoTrack.message);
+  check('música: checker sin pista no bloquea', (await isMusicAlreadyPaused()).alreadyApplied === false);
 
   // Sin puente de app registrado: degradación con mensaje.
   setAgentAppBridge(null);
