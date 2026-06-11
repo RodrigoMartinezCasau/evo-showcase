@@ -75,6 +75,9 @@ Si es una pregunta o comentario normal (NO pide navegar ni ejecutar una acción)
 
 REGLAS DE NAVEGACIÓN:
 - Usa SOLO intents de la lista; nunca inventes intents ni rutas.
+- create_reflection y create_phrase abren el editor VACÍO. Si el usuario dice QUÉ escribir
+  (tema, cita, texto literal, autor…) NO navegues: usa la acción execute create_*_prefill
+  del bloque de acciones (abre la pantalla con el texto preparado).
 - Si la petición del usuario coincide (igual o casi igual) con un ejemplo del manifest, navega
   directamente SIN preguntar. Ej.: "vuelve" o "atrás" → intent 'back'.
 - Solo pregunta (action type none) si la petición encaja igual de bien en DOS intents distintos
@@ -164,18 +167,22 @@ REGLAS PARA ACCIONES CON CONFIRMACIÓN:
   ejecuta directamente con reply confirmatorio.
 
 ACCIONES DE CREACIÓN (create_reflection_prefill, create_phrase_prefill, create_comment_prefill):
+PRIORIDAD: si menciona qué escribir → SIEMPRE execute create_*_prefill, NUNCA navigate
+create_reflection/create_phrase.
 Cuando el usuario pide crear contenido (reflexión, frase, comentario):
-- Extrae el contenido o el tema de LO QUE ÉL DICE y pásalo en los parámetros.
+- Extrae el contenido o el tema de LO QUE ÉL DICE y pásalo en los parámetros con los
+  nombres exactos: content (reflexión), phraseText y author opcional (frase),
+  commentText (comentario), searchQuery (búsqueda/perfil).
 - NUNCA generes tú el contenido completo. Tu trabajo es extraer lo que el usuario
   quiere decir, no escribir por él.
 - Si da contenido literal ("reflexión que diga X", "comenta: gran post"), pásalo tal cual.
-- Si da solo un tema ("reflexión sobre la libertad"), pasa el tema; la app pondrá un
-  punto de partida mínimo.
+- Si da solo un tema ("reflexión sobre la libertad"), pasa el tema en content; la app
+  pondrá un punto de partida mínimo.
 - Estas acciones NO publican nada: solo abren la pantalla con el texto preparado para
   que el usuario lo revise, lo edite y lo publique él mismo.
-- reply ejemplo: "Te abro una nueva reflexión sobre la libertad. Revisa y publica cuando quieras."
-- Si el usuario solo quiere abrir la pantalla SIN contenido ("nueva reflexión"), usa la
-  navegación normal (intents create_reflection / create_phrase).
+- reply ejemplo: "Te abro una reflexión sobre la libertad. Revísala y publícala cuando quieras."
+- Si el usuario solo quiere abrir la pantalla SIN contenido ("nueva reflexión", "crear frase"),
+  usa la navegación normal (intents create_reflection / create_phrase).
 
 ACCIONES SOBRE EL PERFIL VISIBLE (follow_user, unfollow_user, block_user):
 - Solo tienen sentido si el contexto incluye el perfil de OTRO usuario en pantalla
@@ -184,6 +191,7 @@ ACCIONES SOBRE EL PERFIL VISIBLE (follow_user, unfollow_user, block_user):
 - El cliente resuelve sobre qué perfil se actúa; tú no necesitas identificarlo.
 
 BÚSQUEDA Y PERFILES POR NOMBRE (find_user_profile, search_content):
+- SIEMPRE execute (no respondas que no puedes buscar perfiles: esa capacidad SÍ existe).
 - "llévame al perfil de [nombre]", "abre el perfil de @[username]", "busca a [nombre] y
   abre su perfil" → find_user_profile con searchQuery = el nombre dicho (sin la arroba).
   La app busca al usuario; si hay varios o ninguno, ella misma se lo dirá al usuario.
@@ -284,6 +292,27 @@ def _strip_code_fences(raw: str) -> str:
     return "\n".join(lines).strip()
 
 
+def _looks_like_broken_json_reply(text: str) -> bool:
+    """Detecta salidas del LLM que son JSON roto/truncado — no deben leerse en voz alta."""
+    t = text.strip()
+    if not t:
+        return False
+    if t.startswith("{") or t.startswith("```"):
+        return True
+    if '{"reply"' in t or '"action"' in t and "{" in t:
+        return True
+    if t.count("{") > t.count("}") + 1:
+        return True
+    return False
+
+
+def _fallback_reply_when_parse_fails(raw: str) -> str:
+    if _looks_like_broken_json_reply(raw):
+        return "No he podido procesarlo bien. ¿Puedes repetirlo con más claridad?"
+    stripped = raw.strip()
+    return stripped if stripped else "No he podido formular una respuesta. ¿Puedes repetirlo?"
+
+
 def _extract_embedded_json(text: str) -> tuple[dict | None, str]:
     """
     El LLM a veces antepone texto al JSON ("Vamos a X.{\"reply\": ...}").
@@ -341,14 +370,14 @@ def _parse_agent_json(
     except (json.JSONDecodeError, ValueError):
         data, prefix = _extract_embedded_json(text)
         if data is None:
-            return raw.strip(), None
+            return _fallback_reply_when_parse_fails(raw), None
         # El texto previo al JSON suele ser el mismo reply duplicado: ignorarlo
         # salvo que el JSON no traiga reply.
         if not str(data.get("reply", "")).strip() and prefix:
             data["reply"] = prefix
 
     if not isinstance(data, dict):
-        return raw.strip(), None
+        return _fallback_reply_when_parse_fails(raw), None
 
     reply = str(data.get("reply", "")).strip()
     action_raw = data.get("action")
@@ -441,7 +470,7 @@ def run_voice_assistant_turn(
         system=_build_system_prompt(manifest_routes, current_route, manifest_actions),
         user=_build_user_prompt(text, screen_context=screen_context),
         language="es",
-        max_tokens=220 if has_manifest else 150,
+        max_tokens=320 if has_manifest else 150,
         prompt_id="voice_assistant",
     )
     raw = (raw or "").strip()

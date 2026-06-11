@@ -15,7 +15,15 @@
  *  RECORDING    → Waveform animado + contador de tiempo + botón PARAR
  *  TRANSCRIBING → Indicador de carga mientras se finaliza la transcripción
  */
-import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import React, {
+  forwardRef,
+  useImperativeHandle,
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+  useMemo,
+} from 'react';
 import {
   View,
   Text,
@@ -251,6 +259,12 @@ function IslandBackdrop({ fadeHeight }: { fadeHeight: number }) {
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
+export type ChatInputBarHandle = {
+  /** Carga el texto de un mensaje del usuario para editarlo y enfoca el teclado. */
+  loadTextForEdit: (text: string) => void;
+  clear: () => void;
+};
+
 type ChatInputBarProps = {
   placeholder?: string;
   onSend: (text: string) => void;
@@ -265,24 +279,39 @@ type ChatInputBarProps = {
    * campo está vacío — nunca pisa texto que el usuario ya haya escrito.
    */
   initialText?: string;
+  /** Modo edición de mensaje enviado (muestra banner y permite cancelar). */
+  editModeActive?: boolean;
+  onCancelEdit?: () => void;
+  /** La IA está generando: el botón de envío pasa a cuadrado (parar). */
+  aiGenerating?: boolean;
+  /** Parar la generación en curso (botón cuadrado). */
+  onStopGenerating?: () => void;
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function ChatInputBar({
-  placeholder = 'Escribe aquí...',
-  onSend,
-  sendIcon,
-  contentAboveBar,
-  clanColor = '#c7ff02',
-  inputCursorColor = clanColor,
-  aiUsesAvailable = true,
-  initialText,
-}: ChatInputBarProps) {
+export const ChatInputBar = forwardRef<ChatInputBarHandle, ChatInputBarProps>(function ChatInputBar(
+  {
+    placeholder = 'Escribe aquí...',
+    onSend,
+    sendIcon,
+    contentAboveBar,
+    clanColor = '#c7ff02',
+    inputCursorColor = clanColor,
+    aiUsesAvailable = true,
+    initialText,
+    editModeActive = false,
+    onCancelEdit,
+    aiGenerating = false,
+    onStopGenerating,
+  },
+  ref,
+) {
   const insets = useSafeAreaInsets();
   const [text, setText] = useState('');
   const textRef = useRef('');
   textRef.current = text;
+  const inputRef = useRef<TextInput>(null);
 
   // Prefill (agente de voz): se aplica cuando llega un initialText nuevo y el
   // campo está vacío. consumedInitialTextRef evita re-aplicarlo tras borrar.
@@ -293,6 +322,21 @@ export function ChatInputBar({
     consumedInitialTextRef.current = incoming;
     setText((prev) => (prev.trim() ? prev : clampMessageInput(incoming)));
   }, [initialText]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      loadTextForEdit: (next: string) => {
+        setText(clampMessageInput(next));
+        requestAnimationFrame(() => {
+          inputRef.current?.focus();
+        });
+      },
+      clear: () => setText(''),
+    }),
+    [],
+  );
+
   const welcomeOpacity = useRef(new Animated.Value(1)).current;
 
   // The TextInput auto-grows from minHeight to maxInputHeight thanks to
@@ -377,10 +421,15 @@ export function ChatInputBar({
   // ── Action button ──────────────────────────────────────────────────────────
 
   const outOfUses = !aiUsesAvailable;
-  const actionButtonBg = isRecording ? clanColor : BTN.backgroundColor;
-  const handleActionButton = isRecording ? stopRecording : handleSend;
+  const showStopButton = isRecording || aiGenerating;
+  const actionButtonBg = showStopButton ? clanColor : BTN.backgroundColor;
+  const handleActionButton = isRecording
+    ? stopRecording
+    : aiGenerating
+      ? () => onStopGenerating?.()
+      : handleSend;
 
-  const actionButtonContent = isRecording ? (
+  const actionButtonContent = showStopButton ? (
     <View style={styles.stopSquare} />
   ) : isTranscribing ? (
     <ActivityIndicator size="small" color="#0b0b0f" />
@@ -439,6 +488,17 @@ export function ChatInputBar({
         >
           {contentAboveBar}
         </Animated.View>
+      ) : null}
+
+      {editModeActive ? (
+        <View style={styles.editBanner}>
+          <Text style={styles.editBannerText}>Editando mensaje</Text>
+          {onCancelEdit ? (
+            <TouchableOpacity onPress={onCancelEdit} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={[styles.editBannerCancel, { color: clanColor }]}>Cancelar</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
       ) : null}
 
       {/* ── The actual bar row ── */}
@@ -500,6 +560,7 @@ export function ChatInputBar({
           ) : (
             <>
               <TextInput
+                ref={inputRef}
                 value={text}
                 onChangeText={handleTextChange}
                 placeholder={interimText ? '…' : placeholder}
@@ -535,7 +596,7 @@ export function ChatInputBar({
         {/* Send / Stop button */}
         <TouchableOpacity
           onPress={handleActionButton}
-          disabled={isTranscribing}
+          disabled={isTranscribing && !aiGenerating}
           style={[
             styles.sendBtn,
             {
@@ -556,11 +617,28 @@ export function ChatInputBar({
       </View>
     </Animated.View>
   );
-}
+});
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  editBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: AREA.paddingHorizontal + 4,
+    paddingTop: 6,
+    paddingBottom: 2,
+  },
+  editBannerText: {
+    color: evoconnColors.muted,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  editBannerCancel: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
   outerWrapper: {
     position: 'absolute',
     left: 0,

@@ -33,6 +33,7 @@ import { useEvoPreferences } from '@evoconn/hooks/EvoPreferencesContext';
 import { useVoiceAssistantPreferences } from '@evoconn/hooks/VoiceAssistantPreferencesContext';
 import { getVoiceAssistantVoiceOption } from '@evoconn/constants/voiceAssistantVoices';
 import { useAuth } from '../../mobile/lib/AuthContext';
+import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { isRealUserId, setProfilePrivate } from '@evoconn/services/supabaseSocial';
 import { EvoInfoModal } from '@evoconn/components/shared/EvoActionSheetModal';
 
@@ -313,6 +314,7 @@ export default function SettingsScreen({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { remainingUses }         = useDebugStats();
   const { profile, refreshProfile } = useAuth();
+  const { refreshSocialFromSupabase } = useSimulation();
   const [privateAccountLocal, setPrivateAccountLocal] = useState(false);
   const [privateSaveErrorOpen, setPrivateSaveErrorOpen] = useState(false);
   const [deleteUnavailableOpen, setDeleteUnavailableOpen] = useState(false);
@@ -332,7 +334,10 @@ export default function SettingsScreen({
       return;
     }
     await refreshProfile();
-  }, [profile?.id, refreshProfile]);
+    if (!next) {
+      await refreshSocialFromSupabase();
+    }
+  }, [profile?.id, refreshProfile, refreshSocialFromSupabase]);
 
   // ── Notifications toggle (persisted) ─────────────────────────────────────
   const [notifsEnabled, setNotifsEnabled] = useState(true);

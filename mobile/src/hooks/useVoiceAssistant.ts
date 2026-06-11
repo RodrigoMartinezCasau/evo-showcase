@@ -55,6 +55,8 @@ import {
   applyVoiceAssistantPlayerVolume,
   ensureVoiceAssistantSpeakAudioMode,
 } from '@evoconn/utils/voiceAssistantAudio';
+import { requestNoUsesAnimation } from '@evoconn/components/animations/AppAnimationLayer';
+import { recordUsesLog } from '@evoconn/services/streakApi';
 import { showOutOfUsesAlert } from '@evoconn/utils/dailyUsesGate';
 import { CLAN_LABELS } from '@evoconn/services/clanClassifier';
 import { useAuth } from '../../mobile/lib/AuthContext';
@@ -75,11 +77,11 @@ const MIN_TRANSCRIPT_CHARS = 3;
 const THINKING_WATCHDOG_MS = 20_000;
 
 /**
- * TESTEO: el asistente no gasta usos diarios (ni bloquea sin usos).
- * Debe ir en sync con ASSISTANT_QUOTA_DISABLED=1 del backend (.env).
- * PONER A false ANTES DE LANZAR A USUARIOS REALES.
+ * Solo para desarrollo local: poner true para probar el agente sin gastar usos.
+ * En producción debe ser false (sync con backend: ASSISTANT_QUOTA_DISABLED no
+ * configurado o =0).
  */
-const ASSISTANT_USES_DISABLED_FOR_TESTING = true;
+const ASSISTANT_USES_DISABLED_FOR_TESTING = false;
 
 /**
  * 'confirming' (Sprint 4): ventana de escucha de confirmación por voz tras
@@ -310,10 +312,17 @@ export function useVoiceAssistant({ enabled = true }: Options = {}) {
         console.log('[VoiceAssistant] reply:', reply.slice(0, 120));
       }
 
-      if (audioBase64?.length) {
+      // Si el TTS del turno falló o se invalidó (p. ej. feedback de acción),
+      // reintenta con la voz elegida por el usuario antes de caer a Siri.
+      let audio = audioBase64;
+      if (!audio?.length) {
+        audio = await fetchAssistantTtsBase64(voiceId, reply);
+      }
+
+      if (audio?.length) {
         const uri = `${FileSystem.cacheDirectory}evo-assistant-${Date.now()}.mp3`;
         try {
-          await FileSystem.writeAsStringAsync(uri, audioBase64, {
+          await FileSystem.writeAsStringAsync(uri, audio, {
             encoding: FileSystem.EncodingType.Base64,
           });
           const player = createAudioPlayer(null, { keepAudioSessionActive: true });
@@ -339,7 +348,7 @@ export function useVoiceAssistant({ enabled = true }: Options = {}) {
       await speakWithDeviceTts(reply);
       if (phaseRef.current === 'speaking') setPhaseSafe('idle');
     },
-    [disposePlayer, setPhaseSafe, speakWithDeviceTts, stopSpeech],
+    [disposePlayer, setPhaseSafe, speakWithDeviceTts, stopSpeech, voiceId],
   );
 
   const handleTranscript = useCallback(
@@ -419,7 +428,12 @@ export function useVoiceAssistant({ enabled = true }: Options = {}) {
           setPhaseSafe('idle');
           return;
         }
-        if (!ASSISTANT_USES_DISABLED_FOR_TESTING) decrementUses();
+        if (!ASSISTANT_USES_DISABLED_FOR_TESTING) {
+          const justEmptiedDailyUses = remainingUses === 1;
+          decrementUses();
+          if (justEmptiedDailyUses) requestNoUsesAnimation();
+          if (profile?.id) void recordUsesLog(profile.id).catch(console.error);
+        }
 
         const latencyMs = Date.now() - startedAt;
         // Qué se habla al final: por defecto el reply del LLM con su TTS. Si
@@ -550,22 +564,21 @@ export function useVoiceAssistant({ enabled = true }: Options = {}) {
               contextChars,
               redactionsApplied: redactions,
             });
-            if ((result.idempotent || !result.success) && result.message) {
+            if (result.message) {
               spokenReply = result.message;
-              spokenAudio = null;
-            } else if (
-              result.success &&
-              result.message &&
-              result.data?.useNewVoiceForFeedback === true
-            ) {
-              // Cambio de voz: el feedback debe sonar CON la voz nueva (el
-              // audio del LLM viene con la antigua). Síntesis corta sin cuota;
-              // si falla, speakReply degrada al TTS del dispositivo.
-              const newVoice = normalizeVoiceAssistantVoiceId(
-                typeof result.data.voiceId === 'string' ? result.data.voiceId : null,
-              );
-              spokenReply = result.message;
-              spokenAudio = await fetchAssistantTtsBase64(newVoice, result.message);
+              if (
+                result.success &&
+                result.data?.useNewVoiceForFeedback === true
+              ) {
+                const newVoice = normalizeVoiceAssistantVoiceId(
+                  typeof result.data.voiceId === 'string' ? result.data.voiceId : null,
+                );
+                spokenAudio = await fetchAssistantTtsBase64(newVoice, result.message);
+              } else {
+                // Feedback real del handler (éxito, idempotente o error):
+                // no reutilizar el audio del LLM (puede contradecir la acción).
+                spokenAudio = null;
+              }
             }
           }
         } else {
@@ -627,7 +640,18 @@ export function useVoiceAssistant({ enabled = true }: Options = {}) {
         setPhaseSafe('idle');
       }
     },
-    [decrementUses, enabled, getScreenContextText, getScreenSnapshot, getUserContextText, setPhaseSafe, speakReply, voiceId],
+    [
+      decrementUses,
+      enabled,
+      getScreenContextText,
+      getScreenSnapshot,
+      getUserContextText,
+      profile?.id,
+      remainingUses,
+      setPhaseSafe,
+      speakReply,
+      voiceId,
+    ],
   );
 
   const onSimulatedTranscriptBlocked = useCallback(() => {

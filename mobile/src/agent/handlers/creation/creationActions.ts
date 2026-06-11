@@ -9,6 +9,7 @@
 import type { ActionResult, AgentScreenContext } from '../../core/types';
 import { getFocusedPost } from '../../core/feedContext';
 import { getAgentAppBridge } from '../appBridge';
+import { pickStringParam } from '../paramUtils';
 import { getAgentPostUi } from '../postUiRegistry';
 
 const NO_BRIDGE: ActionResult = {
@@ -17,20 +18,22 @@ const NO_BRIDGE: ActionResult = {
   message: 'No he podido abrirlo. Inténtalo de nuevo.',
 };
 
-function asTrimmedString(value: unknown): string | undefined {
-  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
-}
-
 /** C1: abre la creación de reflexión con texto/tema de partida opcional. */
 export async function prefillReflectionHandler(
   params: Record<string, unknown>,
 ): Promise<ActionResult> {
   const bridge = getAgentAppBridge();
   if (!bridge) return NO_BRIDGE;
-  const content = asTrimmedString(params.content);
+  const content = pickStringParam(params, 'content', 'text', 'topic', 'theme', 'reflection');
   try {
     bridge.openReflectionComposer(content);
-    return { success: true, data: { prefilled: content != null } };
+    return {
+      success: true,
+      data: { prefilled: content != null },
+      message: content
+        ? 'Te abro la reflexión con el texto que pediste. Revísalo y publícalo cuando quieras.'
+        : 'Te abro una nueva reflexión.',
+    };
   } catch (e) {
     return {
       success: false,
@@ -46,11 +49,17 @@ export async function prefillPhraseHandler(
 ): Promise<ActionResult> {
   const bridge = getAgentAppBridge();
   if (!bridge) return NO_BRIDGE;
-  const phraseText = asTrimmedString(params.phraseText);
-  const author = asTrimmedString(params.author);
+  const phraseText = pickStringParam(params, 'phraseText', 'phrase', 'text', 'content');
+  const author = pickStringParam(params, 'author', 'authorName');
   try {
     bridge.openPhraseComposer(phraseText, author);
-    return { success: true, data: { prefilled: phraseText != null } };
+    return {
+      success: true,
+      data: { prefilled: phraseText != null },
+      message: phraseText
+        ? 'Te abro la frase con el texto que pediste. Revísala y publícala cuando quieras.'
+        : 'Te abro una nueva frase.',
+    };
   } catch (e) {
     return {
       success: false,
@@ -76,7 +85,7 @@ export async function prefillCommentHandler(
       message: 'Para comentar, abre primero la publicación.',
     };
   }
-  const commentText = asTrimmedString(params.commentText);
+  const commentText = pickStringParam(params, 'commentText', 'comment', 'text', 'content');
   if (!commentText) {
     return {
       success: false,

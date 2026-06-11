@@ -58,38 +58,58 @@ function networkError(msg: string): string {
     : msg;
 }
 
+function isAbortError(err: unknown): boolean {
+  return err instanceof Error && err.name === 'AbortError';
+}
+
 /** Fetch with a timeout. Rejects with AbortError if the deadline is exceeded. */
 async function fetchWithTimeout(
   url: string,
   init: RequestInit,
   timeoutMs = 60_000,
+  externalSignal?: AbortSignal,
 ): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const onExternalAbort = () => controller.abort();
+  if (externalSignal) {
+    if (externalSignal.aborted) {
+      clearTimeout(timer);
+      controller.abort();
+    } else {
+      externalSignal.addEventListener('abort', onExternalAbort);
+    }
+  }
   try {
     return await fetch(url, { ...init, signal: controller.signal });
   } finally {
     clearTimeout(timer);
+    externalSignal?.removeEventListener('abort', onExternalAbort);
   }
 }
 
-/** Fetch with timeout + automatic retry on network/abort errors (not 4xx/5xx). */
+/** Fetch with timeout + automatic retry on network errors (not 4xx/5xx). */
 async function fetchWithRetry(
   url: string,
   init: RequestInit,
-  { timeoutMs = 60_000, retries = 2 }: { timeoutMs?: number; retries?: number } = {},
+  {
+    timeoutMs = 60_000,
+    retries = 2,
+    signal,
+  }: { timeoutMs?: number; retries?: number; signal?: AbortSignal } = {},
 ): Promise<Response> {
   let lastErr: unknown;
   for (let attempt = 0; attempt <= retries; attempt++) {
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
     try {
-      return await fetchWithTimeout(url, init, timeoutMs);
+      return await fetchWithTimeout(url, init, timeoutMs, signal);
     } catch (err) {
       lastErr = err;
+      if (signal?.aborted || isAbortError(err)) throw err;
       const msg = err instanceof Error ? err.message : '';
-      const isNetworkErr = msg.includes('fetch') || msg.includes('Network') || msg.includes('abort');
+      const isNetworkErr = msg.includes('fetch') || msg.includes('Network');
       if (!isNetworkErr || attempt === retries) throw err;
-      // Wait before retrying: 2s, 4s, ...
-      await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+      await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
     }
   }
   throw lastErr;
@@ -188,6 +208,7 @@ export async function sendMessage(
   message: string,
   requestId?: string,
   flags?: AIFlags,
+  options?: { signal?: AbortSignal },
 ): Promise<SendMessageResponse> {
   const url = `${_apiUrl}/debates/${debateId}/chat`;
   const body: Record<string, unknown> = { message };
@@ -203,9 +224,14 @@ export async function sendMessage(
         body: JSON.stringify(body),
         requestId,
       }),
-      { timeoutMs: 90_000, retries: 2 },
+      {
+        timeoutMs: 90_000,
+        retries: options?.signal ? 0 : 2,
+        signal: options?.signal,
+      },
     );
   } catch (err) {
+    if (isAbortError(err) || options?.signal?.aborted) throw err;
     const msg = err instanceof Error ? err.message : 'Network error';
     throw new Error(networkError(msg));
   }

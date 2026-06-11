@@ -67,9 +67,9 @@ export const evoManifest: AppManifest = {
       examples: [
         'nueva reflexión',
         'crear reflexión',
-        'escribir una reflexión',
+        'abre reflexiones',
+        'pantalla de reflexión',
         'quiero reflexionar',
-        'publicar un pensamiento',
       ],
     },
     {
@@ -79,9 +79,9 @@ export const evoManifest: AppManifest = {
       examples: [
         'nueva frase',
         'crear frase',
-        'compartir una cita',
-        'añadir una frase filosófica',
-        'publicar una frase',
+        'abre frases',
+        'pantalla de frases',
+        'añadir una frase',
       ],
     },
     {

@@ -184,8 +184,18 @@ export type ClassificationContextValue = {
   /** True until the initial AsyncStorage load resolves. */
   loading: boolean;
 
-  /** Record an input the user just sent to the AI. Returns the resulting state. */
-  recordInput: (text: string, type: InputType, inputId?: string) => Promise<void>;
+  /**
+   * Record an input the user just sent to the AI.
+   * `skipInputCount`: true al reenviar una edición — conserva la evaluación
+   * anterior en `inputs[]` y añade la nueva, pero NO incrementa
+   * totalReflectionsSent / totalPhrasesSent.
+   */
+  recordInput: (
+    text: string,
+    type: InputType,
+    inputId?: string,
+    options?: { skipInputCount?: boolean },
+  ) => Promise<void>;
 
   /** Percentages array for the philosophy panel. Defaults to active user. */
   getPercentages: (userId?: string) => ClanPct[];
@@ -722,7 +732,12 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
   // local state as dirty so EffectiveClanSync picks it up later as a
   // retry safety net.
   const recordInput = useCallback(
-    async (text: string, type: InputType, inputId?: string): Promise<void> => {
+    async (
+      text: string,
+      type: InputType,
+      inputId?: string,
+      options?: { skipInputCount?: boolean },
+    ): Promise<void> => {
       const userId = activeUserId;
       if (!text || !text.trim()) return;
 
@@ -795,10 +810,11 @@ export function ClassificationProvider({ children }: { children: ReactNode }) {
 
         const newTotals = applyScoresWithPerClanWeights(prevState.totals, boostedScores, perClanWeights);
 
+        const countThisInput = !options?.skipInputCount;
         const totalReflectionsSent =
-          prevState.totalReflectionsSent + (type === 'reflection' ? 1 : 0);
+          prevState.totalReflectionsSent + (countThisInput && type === 'reflection' ? 1 : 0);
         const totalPhrasesSent =
-          prevState.totalPhrasesSent + (type === 'phrase' ? 1 : 0);
+          prevState.totalPhrasesSent + (countThisInput && type === 'phrase' ? 1 : 0);
 
         const reveal = deriveVisibleClan(
           prevState,

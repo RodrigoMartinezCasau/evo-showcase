@@ -2,7 +2,10 @@ import React, { useEffect, useRef, useCallback } from 'react';
 import { AppState, Platform } from 'react-native';
 import { useFeedStore } from '@evoconn/hooks/useFeedStore';
 import { resolveTopPhraseWidgetPayload } from './widgetPhraseLock';
-import { pushTopPhraseWidgetSnapshot } from './iosWidgetBridge';
+import {
+  pushTopPhraseWidgetSnapshot,
+  requestAndroidWidgetNetworkRefresh,
+} from './iosWidgetBridge';
 
 const DEBOUNCE_MS = 400;
 
@@ -19,6 +22,7 @@ export function WidgetSnapshotSync() {
     void (async () => {
       const payload = await resolveTopPhraseWidgetPayload(posts);
       if (Platform.OS === 'android' && payload == null) {
+        void requestAndroidWidgetNetworkRefresh();
         return;
       }
       void pushTopPhraseWidgetSnapshot(payload);

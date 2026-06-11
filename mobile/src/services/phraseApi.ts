@@ -44,8 +44,10 @@ export async function generatePhraseIntro(
     const data = (await res.json()) as PhraseIntroResponse;
     const intro = (data?.intro ?? '').trim();
     return intro.length > 0 ? intro : null;
-  } catch {
-    // Network errors / aborted requests → no intro, phrase tools still work.
+  } catch (err) {
+    if (options?.signal?.aborted || (err instanceof Error && err.name === 'AbortError')) {
+      throw err;
+    }
     return null;
   }
 }

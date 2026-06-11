@@ -45,6 +45,13 @@ check(
     ("Esto no es JSON, es prosa.", None),
 )
 
+# ── JSON truncado/roto → no leer JSON en voz alta (anti-balbuceo) ─────────────
+check(
+    "JSON truncado",
+    _parse_agent_json('{"reply": "Te abro", "action": {"type": "execute", "intent": "create_', VALID),
+    ("No he podido procesarlo bien. ¿Puedes repetirlo con más claridad?", None),
+)
+
 # ── Campos extra inesperados → parsea lo válido e ignora el resto ─────────────
 check(
     "campos extra",

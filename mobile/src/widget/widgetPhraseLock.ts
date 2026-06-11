@@ -53,7 +53,7 @@ export async function resolveTopPhraseWidgetPayload(
   const { startMs, endMs, displayDay } = getWidgetDailyPhraseWindow(now);
 
   const cached = await loadLock();
-  if (cached?.displayDay === displayDay) {
+  if (cached?.displayDay === displayDay && cached.payload != null) {
     return cached.payload;
   }
 
@@ -84,14 +84,7 @@ export async function resolveTopPhraseWidgetPayload(
     );
   }
 
-  // No fijar un día vacío hasta que el feed cubra frases de la ventana del concurso.
-  const feedCoversWindow = localPosts.some((p) => {
-    if (p.type !== 'phrase') return false;
-    const ts = Date.parse(p.createdAt);
-    return Number.isFinite(ts) && ts >= startMs && ts < endMs;
-  });
-
-  if (payload != null || feedCoversWindow) {
+  if (payload != null) {
     await saveLock({ displayDay, payload });
   }
 

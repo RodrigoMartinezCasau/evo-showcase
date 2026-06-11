@@ -27,6 +27,8 @@ import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-ha
 import { useLocalSearchParams, useRouter, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppTopBar, ChatInputBar, SidebarDrawer } from '@evoconn/components';
+import type { ChatInputBarHandle } from '@evoconn/components/ChatInputBar';
+import { EditUserMessageButton } from '@evoconn/components/EditUserMessageButton';
 import { getChatSendButtonByHouse } from '@evoconn/utils/getChatSendButtonByHouse';
 import { getAppTopBarLayoutHeight } from '@evoconn/constants/topBarLayout';
 import { evoconnColors } from '@evoconn/theme/colors';
@@ -225,6 +227,9 @@ export default function ReflectionCreationScreen() {
   const [sending, setSending] = useState(false);
   const [loadingThread, setLoadingThread] = useState(!!thoughtId);
   const [error, setError] = useState<string | null>(null);
+  /** Índice del mensaje de usuario en edición (null = envío normal). */
+  const [editingUserIndex, setEditingUserIndex] = useState<number | null>(null);
+  const chatInputRef = useRef<ChatInputBarHandle>(null);
 
   /**
    * Always-current ref of the local `messages` state.
@@ -235,6 +240,37 @@ export default function ReflectionCreationScreen() {
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
+
+  /** Aborta POST /debates/{id}/chat cuando el usuario pulsa parar. */
+  const generationAbortRef = useRef<AbortController | null>(null);
+
+  const stripStreamingAssistant = useCallback((msgs: ChatBubble[]): ChatBubble[] => {
+    const copy = [...msgs];
+    const last = copy[copy.length - 1];
+    if (
+      last?.role === 'assistant' &&
+      (last.streaming || !(last.content ?? '').trim())
+    ) {
+      copy.pop();
+    }
+    return copy;
+  }, []);
+
+  const handleStopGeneration = useCallback(() => {
+    generationAbortRef.current?.abort();
+    generationAbortRef.current = null;
+    setSending(false);
+    setMessages((prev) => {
+      const next = stripStreamingAssistant(prev);
+      messagesRef.current = next;
+      return next;
+    });
+    const id = debateId;
+    if (id) {
+      const next = stripStreamingAssistant(messagesRef.current);
+      updateThought(id, { messages: next.map(toPersistedMessage) });
+    }
+  }, [debateId, stripStreamingAssistant, toPersistedMessage, updateThought]);
 
   // Warm up the Railway backend as soon as the screen mounts so it's awake
   // by the time the user sends their first message.
@@ -381,20 +417,218 @@ export default function ReflectionCreationScreen() {
     [onKeyboardScroll, checkIslandVisibility],
   );
 
+  const handleBeginEditUserMessage = useCallback((userIndex: number) => {
+    if (sending) return;
+    const content = messagesRef.current[userIndex]?.content ?? '';
+    setEditingUserIndex(userIndex);
+    chatInputRef.current?.loadTextForEdit(content);
+  }, [sending]);
+
+  const handleCancelEditUserMessage = useCallback(() => {
+    setEditingUserIndex(null);
+    chatInputRef.current?.clear();
+  }, []);
+
+  const handleEditResend = useCallback(
+    async (userIndex: number, text: string) => {
+      if (sending) return;
+      if (blockIfNoUses()) return;
+      const trimmed = text.trim();
+      if (!trimmed) return;
+
+      let id = debateId;
+      if (!id) return;
+
+      Keyboard.dismiss();
+      setError(null);
+      generationAbortRef.current?.abort();
+      generationAbortRef.current = new AbortController();
+      const genSignal = generationAbortRef.current.signal;
+
+      setSending(true);
+      setEditingUserIndex(null);
+      chatInputRef.current?.clear();
+
+      const prefix = messagesRef.current.slice(0, userIndex);
+      const userMsg: ChatBubble = { role: 'user', content: trimmed, revealed: trimmed };
+      const placeholder: ChatBubble = {
+        role: 'assistant',
+        content: '',
+        streaming: true,
+        revealed: '',
+      };
+      const truncated: ChatBubble[] = [...prefix, userMsg, placeholder];
+      messagesRef.current = truncated;
+      setMessages(truncated);
+      scrollToEnd();
+
+      try {
+        let resp: Awaited<ReturnType<typeof debateApi.sendMessage>>;
+        try {
+          resp = await debateApi.sendMessage(
+            id,
+            trimmed,
+            undefined,
+            {
+              includeReflectiveQuestion,
+              includePhilosophicalReferences,
+            },
+            { signal: genSignal },
+          );
+        } catch (sendErr) {
+          if (genSignal.aborted || (sendErr instanceof Error && sendErr.name === 'AbortError')) {
+            throw sendErr;
+          }
+          const errMsg = sendErr instanceof Error ? sendErr.message : '';
+          if (errMsg.includes('Debate not found') || errMsg.includes('404')) {
+            const freshId = await createThought(trimmed);
+            setDebateId(freshId);
+            id = freshId;
+            resp = await debateApi.sendMessage(
+              freshId,
+              trimmed,
+              undefined,
+              {
+                includeReflectiveQuestion,
+                includePhilosophicalReferences,
+              },
+              { signal: genSignal },
+            );
+          } else {
+            throw sendErr;
+          }
+        }
+
+        const justEmptiedDailyUses = remainingUses === 1;
+        decrementUses();
+        if (justEmptiedDailyUses) requestNoUsesAnimation();
+        void recordUsesLog(apiUserId).catch(console.error);
+
+        const pickedQuote = await selectAndUnlockQuote(trimmed);
+        const domainMeta = DOMAIN_MAP[pickedQuote.domain];
+        const selectedPhrase: SelectedPhrase = {
+          id: pickedQuote.id,
+          text: pickedQuote.text,
+          author: pickedQuote.author,
+          domain: pickedQuote.domain,
+          domainColor: domainMeta?.color ?? '#7C3AED',
+        };
+        const assistantText = resp.assistant_text;
+
+        // Nueva evaluación de clan; la anterior permanece en inputs[] (skipInputCount).
+        void recordClassificationInput(
+          trimmed,
+          'reflection',
+          `edit_${id}_${userIndex}_${Date.now()}`,
+          { skipInputCount: true },
+        );
+
+        const introText = resp.debate_response?.debate_layer?.conversational_intro ?? '';
+        const introLen = (introText || '').length;
+        const introDuration = computeIntroDurationMs(introText);
+
+        const assistantMsg: ChatBubble = {
+          role: 'assistant',
+          content: assistantText,
+          id: resp.message_id,
+          debateResponse: resp.debate_response,
+          nextQuestion: resp.next_question,
+          topic: resp.topic,
+          lang: resp.lang,
+          selectedPhrase,
+          streaming: false,
+          revealed: assistantText,
+          introPhase: introLen > 0 ? 'intro' : 'done',
+        };
+
+        setMessages((prev) => {
+          const copy = [...prev];
+          copy[copy.length - 1] = assistantMsg;
+          return copy;
+        });
+        triggerHaptic('light');
+        scrollToEnd();
+
+        if (introLen > 0) {
+          setTimeout(() => {
+            setMessages((prev) => {
+              if (prev.length === 0) return prev;
+              const copy = [...prev];
+              const last = copy[copy.length - 1];
+              if (last.role === 'assistant' && last.introPhase === 'intro') {
+                copy[copy.length - 1] = { ...last, introPhase: 'done' };
+              }
+              return copy;
+            });
+          }, introDuration);
+        }
+
+        const finalisedThread: ChatBubble[] = [...prefix, userMsg, assistantMsg];
+        updateThought(id, {
+          title: resp.topic || thoughts.find((t) => t.id === id)?.title || 'Reflexión',
+          messages: finalisedThread.map(toPersistedMessage),
+        });
+      } catch (err) {
+        const aborted =
+          genSignal.aborted || (err instanceof Error && err.name === 'AbortError');
+        if (aborted) {
+          const next = stripStreamingAssistant(messagesRef.current);
+          messagesRef.current = next;
+          setMessages(next);
+          if (id) updateThought(id, { messages: next.map(toPersistedMessage) });
+          return;
+        }
+        const msg = err instanceof Error ? err.message : 'Error desconocido';
+        setError(msg);
+        setMessages((prev) => stripStreamingAssistant(prev));
+      } finally {
+        setSending(false);
+        generationAbortRef.current = null;
+      }
+    },
+    [
+      sending,
+      blockIfNoUses,
+      debateId,
+      createThought,
+      updateThought,
+      scrollToEnd,
+      thoughts,
+      decrementUses,
+      remainingUses,
+      selectAndUnlockQuote,
+      includeReflectiveQuestion,
+      includePhilosophicalReferences,
+      toPersistedMessage,
+      recordClassificationInput,
+      triggerHaptic,
+      apiUserId,
+      stripStreamingAssistant,
+    ],
+  );
+
   const handleSend = useCallback(
     async (text: string) => {
+      if (editingUserIndex !== null) {
+        await handleEditResend(editingUserIndex, text);
+        return;
+      }
       if (sending) return;
       if (blockIfNoUses()) return;
       Keyboard.dismiss();
       setError(null);
+      generationAbortRef.current?.abort();
+      generationAbortRef.current = new AbortController();
+      const genSignal = generationAbortRef.current.signal;
+
       setSending(true);
 
       const userMsg: ChatBubble = { role: 'user', content: text, revealed: text };
       setMessages((prev) => [...prev, userMsg]);
       scrollToEnd();
 
+      let id: string | null = debateId;
       try {
-        let id = debateId;
         if (!id) {
           id = await createThought(text);
           setDebateId(id);
@@ -410,11 +644,20 @@ export default function ReflectionCreationScreen() {
 
         let resp: Awaited<ReturnType<typeof debateApi.sendMessage>>;
         try {
-          resp = await debateApi.sendMessage(id, text, undefined, {
-            includeReflectiveQuestion,
-            includePhilosophicalReferences,
-          });
+          resp = await debateApi.sendMessage(
+            id,
+            text,
+            undefined,
+            {
+              includeReflectiveQuestion,
+              includePhilosophicalReferences,
+            },
+            { signal: genSignal },
+          );
         } catch (sendErr) {
+          if (genSignal.aborted || (sendErr instanceof Error && sendErr.name === 'AbortError')) {
+            throw sendErr;
+          }
           // Railway wipes the SQLite DB on cold-start → the saved debate_id no
           // longer exists. Auto-recover: create a fresh debate and retry once.
           const errMsg = sendErr instanceof Error ? sendErr.message : '';
@@ -422,10 +665,16 @@ export default function ReflectionCreationScreen() {
             const freshId = await createThought(text);
             setDebateId(freshId);
             id = freshId;
-            resp = await debateApi.sendMessage(freshId, text, undefined, {
-              includeReflectiveQuestion,
-              includePhilosophicalReferences,
-            });
+            resp = await debateApi.sendMessage(
+              freshId,
+              text,
+              undefined,
+              {
+                includeReflectiveQuestion,
+                includePhilosophicalReferences,
+              },
+              { signal: genSignal },
+            );
           } else {
             throw sendErr;
           }
@@ -520,19 +769,24 @@ export default function ReflectionCreationScreen() {
           messages: finalisedThread.map(toPersistedMessage),
         });
       } catch (err) {
+        const aborted =
+          genSignal.aborted || (err instanceof Error && err.name === 'AbortError');
+        if (aborted) {
+          const next = stripStreamingAssistant(messagesRef.current);
+          messagesRef.current = next;
+          setMessages(next);
+          if (id) updateThought(id, { messages: next.map(toPersistedMessage) });
+          return;
+        }
         const msg = err instanceof Error ? err.message : 'Error desconocido';
         setError(msg);
-        setMessages((prev) => {
-          if (prev.length > 0 && prev[prev.length - 1].role === 'assistant' && !prev[prev.length - 1].content) {
-            return prev.slice(0, -1);
-          }
-          return prev;
-        });
+        setMessages((prev) => stripStreamingAssistant(prev));
       } finally {
         setSending(false);
+        generationAbortRef.current = null;
       }
     },
-    [sending, blockIfNoUses, debateId, createThought, updateThought, scrollToEnd, thoughts, markStreakActivated, decrementUses, remainingUses, selectAndUnlockQuote, includeReflectiveQuestion, includePhilosophicalReferences, toPersistedMessage, recordClassificationInput, triggerHaptic],
+    [editingUserIndex, handleEditResend, sending, blockIfNoUses, debateId, createThought, updateThought, scrollToEnd, thoughts, markStreakActivated, decrementUses, remainingUses, selectAndUnlockQuote, includeReflectiveQuestion, includePhilosophicalReferences, toPersistedMessage, recordClassificationInput, triggerHaptic, apiUserId, stripStreamingAssistant],
   );
 
   const conversationItems = useMemo(
@@ -645,6 +899,16 @@ export default function ReflectionCreationScreen() {
               const publishHandlerBelow = nextIsStructured && isPublishable && nextMsg
                 ? doPublish(nextMsg.id, msg.content)
                 : undefined;
+              const assistantDone =
+                !!nextMsg &&
+                nextMsg.role === 'assistant' &&
+                !nextMsg.streaming &&
+                (!!(nextMsg as Extract<ChatBubble, { role: 'assistant' }>).debateResponse ||
+                  !!(nextMsg.content ?? '').trim());
+              const alreadyPublished =
+                !!nextMsg?.id && publishedRef.current.has(`${nextMsg.id}_pub`);
+              const showEditButton =
+                !sending && assistantDone && !alreadyPublished && editingUserIndex !== i;
               return (
                 <View
                   key={`${msg.id ?? i}-${msg.role}`}
@@ -668,6 +932,9 @@ export default function ReflectionCreationScreen() {
                         ? (node) => registerInputAnchor(i, node)
                         : undefined
                     }
+                    showEditButton={showEditButton}
+                    isEditing={editingUserIndex === i}
+                    onEdit={() => handleBeginEditUserMessage(i)}
                   />
                 </View>
               );
@@ -774,12 +1041,15 @@ export default function ReflectionCreationScreen() {
       ) : null}
 
       <ChatInputBar
+        ref={chatInputRef}
         placeholder={
           sending
             ? 'Esperando respuesta…'
-            : messages.length === 0
-              ? 'Escribe tu reflexión…'
-              : 'Continúa la conversación…'
+            : editingUserIndex !== null
+              ? 'Edita y vuelve a enviar…'
+              : messages.length === 0
+                ? 'Escribe tu reflexión…'
+                : 'Continúa la conversación…'
         }
         onSend={handleSend}
         sendIcon={sendIconNode}
@@ -788,6 +1058,10 @@ export default function ReflectionCreationScreen() {
         inputCursorColor={clanColor}
         aiUsesAvailable={hasAiUses}
         initialText={prefillText}
+        editModeActive={editingUserIndex !== null}
+        onCancelEdit={handleCancelEditUserMessage}
+        aiGenerating={sending}
+        onStopGenerating={handleStopGeneration}
       />
 
       {!sidebarOpen ? (
@@ -872,6 +1146,9 @@ const MessageBubble = React.memo(function MessageBubble({
   publishHandlerBelow,
   onPublishAuthorFocusChange,
   registerPublishAuthorAnchor,
+  showEditButton,
+  isEditing,
+  onEdit,
 }: {
   message: ChatBubble;
   clanColor: string;
@@ -884,6 +1161,9 @@ const MessageBubble = React.memo(function MessageBubble({
   ) => Promise<void> | void;
   onPublishAuthorFocusChange?: (focused: boolean) => void;
   registerPublishAuthorAnchor?: (node: View | null) => void;
+  showEditButton?: boolean;
+  isEditing?: boolean;
+  onEdit?: () => void;
 }) {
   const isUser = message.role === 'user';
   const displayText = message.revealed ?? message.content;
@@ -906,6 +1186,9 @@ const MessageBubble = React.memo(function MessageBubble({
               registerPublishAuthorAnchor={registerPublishAuthorAnchor}
             />
           </View>
+        ) : null}
+        {showEditButton && onEdit ? (
+          <EditUserMessageButton onPress={onEdit} active={isEditing} />
         ) : null}
       </View>
     );

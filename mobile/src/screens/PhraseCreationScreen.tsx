@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AppTopBar, ChatInputBar, SidebarDrawer } from '@evoconn/components';
+import type { ChatInputBarHandle } from '@evoconn/components/ChatInputBar';
+import { EditUserMessageButton } from '@evoconn/components/EditUserMessageButton';
 import { getPhraseSendButtonByHouse } from '@evoconn/utils/getPhraseSendButtonByHouse';
 import { PublishBlock, PhraseNotesCard, PhraseFolderManagerCard } from '@evoconn/components/debate';
 import { useThoughts } from '@evoconn/hooks/useThoughts';
@@ -245,6 +247,8 @@ export default function PhraseCreationScreen() {
   const [messages, setMessages] = useState<DebateMessage[]>([]);
   const [loadingThread, setLoadingThread] = useState(!!phraseId);
   const [sending, setSending] = useState(false);
+  const [editingUserIndex, setEditingUserIndex] = useState<number | null>(null);
+  const chatInputRef = useRef<ChatInputBarHandle>(null);
 
   const scrollContentRef = useRef<View>(null);
   const authorDraftByIndexRef = useRef<Record<number, string>>({});
@@ -305,6 +309,8 @@ export default function PhraseCreationScreen() {
    *  rehydrate over it (which would wipe `phraseIntroLoading`, the in-flight
    *  intro fetch progress, and any other live UI state). */
   const justCreatedRef = useRef<Set<string>>(new Set());
+  /** Aborta POST /phrase/intro cuando el usuario pulsa parar. */
+  const phraseGenerationAbortRef = useRef<AbortController | null>(null);
   /** Always-current snapshot of the messages state, so callbacks fired across
    *  the lifecycle (intro fetch resolving after a remount, etc.) can read the
    *  latest values without depending on stale closures. */
@@ -580,13 +586,30 @@ export default function PhraseCreationScreen() {
     ) => {
       if (introRequestedRef.current.has(slotKey)) return;
       introRequestedRef.current.add(slotKey);
+
+      phraseGenerationAbortRef.current?.abort();
+      const controller = new AbortController();
+      phraseGenerationAbortRef.current = controller;
+
       let intro: string | null = null;
       try {
-        intro = await generatePhraseIntro({ phrase: phraseText, author: author ?? null });
+        intro = await generatePhraseIntro(
+          { phrase: phraseText, author: author ?? null },
+          { signal: controller.signal },
+        );
       } catch (err) {
+        if (controller.signal.aborted || (err instanceof Error && err.name === 'AbortError')) {
+          introRequestedRef.current.delete(slotKey);
+          return;
+        }
         // eslint-disable-next-line no-console
         console.warn('[PHRASE] generatePhraseIntro failed, skipping intro:', err);
         intro = null;
+      }
+
+      if (controller.signal.aborted) {
+        introRequestedRef.current.delete(slotKey);
+        return;
       }
       let nextMessages: DebateMessage[] | null = null;
       setMessages((prev) => {
@@ -641,11 +664,138 @@ export default function PhraseCreationScreen() {
     [updateThought],
   );
 
+  const isAiGenerating = useMemo(
+    () =>
+      sending ||
+      messages.some((m) => m.role === 'assistant' && !!m.phraseIntroLoading),
+    [sending, messages],
+  );
+
+  const handleStopGeneration = useCallback(() => {
+    phraseGenerationAbortRef.current?.abort();
+    phraseGenerationAbortRef.current = null;
+    setSending(false);
+
+    setMessages((prev) => {
+      const copy = [...prev];
+      for (let j = copy.length - 1; j >= 0; j--) {
+        const m = copy[j];
+        if (m.role === 'assistant' && m.phraseIntroLoading) {
+          const tid = phraseId;
+          if (tid) {
+            const slotKey = phraseIntroSlotKey(tid, j);
+            introRequestedRef.current.delete(slotKey);
+            setIntroTypewriterDone((done) =>
+              done[slotKey] ? done : { ...done, [slotKey]: true },
+            );
+          }
+          copy[j] = {
+            ...m,
+            phraseIntroLoading: false,
+            phrasePublishUI: m.phrasePublishUI ?? { status: 'pending' },
+          };
+          break;
+        }
+      }
+      messagesRef.current = copy;
+      if (phraseId) updateThought(phraseId, { messages: copy });
+      return copy;
+    });
+  }, [phraseId, updateThought]);
+
+  const handleBeginEditUserMessage = useCallback((userIndex: number) => {
+    if (isAiGenerating) return;
+    const content = messagesRef.current[userIndex]?.content ?? '';
+    setEditingUserIndex(userIndex);
+    chatInputRef.current?.loadTextForEdit(content);
+  }, [isAiGenerating]);
+
+  const handleCancelEditUserMessage = useCallback(() => {
+    setEditingUserIndex(null);
+    chatInputRef.current?.clear();
+  }, []);
+
+  const handleEditResend = useCallback(
+    async (userIndex: number, text: string) => {
+      const t = text.trim();
+      if (!t || isAiGenerating) return;
+      if (blockIfNoUses()) return;
+      const threadId = phraseId;
+      if (!threadId) return;
+
+      setSending(true);
+      Keyboard.dismiss();
+      setEditingUserIndex(null);
+      chatInputRef.current?.clear();
+
+      const prefix = messagesRef.current.slice(0, userIndex);
+      const userMsg: DebateMessage = { role: 'user', content: t };
+      const assistantIdx = prefix.length + 1;
+      const assistantPlaceholder: DebateMessage = {
+        role: 'assistant',
+        content: '',
+        phrasePublishUI: { status: 'pending' },
+        phraseIntro: null,
+        phraseIntroLoading: true,
+      };
+      const truncated = [...prefix, userMsg, assistantPlaceholder];
+      messagesRef.current = truncated;
+      setMessages(truncated);
+      scrollToEnd();
+
+      const slotKey = phraseIntroSlotKey(threadId, assistantIdx);
+      introRequestedRef.current.delete(slotKey);
+      setIntroTypewriterDone((prev) => {
+        if (!prev[slotKey]) return prev;
+        const next = { ...prev };
+        delete next[slotKey];
+        return next;
+      });
+
+      try {
+        const justEmptiedDailyUses = remainingUses === 1;
+        decrementUses();
+        if (justEmptiedDailyUses) requestNoUsesAnimation();
+        void recordUsesLog(apiUserId).catch(console.error);
+
+        void recordClassificationInput(t, 'phrase', `edit_${threadId}_${userIndex}_${Date.now()}`, {
+          skipInputCount: true,
+        });
+
+        updateThought(threadId, { messages: truncated });
+        void requestPhraseIntro(threadId, slotKey, t, null);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn('[PHRASE] edit resend failed:', err);
+        Alert.alert('Error', 'No se pudo reenviar la frase. Inténtalo de nuevo.');
+      } finally {
+        setSending(false);
+      }
+    },
+    [
+      isAiGenerating,
+      blockIfNoUses,
+      phraseId,
+      scrollToEnd,
+      decrementUses,
+      remainingUses,
+      recordClassificationInput,
+      updateThought,
+      requestPhraseIntro,
+      apiUserId,
+    ],
+  );
+
   const handleSend = useCallback(
     async (text: string) => {
       const t = text.trim();
-      if (!t || sending) return;
+      if (!t || isAiGenerating) return;
       if (blockIfNoUses()) return;
+
+      if (editingUserIndex !== null) {
+        await handleEditResend(editingUserIndex, t);
+        return;
+      }
 
       const threadId = phraseId;
       const isFirstPhrase = !threadId && messages.length === 0;
@@ -765,7 +915,7 @@ export default function PhraseCreationScreen() {
       }
     },
     [
-      sending,
+      isAiGenerating,
       blockIfNoUses,
       phraseId,
       messages.length,
@@ -779,6 +929,8 @@ export default function PhraseCreationScreen() {
       requestPhraseIntro,
       recordClassificationInput,
       apiUserId,
+      editingUserIndex,
+      handleEditResend,
     ],
   );
 
@@ -923,20 +1075,42 @@ export default function PhraseCreationScreen() {
                 : 0;
 
             if (msg.role === 'user') {
+              const nextAssistant = displayMessages[i + 1];
+              const nextPubUi =
+                nextAssistant?.role === 'assistant' ? getPhrasePublishUI(nextAssistant) : null;
+              const assistantReady =
+                nextAssistant?.role === 'assistant' &&
+                !nextAssistant.phraseIntroLoading;
+              const showEditButton =
+                !isAiGenerating &&
+                assistantReady &&
+                nextPubUi?.status !== 'published' &&
+                editingUserIndex !== i;
               return (
                 <View
                   key={`u-${i}-${msg.content.slice(0, 8)}`}
                   style={[
-                    styles.userBubble,
-                    {
-                      borderLeftColor: clanColor,
-                      borderLeftWidth: CHAT_USER_MESSAGE_LAYOUT.accentWidth,
-                      marginTop: turnTopGap,
-                      marginBottom: PHRASE_STACK.userBubbleBottomGapPx,
-                    },
+                    styles.userBubbleWrap,
+                    { marginTop: turnTopGap, marginBottom: PHRASE_STACK.userBubbleBottomGapPx },
                   ]}
                 >
-                  <Text style={styles.userText}>{msg.content}</Text>
+                  <View
+                    style={[
+                      styles.userBubble,
+                      {
+                        borderLeftColor: clanColor,
+                        borderLeftWidth: CHAT_USER_MESSAGE_LAYOUT.accentWidth,
+                      },
+                    ]}
+                  >
+                    <Text style={styles.userText}>{msg.content}</Text>
+                  </View>
+                  {showEditButton ? (
+                    <EditUserMessageButton
+                      onPress={() => handleBeginEditUserMessage(i)}
+                      active={editingUserIndex === i}
+                    />
+                  ) : null}
                 </View>
               );
             }
@@ -1097,12 +1271,15 @@ export default function PhraseCreationScreen() {
       )}
 
       <ChatInputBar
+        ref={chatInputRef}
         placeholder={
           sending
             ? 'Guardando…'
-            : phraseId || messages.length > 0
-              ? 'Sigue la conversación…'
-              : 'Escribe tu frase...'
+            : editingUserIndex !== null
+              ? 'Edita y vuelve a enviar…'
+              : phraseId || messages.length > 0
+                ? 'Sigue la conversación…'
+                : 'Escribe tu frase...'
         }
         onSend={handleSend}
         sendIcon={sendIconNode}
@@ -1111,6 +1288,10 @@ export default function PhraseCreationScreen() {
         inputCursorColor={phraseCursorColor}
         aiUsesAvailable={hasAiUses}
         initialText={prefillText}
+        editModeActive={editingUserIndex !== null}
+        onCancelEdit={handleCancelEditUserMessage}
+        aiGenerating={isAiGenerating}
+        onStopGenerating={handleStopGeneration}
       />
 
       {!sidebarOpen ? (
@@ -1180,6 +1361,10 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     textAlign: 'center',
     lineHeight: 20,
+  },
+  userBubbleWrap: {
+    alignSelf: 'flex-end',
+    maxWidth: '92%',
   },
   userBubble: {
     alignSelf: 'flex-end',

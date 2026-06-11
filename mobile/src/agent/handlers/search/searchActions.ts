@@ -14,16 +14,13 @@
  */
 import type { ActionResult } from '../../core/types';
 import { getAgentAppBridge, type AgentUserSearchResult } from '../appBridge';
+import { pickStringParam } from '../paramUtils';
 
 const NO_BRIDGE: ActionResult = {
   success: false,
   error: 'AgentAppBridge not registered',
   message: 'No he podido buscar. Inténtalo de nuevo.',
 };
-
-function asTrimmedString(value: unknown): string | undefined {
-  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
-}
 
 /** Normaliza el nombre dicho: sin "@", sin acentos, minúsculas. */
 function normalizeName(name: string): string {
@@ -61,7 +58,7 @@ export async function findUserProfileHandler(
 ): Promise<ActionResult> {
   const bridge = getAgentAppBridge();
   if (!bridge) return NO_BRIDGE;
-  const query = asTrimmedString(params.searchQuery);
+  const query = pickStringParam(params, 'searchQuery', 'query', 'name', 'username', 'user');
   if (!query) {
     return {
       success: false,
@@ -125,10 +122,16 @@ export async function openSearchWithQueryHandler(
 ): Promise<ActionResult> {
   const bridge = getAgentAppBridge();
   if (!bridge) return NO_BRIDGE;
-  const query = asTrimmedString(params.searchQuery);
+  const query = pickStringParam(params, 'searchQuery', 'query', 'name', 'username');
   try {
     bridge.openSearch(query?.replace(/^@/, ''));
-    return { success: true, data: { query: query ?? null } };
+    return {
+      success: true,
+      data: { query: query ?? null },
+      message: query
+        ? `Abro la búsqueda de ${query}.`
+        : 'Te abro el buscador.',
+    };
   } catch (e) {
     return {
       success: false,

@@ -14,6 +14,8 @@ export const IOS_WIDGET_SNAPSHOT_USER_DEFAULTS_KEY = 'evoTopPhraseWidgetJSON';
 type EvoWidgetBridgeNative = {
   setSnapshot: (json: string) => Promise<void>;
   setStreakSnapshot?: (json: string) => Promise<void>;
+  /** Android: enqueue a one-shot WorkManager fetch from Supabase. */
+  refreshFromNetwork?: () => Promise<void>;
 };
 
 const native = NativeModules.EvoWidgetBridge as EvoWidgetBridgeNative | undefined;
@@ -37,6 +39,16 @@ export async function pushTopPhraseWidgetSnapshot(payload: TopPhraseWidgetPayloa
     await native!.setSnapshot(JSON.stringify(payload ?? { kind: 'empty' }));
   } catch {
     // Native widget is best-effort; never break the app
+  }
+}
+
+/** Android: trigger immediate native Supabase refresh when JS has no phrase yet. */
+export async function requestAndroidWidgetNetworkRefresh(): Promise<void> {
+  if (Platform.OS !== 'android' || typeof native?.refreshFromNetwork !== 'function') return;
+  try {
+    await native.refreshFromNetwork();
+  } catch {
+    // best-effort
   }
 }
 

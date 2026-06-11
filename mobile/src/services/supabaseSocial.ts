@@ -1110,6 +1110,26 @@ export async function acceptFollowRequestRpc(requesterId: string): Promise<boole
   return data === true;
 }
 
+/** Acepta todas las solicitudes pendientes hacia el usuario autenticado. */
+export async function acceptAllPendingFollowRequestsForUser(userId: string): Promise<number> {
+  if (!isRealUserId(userId)) return 0;
+
+  const { data, error } = await supabase.rpc('accept_all_follow_requests_on_public');
+  if (!error && typeof data === 'number') {
+    return data;
+  }
+  if (error && !error.message.includes('accept_all_follow_requests_on_public')) {
+    console.error('[Social] acceptAllPendingFollowRequestsForUser rpc:', error.message);
+  }
+
+  const pending = await fetchIncomingFollowRequests(userId);
+  let accepted = 0;
+  for (const req of pending) {
+    if (await acceptFollowRequestRpc(req.requesterId)) accepted += 1;
+  }
+  return accepted;
+}
+
 /** `true` si se eliminó una solicitud pendiente. */
 export async function rejectFollowRequestRpc(requesterId: string): Promise<boolean> {
   if (!isRealUserId(requesterId)) return false;
@@ -1132,6 +1152,9 @@ export async function setProfilePrivate(userId: string, isPrivate: boolean): Pro
   if (error) {
     console.error('[Social] setProfilePrivate:', error.message);
     return false;
+  }
+  if (!isPrivate) {
+    await acceptAllPendingFollowRequestsForUser(userId);
   }
   return true;
 }

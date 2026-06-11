@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
 import { useAuth } from '../../../mobile/lib/AuthContext';
+import { useSimulation } from '@evoconn/hooks/SimulationContext';
 import { useVoiceAssistantPreferences } from '@evoconn/hooks/VoiceAssistantPreferencesContext';
 import { normalizeVoiceAssistantVoiceId } from '@evoconn/constants/voiceAssistantVoices';
 import { isRealUserId, setProfilePrivate } from '@evoconn/services/supabaseSocial';
@@ -62,12 +63,13 @@ async function ensureSystemPermission(): Promise<NotificationsPermission> {
 
 export function useRegisterAgentConfig(): void {
   const { profile, refreshProfile } = useAuth();
+  const { refreshSocialFromSupabase } = useSimulation();
   const { voiceId, setVoiceId } = useVoiceAssistantPreferences();
 
   // El puente lee siempre la versión más reciente vía ref (las funciones y el
   // perfil cambian de identidad entre renders).
-  const stateRef = useRef({ profile, refreshProfile, voiceId, setVoiceId });
-  stateRef.current = { profile, refreshProfile, voiceId, setVoiceId };
+  const stateRef = useRef({ profile, refreshProfile, refreshSocialFromSupabase, voiceId, setVoiceId });
+  stateRef.current = { profile, refreshProfile, refreshSocialFromSupabase, voiceId, setVoiceId };
 
   useEffect(() => {
     const bridge: AgentConfigBridge = {
@@ -80,7 +82,12 @@ export function useRegisterAgentConfig(): void {
         const p = stateRef.current.profile;
         if (!p?.id || !isRealUserId(p.id)) return false;
         const ok = await setProfilePrivate(p.id, isPrivate);
-        if (ok) await stateRef.current.refreshProfile();
+        if (ok) {
+          await stateRef.current.refreshProfile();
+          if (!isPrivate) {
+            await stateRef.current.refreshSocialFromSupabase();
+          }
+        }
         return ok;
       },
       getAssistantVoice: () => stateRef.current.voiceId,
