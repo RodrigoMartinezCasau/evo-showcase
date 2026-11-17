@@ -56,7 +56,7 @@ flowchart LR
 
 ## 🎬 Demo
 
-<!-- Add a GIF or video at assets/demo.gif. Do not include user data or keys. -->
+[How Evo works, on LinkedIn](https://www.linkedin.com/feed/update/urn:li:activity:7519690665765539841/)
 
 ## 📱 Screenshots
 
