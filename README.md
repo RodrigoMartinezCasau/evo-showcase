@@ -60,4 +60,4 @@ flowchart LR
 
 ## 📱 Screenshots
 
-Screenshots go in `assets/`. None are in the repository yet.
+<!-- Screenshots go in assets/. None are in the repository yet. -->
