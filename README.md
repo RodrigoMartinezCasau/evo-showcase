@@ -60,4 +60,30 @@ flowchart LR
 
 ## 📱 Screenshots
 
-<!-- Screenshots go in assets/. None are in the repository yet. -->
+<table>
+<tr>
+<td width="250" align="center">
+<img src="assets/01-reflexion.jpg" width="250" alt="Reflection screen">
+<br>The reflection screen on a phone.
+</td>
+<td width="250" align="center">
+<img src="assets/02-clan.jpg" width="250" alt="Clan result">
+<br>A clan result: Nihilist, first of eight.
+</td>
+<td width="250" align="center">
+<img src="assets/03-frase.jpg" width="250" alt="Daily phrase screen">
+<br>The daily phrase screen.
+</td>
+</tr>
+<tr>
+<td width="250" align="center">
+<img src="assets/04-widget.jpg" width="250" alt="Home screen widget">
+<br>A phrase on the home-screen widget.
+</td>
+<td width="250" align="center">
+<img src="assets/05-rango.jpg" width="250" alt="Clan rank">
+<br>The rank that follows a reflection: Racionalista.
+</td>
+<td></td>
+</tr>
+</table>
